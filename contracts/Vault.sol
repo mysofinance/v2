@@ -9,8 +9,6 @@ import {DataTypes} from "./DataTypes.sol";
 
 import "hardhat/console.sol";
 
-
-
 contract Vault is ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
 
@@ -20,7 +18,8 @@ contract Vault is ReentrancyGuard {
     address public owner;
     address public router;
 
-    address AAVE_V2_LENDING_POOL_ADDR = 0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9;
+    address AAVE_V2_LENDING_POOL_ADDR =
+        0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9;
     address USDC = address(0);
 
     error Invalid();
@@ -34,10 +33,19 @@ contract Vault is ReentrancyGuard {
         if (msg.sender != owner) {
             revert Invalid();
         }
-        IERC20Metadata(token).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20Metadata(token).safeTransferFrom(
+            msg.sender,
+            address(this),
+            amount
+        );
 
         if (token == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).deposit(token, amount, address(this), 0);
+            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).deposit(
+                token,
+                amount,
+                address(this),
+                0
+            );
         }
     }
 
@@ -51,22 +59,49 @@ contract Vault is ReentrancyGuard {
         }
 
         if (token == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(token, amount, msg.sender);
+            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(
+                token,
+                amount,
+                msg.sender
+            );
         }
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
 
-    function borrow(DataTypes.LoanQuote calldata loanQuote, address callbacker, bytes calldata data) external nonReentrant() {
-        bytes32 payloadHash = keccak256(abi.encode(loanQuote.borrower, loanQuote.collToken, loanQuote.loanToken, loanQuote.pledgeAmount, loanQuote.loanAmount, loanQuote.expiry, loanQuote.earliestRepay, loanQuote.repayAmount, loanQuote.validUntil));
-        bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash));
-        address signer = ecrecover(messageHash, loanQuote.v, loanQuote.r, loanQuote.s);
+    function borrow(
+        DataTypes.LoanQuote calldata loanQuote,
+        address callbacker,
+        bytes calldata data
+    ) external nonReentrant {
+        bytes32 payloadHash = keccak256(
+            abi.encode(
+                loanQuote.borrower,
+                loanQuote.collToken,
+                loanQuote.loanToken,
+                loanQuote.pledgeAmount,
+                loanQuote.loanAmount,
+                loanQuote.expiry,
+                loanQuote.earliestRepay,
+                loanQuote.repayAmount,
+                loanQuote.validUntil
+            )
+        );
+        bytes32 messageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
+        );
+        address signer = ecrecover(
+            messageHash,
+            loanQuote.v,
+            loanQuote.r,
+            loanQuote.s
+        );
 
-        if(signer != owner || loanQuote.validUntil < block.timestamp) {
+        if (signer != owner || loanQuote.validUntil < block.timestamp) {
             revert Invalid();
         }
 
         loanId += 1;
-        
+
         DataTypes.Loan memory loan;
         loan.borrower = msg.sender;
         loan.loanToken = loanQuote.loanToken;
@@ -75,23 +110,38 @@ contract Vault is ReentrancyGuard {
         loan.earliestRepay = uint40(loanQuote.earliestRepay);
         loan.initRepayAmount = uint128(loanQuote.repayAmount);
 
-        uint256 loanTokenBalBefore = IERC20Metadata(loanQuote.loanToken).balanceOf(address(this));
-        uint256 collTokenBalBefore = IERC20Metadata(loanQuote.collToken).balanceOf(address(this));
-        
+        uint256 loanTokenBalBefore = IERC20Metadata(loanQuote.loanToken)
+            .balanceOf(address(this));
+        uint256 collTokenBalBefore = IERC20Metadata(loanQuote.collToken)
+            .balanceOf(address(this));
+
         if (loanQuote.loanToken == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(loanQuote.loanToken, loanQuote.loanAmount, address(this));
+            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(
+                loanQuote.loanToken,
+                loanQuote.loanAmount,
+                address(this)
+            );
         }
 
-        IERC20Metadata(loanQuote.loanToken).safeTransfer(msg.sender, loanQuote.loanAmount);
+        IERC20Metadata(loanQuote.loanToken).safeTransfer(
+            msg.sender,
+            loanQuote.loanAmount
+        );
         if (callbacker != address(0)) {
             IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
         }
-        IERC20Metadata(loanQuote.collToken).safeTransferFrom(msg.sender, address(this), loanQuote.pledgeAmount);
+        IERC20Metadata(loanQuote.collToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            loanQuote.pledgeAmount
+        );
 
-        uint256 loanTokenBalAfter = IERC20Metadata(loanQuote.loanToken).balanceOf(address(this));
-        uint256 collTokenBalAfter = IERC20Metadata(loanQuote.collToken).balanceOf(address(this));
+        uint256 loanTokenBalAfter = IERC20Metadata(loanQuote.loanToken)
+            .balanceOf(address(this));
+        uint256 collTokenBalAfter = IERC20Metadata(loanQuote.collToken)
+            .balanceOf(address(this));
         uint256 collTokenReceived = collTokenBalAfter - collTokenBalBefore;
-        
+
         loan.initCollAmount = uint128(collTokenReceived);
         loans[loanId] = loan;
 
@@ -103,34 +153,60 @@ contract Vault is ReentrancyGuard {
         }
     }
 
-    function repay(uint256 _loanId, uint256 repayAmount, uint256 loanTokenTransferFees, address callbacker, bytes calldata data) external {
+    function repay(
+        uint256 _loanId,
+        uint256 repayAmount,
+        uint256 loanTokenTransferFees,
+        address callbacker,
+        bytes calldata data
+    ) external {
         DataTypes.Loan storage loan = loans[_loanId];
 
-        (address loanToken, address collToken) = (loan.loanToken, loan.collToken);
-        uint256 reclaimCollAmount = loan.initCollAmount * repayAmount / loan.initRepayAmount;
+        (address loanToken, address collToken) = (
+            loan.loanToken,
+            loan.collToken
+        );
+        uint256 reclaimCollAmount = (loan.initCollAmount * repayAmount) /
+            loan.initRepayAmount;
 
         if (msg.sender != loan.borrower) {
             revert Invalid();
         }
-        if (block.timestamp < loan.earliestRepay || block.timestamp >= loan.expiry) {
+        if (
+            block.timestamp < loan.earliestRepay ||
+            block.timestamp >= loan.expiry
+        ) {
             revert Invalid();
         }
         if (repayAmount > loan.initRepayAmount - loan.amountRepaidSoFar) {
             revert Invalid();
         }
 
-        uint256 loanTokenBalBefore = IERC20Metadata(loanToken).balanceOf(address(this));
-        uint256 collTokenBalBefore = IERC20Metadata(collToken).balanceOf(address(this));
+        uint256 loanTokenBalBefore = IERC20Metadata(loanToken).balanceOf(
+            address(this)
+        );
+        uint256 collTokenBalBefore = IERC20Metadata(collToken).balanceOf(
+            address(this)
+        );
 
         IERC20Metadata(collToken).safeTransfer(msg.sender, reclaimCollAmount);
         if (callbacker != address(0)) {
             IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
         }
-        IERC20Metadata(loanToken).safeTransferFrom(msg.sender, address(this), repayAmount+loanTokenTransferFees);
+        IERC20Metadata(loanToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            repayAmount + loanTokenTransferFees
+        );
 
-        uint256 loanTokenBalAfter = IERC20Metadata(loanToken).balanceOf(address(this));
-        uint256 loanTokenAmountReceived = loanTokenBalAfter - loanTokenBalBefore;
-        uint256 collTokenBalAfter = IERC20Metadata(collToken).balanceOf(address(this));
+        uint256 loanTokenBalAfter = IERC20Metadata(loanToken).balanceOf(
+            address(this)
+        );
+        uint256 loanTokenAmountReceived = loanTokenBalAfter -
+            loanTokenBalBefore;
+        uint256 collTokenBalAfter = IERC20Metadata(collToken).balanceOf(
+            address(this)
+        );
 
         if (loanTokenAmountReceived < repayAmount) {
             revert Invalid();
@@ -144,11 +220,19 @@ contract Vault is ReentrancyGuard {
         lockedAmounts[loan.collToken] -= uint128(reclaimCollAmount);
 
         if (loanToken == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).deposit(loanToken, loanTokenAmountReceived, address(this), 0);
+            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).deposit(
+                loanToken,
+                loanTokenAmountReceived,
+                address(this),
+                0
+            );
         }
     }
 
-    function unlockCollateral(address token, uint256[] calldata loanIds) external {
+    function unlockCollateral(
+        address token,
+        uint256[] calldata loanIds
+    ) external {
         uint256 tmp;
         uint256 totalUnlockableColl;
         for (uint256 i = 0; i < loanIds.length; ) {
@@ -157,12 +241,17 @@ contract Vault is ReentrancyGuard {
                 revert Invalid();
             }
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
-                tmp = loan.initCollAmount - loan.initCollAmount * loan.amountRepaidSoFar / loan.initRepayAmount;
+                tmp =
+                    loan.initCollAmount -
+                    (loan.initCollAmount * loan.amountRepaidSoFar) /
+                    loan.initRepayAmount;
             }
             loan.collUnlocked = true;
             totalUnlockableColl += tmp;
-            unchecked { i++; }
+            unchecked {
+                i++;
+            }
         }
-    lockedAmounts[token] -= totalUnlockableColl;
+        lockedAmounts[token] -= totalUnlockableColl;
     }
 }

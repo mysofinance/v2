@@ -1,18 +1,17 @@
 pragma solidity 0.8.17;
 
 library DataTypes {
-
-    struct Loan { 
-    address borrower;
-    address collToken;
-    address loanToken;
-    uint40 expiry;
-    uint40 earliestRepay;
-    uint128 initCollAmount;
-    uint128 initLoanAmount;
-    uint128 initRepayAmount;
-    uint128 amountRepaidSoFar;
-    bool collUnlocked;
+    struct Loan {
+        address borrower;
+        address collToken;
+        address loanToken;
+        uint40 expiry;
+        uint40 earliestRepay;
+        uint128 initCollAmount;
+        uint128 initLoanAmount;
+        uint128 initRepayAmount;
+        uint128 amountRepaidSoFar;
+        bool collUnlocked;
     }
 
     struct LoanQuote {
