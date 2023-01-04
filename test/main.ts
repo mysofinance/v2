@@ -1,5 +1,3 @@
-import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
@@ -41,25 +39,83 @@ describe("RFQ", function () {
       const { vault, vaultOwner, borrower, tokenDeployer, usdc, weth } = await setupTest();
 
       // vault owner deposits usdc
-      //await usdc.connect(vaultOwner).approve(vault.address, MAX_UINT128);
-      //await vault.connect(vaultOwner).deposit(usdc.address, ONE_USDC.mul(100000))
-      console.log("vault", vault.address)
+      await usdc.connect(vaultOwner).approve(vault.address, MAX_UINT128);
+      await vault.connect(vaultOwner).deposit(usdc.address, ONE_USDC.mul(100000))
 
-      const lendingConfig = {
-        minRate: 0,
-        maxRate: MAX_UINT128,
-        spread: 0,
-        ltv: "900000000000000000000000000",
-        minLoanSize: 0,
-        minTenor: 0,
-        maxTenor: 60*60*24*30,
-        minTimeBeforeRepay: 0
+      // vault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber();
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+      let loanQuote = {
+        borrower: borrower.address,
+        collToken: weth.address,
+        loanToken: usdc.address,
+        pledgeAmount: ONE_WETH,
+        loanAmount: ONE_USDC.mul(1000),
+        expiry: timestamp+60*60*24*30,
+        earliestRepay: timestamp,
+        repayAmount: ONE_USDC.mul(1010),
+        validUntil: timestamp+60,
+        v: undefined,
+        r: undefined,
+        s: undefined,
       }
-      await vault.connect(vaultOwner).setLendingConfig(["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"], lendingConfig)
+      const payload = ethers.utils.defaultAbiCoder.encode(
+        [
+          "address",
+          "address",
+          "address",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256",
+          "uint256"
+        ],
+        [
+          loanQuote.borrower,
+          loanQuote.collToken,
+          loanQuote.loanToken,
+          loanQuote.pledgeAmount,
+          loanQuote.loanAmount,
+          loanQuote.expiry,
+          loanQuote.earliestRepay,
+          loanQuote.repayAmount,
+          loanQuote.validUntil
+        ]
+      )
+      const payloadHash = ethers.utils.keccak256(payload)
+      const signature = await vaultOwner.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig = ethers.utils.splitSignature(signature)
+      const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+      console.log("payloadHash:", payloadHash)
+      console.log("Signature:", sig)
+      expect(recoveredAddr).to.equal(vaultOwner.address)
 
-      // lender executes loan request
-      const quote = await vault.quote(["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"], "1000000000000000000", 60*60*24*10);
-      console.log("quote", quote)
+      // borrower adds sig to quote
+      loanQuote.v = sig.v
+      loanQuote.r = sig.r
+      loanQuote.s = sig.s
+
+      // borrower approves vault
+      await weth.connect(borrower).approve(vault.address, MAX_UINT128)
+
+      // check balance pre borrow
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPre = await weth.balanceOf(vault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(vault.address)
+
+      // borrower executes quote
+      const tx = await vault.connect(borrower).borrow(loanQuote, "0x0000000000000000000000000000000000000000", "0x")
+
+      // check balance post borrow
+      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPost = await weth.balanceOf(vault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(vault.address)
+
+      expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
     });
   })
 
