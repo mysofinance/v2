@@ -109,12 +109,7 @@ contract Vault is ReentrancyGuard {
         loan.expiry = uint40(loanQuote.expiry);
         loan.earliestRepay = uint40(loanQuote.earliestRepay);
         loan.initRepayAmount = uint128(loanQuote.repayAmount);
-
-        uint256 loanTokenBalBefore = IERC20Metadata(loanQuote.loanToken)
-            .balanceOf(address(this));
-        uint256 collTokenBalBefore = IERC20Metadata(loanQuote.collToken)
-            .balanceOf(address(this));
-
+        
         if (loanQuote.loanToken == USDC) {
             ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(
                 loanQuote.loanToken,
@@ -122,6 +117,11 @@ contract Vault is ReentrancyGuard {
                 address(this)
             );
         }
+
+        uint256 loanTokenBalBefore = IERC20Metadata(loanQuote.loanToken)
+            .balanceOf(address(this));
+        uint256 collTokenBalBefore = IERC20Metadata(loanQuote.collToken)
+            .balanceOf(address(this));
 
         IERC20Metadata(loanQuote.loanToken).safeTransfer(
             msg.sender,
