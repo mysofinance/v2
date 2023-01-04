@@ -52,12 +52,14 @@ describe("RFQ", function () {
         ltv: "900000000000000000000000000",
         minLoanSize: 0,
         minTenor: 0,
-        maxTenor: 60*60*24*30
+        maxTenor: 60*60*24*30,
+        minTimeBeforeRepay: 0
       }
       await vault.connect(vaultOwner).setLendingConfig(["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"], lendingConfig)
 
       // lender executes loan request
-      await vault.quote(["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"], "1000000000000000000", 60*60*24*10);
+      const quote = await vault.quote(["0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"], "1000000000000000000", 60*60*24*10);
+      console.log("quote", quote)
     });
   })
 
