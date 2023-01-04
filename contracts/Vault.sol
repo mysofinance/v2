@@ -109,7 +109,7 @@ contract Vault is ReentrancyGuard {
         loan.expiry = uint40(loanQuote.expiry);
         loan.earliestRepay = uint40(loanQuote.earliestRepay);
         loan.initRepayAmount = uint128(loanQuote.repayAmount);
-        
+
         if (loanQuote.loanToken == USDC) {
             ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(
                 loanQuote.loanToken,
@@ -233,9 +233,9 @@ contract Vault is ReentrancyGuard {
         address token,
         uint256[] calldata loanIds
     ) external {
-        uint256 tmp;
         uint256 totalUnlockableColl;
         for (uint256 i = 0; i < loanIds.length; ) {
+            uint256 tmp = 0;
             DataTypes.Loan storage loan = loans[loanIds[i]];
             if (loan.collToken != token) {
                 revert Invalid();
