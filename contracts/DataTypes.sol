@@ -3,7 +3,6 @@ pragma solidity 0.8.17;
 library DataTypes {
     struct Loan {
         address borrower;
-        address collToken;
         address loanToken;
         uint40 expiry;
         uint40 earliestRepay;
@@ -27,5 +26,13 @@ library DataTypes {
         uint8 v;
         bytes32 r;
         bytes32 s;
+    }
+
+    struct LoanRepayInfo {
+        address collToken;
+        address loanToken;
+        uint256 loanId;
+        uint256 repayAmount;
+        uint256 loanTokenTransferFees;
     }
 }
