@@ -14,6 +14,8 @@ contract Vault is ReentrancyGuard {
 
     mapping(uint256 => DataTypes.Loan) public loans;
     mapping(address => uint256) public lockedAmounts;
+    mapping(bytes32 => bool) executedQuote;
+
     uint256 public loanId;
     address public owner;
     address public router;
@@ -86,6 +88,9 @@ contract Vault is ReentrancyGuard {
                 loanQuote.validUntil
             )
         );
+        if (executedQuote[payloadHash]) {
+            revert Invalid();
+        }
         bytes32 messageHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
         );
@@ -144,6 +149,7 @@ contract Vault is ReentrancyGuard {
 
         loan.initCollAmount = uint128(collTokenReceived);
         loans[loanId] = loan;
+        executedQuote[payloadHash] = true;
 
         if (loanTokenBalBefore - loanTokenBalAfter < loanQuote.loanAmount) {
             revert Invalid();

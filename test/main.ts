@@ -116,6 +116,9 @@ describe("RFQ", function () {
 
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+
+      // borrower cannot replay quote
+      await expect(vault.connect(borrower).borrow(loanQuote, "0x0000000000000000000000000000000000000000", "0x")).to.be.reverted
     });
   })
 
