@@ -13,7 +13,7 @@ describe("RFQ", function () {
     // deploy vault
     const Vault = await ethers.getContractFactory("Vault")
     await Vault.connect(vaultOwner)
-    const vault = await Vault.deploy("0x0000000000000000000000000000000000000000")
+    const vault = await Vault.deploy()
     await vault.deployed()
 
     // deploy test tokens

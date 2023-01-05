@@ -18,7 +18,6 @@ contract Vault is ReentrancyGuard {
     mapping(bytes32 => bool) executedQuote;
 
     address public owner;
-    address public router;
 
     address AAVE_V2_LENDING_POOL_ADDR =
         0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9;
@@ -26,9 +25,8 @@ contract Vault is ReentrancyGuard {
 
     error Invalid();
 
-    constructor(address _router) {
+    constructor() {
         owner = msg.sender;
-        router = _router;
     }
 
     function deposit(address token, uint256 amount) external {
@@ -242,12 +240,12 @@ contract Vault is ReentrancyGuard {
 
     function unlockCollateral(
         address collToken,
-        uint256[] calldata loanIds
+        uint256[] calldata _loanIds
     ) external {
         uint256 totalUnlockableColl;
-        for (uint256 i = 0; i < loanIds.length; ) {
+        for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
-            DataTypes.Loan storage loan = loans[collToken][loanIds[i]];
+            DataTypes.Loan storage loan = loans[collToken][_loanIds[i]];
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
                 tmp =
                     loan.initCollAmount -
