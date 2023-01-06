@@ -29,6 +29,13 @@ contract Vault is ReentrancyGuard {
         owner = msg.sender;
     }
 
+    function transferOwnership(address newOwner) external {
+        if (msg.sender != owner || newOwner == address(0)) {
+            revert Invalid();
+        }
+        owner = newOwner;
+    }
+
     function deposit(address token, uint256 amount) external {
         if (msg.sender != owner) {
             revert Invalid();
