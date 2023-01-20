@@ -75,6 +75,10 @@ contract Vault is ReentrancyGuard {
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
 
+    // possibly whitelist possible coll and borr tokens so that
+    // previous borrowers don't have to worry some malicious
+    // ERC-20 draining funds later? obviously for first prototype not needed
+    // but something to keep in mind maybe
     function borrow(
         DataTypes.LoanQuote calldata loanQuote,
         address callbacker,
@@ -91,7 +95,8 @@ contract Vault is ReentrancyGuard {
                     loanQuote.expiry,
                     loanQuote.earliestRepay,
                     loanQuote.repayAmount,
-                    loanQuote.validUntil
+                    loanQuote.validUntil,
+                    loanQuote.upfrontFee
                 )
             );
             if (executedQuote[payloadHash]) {
@@ -149,7 +154,7 @@ contract Vault is ReentrancyGuard {
         IERC20Metadata(loanQuote.collToken).safeTransferFrom(
             msg.sender,
             address(this),
-            loanQuote.pledgeAmount
+            loanQuote.pledgeAmount + loanQuote.upfrontFee
         );
 
         uint256 loanTokenBalAfter = IERC20Metadata(loanQuote.loanToken)
@@ -160,12 +165,14 @@ contract Vault is ReentrancyGuard {
 
         loan.initCollAmount = uint128(collTokenReceived);
         loans[loanQuote.collToken][loanIds[loanQuote.collToken]] = loan;
-        lockedAmounts[loanQuote.collToken] += uint128(collTokenReceived);
+        lockedAmounts[loanQuote.collToken] += uint128(
+            collTokenReceived - loanQuote.upfrontFee
+        );
 
         if (loanTokenBalBefore - loanTokenBalAfter < loanQuote.loanAmount) {
             revert Invalid();
         }
-        if (collTokenReceived < loanQuote.pledgeAmount) {
+        if (collTokenReceived - loanQuote.upfrontFee < loanQuote.pledgeAmount) {
             revert Invalid();
         }
     }
@@ -266,5 +273,12 @@ contract Vault is ReentrancyGuard {
             }
         }
         lockedAmounts[collToken] -= totalUnlockableColl;
+        uint256 currentCollTokenBalance = IERC20Metadata(collToken).balanceOf(
+            address(this)
+        );
+        IERC20Metadata(collToken).safeTransfer(
+            owner,
+            currentCollTokenBalance - lockedAmounts[collToken]
+        );
     }
 }
