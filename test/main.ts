@@ -48,12 +48,13 @@ describe("RFQ", function () {
         borrower: borrower.address,
         collToken: weth.address,
         loanToken: usdc.address,
-        pledgeAmount: ONE_WETH,
+        sendAmount: ONE_WETH,
         loanAmount: ONE_USDC.mul(1000),
         expiry: timestamp+60*60*24*30,
         earliestRepay: timestamp,
         repayAmount: ONE_USDC.mul(1010),
         validUntil: timestamp+60,
+        upfrontFee: ONE_WETH.mul(50).div(10000),
         v: undefined,
         r: undefined,
         s: undefined,
@@ -68,20 +69,23 @@ describe("RFQ", function () {
           "uint256",
           "uint256",
           "uint256",
+          "uint256",
           "uint256"
         ],
         [
           loanQuote.borrower,
           loanQuote.collToken,
           loanQuote.loanToken,
-          loanQuote.pledgeAmount,
+          loanQuote.sendAmount,
           loanQuote.loanAmount,
           loanQuote.expiry,
           loanQuote.earliestRepay,
           loanQuote.repayAmount,
-          loanQuote.validUntil
+          loanQuote.validUntil,
+          loanQuote.upfrontFee
         ]
       )
+
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await vaultOwner.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
