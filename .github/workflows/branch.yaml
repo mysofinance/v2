@@ -35,4 +35,4 @@ jobs:
     needs: [consecutiveness]
     uses: ./.github/workflows/workflow-test.yaml
     with:
-      alchemy_api_key: ""
+      alchemy_api_key: 'yQNr022A-qRkQlO725iOMhEAOxU0KMgx'
