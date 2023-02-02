@@ -1,0 +1,24 @@
+name: Workflow | Test
+
+on:
+  workflow_call:
+    inputs:
+      alchemy_api_key:
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup | Install npm dependencies
+        uses: ./.github/actions/npm-install
+
+      - name: Test
+        run: npm run test
+        env:
+          ALCHEMY_API_KEY: ${{ inputs.alchemy_api_key }}
