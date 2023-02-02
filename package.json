@@ -1,8 +1,24 @@
 {
   "name": "hardhat-project",
+  "scripts": {
+    "clean": "hardhat clean && rm -rf abi/ && rm -rf artifacts/ && rm -rf dist/ && rm -rf typechain/",
+    "compile": "hardhat compile",
+    "prettier": "prettier --config .prettierrc --check \"{contracts,test}/**/*.{js,json,sol,ts}\"",
+    "prettier:write": "prettier --config .prettierrc --write \"{contracts,test}/**/*.{js,json,sol,ts}\"",
+    "test": "hardhat test",
+    "lint": "solhint \"contracts/**/*.sol\"",
+    "slither": "slither . --checklist",
+    "prepare": "husky install"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^1.0.2",
-    "hardhat": "^2.12.4"
+    "hardhat": "^2.12.4",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.1.0",
+    "prettier": "^2.8.3",
+    "prettier-plugin-solidity": "^1.1.1",
+    "solhint": "^3.3.8",
+    "solhint-plugin-prettier": "^0.0.5"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.8.0",
