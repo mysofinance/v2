@@ -10,11 +10,11 @@ describe("RFQ", function () {
   async function setupTest() {
     const [vaultOwner, borrower, tokenDeployer] = await ethers.getSigners()
 
-    // deploy vault
-    const Vault = await ethers.getContractFactory("Vault")
-    await Vault.connect(vaultOwner)
-    const vault = await Vault.deploy()
-    await vault.deployed()
+    // deploy lenderVault
+    const LenderVault = await ethers.getContractFactory('LenderVault')
+    await LenderVault.connect(vaultOwner)
+    const lenderVault = await LenderVault.deploy()
+    await lenderVault.deployed()
 
     // deploy test tokens
     const MyERC20 = await ethers.getContractFactory("MyERC20")
@@ -31,19 +31,19 @@ describe("RFQ", function () {
     await usdc.mint(vaultOwner.address, ONE_USDC.mul(100000))
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
-    return { vault, vaultOwner, borrower, tokenDeployer, usdc, weth };
+    return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth }
   }
 
-  describe("...", function () {
-    it("...", async function () {
-      const { vault, vaultOwner, borrower, tokenDeployer, usdc, weth } = await setupTest();
+  describe('...', function () {
+    it('...', async function () {
+      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth } = await setupTest()
 
-      // vault owner deposits usdc
-      await usdc.connect(vaultOwner).transfer(vault.address, ONE_USDC.mul(100000));
+      // lenderVault owner deposits usdc
+      await usdc.connect(vaultOwner).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
-      // vault owner gives quote
-      const blocknum = await ethers.provider.getBlockNumber();
-      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp;
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       let loanQuote = {
         borrower: borrower.address,
         collToken: weth.address,
@@ -99,30 +99,31 @@ describe("RFQ", function () {
       loanQuote.r = sig.r
       loanQuote.s = sig.s
 
-      // borrower approves vault
-      await weth.connect(borrower).approve(vault.address, MAX_UINT128)
+      // borrower approves lenderVault
+      await weth.connect(borrower).approve(lenderVault.address, MAX_UINT128)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
-      const vaultWethBalPre = await weth.balanceOf(vault.address)
-      const vaultUsdcBalPre = await usdc.balanceOf(vault.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
       // borrower executes quote
-      const tx = await vault.connect(borrower).borrowWithQuote(loanQuote, "0x0000000000000000000000000000000000000000", "0x")
+      const tx = await lenderVault.connect(borrower).borrowWithQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
-      const vaultWethBalPost = await weth.balanceOf(vault.address)
-      const vaultUsdcBalPost = await usdc.balanceOf(vault.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
       // borrower cannot replay quote
-      await expect(vault.connect(borrower).borrowWithQuote(loanQuote, "0x0000000000000000000000000000000000000000", "0x")).to.be.reverted
-    });
+      await expect(lenderVault.connect(borrower).borrowWithQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')).to
+        .be.reverted
+    })
   })
 
 });
