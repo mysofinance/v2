@@ -39,8 +39,7 @@ describe("RFQ", function () {
       const { vault, vaultOwner, borrower, tokenDeployer, usdc, weth } = await setupTest();
 
       // vault owner deposits usdc
-      await usdc.connect(vaultOwner).approve(vault.address, MAX_UINT128);
-      await vault.connect(vaultOwner).deposit(usdc.address, ONE_USDC.mul(100000))
+      await usdc.connect(vaultOwner).transfer(vault.address, ONE_USDC.mul(100000));
 
       // vault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber();
@@ -106,7 +105,7 @@ describe("RFQ", function () {
       const vaultUsdcBalPre = await usdc.balanceOf(vault.address)
 
       // borrower executes quote
-      const tx = await vault.connect(borrower).borrow(loanQuote, "0x0000000000000000000000000000000000000000", "0x")
+      const tx = await vault.connect(borrower).borrowWithQuote(loanQuote, "0x0000000000000000000000000000000000000000", "0x")
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -118,7 +117,7 @@ describe("RFQ", function () {
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
       // borrower cannot replay quote
-      await expect(vault.connect(borrower).borrow(loanQuote, "0x0000000000000000000000000000000000000000", "0x")).to.be.reverted
+      await expect(vault.connect(borrower).borrowWithQuote(loanQuote, "0x0000000000000000000000000000000000000000", "0x")).to.be.reverted
     });
   })
 

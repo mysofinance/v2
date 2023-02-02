@@ -4,7 +4,6 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
-import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 import "hardhat/console.sol";
@@ -12,16 +11,25 @@ import "hardhat/console.sol";
 contract Vault is ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
 
+    uint256 BASE = 1e18;
+
     mapping(address => uint256) public loanIds;
     mapping(address => mapping(uint256 => DataTypes.Loan)) public loans;
     mapping(address => uint256) public lockedAmounts;
     mapping(bytes32 => bool) executedQuote;
 
     address public owner;
+    address public newOwner;
 
-    address AAVE_V2_LENDING_POOL_ADDR =
-        0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9;
-    address USDC = address(0);
+    DataTypes.StandingLoanOffer[10] public standingLoanOffers; // stores standing loan offers
+
+    /*
+    can remove ILendingPool because also interest bearing tokens can be deposited 
+    by virtue of simple transfer; e.g. lender can also deposit an atoken and allow
+    borrowers to directly borrow the atoken; the repayment amount could then also be
+    set to be atoken such that on repayment any idle funds automatically continue earning
+    yield
+    */
 
     error Invalid();
 
@@ -29,31 +37,18 @@ contract Vault is ReentrancyGuard {
         owner = msg.sender;
     }
 
-    function transferOwnership(address newOwner) external {
-        if (msg.sender != owner || newOwner == address(0)) {
+    function proposeNewOwner(address _newOwner) external {
+        if (msg.sender != owner || _newOwner == address(0)) {
+            revert Invalid();
+        }
+        newOwner = _newOwner;
+    }
+
+    function claimOwnership() external {
+        if (msg.sender != newOwner) {
             revert Invalid();
         }
         owner = newOwner;
-    }
-
-    function deposit(address token, uint256 amount) external {
-        if (msg.sender != owner) {
-            revert Invalid();
-        }
-        IERC20Metadata(token).safeTransferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-
-        if (token == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).deposit(
-                token,
-                amount,
-                address(this),
-                0
-            );
-        }
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -64,15 +59,17 @@ contract Vault is ReentrancyGuard {
         if (amount > vaultBalance - lockedAmounts[token]) {
             revert Invalid();
         }
-
-        if (token == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(
-                token,
-                amount,
-                msg.sender
-            );
-        }
         IERC20Metadata(token).safeTransfer(owner, amount);
+    }
+
+    function setStandingLoanOffer(
+        DataTypes.StandingLoanOffer calldata standingLoanOffer,
+        uint256 loanOfferId
+    ) external {
+        if (msg.sender != owner) {
+            revert Invalid();
+        }
+        standingLoanOffers[loanOfferId] = standingLoanOffer;
     }
 
     // possibly whitelist possible coll and borr tokens so that
@@ -80,6 +77,88 @@ contract Vault is ReentrancyGuard {
     // ERC-20 draining funds later? obviously for first prototype not needed
     // but something to keep in mind maybe
     function borrow(
+        uint256 loanOfferId,
+        uint256 pledgeAmount,
+        address callbacker,
+        bytes calldata data
+    ) external nonReentrant {
+        DataTypes.StandingLoanOffer
+            memory standingLoanOffer = standingLoanOffers[loanOfferId];
+        if (
+            standingLoanOffer.collToken == address(0) ||
+            standingLoanOffer.loanToken == address(0)
+        ) {
+            revert Invalid();
+        }
+        loanIds[standingLoanOffer.collToken] += 1;
+
+        DataTypes.Loan memory loan;
+        loan.borrower = msg.sender;
+        loan.loanToken = standingLoanOffer.loanToken;
+        loan.expiry = uint40(block.timestamp + standingLoanOffer.tenor);
+        loan.earliestRepay = uint40(
+            block.timestamp + standingLoanOffer.timeUntilEarliestRepay
+        );
+        uint256 tmp = (standingLoanOffer.loanPerCollUnit * pledgeAmount) /
+            IERC20Metadata(standingLoanOffer.collToken).decimals();
+        if (uint128(tmp) != tmp) {
+            revert Invalid();
+        }
+        loan.initLoanAmount = uint128(tmp);
+        if (standingLoanOffer.isNegativeRate) {
+            tmp = (tmp * (BASE - standingLoanOffer.interestRate)) / BASE;
+        } else {
+            tmp = (tmp * (BASE + standingLoanOffer.interestRate)) / BASE;
+        }
+        if (uint128(tmp) != tmp) {
+            revert Invalid();
+        }
+        loan.initRepayAmount = uint128(tmp);
+
+        uint256 loanTokenBalBefore = IERC20Metadata(standingLoanOffer.loanToken)
+            .balanceOf(address(this));
+        uint256 collTokenBalBefore = IERC20Metadata(standingLoanOffer.collToken)
+            .balanceOf(address(this));
+
+        IERC20Metadata(standingLoanOffer.loanToken).safeTransfer(
+            msg.sender,
+            loan.initLoanAmount
+        );
+        if (callbacker != address(0)) {
+            IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
+        }
+        IERC20Metadata(standingLoanOffer.collToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            pledgeAmount
+        );
+
+        uint256 loanTokenBalAfter = IERC20Metadata(standingLoanOffer.loanToken)
+            .balanceOf(address(this));
+        uint256 collTokenBalAfter = IERC20Metadata(standingLoanOffer.collToken)
+            .balanceOf(address(this));
+        uint256 collTokenReceived = collTokenBalAfter - collTokenBalBefore;
+
+        if (uint128(collTokenReceived) != collTokenReceived) {
+            revert Invalid();
+        }
+        loan.initCollAmount = uint128(collTokenReceived);
+        loans[standingLoanOffer.collToken][
+            loanIds[standingLoanOffer.collToken]
+        ] = loan;
+        lockedAmounts[standingLoanOffer.collToken] += uint128(
+            collTokenReceived
+        );
+
+        if (loanTokenBalBefore - loanTokenBalAfter > loan.initLoanAmount) {
+            revert Invalid();
+        }
+        if (collTokenReceived < pledgeAmount) {
+            revert Invalid();
+        }
+    }
+
+    function borrowWithQuote(
         DataTypes.LoanQuote calldata loanQuote,
         address callbacker,
         bytes calldata data
@@ -120,6 +199,12 @@ contract Vault is ReentrancyGuard {
             if (signer != owner || loanQuote.validUntil < block.timestamp) {
                 revert Invalid();
             }
+            if (
+                loanQuote.borrower != address(0) &&
+                loanQuote.borrower != msg.sender
+            ) {
+                revert Invalid();
+            }
         }
 
         loanIds[loanQuote.collToken] += 1;
@@ -130,14 +215,6 @@ contract Vault is ReentrancyGuard {
         loan.expiry = uint40(loanQuote.expiry);
         loan.earliestRepay = uint40(loanQuote.earliestRepay);
         loan.initRepayAmount = uint128(loanQuote.repayAmount);
-
-        if (loanQuote.loanToken == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).withdraw(
-                loanQuote.loanToken,
-                loanQuote.loanAmount,
-                address(this)
-            );
-        }
 
         uint256 loanTokenBalBefore = IERC20Metadata(loanQuote.loanToken)
             .balanceOf(address(this));
@@ -241,15 +318,6 @@ contract Vault is ReentrancyGuard {
 
         loan.amountRepaidSoFar += uint128(loanTokenAmountReceived);
         lockedAmounts[loanRepayInfo.collToken] -= uint128(reclaimCollAmount);
-
-        if (loanRepayInfo.loanToken == USDC) {
-            ILendingPool(AAVE_V2_LENDING_POOL_ADDR).deposit(
-                loanRepayInfo.loanToken,
-                loanTokenAmountReceived,
-                address(this),
-                0
-            );
-        }
     }
 
     function unlockCollateral(
