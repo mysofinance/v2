@@ -3,8 +3,7 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
-
-//import {ICompartment} from "interfaces/ICompartment.sol";
+import {ICompartment} from "./interfaces/ICompartment.sol";
 
 // start simple with just an example voting and rewards implementation
 // could make a mapping later for more flexibility
@@ -68,12 +67,12 @@ contract CollateralCompartmentFactory {
             salt
         );
 
-        // ICompartment(newCompartmentInstanceAddr).initialize(
-        //     vaultAddr,
-        //     borrowerAddr,
-        //     collTokenAddr,
-        //     loanIdx
-        // );
+        ICompartment(newCompartmentInstanceAddr).initialize(
+            vaultAddr,
+            borrowerAddr,
+            collTokenAddr,
+            loanIdx
+        );
 
         isCompartment[newCompartmentInstanceAddr] = true;
         allCompartments.push(newCompartmentInstanceAddr);
