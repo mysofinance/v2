@@ -20,7 +20,7 @@ contract MyERC20 is ERC20, Ownable {
         return _decimals;
     }
 
-    function mint(address account, uint256 amount) external onlyOwner {
+    function mint(address account, uint256 amount) external {
         _mint(account, amount);
     }
 }
