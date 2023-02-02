@@ -28,6 +28,17 @@ library DataTypes {
         bytes32 s;
     }
 
+    struct StandingLoanOffer {
+        uint256 loanPerCollUnit;
+        uint256 interestRate;
+        uint256 upfrontFee;
+        address collToken;
+        address loanToken;
+        uint40 tenor;
+        uint40 timeUntilEarliestRepay;
+        bool isNegativeRate;
+    }
+
     struct LoanRepayInfo {
         address collToken;
         address loanToken;
