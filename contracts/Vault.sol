@@ -51,6 +51,27 @@ contract Vault is ReentrancyGuard {
         owner = newOwner;
     }
 
+    function cancelOrder(DataTypes.LoanQuote calldata loanQuote) external {
+        if (msg.sender != owner) {
+            revert Invalid();
+        }
+        bytes32 payloadHash = keccak256(
+            abi.encode(
+                loanQuote.borrower,
+                loanQuote.collToken,
+                loanQuote.loanToken,
+                loanQuote.pledgeAmount,
+                loanQuote.loanAmount,
+                loanQuote.expiry,
+                loanQuote.earliestRepay,
+                loanQuote.repayAmount,
+                loanQuote.validUntil,
+                loanQuote.upfrontFee
+            )
+        );
+        executedQuote[payloadHash] = true;
+    }
+
     function withdraw(address token, uint256 amount) external {
         if (msg.sender != owner) {
             revert Invalid();
