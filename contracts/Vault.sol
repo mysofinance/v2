@@ -60,6 +60,7 @@ contract Vault is ReentrancyGuard {
                 loanQuote.borrower,
                 loanQuote.collToken,
                 loanQuote.loanToken,
+                loanQuote.upfrontFeeToken,
                 loanQuote.pledgeAmount,
                 loanQuote.loanAmount,
                 loanQuote.expiry,
@@ -190,6 +191,7 @@ contract Vault is ReentrancyGuard {
                     loanQuote.borrower,
                     loanQuote.collToken,
                     loanQuote.loanToken,
+                    loanQuote.upfrontFeeToken,
                     loanQuote.pledgeAmount,
                     loanQuote.loanAmount,
                     loanQuote.expiry,
@@ -241,6 +243,8 @@ contract Vault is ReentrancyGuard {
             .balanceOf(address(this));
         uint256 collTokenBalBefore = IERC20Metadata(loanQuote.collToken)
             .balanceOf(address(this));
+        uint256 feeTokenBalBefore = IERC20Metadata(loanQuote.upfrontFeeToken)
+            .balanceOf(address(this));
 
         IERC20Metadata(loanQuote.loanToken).safeTransfer(
             msg.sender,
@@ -252,25 +256,34 @@ contract Vault is ReentrancyGuard {
         IERC20Metadata(loanQuote.collToken).safeTransferFrom(
             msg.sender,
             address(this),
-            loanQuote.pledgeAmount + loanQuote.upfrontFee
+            loanQuote.pledgeAmount
+        );
+        IERC20Metadata(loanQuote.upfrontFeeToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            loanQuote.upfrontFee
         );
 
         uint256 loanTokenBalAfter = IERC20Metadata(loanQuote.loanToken)
             .balanceOf(address(this));
         uint256 collTokenBalAfter = IERC20Metadata(loanQuote.collToken)
             .balanceOf(address(this));
-        uint256 collTokenReceived = collTokenBalAfter - collTokenBalBefore;
+        uint256 feeTokenBalAfter = IERC20Metadata(loanQuote.collToken)
+            .balanceOf(address(this));
 
-        loan.initCollAmount = uint128(collTokenReceived);
+        loan.initCollAmount = uint128(collTokenBalAfter - collTokenBalBefore);
         loans[loanQuote.collToken][loanIds[loanQuote.collToken]] = loan;
         lockedAmounts[loanQuote.collToken] += uint128(
-            collTokenReceived - loanQuote.upfrontFee
+            collTokenBalAfter - collTokenBalBefore
         );
 
         if (loanTokenBalBefore - loanTokenBalAfter < loanQuote.loanAmount) {
             revert Invalid();
         }
-        if (collTokenReceived - loanQuote.upfrontFee < loanQuote.pledgeAmount) {
+        if (collTokenBalAfter - collTokenBalBefore < loanQuote.pledgeAmount) {
+            revert Invalid();
+        }
+        if (feeTokenBalAfter - feeTokenBalBefore < loanQuote.upfrontFee) {
             revert Invalid();
         }
     }
