@@ -29,6 +29,19 @@ library DataTypes {
         bytes32 s;
     }
 
+    struct LoanRequest {
+        address borrower;
+        address collToken;
+        address loanToken;
+        uint256 sendAmount;
+        uint256 loanAmount;
+        uint256 expiry;
+        uint256 earliestRepay;
+        uint256 repayAmount;
+        uint256 validUntil;
+        uint256 upfrontFee;
+    }
+
     struct StandingLoanOffer {
         uint256 loanPerCollUnit;
         uint256 interestRatePctInBase;

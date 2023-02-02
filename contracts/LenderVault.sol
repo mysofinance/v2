@@ -6,9 +6,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-import "hardhat/console.sol";
-
-contract Vault is ReentrancyGuard {
+contract LenderVault is ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
 
     uint256 BASE = 1e18;
