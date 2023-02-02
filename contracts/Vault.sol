@@ -13,15 +13,15 @@ contract Vault is ReentrancyGuard {
 
     uint256 BASE = 1e18;
 
-    mapping(address => uint256) public loanIds;
-    mapping(address => mapping(uint256 => DataTypes.Loan)) public loans;
     mapping(address => uint256) public lockedAmounts;
-    mapping(bytes32 => bool) executedQuote;
+    mapping(bytes32 => bool) isInvalidatedQuote;
+    mapping(bytes32 => bool) public isStandingLoanOffer;
+    DataTypes.StandingLoanOffer[] public standingLoanOffers; // stores standing loan offers
+    DataTypes.Loan[] public loans; // stores loans
 
+    uint256 public currLoanId;
     address public owner;
     address public newOwner;
-
-    DataTypes.StandingLoanOffer[10] public standingLoanOffers; // stores standing loan offers
 
     /*
     can remove ILendingPool because also interest bearing tokens can be deposited 
@@ -51,7 +51,7 @@ contract Vault is ReentrancyGuard {
         owner = newOwner;
     }
 
-    function cancelOrder(DataTypes.LoanQuote calldata loanQuote) external {
+    function invalidateQuote(DataTypes.LoanQuote calldata loanQuote) external {
         if (msg.sender != owner) {
             revert Invalid();
         }
@@ -60,8 +60,7 @@ contract Vault is ReentrancyGuard {
                 loanQuote.borrower,
                 loanQuote.collToken,
                 loanQuote.loanToken,
-                loanQuote.upfrontFeeToken,
-                loanQuote.pledgeAmount,
+                loanQuote.sendAmount,
                 loanQuote.loanAmount,
                 loanQuote.expiry,
                 loanQuote.earliestRepay,
@@ -70,7 +69,7 @@ contract Vault is ReentrancyGuard {
                 loanQuote.upfrontFee
             )
         );
-        executedQuote[payloadHash] = true;
+        isInvalidatedQuote[payloadHash] = true;
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -84,14 +83,71 @@ contract Vault is ReentrancyGuard {
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
 
-    function setStandingLoanOffer(
-        DataTypes.StandingLoanOffer calldata standingLoanOffer,
-        uint256 loanOfferId
+    function addStandingLoanOffer(
+        DataTypes.StandingLoanOffer calldata standingLoanOffer
     ) external {
         if (msg.sender != owner) {
             revert Invalid();
         }
-        standingLoanOffers[loanOfferId] = standingLoanOffer;
+        if (
+            standingLoanOffer.collToken == address(0) ||
+            standingLoanOffer.loanToken == address(0) ||
+            standingLoanOffer.collToken == standingLoanOffer.loanToken ||
+            standingLoanOffer.timeUntilEarliestRepay >
+            standingLoanOffer.tenor ||
+            (standingLoanOffer.isNegativeInterestRate &&
+                standingLoanOffer.interestRatePctInBase > BASE)
+        ) {
+            revert Invalid();
+        }
+        bytes32 standingLoanOfferHash = hashStandingLoanOffer(
+            standingLoanOffer
+        );
+        if (isStandingLoanOffer[standingLoanOfferHash]) {
+            revert Invalid();
+        }
+        isStandingLoanOffer[standingLoanOfferHash] = true;
+        standingLoanOffers.push(standingLoanOffer);
+    }
+
+    function updateStandingLoanOffer(
+        uint256 oldStandingLoanOfferIdx,
+        DataTypes.StandingLoanOffer calldata newStandingLoanOffer
+    ) external {
+        if (msg.sender != owner) {
+            revert Invalid();
+        }
+        uint256 arrayLen = standingLoanOffers.length;
+        if (oldStandingLoanOfferIdx > arrayLen - 1) {
+            revert Invalid();
+        }
+        DataTypes.StandingLoanOffer
+            memory oldStandingLoanOffer = standingLoanOffers[
+                oldStandingLoanOfferIdx
+            ];
+        bytes32 oldStandingLoanOfferHash = hashStandingLoanOffer(
+            oldStandingLoanOffer
+        );
+        isStandingLoanOffer[oldStandingLoanOfferHash] = false;
+
+        if (
+            newStandingLoanOffer.collToken == address(0) ||
+            newStandingLoanOffer.loanToken == address(0)
+        ) {
+            standingLoanOffers[oldStandingLoanOfferIdx] = standingLoanOffers[
+                arrayLen - 1
+            ];
+            standingLoanOffers.pop();
+        } else {
+            bytes32 newStandingLoanOfferHash = hashStandingLoanOffer(
+                newStandingLoanOffer
+            );
+            if (oldStandingLoanOfferHash == newStandingLoanOfferHash) {
+                revert Invalid();
+            }
+            isStandingLoanOffer[newStandingLoanOfferHash] = true;
+            standingLoanOffers[oldStandingLoanOfferIdx] = newStandingLoanOffer;
+        }
     }
 
     // possibly whitelist possible coll and borr tokens so that
@@ -99,20 +155,15 @@ contract Vault is ReentrancyGuard {
     // ERC-20 draining funds later? obviously for first prototype not needed
     // but something to keep in mind maybe
     function borrow(
-        uint256 loanOfferId,
-        uint256 pledgeAmount,
+        DataTypes.StandingLoanOffer calldata standingLoanOffer,
+        uint256 sendAmount,
         address callbacker,
         bytes calldata data
     ) external nonReentrant {
-        DataTypes.StandingLoanOffer
-            memory standingLoanOffer = standingLoanOffers[loanOfferId];
-        if (
-            standingLoanOffer.collToken == address(0) ||
-            standingLoanOffer.loanToken == address(0)
-        ) {
+        if (!isStandingLoanOffer[hashStandingLoanOffer(standingLoanOffer)]) {
             revert Invalid();
         }
-        loanIds[standingLoanOffer.collToken] += 1;
+        currLoanId += 1;
 
         DataTypes.Loan memory loan;
         loan.borrower = msg.sender;
@@ -121,22 +172,27 @@ contract Vault is ReentrancyGuard {
         loan.earliestRepay = uint40(
             block.timestamp + standingLoanOffer.timeUntilEarliestRepay
         );
-        uint256 tmp = (standingLoanOffer.loanPerCollUnit * pledgeAmount) /
-            IERC20Metadata(standingLoanOffer.collToken).decimals();
+        uint256 tmp = (standingLoanOffer.loanPerCollUnit * sendAmount) /
+            (10 ** IERC20Metadata(standingLoanOffer.collToken).decimals());
         if (uint128(tmp) != tmp) {
             revert Invalid();
         }
         loan.initLoanAmount = uint128(tmp);
-        if (standingLoanOffer.isNegativeRate) {
-            tmp = (tmp * (BASE - standingLoanOffer.interestRate)) / BASE;
+        if (standingLoanOffer.isNegativeInterestRate) {
+            tmp =
+                (tmp * (BASE - standingLoanOffer.interestRatePctInBase)) /
+                BASE;
         } else {
-            tmp = (tmp * (BASE + standingLoanOffer.interestRate)) / BASE;
+            tmp =
+                (tmp * (BASE + standingLoanOffer.interestRatePctInBase)) /
+                BASE;
         }
         if (uint128(tmp) != tmp) {
             revert Invalid();
         }
         loan.initRepayAmount = uint128(tmp);
 
+        tmp = (sendAmount * standingLoanOffer.upfrontFeePctInBase) / BASE;
         uint256 loanTokenBalBefore = IERC20Metadata(standingLoanOffer.loanToken)
             .balanceOf(address(this));
         uint256 collTokenBalBefore = IERC20Metadata(standingLoanOffer.collToken)
@@ -152,30 +208,27 @@ contract Vault is ReentrancyGuard {
         IERC20Metadata(standingLoanOffer.collToken).safeTransferFrom(
             msg.sender,
             address(this),
-            pledgeAmount
+            sendAmount
         );
 
         uint256 loanTokenBalAfter = IERC20Metadata(standingLoanOffer.loanToken)
             .balanceOf(address(this));
         uint256 collTokenBalAfter = IERC20Metadata(standingLoanOffer.collToken)
             .balanceOf(address(this));
+
         uint256 collTokenReceived = collTokenBalAfter - collTokenBalBefore;
 
         if (uint128(collTokenReceived) != collTokenReceived) {
             revert Invalid();
         }
-        loan.initCollAmount = uint128(collTokenReceived);
-        loans[standingLoanOffer.collToken][
-            loanIds[standingLoanOffer.collToken]
-        ] = loan;
-        lockedAmounts[standingLoanOffer.collToken] += uint128(
-            collTokenReceived
-        );
+        loan.initCollAmount = uint128(collTokenReceived - tmp);
+        lockedAmounts[standingLoanOffer.collToken] += loan.initCollAmount;
+        loans.push(loan);
 
         if (loanTokenBalBefore - loanTokenBalAfter > loan.initLoanAmount) {
             revert Invalid();
         }
-        if (collTokenReceived < pledgeAmount) {
+        if (collTokenReceived < sendAmount) {
             revert Invalid();
         }
     }
@@ -191,8 +244,7 @@ contract Vault is ReentrancyGuard {
                     loanQuote.borrower,
                     loanQuote.collToken,
                     loanQuote.loanToken,
-                    loanQuote.upfrontFeeToken,
-                    loanQuote.pledgeAmount,
+                    loanQuote.sendAmount,
                     loanQuote.loanAmount,
                     loanQuote.expiry,
                     loanQuote.earliestRepay,
@@ -201,10 +253,10 @@ contract Vault is ReentrancyGuard {
                     loanQuote.upfrontFee
                 )
             );
-            if (executedQuote[payloadHash]) {
+            if (isInvalidatedQuote[payloadHash]) {
                 revert Invalid();
             }
-            executedQuote[payloadHash] = true;
+            isInvalidatedQuote[payloadHash] = true;
 
             bytes32 messageHash = keccak256(
                 abi.encodePacked(
@@ -230,7 +282,7 @@ contract Vault is ReentrancyGuard {
             }
         }
 
-        loanIds[loanQuote.collToken] += 1;
+        currLoanId += 1;
 
         DataTypes.Loan memory loan;
         loan.borrower = msg.sender;
@@ -243,8 +295,6 @@ contract Vault is ReentrancyGuard {
             .balanceOf(address(this));
         uint256 collTokenBalBefore = IERC20Metadata(loanQuote.collToken)
             .balanceOf(address(this));
-        uint256 feeTokenBalBefore = IERC20Metadata(loanQuote.upfrontFeeToken)
-            .balanceOf(address(this));
 
         IERC20Metadata(loanQuote.loanToken).safeTransfer(
             msg.sender,
@@ -256,34 +306,28 @@ contract Vault is ReentrancyGuard {
         IERC20Metadata(loanQuote.collToken).safeTransferFrom(
             msg.sender,
             address(this),
-            loanQuote.pledgeAmount
-        );
-        IERC20Metadata(loanQuote.upfrontFeeToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            loanQuote.upfrontFee
+            loanQuote.sendAmount
         );
 
         uint256 loanTokenBalAfter = IERC20Metadata(loanQuote.loanToken)
             .balanceOf(address(this));
         uint256 collTokenBalAfter = IERC20Metadata(loanQuote.collToken)
             .balanceOf(address(this));
-        uint256 feeTokenBalAfter = IERC20Metadata(loanQuote.collToken)
-            .balanceOf(address(this));
 
-        loan.initCollAmount = uint128(collTokenBalAfter - collTokenBalBefore);
-        loans[loanQuote.collToken][loanIds[loanQuote.collToken]] = loan;
-        lockedAmounts[loanQuote.collToken] += uint128(
-            collTokenBalAfter - collTokenBalBefore
-        );
+        uint256 reclaimable = collTokenBalAfter -
+            collTokenBalBefore -
+            loanQuote.upfrontFee;
+        if (reclaimable != uint128(reclaimable)) {
+            revert Invalid();
+        }
+        loan.initCollAmount = uint128(reclaimable);
+        loans.push(loan);
+        lockedAmounts[loanQuote.collToken] += uint128(reclaimable);
 
         if (loanTokenBalBefore - loanTokenBalAfter < loanQuote.loanAmount) {
             revert Invalid();
         }
-        if (collTokenBalAfter - collTokenBalBefore < loanQuote.pledgeAmount) {
-            revert Invalid();
-        }
-        if (feeTokenBalAfter - feeTokenBalBefore < loanQuote.upfrontFee) {
+        if (collTokenBalAfter - collTokenBalBefore < loanQuote.sendAmount) {
             revert Invalid();
         }
     }
@@ -293,13 +337,7 @@ contract Vault is ReentrancyGuard {
         address callbacker,
         bytes calldata data
     ) external nonReentrant {
-        DataTypes.Loan storage loan = loans[loanRepayInfo.collToken][
-            loanRepayInfo.loanId
-        ];
-
-        uint256 reclaimCollAmount = (loan.initCollAmount *
-            loanRepayInfo.repayAmount) / loan.initRepayAmount;
-
+        DataTypes.Loan memory loan = loans[loanRepayInfo.loanId];
         if (msg.sender != loan.borrower) {
             revert Invalid();
         }
@@ -315,6 +353,8 @@ contract Vault is ReentrancyGuard {
         ) {
             revert Invalid();
         }
+        uint256 reclaimCollAmount = (loan.initCollAmount *
+            loanRepayInfo.repayAmount) / loan.initRepayAmount;
 
         uint256 loanTokenBalBefore = IERC20Metadata(loanRepayInfo.loanToken)
             .balanceOf(address(this));
@@ -361,7 +401,7 @@ contract Vault is ReentrancyGuard {
         uint256 totalUnlockableColl;
         for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
-            DataTypes.Loan storage loan = loans[collToken][_loanIds[i]];
+            DataTypes.Loan storage loan = loans[_loanIds[i]];
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
                 tmp =
                     loan.initCollAmount -
@@ -381,6 +421,23 @@ contract Vault is ReentrancyGuard {
         IERC20Metadata(collToken).safeTransfer(
             owner,
             currentCollTokenBalance - lockedAmounts[collToken]
+        );
+    }
+
+    function hashStandingLoanOffer(
+        DataTypes.StandingLoanOffer memory standingLoanOffer
+    ) internal pure returns (bytes32 standingLoanOfferHash) {
+        standingLoanOfferHash = keccak256(
+            abi.encode(
+                standingLoanOffer.loanPerCollUnit,
+                standingLoanOffer.interestRatePctInBase,
+                standingLoanOffer.upfrontFeePctInBase,
+                standingLoanOffer.collToken,
+                standingLoanOffer.loanToken,
+                standingLoanOffer.tenor,
+                standingLoanOffer.timeUntilEarliestRepay,
+                standingLoanOffer.isNegativeInterestRate
+            )
         );
     }
 }

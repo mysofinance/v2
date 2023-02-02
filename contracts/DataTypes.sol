@@ -17,8 +17,7 @@ library DataTypes {
         address borrower;
         address collToken;
         address loanToken;
-        address upfrontFeeToken;
-        uint256 pledgeAmount;
+        uint256 sendAmount;
         uint256 loanAmount;
         uint256 expiry;
         uint256 earliestRepay;
@@ -32,13 +31,13 @@ library DataTypes {
 
     struct StandingLoanOffer {
         uint256 loanPerCollUnit;
-        uint256 interestRate;
-        uint256 upfrontFee;
+        uint256 interestRatePctInBase;
+        uint256 upfrontFeePctInBase;
         address collToken;
         address loanToken;
         uint40 tenor;
         uint40 timeUntilEarliestRepay;
-        bool isNegativeRate;
+        bool isNegativeInterestRate;
     }
 
     struct LoanRepayInfo {
