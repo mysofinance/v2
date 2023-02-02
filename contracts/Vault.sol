@@ -51,6 +51,28 @@ contract Vault is ReentrancyGuard {
         owner = newOwner;
     }
 
+    function cancelOrder(DataTypes.LoanQuote calldata loanQuote) external {
+        if (msg.sender != owner) {
+            revert Invalid();
+        }
+        bytes32 payloadHash = keccak256(
+            abi.encode(
+                loanQuote.borrower,
+                loanQuote.collToken,
+                loanQuote.loanToken,
+                loanQuote.upfrontFeeToken,
+                loanQuote.pledgeAmount,
+                loanQuote.loanAmount,
+                loanQuote.expiry,
+                loanQuote.earliestRepay,
+                loanQuote.repayAmount,
+                loanQuote.validUntil,
+                loanQuote.upfrontFee
+            )
+        );
+        executedQuote[payloadHash] = true;
+    }
+
     function withdraw(address token, uint256 amount) external {
         if (msg.sender != owner) {
             revert Invalid();
@@ -72,6 +94,10 @@ contract Vault is ReentrancyGuard {
         standingLoanOffers[loanOfferId] = standingLoanOffer;
     }
 
+    // possibly whitelist possible coll and borr tokens so that
+    // previous borrowers don't have to worry some malicious
+    // ERC-20 draining funds later? obviously for first prototype not needed
+    // but something to keep in mind maybe
     function borrow(
         uint256 loanOfferId,
         uint256 pledgeAmount,
@@ -165,12 +191,14 @@ contract Vault is ReentrancyGuard {
                     loanQuote.borrower,
                     loanQuote.collToken,
                     loanQuote.loanToken,
+                    loanQuote.upfrontFeeToken,
                     loanQuote.pledgeAmount,
                     loanQuote.loanAmount,
                     loanQuote.expiry,
                     loanQuote.earliestRepay,
                     loanQuote.repayAmount,
-                    loanQuote.validUntil
+                    loanQuote.validUntil,
+                    loanQuote.upfrontFee
                 )
             );
             if (executedQuote[payloadHash]) {
@@ -215,6 +243,8 @@ contract Vault is ReentrancyGuard {
             .balanceOf(address(this));
         uint256 collTokenBalBefore = IERC20Metadata(loanQuote.collToken)
             .balanceOf(address(this));
+        uint256 feeTokenBalBefore = IERC20Metadata(loanQuote.upfrontFeeToken)
+            .balanceOf(address(this));
 
         IERC20Metadata(loanQuote.loanToken).safeTransfer(
             msg.sender,
@@ -228,21 +258,32 @@ contract Vault is ReentrancyGuard {
             address(this),
             loanQuote.pledgeAmount
         );
+        IERC20Metadata(loanQuote.upfrontFeeToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            loanQuote.upfrontFee
+        );
 
         uint256 loanTokenBalAfter = IERC20Metadata(loanQuote.loanToken)
             .balanceOf(address(this));
         uint256 collTokenBalAfter = IERC20Metadata(loanQuote.collToken)
             .balanceOf(address(this));
-        uint256 collTokenReceived = collTokenBalAfter - collTokenBalBefore;
+        uint256 feeTokenBalAfter = IERC20Metadata(loanQuote.collToken)
+            .balanceOf(address(this));
 
-        loan.initCollAmount = uint128(collTokenReceived);
+        loan.initCollAmount = uint128(collTokenBalAfter - collTokenBalBefore);
         loans[loanQuote.collToken][loanIds[loanQuote.collToken]] = loan;
-        lockedAmounts[loanQuote.collToken] += uint128(collTokenReceived);
+        lockedAmounts[loanQuote.collToken] += uint128(
+            collTokenBalAfter - collTokenBalBefore
+        );
 
         if (loanTokenBalBefore - loanTokenBalAfter < loanQuote.loanAmount) {
             revert Invalid();
         }
-        if (collTokenReceived < loanQuote.pledgeAmount) {
+        if (collTokenBalAfter - collTokenBalBefore < loanQuote.pledgeAmount) {
+            revert Invalid();
+        }
+        if (feeTokenBalAfter - feeTokenBalBefore < loanQuote.upfrontFee) {
             revert Invalid();
         }
     }
@@ -334,5 +375,12 @@ contract Vault is ReentrancyGuard {
             }
         }
         lockedAmounts[collToken] -= totalUnlockableColl;
+        uint256 currentCollTokenBalance = IERC20Metadata(collToken).balanceOf(
+            address(this)
+        );
+        IERC20Metadata(collToken).safeTransfer(
+            owner,
+            currentCollTokenBalance - lockedAmounts[collToken]
+        );
     }
 }

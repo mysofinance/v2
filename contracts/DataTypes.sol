@@ -17,12 +17,14 @@ library DataTypes {
         address borrower;
         address collToken;
         address loanToken;
+        address upfrontFeeToken;
         uint256 pledgeAmount;
         uint256 loanAmount;
         uint256 expiry;
         uint256 earliestRepay;
         uint256 repayAmount;
         uint256 validUntil;
+        uint256 upfrontFee;
         uint8 v;
         bytes32 r;
         bytes32 s;
