@@ -1,12 +1,11 @@
-import { expect } from "chai";
-import { ethers } from "hardhat";
+import { expect } from 'chai'
+import { ethers } from 'hardhat'
 
-const ONE_USDC = ethers.BigNumber.from("1000000");
-const ONE_WETH = ethers.BigNumber.from("1000000000000000000");
-const MAX_UINT128 = ethers.BigNumber.from("340282366920938463463374607431768211455");
+const ONE_USDC = ethers.BigNumber.from('1000000')
+const ONE_WETH = ethers.BigNumber.from('1000000000000000000')
+const MAX_UINT128 = ethers.BigNumber.from('340282366920938463463374607431768211455')
 
-describe("RFQ", function () {
-
+describe('RFQ', function () {
   async function setupTest() {
     const [vaultOwner, borrower, tokenDeployer] = await ethers.getSigners()
 
@@ -17,14 +16,14 @@ describe("RFQ", function () {
     await lenderVault.deployed()
 
     // deploy test tokens
-    const MyERC20 = await ethers.getContractFactory("MyERC20")
+    const MyERC20 = await ethers.getContractFactory('MyERC20')
 
     const USDC = await MyERC20.connect(tokenDeployer)
-    const usdc = await USDC.deploy("USDC", "USDC", 6)
+    const usdc = await USDC.deploy('USDC', 'USDC', 6)
     await usdc.deployed()
 
     const WETH = await MyERC20.connect(tokenDeployer)
-    const weth = await WETH.deploy("WETH", "WETH", 18)
+    const weth = await WETH.deploy('WETH', 'WETH', 18)
     await weth.deployed()
 
     // transfer some test tokens
@@ -42,6 +41,7 @@ describe("RFQ", function () {
       await usdc.connect(vaultOwner).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // lenderVault owner gives quote
+
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       let loanQuote = {
@@ -50,28 +50,17 @@ describe("RFQ", function () {
         loanToken: usdc.address,
         sendAmount: ONE_WETH,
         loanAmount: ONE_USDC.mul(1000),
-        expiry: timestamp+60*60*24*30,
+        expiry: timestamp + 60 * 60 * 24 * 30,
         earliestRepay: timestamp,
         repayAmount: ONE_USDC.mul(1010),
-        validUntil: timestamp+60,
+        validUntil: timestamp + 60,
         upfrontFee: ONE_WETH.mul(50).div(10000),
         v: undefined,
         r: undefined,
-        s: undefined,
+        s: undefined
       }
       const payload = ethers.utils.defaultAbiCoder.encode(
-        [
-          "address",
-          "address",
-          "address",
-          "uint256",
-          "uint256",
-          "uint256",
-          "uint256",
-          "uint256",
-          "uint256",
-          "uint256"
-        ],
+        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
         [
           loanQuote.borrower,
           loanQuote.collToken,
@@ -90,8 +79,8 @@ describe("RFQ", function () {
       const signature = await vaultOwner.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
       const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
-      console.log("payloadHash:", payloadHash)
-      console.log("Signature:", sig)
+      console.log('payloadHash:', payloadHash)
+      console.log('Signature:', sig)
       expect(recoveredAddr).to.equal(vaultOwner.address)
 
       // borrower adds sig to quote
@@ -125,5 +114,4 @@ describe("RFQ", function () {
         .be.reverted
     })
   })
-
-});
+})
