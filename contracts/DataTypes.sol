@@ -25,6 +25,7 @@ library DataTypes {
         uint256 repayAmount;
         uint256 validUntil;
         uint256 upfrontFee;
+        uint256 nonce;
         uint8 v;
         bytes32 r;
         bytes32 s;

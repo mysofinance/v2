@@ -12,12 +12,13 @@ contract LenderVault is ReentrancyGuard {
     uint256 BASE = 1e18;
 
     mapping(address => uint256) public lockedAmounts;
-    mapping(bytes32 => bool) isInvalidatedQuote;
+    mapping(bytes32 => bool) isConsumedQuote;
     mapping(bytes32 => bool) public isStandingLoanOffer;
     DataTypes.StandingLoanOffer[] public standingLoanOffers; // stores standing loan offers
     DataTypes.Loan[] public loans; // stores loans
 
     uint256 public currLoanId;
+    uint256 public loanQuoteNonce;
     address public owner;
     address public newOwner;
 
@@ -33,6 +34,7 @@ contract LenderVault is ReentrancyGuard {
 
     constructor() {
         owner = msg.sender;
+        loanQuoteNonce = 1;
     }
 
     function proposeNewOwner(address _newOwner) external {
@@ -49,25 +51,11 @@ contract LenderVault is ReentrancyGuard {
         owner = newOwner;
     }
 
-    function invalidateQuote(DataTypes.LoanQuote calldata loanQuote) external {
-        if (msg.sender != owner) {
+    function invalidateQuotes() external {
+        if (msg.sender != newOwner) {
             revert Invalid();
         }
-        bytes32 payloadHash = keccak256(
-            abi.encode(
-                loanQuote.borrower,
-                loanQuote.collToken,
-                loanQuote.loanToken,
-                loanQuote.sendAmount,
-                loanQuote.loanAmount,
-                loanQuote.expiry,
-                loanQuote.earliestRepay,
-                loanQuote.repayAmount,
-                loanQuote.validUntil,
-                loanQuote.upfrontFee
-            )
-        );
-        isInvalidatedQuote[payloadHash] = true;
+        loanQuoteNonce += 1;
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -213,13 +201,17 @@ contract LenderVault is ReentrancyGuard {
                     loanQuote.earliestRepay,
                     loanQuote.repayAmount,
                     loanQuote.validUntil,
-                    loanQuote.upfrontFee
+                    loanQuote.upfrontFee,
+                    loanQuote.nonce
                 )
             );
-            if (isInvalidatedQuote[payloadHash]) {
+            if (
+                isConsumedQuote[payloadHash] ||
+                loanQuote.nonce >= loanQuoteNonce
+            ) {
                 revert Invalid();
             }
-            isInvalidatedQuote[payloadHash] = true;
+            isConsumedQuote[payloadHash] = true;
 
             bytes32 messageHash = keccak256(
                 abi.encodePacked(
@@ -275,6 +267,12 @@ contract LenderVault is ReentrancyGuard {
         uint256 loanTokenBalBefore = IERC20Metadata(loan.loanToken).balanceOf(
             address(this)
         );
+        if (
+            loanTokenBalBefore - lockedAmounts[loan.loanToken] <
+            loan.initLoanAmount
+        ) {
+            revert();
+        }
         uint256 collTokenBalBefore = IERC20Metadata(loan.collToken).balanceOf(
             address(this)
         );

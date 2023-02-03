@@ -55,12 +55,13 @@ describe('RFQ', function () {
         repayAmount: ONE_USDC.mul(1010),
         validUntil: timestamp + 60,
         upfrontFee: ONE_WETH.mul(50).div(10000),
+        nonce: 0,
         v: undefined,
         r: undefined,
         s: undefined
       }
       const payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
+        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
         [
           loanQuote.borrower,
           loanQuote.collToken,
@@ -71,7 +72,8 @@ describe('RFQ', function () {
           loanQuote.earliestRepay,
           loanQuote.repayAmount,
           loanQuote.validUntil,
-          loanQuote.upfrontFee
+          loanQuote.upfrontFee,
+          loanQuote.nonce
         ]
       )
 
