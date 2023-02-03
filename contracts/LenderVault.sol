@@ -311,16 +311,18 @@ contract LenderVault is ReentrancyGuard {
                     loans.length
                 )
             );
-            address _factory = compartmentFactory;
             address _predictedNewCompartmentAddress = Clones
-                .predictDeterministicAddress(implAddr, salt, _factory);
+                .predictDeterministicAddress(
+                    implAddr,
+                    salt,
+                    compartmentFactory
+                );
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 msg.sender,
                 _predictedNewCompartmentAddress,
                 sendAmount
             );
-
-            address actualNewCompartmentAddress = ICompartmentFactory(
+            loan.collTokenCompartmentAddr = ICompartmentFactory(
                 compartmentFactory
             ).createCompartment(
                     implAddr,
@@ -330,11 +332,11 @@ contract LenderVault is ReentrancyGuard {
                     loans.length
                 );
             if (
-                actualNewCompartmentAddress != _predictedNewCompartmentAddress
+                loan.collTokenCompartmentAddr != _predictedNewCompartmentAddress
             ) {
                 revert InvalidCompartmentAddr();
             }
-            loan.collTokenCompartmentAddr = actualNewCompartmentAddress;
+
             if (
                 IERC20Metadata(loan.collToken).balanceOf(
                     _predictedNewCompartmentAddress

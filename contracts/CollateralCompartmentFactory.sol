@@ -16,11 +16,11 @@ contract CollateralCompartmentFactory {
     mapping(address => bool) public isCompartment;
     address[] allCompartments;
 
-    constructor(address[] memory _Impls) {
-        for (uint i = 0; i < _Impls.length; ) {
-            if (!isValidImplementation[_Impls[i]]) {
-                compartmentImplementations.push(_Impls[i]);
-                isValidImplementation[_Impls[i]] = true;
+    constructor(address[] memory _impls) {
+        for (uint i = 0; i < _impls.length; ) {
+            if (!isValidImplementation[_impls[i]]) {
+                compartmentImplementations.push(_impls[i]);
+                isValidImplementation[_impls[i]] = true;
             }
             unchecked {
                 i++;
