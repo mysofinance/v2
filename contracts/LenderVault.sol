@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
 import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
+import {ICompartment} from "./interfaces/ICompartment.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVault is ReentrancyGuard {
@@ -370,11 +371,10 @@ contract LenderVault is ReentrancyGuard {
         if (loanTokenBalBefore - loanTokenBalAfter < loan.initLoanAmount) {
             revert Invalid();
         }
-        if (loan.hasCollCompartment) {
-            if (collTokenBalAfter != collTokenBalBefore) {
-                revert Invalid();
-            }
-        } else if (collTokenBalAfter - collTokenBalBefore < sendAmount) {
+        if (
+            !loan.hasCollCompartment &&
+            collTokenBalAfter - collTokenBalBefore < sendAmount
+        ) {
             revert Invalid();
         }
     }
@@ -408,10 +408,17 @@ contract LenderVault is ReentrancyGuard {
         uint256 collTokenBalBefore = IERC20Metadata(loanRepayInfo.collToken)
             .balanceOf(address(this));
 
-        IERC20Metadata(loanRepayInfo.collToken).safeTransfer(
-            msg.sender,
-            reclaimCollAmount
-        );
+        if (loan.hasCollCompartment) {
+            ICompartment(loan.collTokenCompartmentAddr).transferCollToBorrower(
+                reclaimCollAmount
+            );
+        } else {
+            IERC20Metadata(loanRepayInfo.collToken).safeTransfer(
+                msg.sender,
+                reclaimCollAmount
+            );
+        }
+
         if (callbacker != address(0)) {
             IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
         }
@@ -432,8 +439,10 @@ contract LenderVault is ReentrancyGuard {
         if (loanTokenAmountReceived < loanRepayInfo.repayAmount) {
             revert Invalid();
         }
-
-        if (collTokenBalBefore - collTokenBalAfter < reclaimCollAmount) {
+        if (
+            !loan.hasCollCompartment &&
+            collTokenBalBefore - collTokenBalAfter < reclaimCollAmount
+        ) {
             revert Invalid();
         }
 
@@ -454,6 +463,11 @@ contract LenderVault is ReentrancyGuard {
                     loan.initCollAmount -
                     (loan.initCollAmount * loan.amountRepaidSoFar) /
                     loan.initRepayAmount;
+            }
+            // compartments which default are more expensive...so something for Lenders to keep in mind
+            if (loan.hasCollCompartment) {
+                ICompartment(collTokenImplAddrs[loan.collToken])
+                    .unlockCollToVault();
             }
             loan.collUnlocked = true;
             totalUnlockableColl += tmp;

@@ -17,4 +17,17 @@ interface ICompartment {
         address collTokenAddr,
         uint256 loanIdx
     ) external;
+
+    /**
+     * @notice function to unlock all collateral left in compartment
+     * @dev this function can only be called by vault and returns all collateral to vault
+     */
+    function unlockCollToVault() external;
+
+    /**
+     * @notice function to transfer some amount of collateral to borrower on repay
+     * @dev this function can only be called by vault and returns amount to borrower address
+     * @param amount amount of collateral token to send back to borrower
+     */
+    function transferCollToBorrower(uint256 amount) external;
 }

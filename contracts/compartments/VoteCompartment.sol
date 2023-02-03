@@ -6,10 +6,11 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVoteCompartment} from "../interfaces/IVoteCompartment.sol";
+import {ICompartment} from "../interfaces/ICompartment.sol";
 
 // start simple with just an example voting and rewards implementation
 // could make a mapping later for more flexibility
-contract VoteCompartment is Initializable {
+contract VoteCompartment is Initializable, ICompartment {
     using SafeERC20 for IERC20;
 
     error InvalidSender();
@@ -41,14 +42,10 @@ contract VoteCompartment is Initializable {
         IVoteCompartment(collTokenAddr).delegate(delegatee);
     }
 
-    // not sure if will make this transfer to vault or borrower directly..
-    // this seems to save some gas, and shouldn't affect fees
-    function transferToBorrower() external {
+    // transfer coll on repays
+    function transferCollToBorrower(uint256 amount) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
-        uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
-            address(this)
-        );
-        IERC20(collTokenAddr).safeTransfer(borrowerAddr, currentCollBalance);
+        IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
     }
 
     // unlockColl this would be called on defaults
