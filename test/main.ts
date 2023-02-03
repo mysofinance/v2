@@ -12,7 +12,7 @@ describe('RFQ', function () {
     //deploy CompartmentFactory
     const CompartmentFactory = await ethers.getContractFactory('CollateralCompartmentFactory')
     await CompartmentFactory.connect(vaultOwner)
-    const compartmentFactory = await CompartmentFactory.deploy('0x')
+    const compartmentFactory = await CompartmentFactory.deploy(['0x0000000000000000000000000000000000000001'])
     await compartmentFactory.deployed()
 
     // deploy lenderVault
