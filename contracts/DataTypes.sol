@@ -12,6 +12,8 @@ library DataTypes {
         uint128 initRepayAmount;
         uint128 amountRepaidSoFar;
         bool collUnlocked;
+        bool hasCollCompartment;
+        address collTokenCompartmentAddr;
     }
 
     struct LoanQuote {
@@ -25,6 +27,7 @@ library DataTypes {
         uint256 repayAmount;
         uint256 validUntil;
         uint256 upfrontFee;
+        bool useCollCompartment;
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -41,6 +44,7 @@ library DataTypes {
         uint256 repayAmount;
         uint256 validUntil;
         uint256 upfrontFee;
+        bool useCollCompartment;
     }
 
     struct StandingLoanOffer {
@@ -52,6 +56,7 @@ library DataTypes {
         uint40 tenor;
         uint40 timeUntilEarliestRepay;
         bool isNegativeInterestRate;
+        bool useCollCompartment;
     }
 
     struct LoanRepayInfo {

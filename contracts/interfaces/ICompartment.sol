@@ -17,11 +17,4 @@ interface ICompartment {
         address collTokenAddr,
         uint256 loanIdx
     ) external;
-
-    /**
-     * @notice function to run after vault created and initialized
-     * @dev could possibly look into using the salted address to transfer first,
-     * then move this in initializer...but for now will call right when returns from creation
-     */
-    function postTransferFromVault() external;
 }

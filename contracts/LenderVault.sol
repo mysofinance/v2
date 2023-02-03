@@ -1,25 +1,31 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
+import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVault is ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 BASE = 1e18;
+    uint256 constant BASE = 1e18;
 
     mapping(address => uint256) public lockedAmounts;
     mapping(bytes32 => bool) isInvalidatedQuote;
     mapping(bytes32 => bool) public isStandingLoanOffer;
+    mapping(address => address) public collTokenImplAddrs;
     DataTypes.StandingLoanOffer[] public standingLoanOffers; // stores standing loan offers
     DataTypes.Loan[] public loans; // stores loans
 
     uint256 public currLoanId;
     address public owner;
     address public newOwner;
+    address public compartmentFactory;
 
     /*
     can remove ILendingPool because also interest bearing tokens can be deposited 
@@ -30,9 +36,11 @@ contract LenderVault is ReentrancyGuard {
     */
 
     error Invalid();
+    error InvalidCompartmentAddr();
 
-    constructor() {
+    constructor(address _factoryAddr) {
         owner = msg.sender;
+        compartmentFactory = _factoryAddr;
     }
 
     function proposeNewOwner(address _newOwner) external {
@@ -64,7 +72,8 @@ contract LenderVault is ReentrancyGuard {
                 loanQuote.earliestRepay,
                 loanQuote.repayAmount,
                 loanQuote.validUntil,
-                loanQuote.upfrontFee
+                loanQuote.upfrontFee,
+                loanQuote.useCollCompartment
             )
         );
         isInvalidatedQuote[payloadHash] = true;
@@ -193,6 +202,8 @@ contract LenderVault is ReentrancyGuard {
 
         tmp = (sendAmount * standingLoanOffer.upfrontFeePctInBase) / BASE;
 
+        loan.hasCollCompartment = standingLoanOffer.useCollCompartment;
+
         _borrowTransfers(loan, sendAmount, tmp, callbacker, data);
     }
 
@@ -213,7 +224,8 @@ contract LenderVault is ReentrancyGuard {
                     loanQuote.earliestRepay,
                     loanQuote.repayAmount,
                     loanQuote.validUntil,
-                    loanQuote.upfrontFee
+                    loanQuote.upfrontFee,
+                    loanQuote.useCollCompartment
                 )
             );
             if (isInvalidatedQuote[payloadHash]) {
@@ -255,6 +267,7 @@ contract LenderVault is ReentrancyGuard {
         loan.earliestRepay = uint40(loanQuote.earliestRepay);
         loan.initRepayAmount = uint128(loanQuote.repayAmount);
         loan.initLoanAmount = uint128(loanQuote.loanAmount);
+        loan.hasCollCompartment = loanQuote.useCollCompartment;
 
         _borrowTransfers(
             loan,
@@ -286,11 +299,54 @@ contract LenderVault is ReentrancyGuard {
         if (callbacker != address(0)) {
             IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
         }
-        IERC20Metadata(loan.collToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            sendAmount
-        );
+
+        if (loan.hasCollCompartment) {
+            address implAddr = collTokenImplAddrs[loan.collToken];
+            bytes32 salt = keccak256(
+                abi.encode(
+                    implAddr,
+                    address(this),
+                    msg.sender,
+                    loan.collToken,
+                    loans.length
+                )
+            );
+            address _factory = compartmentFactory;
+            address _predictedNewCompartmentAddress = Clones
+                .predictDeterministicAddress(implAddr, salt, _factory);
+            IERC20Metadata(loan.collToken).safeTransferFrom(
+                msg.sender,
+                _predictedNewCompartmentAddress,
+                sendAmount
+            );
+
+            address actualNewCompartmentAddress = ICompartmentFactory(
+                compartmentFactory
+            ).createCompartment(
+                    implAddr,
+                    address(this),
+                    msg.sender,
+                    loan.collToken,
+                    loans.length
+                );
+            if (
+                actualNewCompartmentAddress != _predictedNewCompartmentAddress
+            ) {
+                revert InvalidCompartmentAddr();
+            }
+            loan.collTokenCompartmentAddr = actualNewCompartmentAddress;
+            if (
+                IERC20Metadata(loan.collToken).balanceOf(
+                    _predictedNewCompartmentAddress
+                ) < sendAmount
+            ) revert Invalid();
+        } else {
+            IERC20Metadata(loan.collToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                sendAmount
+            );
+        }
 
         uint256 loanTokenBalAfter = IERC20Metadata(loan.loanToken).balanceOf(
             address(this)
@@ -312,7 +368,11 @@ contract LenderVault is ReentrancyGuard {
         if (loanTokenBalBefore - loanTokenBalAfter < loan.initLoanAmount) {
             revert Invalid();
         }
-        if (collTokenBalAfter - collTokenBalBefore < sendAmount) {
+        if (loan.hasCollCompartment) {
+            if (collTokenBalAfter != collTokenBalBefore) {
+                revert Invalid();
+            }
+        } else if (collTokenBalAfter - collTokenBalBefore < sendAmount) {
             revert Invalid();
         }
     }
@@ -421,7 +481,8 @@ contract LenderVault is ReentrancyGuard {
                 standingLoanOffer.loanToken,
                 standingLoanOffer.tenor,
                 standingLoanOffer.timeUntilEarliestRepay,
-                standingLoanOffer.isNegativeInterestRate
+                standingLoanOffer.isNegativeInterestRate,
+                standingLoanOffer.useCollCompartment
             )
         );
     }

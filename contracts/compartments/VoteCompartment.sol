@@ -14,12 +14,10 @@ contract VoteCompartment is Initializable {
 
     error InvalidSender();
 
-    address vaultAddr;
-    address borrowerAddr;
-    address collTokenAddr;
-    uint256 loanIdx;
-
-    constructor() {}
+    address public vaultAddr;
+    address public borrowerAddr;
+    address public collTokenAddr;
+    uint256 public loanIdx;
 
     function initialize(
         address _vaultAddr,
@@ -31,11 +29,7 @@ contract VoteCompartment is Initializable {
         borrowerAddr = _borrowerAddr;
         collTokenAddr = _collTokenAddr;
         loanIdx = _loanIdx;
-    }
-
-    function postTransferFromVault() external {
-        if (msg.sender != vaultAddr) revert InvalidSender();
-        _delegate(borrowerAddr);
+        _delegate(_borrowerAddr);
     }
 
     function redirectDelegates(address newDelegatee) external {

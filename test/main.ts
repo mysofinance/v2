@@ -9,10 +9,16 @@ describe('RFQ', function () {
   async function setupTest() {
     const [vaultOwner, borrower, tokenDeployer] = await ethers.getSigners()
 
+    //deploy CompartmentFactory
+    const CompartmentFactory = await ethers.getContractFactory('CollateralCompartmentFactory')
+    await CompartmentFactory.connect(vaultOwner)
+    const compartmentFactory = await CompartmentFactory.deploy('0x')
+    await compartmentFactory.deployed()
+
     // deploy lenderVault
     const LenderVault = await ethers.getContractFactory('LenderVault')
     await LenderVault.connect(vaultOwner)
-    const lenderVault = await LenderVault.deploy()
+    const lenderVault = await LenderVault.deploy(compartmentFactory.address)
     await lenderVault.deployed()
 
     // deploy test tokens
@@ -55,12 +61,13 @@ describe('RFQ', function () {
         repayAmount: ONE_USDC.mul(1010),
         validUntil: timestamp + 60,
         upfrontFee: ONE_WETH.mul(50).div(10000),
-        v: undefined,
-        r: undefined,
-        s: undefined
+        useCollCompartment: false,
+        v: 0,
+        r: '0x0',
+        s: '0x0'
       }
       const payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
+        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bool'],
         [
           loanQuote.borrower,
           loanQuote.collToken,
@@ -71,7 +78,8 @@ describe('RFQ', function () {
           loanQuote.earliestRepay,
           loanQuote.repayAmount,
           loanQuote.validUntil,
-          loanQuote.upfrontFee
+          loanQuote.upfrontFee,
+          loanQuote.useCollCompartment
         ]
       )
 

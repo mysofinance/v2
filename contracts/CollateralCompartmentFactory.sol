@@ -12,7 +12,7 @@ contract CollateralCompartmentFactory {
     error ZeroAddr();
 
     address[] compartmentImplementations;
-    mapping(address => bool) isValidImplementation;
+    mapping(address => bool) public isValidImplementation;
     mapping(address => bool) public isCompartment;
     address[] allCompartments;
 
