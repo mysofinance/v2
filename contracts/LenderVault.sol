@@ -21,7 +21,8 @@ contract LenderVault is ReentrancyGuard {
     mapping(bytes32 => bool) public isOnChainQuote;
     mapping(address => mapping(address => address)) public autoQuoteStrategy; // points to auto loan strategy for given coll/loan token pair
     DataTypes.OnChainQuote[] public onChainQuotes; // stores standing loan quotes
-    mapping(address => address) public collTokenImplAddrs;
+    // for now remove public getter for byte code size purposes...
+    mapping(address => address) collTokenImplAddrs;
     DataTypes.Loan[] public loans; // stores loans
 
     uint256 currLoanId;
@@ -208,6 +209,14 @@ contract LenderVault is ReentrancyGuard {
         address callbacker,
         bytes calldata data
     ) external nonReentrant {
+        whitelistCheck(
+            DataTypes.WhiteListType.TOKEN,
+            loanOffChainQuote.loanToken
+        );
+        whitelistCheck(
+            DataTypes.WhiteListType.TOKEN,
+            loanOffChainQuote.collToken
+        );
         {
             bytes32 payloadHash = keccak256(
                 abi.encode(
