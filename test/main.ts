@@ -15,10 +15,16 @@ describe('RFQ', function () {
     const compartmentFactory = await CompartmentFactory.deploy(['0x0000000000000000000000000000000000000001'])
     await compartmentFactory.deployed()
 
+    //deploy LenderFactory
+    const LenderFactory = await ethers.getContractFactory('LenderFactory')
+    await LenderFactory.connect(vaultOwner)
+    const lenderFactory = await LenderFactory.deploy()
+    await lenderFactory.deployed()
+
     // deploy lenderVault
     const LenderVault = await ethers.getContractFactory('LenderVault')
     await LenderVault.connect(vaultOwner)
-    const lenderVault = await LenderVault.deploy(compartmentFactory.address)
+    const lenderVault = await LenderVault.deploy(lenderFactory.address, compartmentFactory.address)
     await lenderVault.deployed()
 
     // deploy test tokens

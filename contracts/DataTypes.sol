@@ -67,4 +67,11 @@ library DataTypes {
         uint256 upfrontFee;
         bool useCollCompartment;
     }
+
+    enum WhiteListType {
+        TOKEN,
+        STRATEGY,
+        COMPARTMENT,
+        FLASHLOAN
+    }
 }
