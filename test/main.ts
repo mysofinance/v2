@@ -55,12 +55,13 @@ describe('RFQ', function () {
         repayAmount: ONE_USDC.mul(1010),
         validUntil: timestamp + 60,
         upfrontFee: ONE_WETH.mul(50).div(10000),
+        nonce: 0,
         v: undefined,
         r: undefined,
         s: undefined
       }
       const payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
+        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
         [
           loanQuote.borrower,
           loanQuote.collToken,
@@ -71,7 +72,8 @@ describe('RFQ', function () {
           loanQuote.earliestRepay,
           loanQuote.repayAmount,
           loanQuote.validUntil,
-          loanQuote.upfrontFee
+          loanQuote.upfrontFee,
+          loanQuote.nonce
         ]
       )
 
@@ -98,7 +100,7 @@ describe('RFQ', function () {
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
       // borrower executes quote
-      const tx = await lenderVault.connect(borrower).borrowWithQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')
+      const tx = await lenderVault.connect(borrower).borrowWithOffChainQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -110,7 +112,7 @@ describe('RFQ', function () {
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
       // borrower cannot replay quote
-      await expect(lenderVault.connect(borrower).borrowWithQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')).to
+      await expect(lenderVault.connect(borrower).borrowWithOffChainQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')).to
         .be.reverted
     })
   })

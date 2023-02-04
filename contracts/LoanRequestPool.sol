@@ -102,7 +102,7 @@ contract LoanRequestPool is ReentrancyGuard {
 
     function executeRequest(
         uint256 loanRequestId,
-        DataTypes.LoanQuote calldata loanQuote,
+        DataTypes.OffChainQuote calldata offChainQuote,
         address lenderVault
     ) external nonReentrant {
         if (loanRequestId > openLoanRequests.length - 1) {
@@ -112,16 +112,16 @@ contract LoanRequestPool is ReentrancyGuard {
             loanRequestId
         ];
         if (
-            executeLoanRequest.borrower != loanQuote.borrower ||
-            executeLoanRequest.collToken != loanQuote.collToken ||
-            executeLoanRequest.loanToken != loanQuote.loanToken ||
-            executeLoanRequest.sendAmount != loanQuote.sendAmount ||
-            executeLoanRequest.loanAmount != loanQuote.loanAmount ||
-            executeLoanRequest.expiry != loanQuote.expiry ||
-            executeLoanRequest.earliestRepay != loanQuote.earliestRepay ||
-            executeLoanRequest.repayAmount != loanQuote.repayAmount ||
-            executeLoanRequest.validUntil != loanQuote.validUntil ||
-            executeLoanRequest.upfrontFee != loanQuote.upfrontFee
+            executeLoanRequest.borrower != offChainQuote.borrower ||
+            executeLoanRequest.collToken != offChainQuote.collToken ||
+            executeLoanRequest.loanToken != offChainQuote.loanToken ||
+            executeLoanRequest.sendAmount != offChainQuote.sendAmount ||
+            executeLoanRequest.loanAmount != offChainQuote.loanAmount ||
+            executeLoanRequest.expiry != offChainQuote.expiry ||
+            executeLoanRequest.earliestRepay != offChainQuote.earliestRepay ||
+            executeLoanRequest.repayAmount != offChainQuote.repayAmount ||
+            executeLoanRequest.validUntil != offChainQuote.validUntil ||
+            executeLoanRequest.upfrontFee != offChainQuote.upfrontFee
         ) {
             revert();
         }
@@ -136,21 +136,29 @@ contract LoanRequestPool is ReentrancyGuard {
         uint256 loanTokenBalBefore = IERC20Metadata(
             executeLoanRequest.loanToken
         ).balanceOf(address(this));
-        LenderVault(lenderVault).borrowWithQuote(loanQuote, address(0), "");
+        LenderVault(lenderVault).borrowWithOffChainQuote(
+            offChainQuote,
+            address(0),
+            ""
+        );
         IERC20Metadata(executeLoanRequest.collToken).approve(lenderVault, 0);
         uint256 collTokenBalAfter = IERC20Metadata(executeLoanRequest.collToken)
             .balanceOf(address(this));
         uint256 loanTokenBalAfter = IERC20Metadata(executeLoanRequest.loanToken)
             .balanceOf(address(this));
-        if (collTokenBalBefore - collTokenBalAfter != loanQuote.sendAmount) {
+        if (
+            collTokenBalBefore - collTokenBalAfter != offChainQuote.sendAmount
+        ) {
             revert();
         }
-        if (loanTokenBalAfter - loanTokenBalBefore != loanQuote.loanAmount) {
+        if (
+            loanTokenBalAfter - loanTokenBalBefore != offChainQuote.loanAmount
+        ) {
             revert();
         }
         IERC20Metadata(executeLoanRequest.loanToken).safeTransfer(
             executeLoanRequest.borrower,
-            loanQuote.loanAmount
+            offChainQuote.loanAmount
         );
     }
 }
