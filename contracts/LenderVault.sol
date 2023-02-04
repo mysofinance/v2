@@ -33,6 +33,8 @@ contract LenderVault is ReentrancyGuard {
 
     error Invalid();
 
+    event OnChainQuote(DataTypes.OnChainQuote onChainQuote, bool isActive);
+
     constructor() {
         owner = msg.sender;
         loanQuoteNonce = 1;
@@ -67,7 +69,7 @@ contract LenderVault is ReentrancyGuard {
         if (msg.sender != owner) {
             revert Invalid();
         }
-        autoQuoteStrategy[collToken][loanToken] = strategyAddr;
+        autoQuoteStrategy[collToken][loanToken] = strategyAddr; // todo: add check if strategy is whitelisted by DAO
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -88,7 +90,7 @@ contract LenderVault is ReentrancyGuard {
             revert Invalid();
         }
         if (
-            onChainQuote.collToken == address(0) ||
+            onChainQuote.collToken == address(0) || // todo: check if coll and loan token are whitelisted
             onChainQuote.loanToken == address(0) ||
             onChainQuote.collToken == onChainQuote.loanToken ||
             onChainQuote.timeUntilEarliestRepay > onChainQuote.tenor ||
@@ -103,6 +105,7 @@ contract LenderVault is ReentrancyGuard {
         }
         isOnChainQuote[onChainQuoteHash] = true;
         onChainQuotes.push(onChainQuote);
+        emit OnChainQuote(onChainQuote, true);
     }
 
     function updateOnChainQuote(
@@ -122,10 +125,9 @@ contract LenderVault is ReentrancyGuard {
         bytes32 oldOnChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
         isOnChainQuote[oldOnChainQuoteHash] = false;
 
-        if (
-            newOnChainQuote.collToken == address(0) ||
-            newOnChainQuote.loanToken == address(0)
-        ) {
+        bool deleteOnChainQuote = newOnChainQuote.collToken == address(0) ||
+            newOnChainQuote.loanToken == address(0);
+        if (deleteOnChainQuote) {
             onChainQuotes[oldOnChainQuoteId] = onChainQuotes[arrayLen - 1];
             onChainQuotes.pop();
         } else {
@@ -136,6 +138,8 @@ contract LenderVault is ReentrancyGuard {
             isOnChainQuote[newOnChainQuoteHash] = true;
             onChainQuotes[oldOnChainQuoteId] = newOnChainQuote;
         }
+        emit OnChainQuote(oldOnChainQuote, false);
+        emit OnChainQuote(newOnChainQuote, true);
     }
 
     function borrow(
@@ -312,7 +316,7 @@ contract LenderVault is ReentrancyGuard {
             loan.initLoanAmount
         );
         if (callbacker != address(0)) {
-            IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
+            IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data); // todo: whitelist callbacker
         }
         IERC20Metadata(loan.collToken).safeTransferFrom(
             msg.sender,
@@ -379,7 +383,7 @@ contract LenderVault is ReentrancyGuard {
             reclaimCollAmount
         );
         if (callbacker != address(0)) {
-            IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
+            IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data); // todo: whitelist callbacker
         }
         IERC20Metadata(loanRepayInfo.loanToken).safeTransferFrom(
             msg.sender,
