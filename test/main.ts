@@ -62,6 +62,7 @@ describe('RFQ', function () {
         validUntil: timestamp + 60,
         upfrontFee: ONE_WETH.mul(50).div(10000),
         useCollCompartment: false,
+        nonce: 0,
         v: 0,
         r: '0x0',
         s: '0x0'
@@ -80,6 +81,7 @@ describe('RFQ', function () {
           loanQuote.validUntil,
           loanQuote.upfrontFee,
           loanQuote.useCollCompartment
+          loanQuote.nonce
         ]
       )
 
@@ -106,7 +108,7 @@ describe('RFQ', function () {
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
       // borrower executes quote
-      const tx = await lenderVault.connect(borrower).borrowWithQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')
+      const tx = await lenderVault.connect(borrower).borrowWithOffChainQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -118,7 +120,7 @@ describe('RFQ', function () {
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
       // borrower cannot replay quote
-      await expect(lenderVault.connect(borrower).borrowWithQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')).to
+      await expect(lenderVault.connect(borrower).borrowWithOffChainQuote(loanQuote, '0x0000000000000000000000000000000000000000', '0x')).to
         .be.reverted
     })
   })

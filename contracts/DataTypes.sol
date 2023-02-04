@@ -16,7 +16,18 @@ library DataTypes {
         address collTokenCompartmentAddr;
     }
 
-    struct LoanQuote {
+    struct OnChainQuote {
+        uint256 loanPerCollUnit;
+        uint256 interestRatePctInBase;
+        uint256 upfrontFeePctInBase;
+        address collToken;
+        address loanToken;
+        uint40 tenor;
+        uint40 timeUntilEarliestRepay;
+        bool isNegativeInterestRate;
+    }
+
+    struct OffChainQuote {
         address borrower;
         address collToken;
         address loanToken;
@@ -28,9 +39,18 @@ library DataTypes {
         uint256 validUntil;
         uint256 upfrontFee;
         bool useCollCompartment;
+        uint256 nonce;
         uint8 v;
         bytes32 r;
         bytes32 s;
+    }
+
+    struct LoanRepayInfo {
+        address collToken;
+        address loanToken;
+        uint256 loanId;
+        uint256 repayAmount;
+        uint256 loanTokenTransferFees;
     }
 
     struct LoanRequest {
@@ -45,25 +65,5 @@ library DataTypes {
         uint256 validUntil;
         uint256 upfrontFee;
         bool useCollCompartment;
-    }
-
-    struct StandingLoanOffer {
-        uint256 loanPerCollUnit;
-        uint256 interestRatePctInBase;
-        uint256 upfrontFeePctInBase;
-        address collToken;
-        address loanToken;
-        uint40 tenor;
-        uint40 timeUntilEarliestRepay;
-        bool isNegativeInterestRate;
-        bool useCollCompartment;
-    }
-
-    struct LoanRepayInfo {
-        address collToken;
-        address loanToken;
-        uint256 loanId;
-        uint256 repayAmount;
-        uint256 loanTokenTransferFees;
     }
 }
