@@ -25,7 +25,7 @@ contract LenderVault is ReentrancyGuard {
     DataTypes.Loan[] public loans; // stores loans
 
     uint256 public currLoanId;
-    uint256 public loanQuoteNonce;
+    uint256 public loanOffChainQuoteNonce;
     address public owner;
     address public newOwner;
     address public compartmentFactory;
@@ -45,7 +45,7 @@ contract LenderVault is ReentrancyGuard {
 
     constructor(address _factoryAddr) {
         owner = msg.sender;
-        loanQuoteNonce = 1;
+        loanOffChainQuoteNonce = 1;
         compartmentFactory = _factoryAddr;
     }
 
@@ -67,9 +67,10 @@ contract LenderVault is ReentrancyGuard {
         if (msg.sender != owner) {
             revert Invalid();
         }
-        loanQuoteNonce += 1;
+        loanOffChainQuoteNonce += 1;
     }
 
+    /*
     function setAutoQuoteStrategy(
         address collToken,
         address loanToken,
@@ -91,6 +92,7 @@ contract LenderVault is ReentrancyGuard {
         }
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
+    */
 
     function addOnChainQuote(
         DataTypes.OnChainQuote calldata onChainQuote
@@ -193,30 +195,30 @@ contract LenderVault is ReentrancyGuard {
     }
 
     function borrowWithOffChainQuote(
-        DataTypes.OffChainQuote calldata loanQuote,
+        DataTypes.OffChainQuote calldata loanOffChainQuote,
         address callbacker,
         bytes calldata data
     ) external nonReentrant {
         {
             bytes32 payloadHash = keccak256(
                 abi.encode(
-                    loanQuote.borrower,
-                    loanQuote.collToken,
-                    loanQuote.loanToken,
-                    loanQuote.sendAmount,
-                    loanQuote.loanAmount,
-                    loanQuote.expiry,
-                    loanQuote.earliestRepay,
-                    loanQuote.repayAmount,
-                    loanQuote.validUntil,
-                    loanQuote.upfrontFee,
-                    loanQuote.useCollCompartment
-                    loanQuote.nonce
+                    loanOffChainQuote.borrower,
+                    loanOffChainQuote.collToken,
+                    loanOffChainQuote.loanToken,
+                    loanOffChainQuote.sendAmount,
+                    loanOffChainQuote.loanAmount,
+                    loanOffChainQuote.expiry,
+                    loanOffChainQuote.earliestRepay,
+                    loanOffChainQuote.repayAmount,
+                    loanOffChainQuote.validUntil,
+                    loanOffChainQuote.upfrontFee,
+                    loanOffChainQuote.useCollCompartment,
+                    loanOffChainQuote.nonce
                 )
             );
             if (
                 isConsumedQuote[payloadHash] ||
-                loanQuote.nonce >= loanQuoteNonce
+                loanOffChainQuote.nonce >= loanOffChainQuoteNonce
             ) {
                 revert Invalid();
             }
@@ -230,17 +232,20 @@ contract LenderVault is ReentrancyGuard {
             );
             address signer = ecrecover(
                 messageHash,
-                loanQuote.v,
-                loanQuote.r,
-                loanQuote.s
+                loanOffChainQuote.v,
+                loanOffChainQuote.r,
+                loanOffChainQuote.s
             );
 
-            if (signer != owner || loanQuote.validUntil < block.timestamp) {
+            if (
+                signer != owner ||
+                loanOffChainQuote.validUntil < block.timestamp
+            ) {
                 revert Invalid();
             }
             if (
-                loanQuote.borrower != address(0) &&
-                loanQuote.borrower != msg.sender
+                loanOffChainQuote.borrower != address(0) &&
+                loanOffChainQuote.borrower != msg.sender
             ) {
                 revert Invalid();
             }
@@ -250,18 +255,18 @@ contract LenderVault is ReentrancyGuard {
 
         DataTypes.Loan memory loan;
         loan.borrower = msg.sender;
-        loan.collToken = loanQuote.collToken;
-        loan.loanToken = loanQuote.loanToken;
-        loan.expiry = uint40(loanQuote.expiry);
-        loan.earliestRepay = uint40(loanQuote.earliestRepay);
-        loan.initRepayAmount = uint128(loanQuote.repayAmount);
-        loan.initLoanAmount = uint128(loanQuote.loanAmount);
-        loan.hasCollCompartment = loanQuote.useCollCompartment;
+        loan.collToken = loanOffChainQuote.collToken;
+        loan.loanToken = loanOffChainQuote.loanToken;
+        loan.expiry = uint40(loanOffChainQuote.expiry);
+        loan.earliestRepay = uint40(loanOffChainQuote.earliestRepay);
+        loan.initRepayAmount = uint128(loanOffChainQuote.repayAmount);
+        loan.initLoanAmount = uint128(loanOffChainQuote.loanAmount);
+        loan.hasCollCompartment = loanOffChainQuote.useCollCompartment;
 
         _borrowTransfers(
             loan,
-            loanQuote.sendAmount,
-            loanQuote.upfrontFee,
+            loanOffChainQuote.sendAmount,
+            loanOffChainQuote.upfrontFee,
             callbacker,
             data
         );
@@ -500,7 +505,7 @@ contract LenderVault is ReentrancyGuard {
                 onChainQuote.loanToken,
                 onChainQuote.tenor,
                 onChainQuote.timeUntilEarliestRepay,
-                onChainQuote.isNegativeInterestRate
+                onChainQuote.isNegativeInterestRate,
                 onChainQuote.useCollCompartment
             )
         );

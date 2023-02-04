@@ -25,6 +25,7 @@ library DataTypes {
         uint40 tenor;
         uint40 timeUntilEarliestRepay;
         bool isNegativeInterestRate;
+        bool useCollCompartment;
     }
 
     struct OffChainQuote {
