@@ -42,6 +42,9 @@ describe('RFQ', function () {
     await usdc.mint(vaultOwner.address, ONE_USDC.mul(100000))
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
+    await lenderFactory.addToWhitelist(0,usdc.address)
+    await lenderFactory.addToWhitelist(0,weth.address)
+
     return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth }
   }
 
