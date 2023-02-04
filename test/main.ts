@@ -84,7 +84,7 @@ describe('RFQ', function () {
           loanOffChainQuote.nonce
         ]
       )
-      /*
+      
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await vaultOwner.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
@@ -121,7 +121,7 @@ describe('RFQ', function () {
 
       // borrower cannot replay quote
       await expect(lenderVault.connect(borrower).borrowWithOffChainQuote(loanOffChainQuote, '0x0000000000000000000000000000000000000000', '0x')).to
-        .be.reverted*/
+        .be.reverted
     })
   })
 })
