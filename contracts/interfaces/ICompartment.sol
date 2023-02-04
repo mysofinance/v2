@@ -8,8 +8,8 @@ interface ICompartment {
      * @dev factory creates clone and then initializes implementation contract
      * @param vaultAddr address of vault
      * @param borrowerAddr address of borrower
-     * @param collTokenAddr address of collateral token
-     * @param loanIdx index of loan for given vault
+     * @param collTokenAddr address of coll token
+     * @param loanIdx index of the loan
      */
     function initialize(
         address vaultAddr,
@@ -21,13 +21,20 @@ interface ICompartment {
     /**
      * @notice function to unlock all collateral left in compartment
      * @dev this function can only be called by vault and returns all collateral to vault
+     * @param collTokenAddr pass in collToken addr to avoid callback reads gas cost
      */
-    function unlockCollToVault() external;
+    function unlockCollToVault(address collTokenAddr) external;
 
     /**
      * @notice function to transfer some amount of collateral to borrower on repay
      * @dev this function can only be called by vault and returns amount to borrower address
      * @param amount amount of collateral token to send back to borrower
+     * @param borrowerAddr address of borrower receiving transfer
+     * @param collTokenAddr address of collateral token being transferred
      */
-    function transferCollToBorrower(uint256 amount) external;
+    function transferCollToBorrower(
+        uint256 amount,
+        address borrowerAddr,
+        address collTokenAddr
+    ) external;
 }

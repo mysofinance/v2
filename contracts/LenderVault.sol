@@ -301,62 +301,30 @@ contract LenderVault is ReentrancyGuard {
             IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
         }
 
-        if (loan.hasCollCompartment) {
-            address implAddr = collTokenImplAddrs[loan.collToken];
-            bytes32 salt = keccak256(
-                abi.encode(
-                    implAddr,
-                    address(this),
-                    msg.sender,
-                    loan.collToken,
-                    loans.length
-                )
-            );
-            address _predictedNewCompartmentAddress = Clones
-                .predictDeterministicAddress(
-                    implAddr,
-                    salt,
-                    compartmentFactory
-                );
-            IERC20Metadata(loan.collToken).safeTransferFrom(
-                msg.sender,
-                _predictedNewCompartmentAddress,
-                sendAmount
-            );
-            loan.collTokenCompartmentAddr = ICompartmentFactory(
-                compartmentFactory
-            ).createCompartment(
-                    implAddr,
-                    address(this),
-                    msg.sender,
-                    loan.collToken,
-                    loans.length
-                );
-            if (
-                loan.collTokenCompartmentAddr != _predictedNewCompartmentAddress
-            ) {
-                revert InvalidCompartmentAddr();
-            }
-
-            if (
-                IERC20Metadata(loan.collToken).balanceOf(
-                    _predictedNewCompartmentAddress
-                ) < sendAmount
-            ) revert Invalid();
-        } else {
-            IERC20Metadata(loan.collToken).safeTransferFrom(
-                msg.sender,
-                address(this),
-                sendAmount
-            );
-        }
-
         uint256 loanTokenBalAfter = IERC20Metadata(loan.loanToken).balanceOf(
             address(this)
         );
+
+        // check exactly that at least correct loan amount is sent
+        if (loanTokenBalBefore - loanTokenBalAfter < loan.initLoanAmount) {
+            revert Invalid();
+        }
+
+        // send the vault full collateral amount
+        IERC20Metadata(loan.collToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            sendAmount
+        );
+
         uint256 collTokenBalAfter = IERC20Metadata(loan.collToken).balanceOf(
             address(this)
         );
+
+        // test that upfrontFee is not bigger than post transfer fee on collateral
+        if (collTokenBalAfter - collTokenBalBefore < upfrontFee) {
+            revert Invalid();
+        }
 
         uint256 reclaimable = collTokenBalAfter -
             collTokenBalBefore -
@@ -364,19 +332,17 @@ contract LenderVault is ReentrancyGuard {
         if (reclaimable != uint128(reclaimable)) {
             revert Invalid();
         }
-        loan.initCollAmount = uint128(reclaimable);
-        loans.push(loan);
-        lockedAmounts[loan.collToken] += uint128(reclaimable);
 
-        if (loanTokenBalBefore - loanTokenBalAfter < loan.initLoanAmount) {
-            revert Invalid();
+        if (loan.hasCollCompartment) {
+            (
+                loan.collTokenCompartmentAddr,
+                loan.initCollAmount
+            ) = createCompartments(loan, reclaimable);
+        } else {
+            loan.initCollAmount = uint128(reclaimable);
+            lockedAmounts[loan.collToken] += uint128(reclaimable);
         }
-        if (
-            !loan.hasCollCompartment &&
-            collTokenBalAfter - collTokenBalBefore < sendAmount
-        ) {
-            revert Invalid();
-        }
+        loans.push(loan);
     }
 
     function repay(
@@ -410,7 +376,9 @@ contract LenderVault is ReentrancyGuard {
 
         if (loan.hasCollCompartment) {
             ICompartment(loan.collTokenCompartmentAddr).transferCollToBorrower(
-                reclaimCollAmount
+                reclaimCollAmount,
+                loan.borrower,
+                loan.collToken
             );
         } else {
             IERC20Metadata(loanRepayInfo.collToken).safeTransfer(
@@ -439,6 +407,7 @@ contract LenderVault is ReentrancyGuard {
         if (loanTokenAmountReceived < loanRepayInfo.repayAmount) {
             revert Invalid();
         }
+        // balance only changes when no compartment
         if (
             !loan.hasCollCompartment &&
             collTokenBalBefore - collTokenBalAfter < reclaimCollAmount
@@ -447,7 +416,12 @@ contract LenderVault is ReentrancyGuard {
         }
 
         loan.amountRepaidSoFar += uint128(loanTokenAmountReceived);
-        lockedAmounts[loanRepayInfo.collToken] -= uint128(reclaimCollAmount);
+        // only update lockedAmounts when no compartment
+        if (!loan.hasCollCompartment) {
+            lockedAmounts[loanRepayInfo.collToken] -= uint128(
+                reclaimCollAmount
+            );
+        }
     }
 
     function unlockCollateral(
@@ -459,18 +433,18 @@ contract LenderVault is ReentrancyGuard {
             uint256 tmp = 0;
             DataTypes.Loan storage loan = loans[_loanIds[i]];
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
-                tmp =
-                    loan.initCollAmount -
-                    (loan.initCollAmount * loan.amountRepaidSoFar) /
-                    loan.initRepayAmount;
-            }
-            // compartments which default are more expensive...so something for Lenders to keep in mind
-            if (loan.hasCollCompartment) {
-                ICompartment(collTokenImplAddrs[loan.collToken])
-                    .unlockCollToVault();
+                if (loan.hasCollCompartment) {
+                    ICompartment(loan.collTokenCompartmentAddr)
+                        .unlockCollToVault(loan.collToken);
+                } else {
+                    tmp =
+                        loan.initCollAmount -
+                        (loan.initCollAmount * loan.amountRepaidSoFar) /
+                        loan.initRepayAmount;
+                    totalUnlockableColl += tmp;
+                }
             }
             loan.collUnlocked = true;
-            totalUnlockableColl += tmp;
             unchecked {
                 i++;
             }
@@ -501,5 +475,54 @@ contract LenderVault is ReentrancyGuard {
                 standingLoanOffer.useCollCompartment
             )
         );
+    }
+
+    // internal helper for stack running too deep
+    function createCompartments(
+        DataTypes.Loan memory loan,
+        uint256 reclaimable
+    ) internal returns (address compartmentAddr, uint128 initCollAmount) {
+        address implAddr = collTokenImplAddrs[loan.collToken];
+        bytes32 salt = keccak256(
+            abi.encode(
+                implAddr,
+                address(this),
+                msg.sender,
+                loan.collToken,
+                loans.length
+            )
+        );
+        address _predictedNewCompartmentAddress = Clones
+            .predictDeterministicAddress(implAddr, salt, compartmentFactory);
+
+        uint256 collTokenBalBefore = IERC20Metadata(loan.collToken).balanceOf(
+            _predictedNewCompartmentAddress
+        );
+
+        IERC20Metadata(loan.collToken).safeTransfer(
+            _predictedNewCompartmentAddress,
+            reclaimable
+        );
+
+        uint256 collTokenBalAfter = IERC20Metadata(loan.collToken).balanceOf(
+            _predictedNewCompartmentAddress
+        );
+
+        compartmentAddr = ICompartmentFactory(compartmentFactory)
+            .createCompartment(
+                implAddr,
+                address(this),
+                msg.sender,
+                loan.collToken,
+                loans.length
+            );
+        if (compartmentAddr != _predictedNewCompartmentAddress) {
+            revert InvalidCompartmentAddr();
+        }
+        // balance difference in coll token of the vault after...
+        // 1) transfer fee into vault on transfer from sender
+        // 2) remove upfrontFee
+        // 3) transfer fee into compartment from vault
+        initCollAmount = uint128(collTokenBalAfter - collTokenBalBefore);
     }
 }
