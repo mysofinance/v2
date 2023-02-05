@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStakeCompartment} from "../../interfaces/IStakeCompartment.sol";
 import {ICompartment} from "../../interfaces/ICompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
+import {ILenderFactory} from "../../interfaces/ILenderFactory.sol";
 import {DataTypes} from "../../DataTypes.sol";
 
 // start simple with just an example voting and rewards implementation
@@ -16,14 +17,15 @@ contract CurveStakingCompartment is Initializable, ICompartment {
     using SafeERC20 for IERC20;
 
     error InvalidSender();
+    error InvalidPool();
 
     address public vaultAddr;
     uint256 public loanIdx;
 
-    address immutable stakeAddr;
+    address public lenderFactory;
 
-    constructor(address _stakeAddr) {
-        stakeAddr = _stakeAddr;
+    constructor(address _lenderFactory) {
+        lenderFactory = _lenderFactory;
     }
 
     function initialize(
@@ -39,6 +41,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
     }
 
     // transfer coll on repays
+    // todo: withdraw from pool
     function transferCollToBorrower(
         uint256 amount,
         address borrowerAddr,
@@ -50,20 +53,34 @@ contract CurveStakingCompartment is Initializable, ICompartment {
 
     // not sure what the staking is and what else if anything needs to be passed in...
     // but this is the general layout for all the staking compartments...
-    // need to think about which pool address and tokens (possibly checks to make sure it's valid staking pool for collToken?)
+    // todo: add check that collToken is actually LP token for given crv pool by calling lp_token public getter???
     function _stake(
         address borrowerAddr,
         address collTokenAddr,
-        bytes memory
+        bytes memory data
     ) internal {
-        IStakeCompartment(collTokenAddr).stake(
+        // todo: think about data clashing resolution, how much data is passed for all cases, including flash loan case...
+        // this means decoding will have more data, but I'll leave as just one address for now
+        address crvPoolAddr = abi.decode(data, (address));
+        if (
+            !ILenderFactory(lenderFactory).whitelistedAddrs(
+                DataTypes.WhiteListType.POOL,
+                crvPoolAddr
+            )
+        ) revert InvalidPool();
+        IERC20(collTokenAddr).approve(crvPoolAddr, type(uint256).max);
+        uint256 currCollBalance = IERC20(collTokenAddr).balanceOf(
+            address(this)
+        );
+        IStakeCompartment(crvPoolAddr).deposit(
+            currCollBalance,
             borrowerAddr,
-            collTokenAddr,
-            stakeAddr
+            true
         );
     }
 
     // unlockColl this would be called on defaults
+    // todo: withdraw from pool
     function unlockCollToVault(address collTokenAddr) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
@@ -71,4 +88,6 @@ contract CurveStakingCompartment is Initializable, ICompartment {
         );
         IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
     }
+
+    //todo: mint/lock crv option less than expiry?
 }
