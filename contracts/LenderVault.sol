@@ -102,70 +102,73 @@ contract LenderVault is ReentrancyGuard {
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
 
-    function addOnChainQuote(
-        DataTypes.OnChainQuote calldata onChainQuote
+    function setOnChainQuote(
+        DataTypes.OnChainQuote calldata onChainQuote,
+        DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
+        uint256 oldOnChainQuoteId
     ) external {
         senderCheck();
-        // remove address 0 check since this will be 0 address will not be allowed to be whitelisted in factory
-        whitelistCheck(DataTypes.WhiteListType.TOKEN, onChainQuote.loanToken);
-        whitelistCheck(DataTypes.WhiteListType.TOKEN, onChainQuote.collToken);
-        if (
-            onChainQuote.collToken == onChainQuote.loanToken ||
-            onChainQuote.timeUntilEarliestRepay > onChainQuote.tenor ||
-            (onChainQuote.isNegativeInterestRate &&
-                onChainQuote.interestRatePctInBase > BASE)
-        ) {
-            revert Invalid();
-        }
-        bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
-        if (isOnChainQuote[onChainQuoteHash]) {
-            revert Invalid();
-        }
-        isOnChainQuote[onChainQuoteHash] = true;
-        onChainQuotes.push(onChainQuote);
-        emit OnChainQuote(onChainQuote, true);
-    }
-
-    function updateOnChainQuote(
-        uint256 oldOnChainQuoteId,
-        DataTypes.OnChainQuote calldata newOnChainQuote
-    ) external {
-        senderCheck();
-        uint256 arrayLen = onChainQuotes.length;
-        if (oldOnChainQuoteId > arrayLen - 1) {
-            revert Invalid();
-        }
-        DataTypes.OnChainQuote memory oldOnChainQuote = onChainQuotes[
-            oldOnChainQuoteId
-        ];
-        bytes32 oldOnChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
-        isOnChainQuote[oldOnChainQuoteHash] = false;
-
-        bool deleteOnChainQuote = newOnChainQuote.collToken == address(0) ||
-            newOnChainQuote.loanToken == address(0);
-        if (deleteOnChainQuote) {
-            onChainQuotes[oldOnChainQuoteId] = onChainQuotes[arrayLen - 1];
-            onChainQuotes.pop();
-        } else {
-            // since address(0) will fail checks and we could have address(0) on deletes...
-            // need to move the check inside the else condition on update quotes
+        if (onChainQuoteUpdateType == DataTypes.OnChainQuoteUpdateType.ADD) {
+            // CASE 1: add on-chain quote
+            // remove address 0 check since this will be 0 address will not be allowed to be whitelisted in factory
             whitelistCheck(
                 DataTypes.WhiteListType.TOKEN,
-                newOnChainQuote.loanToken
+                onChainQuote.loanToken
             );
             whitelistCheck(
                 DataTypes.WhiteListType.TOKEN,
-                newOnChainQuote.collToken
+                onChainQuote.collToken
             );
-            bytes32 newOnChainQuoteHash = hashOnChainQuote(newOnChainQuote);
-            if (oldOnChainQuoteHash == newOnChainQuoteHash) {
+            if (
+                onChainQuote.collToken == onChainQuote.loanToken ||
+                onChainQuote.timeUntilEarliestRepay > onChainQuote.tenor ||
+                (onChainQuote.isNegativeInterestRate &&
+                    onChainQuote.interestRatePctInBase > BASE)
+            ) {
                 revert Invalid();
             }
-            isOnChainQuote[newOnChainQuoteHash] = true;
-            onChainQuotes[oldOnChainQuoteId] = newOnChainQuote;
+            bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
+            if (isOnChainQuote[onChainQuoteHash]) {
+                revert Invalid();
+            }
+            isOnChainQuote[onChainQuoteHash] = true;
+            onChainQuotes.push(onChainQuote);
+            emit OnChainQuote(onChainQuote, true);
+        } else {
+            uint256 arrayLen = onChainQuotes.length;
+            if (oldOnChainQuoteId > arrayLen - 1) {
+                revert Invalid();
+            }
+            DataTypes.OnChainQuote memory oldOnChainQuote = onChainQuotes[
+                oldOnChainQuoteId
+            ];
+            bytes32 oldOnChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
+            isOnChainQuote[oldOnChainQuoteHash] = false;
+
+            if (
+                onChainQuoteUpdateType ==
+                DataTypes.OnChainQuoteUpdateType.DELETE
+            ) {
+                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[arrayLen - 1];
+                onChainQuotes.pop();
+            } else {
+                whitelistCheck(
+                    DataTypes.WhiteListType.TOKEN,
+                    onChainQuote.loanToken
+                );
+                whitelistCheck(
+                    DataTypes.WhiteListType.TOKEN,
+                    onChainQuote.collToken
+                );
+                bytes32 newOnChainQuoteHash = hashOnChainQuote(onChainQuote);
+                if (oldOnChainQuoteHash == newOnChainQuoteHash) {
+                    revert Invalid();
+                }
+                isOnChainQuote[newOnChainQuoteHash] = true;
+                emit OnChainQuote(onChainQuote, true);
+            }
+            emit OnChainQuote(oldOnChainQuote, false);
         }
-        emit OnChainQuote(oldOnChainQuote, false);
-        emit OnChainQuote(newOnChainQuote, true);
     }
 
     function borrowWithOnChainQuote(

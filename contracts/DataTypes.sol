@@ -75,4 +75,10 @@ library DataTypes {
         FLASHLOAN,
         POOL
     }
+
+    enum OnChainQuoteUpdateType {
+        ADD,
+        OVERWRITE,
+        DELETE
+    }
 }

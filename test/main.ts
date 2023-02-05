@@ -5,6 +5,7 @@ const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
+const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60*60*24)
 
 describe('Vault and Test Token Deployment', function () {
@@ -153,7 +154,7 @@ describe('Vault and Test Token Deployment', function () {
         isNegativeInterestRate: false,
         useCollCompartment: false
       }
-      await lenderVault.connect(vaultOwner).addOnChainQuote(onChainQuote)
+      await lenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 0, 0)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
