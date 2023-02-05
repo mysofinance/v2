@@ -391,7 +391,8 @@ contract LenderVault is ReentrancyGuard {
                 reclaimable,
                 collTokenImplAddrs[loan.collToken],
                 compartmentFactory,
-                loans.length
+                loans.length,
+                data
             );
         } else {
             loan.initCollAmount = uint128(reclaimable);

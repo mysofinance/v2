@@ -10,7 +10,8 @@ interface ILenderFactory {
         uint256 reclaimable,
         address implAddr,
         address compartmentFactory,
-        uint256 numLoans
+        uint256 numLoans,
+        bytes memory data
     ) external returns (address compartmentAddr, uint128 initCollAmount);
 
     function registeredVaults(address vaultAddr) external returns (bool);

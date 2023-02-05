@@ -10,12 +10,14 @@ interface ICompartment {
      * @param borrowerAddr address of borrower
      * @param collTokenAddr address of coll token
      * @param loanIdx index of the loan
+     * @param data data needed possibly if stake or rewards pool
      */
     function initialize(
         address vaultAddr,
         address borrowerAddr,
         address collTokenAddr,
-        uint256 loanIdx
+        uint256 loanIdx,
+        bytes memory data
     ) external;
 
     /**

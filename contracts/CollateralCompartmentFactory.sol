@@ -43,7 +43,8 @@ contract CollateralCompartmentFactory {
         address vaultAddr,
         address borrowerAddr,
         address collTokenAddr,
-        uint256 loanIdx
+        uint256 loanIdx,
+        bytes memory data
     ) external returns (address) {
         if (!isValidImplementation[implementationAddr])
             revert InvalidImplAddr();
@@ -71,7 +72,8 @@ contract CollateralCompartmentFactory {
             vaultAddr,
             borrowerAddr,
             collTokenAddr,
-            loanIdx
+            loanIdx,
+            data
         );
 
         isCompartment[newCompartmentInstanceAddr] = true;

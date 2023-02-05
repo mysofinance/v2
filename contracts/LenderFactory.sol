@@ -58,7 +58,8 @@ contract LenderFactory is ReentrancyGuard, ILenderFactory {
         uint256 reclaimable,
         address implAddr,
         address compartmentFactory,
-        uint256 numLoans
+        uint256 numLoans,
+        bytes memory data
     ) external returns (address compartmentAddr, uint128 initCollAmount) {
         if (!registeredVaults[msg.sender]) revert InvalidSender();
         bytes32 salt = keccak256(
@@ -84,8 +85,15 @@ contract LenderFactory is ReentrancyGuard, ILenderFactory {
             reclaimable
         );
 
-        uint256 collTokenBalAfter = IERC20Metadata(loan.collToken).balanceOf(
-            _predictedNewCompartmentAddress
+        // balance difference in coll token of the vault after...
+        // 1) transfer fee into vault on transfer from sender
+        // 2) remove upfrontFee
+        // 3) transfer fee into compartment from vault
+        // had to do in one transaction instead of separate collTokenBalAfter for stack depth...
+        initCollAmount = uint128(
+            IERC20Metadata(loan.collToken).balanceOf(
+                _predictedNewCompartmentAddress
+            ) - collTokenBalBefore
         );
 
         compartmentAddr = ICompartmentFactory(compartmentFactory)
@@ -94,15 +102,11 @@ contract LenderFactory is ReentrancyGuard, ILenderFactory {
                 address(this),
                 msg.sender,
                 loan.collToken,
-                numLoans
+                numLoans,
+                data
             );
         if (compartmentAddr != _predictedNewCompartmentAddress) {
             revert InvalidCompartmentAddr();
         }
-        // balance difference in coll token of the vault after...
-        // 1) transfer fee into vault on transfer from sender
-        // 2) remove upfrontFee
-        // 3) transfer fee into compartment from vault
-        initCollAmount = uint128(collTokenBalAfter - collTokenBalBefore);
     }
 }

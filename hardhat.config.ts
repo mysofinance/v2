@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomiclabs/hardhat-ethers";
+require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require("dotenv").config();
 
@@ -24,6 +25,18 @@ const config: HardhatUserConfig = {
     runOnCompile: true,
     strict: true,
     only: [],
+  },
+  abiExporter: {
+    path: './data/abi',
+    runOnCompile: true,
+    clear: true,
+    flat: false,
+    only: [],
+    spacing: 2,
+    format: "json",
+  },
+  gasReporter: {
+    enabled: true
   }
 };
 
