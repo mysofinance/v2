@@ -7,8 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStakeCompartment} from "../../interfaces/IStakeCompartment.sol";
 import {ICompartment} from "../../interfaces/ICompartment.sol";
-import {ILenderVault} from "../../interfaces/ILenderVault.sol";
-import {ILenderFactory} from "../../interfaces/ILenderFactory.sol";
+import {ILenderVaultFactory} from "../../interfaces/ILenderVaultFactory.sol";
 import {DataTypes} from "../../DataTypes.sol";
 
 // start simple with just an example voting and rewards implementation
@@ -63,7 +62,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
         // this means decoding will have more data, but I'll leave as just one address for now
         address crvPoolAddr = abi.decode(data, (address));
         if (
-            !ILenderFactory(lenderFactory).whitelistedAddrs(
+            !ILenderVaultFactory(lenderFactory).whitelistedAddrs(
                 DataTypes.WhiteListType.POOL,
                 crvPoolAddr
             )

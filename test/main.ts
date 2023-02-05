@@ -1,11 +1,13 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 
-const ONE_USDC = ethers.BigNumber.from('1000000')
-const ONE_WETH = ethers.BigNumber.from('1000000000000000000')
-const MAX_UINT128 = ethers.BigNumber.from('340282366920938463463374607431768211455')
+const BASE = ethers.BigNumber.from(10).pow(18)
+const ONE_USDC = ethers.BigNumber.from(10).pow(6)
+const ONE_WETH = ethers.BigNumber.from(10).pow(18)
+const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
+const ONE_DAY = ethers.BigNumber.from(60*60*24)
 
-describe('RFQ', function () {
+describe('Vault and Test Token Deployment', function () {
   async function setupTest() {
     const [vaultOwner, borrower, tokenDeployer] = await ethers.getSigners()
 
@@ -15,16 +17,16 @@ describe('RFQ', function () {
     const compartmentFactory = await CompartmentFactory.deploy(['0x0000000000000000000000000000000000000001'])
     await compartmentFactory.deployed()
 
-    //deploy LenderFactory
-    const LenderFactory = await ethers.getContractFactory('LenderFactory')
-    await LenderFactory.connect(vaultOwner)
-    const lenderFactory = await LenderFactory.deploy()
-    await lenderFactory.deployed()
+    //deploy LenderVaultFactory
+    const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
+    await LenderVaultFactory.connect(vaultOwner)
+    const lenderVaultFactory = await LenderVaultFactory.deploy()
+    await lenderVaultFactory.deployed()
 
     // deploy lenderVault
     const LenderVault = await ethers.getContractFactory('LenderVault')
     await LenderVault.connect(vaultOwner)
-    const lenderVault = await LenderVault.deploy(lenderFactory.address, compartmentFactory.address)
+    const lenderVault = await LenderVault.deploy(lenderVaultFactory.address, compartmentFactory.address)
     await lenderVault.deployed()
 
     // deploy test tokens
@@ -42,24 +44,23 @@ describe('RFQ', function () {
     await usdc.mint(vaultOwner.address, ONE_USDC.mul(100000))
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
-    await lenderFactory.addToWhitelist(0,usdc.address)
-    await lenderFactory.addToWhitelist(0,weth.address)
+    await lenderVaultFactory.addToWhitelist(0,usdc.address)
+    await lenderVaultFactory.addToWhitelist(0,weth.address)
 
     return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth }
   }
 
-  describe('...', function () {
-    it('...', async function () {
+  describe('Off-Chain Quote Testing', function () {
+    it('Should process off-chain quote correctly, without possibility of replaying', async function () {
       const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(vaultOwner).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // lenderVault owner gives quote
-
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      let loanOffChainQuote = {
+      let offChainQuote = {
         borrower: borrower.address,
         collToken: weth.address,
         loanToken: usdc.address,
@@ -79,21 +80,20 @@ describe('RFQ', function () {
       const payload = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bool', 'uint256'],
         [
-          loanOffChainQuote.borrower,
-          loanOffChainQuote.collToken,
-          loanOffChainQuote.loanToken,
-          loanOffChainQuote.sendAmount,
-          loanOffChainQuote.loanAmount,
-          loanOffChainQuote.expiry,
-          loanOffChainQuote.earliestRepay,
-          loanOffChainQuote.repayAmount,
-          loanOffChainQuote.validUntil,
-          loanOffChainQuote.upfrontFee,
-          loanOffChainQuote.useCollCompartment,
-          loanOffChainQuote.nonce
+          offChainQuote.borrower,
+          offChainQuote.collToken,
+          offChainQuote.loanToken,
+          offChainQuote.sendAmount,
+          offChainQuote.loanAmount,
+          offChainQuote.expiry,
+          offChainQuote.earliestRepay,
+          offChainQuote.repayAmount,
+          offChainQuote.validUntil,
+          offChainQuote.upfrontFee,
+          offChainQuote.useCollCompartment,
+          offChainQuote.nonce
         ]
       )
-      
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await vaultOwner.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
@@ -102,13 +102,10 @@ describe('RFQ', function () {
       console.log('Signature:', sig)
       expect(recoveredAddr).to.equal(vaultOwner.address)
 
-      // borrower adds sig to quote
-      loanOffChainQuote.v = sig.v
-      loanOffChainQuote.r = sig.r
-      loanOffChainQuote.s = sig.s
-
-      // borrower approves lenderVault
-      await weth.connect(borrower).approve(lenderVault.address, MAX_UINT128)
+      // lender add sig to quote and pass to borrower
+      offChainQuote.v = sig.v
+      offChainQuote.r = sig.r
+      offChainQuote.s = sig.s
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -116,8 +113,9 @@ describe('RFQ', function () {
       const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
-      // borrower executes quote
-      const tx = await lenderVault.connect(borrower).borrowWithOffChainQuote(loanOffChainQuote, '0x0000000000000000000000000000000000000000', '0x')
+      // borrower approves and executes quote
+      await weth.connect(borrower).approve(lenderVault.address, MAX_UINT128)
+      await lenderVault.connect(borrower).borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -129,8 +127,52 @@ describe('RFQ', function () {
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
       // borrower cannot replay quote
-      await expect(lenderVault.connect(borrower).borrowWithOffChainQuote(loanOffChainQuote, '0x0000000000000000000000000000000000000000', '0x')).to
+      await expect(lenderVault.connect(borrower).borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')).to
         .be.reverted
+    })
+  })
+
+  describe('On-Chain Quote Testing', function () {
+    it('Should process on-chain quote correctly', async function () {
+      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(vaultOwner).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let onChainQuote = {
+        loanPerCollUnit: ONE_USDC.mul(1000),
+        interestRatePctInBase: BASE.mul(10).div(100),
+        upfrontFeePctInBase: BASE.mul(1).div(100),
+        collToken: weth.address,
+        loanToken: usdc.address,
+        tenor: ONE_DAY.mul(365),
+        timeUntilEarliestRepay: 0,
+        isNegativeInterestRate: false,
+        useCollCompartment: false
+      }
+      await lenderVault.connect(vaultOwner).addOnChainQuote(onChainQuote)
+
+      // check balance pre borrow
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await weth.connect(borrower).approve(lenderVault.address, MAX_UINT128)
+      await lenderVault.connect(borrower).borrowWithOnChainQuote(onChainQuote, ONE_WETH, '0x0000000000000000000000000000000000000000', '0x')
+
+      // check balance post borrow
+      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
     })
   })
 })

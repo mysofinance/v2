@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
 import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
-import {ILenderFactory} from "./interfaces/ILenderFactory.sol";
+import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVault is ReentrancyGuard {
@@ -30,7 +30,7 @@ contract LenderVault is ReentrancyGuard {
     address owner;
     address newOwner;
     address compartmentFactory;
-    address lenderFactory;
+    address lenderVaultFactory;
 
     /*
     can remove ILendingPool because also interest bearing tokens can be deposited 
@@ -48,7 +48,7 @@ contract LenderVault is ReentrancyGuard {
     constructor(address _lenderFactoryAddr, address _compartmentFactoryAddr) {
         owner = msg.sender;
         loanOffChainQuoteNonce = 1;
-        lenderFactory = _lenderFactoryAddr;
+        lenderVaultFactory = _lenderFactoryAddr;
         compartmentFactory = _compartmentFactoryAddr;
     }
 
@@ -386,7 +386,7 @@ contract LenderVault is ReentrancyGuard {
             (
                 loan.collTokenCompartmentAddr,
                 loan.initCollAmount
-            ) = ILenderFactory(lenderFactory).createCompartments(
+            ) = ILenderVaultFactory(lenderVaultFactory).createCompartments(
                 loan,
                 reclaimable,
                 collTokenImplAddrs[loan.collToken],
@@ -550,7 +550,7 @@ contract LenderVault is ReentrancyGuard {
         _owner = owner;
         _newOwner = newOwner;
         _compartmentFactory = compartmentFactory;
-        _lenderFactory = lenderFactory;
+        _lenderFactory = lenderVaultFactory;
     }
 
     function senderCheck() internal view {
@@ -564,7 +564,10 @@ contract LenderVault is ReentrancyGuard {
         address _addrToCheck
     ) internal {
         if (
-            !ILenderFactory(lenderFactory).whitelistedAddrs(_type, _addrToCheck)
+            !ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
+                _type,
+                _addrToCheck
+            )
         ) revert Invalid();
     }
 }

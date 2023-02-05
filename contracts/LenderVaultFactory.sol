@@ -4,15 +4,14 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
 import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
-import {ILenderFactory} from "./interfaces/ILenderFactory.sol";
+import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-contract LenderFactory is ReentrancyGuard, ILenderFactory {
+contract LenderVaultFactory is ILenderVaultFactory {
     using SafeERC20 for IERC20Metadata;
 
     error InvalidCompartmentAddr();
