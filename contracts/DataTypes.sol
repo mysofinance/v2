@@ -12,6 +12,8 @@ library DataTypes {
         uint128 initRepayAmount;
         uint128 amountRepaidSoFar;
         bool collUnlocked;
+        bool hasCollCompartment;
+        address collTokenCompartmentAddr;
     }
 
     struct OnChainQuote {
@@ -23,6 +25,7 @@ library DataTypes {
         uint40 tenor;
         uint40 timeUntilEarliestRepay;
         bool isNegativeInterestRate;
+        bool useCollCompartment;
     }
 
     struct OffChainQuote {
@@ -36,6 +39,7 @@ library DataTypes {
         uint256 repayAmount;
         uint256 validUntil;
         uint256 upfrontFee;
+        bool useCollCompartment;
         uint256 nonce;
         uint8 v;
         bytes32 r;
@@ -61,5 +65,20 @@ library DataTypes {
         uint256 repayAmount;
         uint256 validUntil;
         uint256 upfrontFee;
+        bool useCollCompartment;
+    }
+
+    enum WhiteListType {
+        TOKEN,
+        STRATEGY,
+        COMPARTMENT,
+        FLASHLOAN,
+        POOL
+    }
+
+    enum OnChainQuoteUpdateType {
+        ADD,
+        OVERWRITE,
+        DELETE
     }
 }

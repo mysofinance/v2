@@ -3,8 +3,7 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
-
-//import {ICompartment} from "interfaces/ICompartment.sol";
+import {ICompartment} from "./interfaces/ICompartment.sol";
 
 // start simple with just an example voting and rewards implementation
 // could make a mapping later for more flexibility
@@ -13,15 +12,15 @@ contract CollateralCompartmentFactory {
     error ZeroAddr();
 
     address[] compartmentImplementations;
-    mapping(address => bool) isValidImplementation;
+    mapping(address => bool) public isValidImplementation;
     mapping(address => bool) public isCompartment;
     address[] allCompartments;
 
-    constructor(address[] memory _Impls) {
-        for (uint i = 0; i < _Impls.length; ) {
-            if (!isValidImplementation[_Impls[i]]) {
-                compartmentImplementations.push(_Impls[i]);
-                isValidImplementation[_Impls[i]] = true;
+    constructor(address[] memory _impls) {
+        for (uint i = 0; i < _impls.length; ) {
+            if (!isValidImplementation[_impls[i]]) {
+                compartmentImplementations.push(_impls[i]);
+                isValidImplementation[_impls[i]] = true;
             }
             unchecked {
                 i++;
@@ -44,7 +43,8 @@ contract CollateralCompartmentFactory {
         address vaultAddr,
         address borrowerAddr,
         address collTokenAddr,
-        uint256 loanIdx
+        uint256 loanIdx,
+        bytes memory data
     ) external returns (address) {
         if (!isValidImplementation[implementationAddr])
             revert InvalidImplAddr();
@@ -68,12 +68,13 @@ contract CollateralCompartmentFactory {
             salt
         );
 
-        // ICompartment(newCompartmentInstanceAddr).initialize(
-        //     vaultAddr,
-        //     borrowerAddr,
-        //     collTokenAddr,
-        //     loanIdx
-        // );
+        ICompartment(newCompartmentInstanceAddr).initialize(
+            vaultAddr,
+            borrowerAddr,
+            collTokenAddr,
+            loanIdx,
+            data
+        );
 
         isCompartment[newCompartmentInstanceAddr] = true;
         allCompartments.push(newCompartmentInstanceAddr);
