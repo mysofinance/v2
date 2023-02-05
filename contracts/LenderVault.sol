@@ -9,6 +9,7 @@ import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
 import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
+import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVault is ReentrancyGuard {
@@ -167,36 +168,27 @@ contract LenderVault is ReentrancyGuard {
         emit OnChainQuote(newOnChainQuote, true);
     }
 
-    function borrow(
-        address collToken,
-        address loanToken,
-        uint256 sendAmount,
-        address callbacker,
-        bytes calldata data
-    ) external nonReentrant {
-        address strategyAddr = autoQuoteStrategy[collToken][loanToken];
-        if (strategyAddr == address(0)) {
-            revert Invalid();
-        }
-        currLoanId += 1;
-        DataTypes.OnChainQuote memory onChainQuote; // = IAutoStrategy(strategyAddr).getStrategyValues()
-        (
-            uint256 feeAmount,
-            DataTypes.Loan memory loan
-        ) = _getFeeAndLoanExclCollAmount(onChainQuote, sendAmount);
-        _borrowTransfers(loan, sendAmount, feeAmount, callbacker, data);
-    }
-
     function borrowWithOnChainQuote(
-        DataTypes.OnChainQuote calldata onChainQuote,
+        DataTypes.OnChainQuote memory onChainQuote,
+        bool isAutoQuote,
         uint256 sendAmount,
         address callbacker,
         bytes calldata data
     ) external nonReentrant {
-        if (!isOnChainQuote[hashOnChainQuote(onChainQuote)]) {
-            revert Invalid();
-        }
         currLoanId += 1;
+        if (isAutoQuote) {
+            address strategyAddr = autoQuoteStrategy[onChainQuote.collToken][
+                onChainQuote.loanToken
+            ];
+            if (strategyAddr == address(0)) {
+                revert Invalid();
+            }
+            onChainQuote = IAutoQuoteStrategy(strategyAddr).getOnChainQuote();
+        } else {
+            if (!isOnChainQuote[hashOnChainQuote(onChainQuote)]) {
+                revert Invalid();
+            }
+        }
         (
             uint256 feeAmount,
             DataTypes.Loan memory loan

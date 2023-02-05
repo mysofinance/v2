@@ -163,7 +163,7 @@ describe('Vault and Test Token Deployment', function () {
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(lenderVault.address, MAX_UINT128)
-      await lenderVault.connect(borrower).borrowWithOnChainQuote(onChainQuote, ONE_WETH, '0x0000000000000000000000000000000000000000', '0x')
+      await lenderVault.connect(borrower).borrowWithOnChainQuote(onChainQuote, false, ONE_WETH, '0x0000000000000000000000000000000000000000', '0x')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
