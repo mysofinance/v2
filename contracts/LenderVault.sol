@@ -183,10 +183,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
             }
         }
         (
-            uint256 feeAmount,
+            uint256 upfrontFee,
             DataTypes.Loan memory loan
-        ) = _getFeeAndLoanExclCollAmount(onChainQuote, sendAmount);
-        _borrowTransfers(loan, sendAmount, feeAmount, callbacker, data);
+        ) = _getFeeAndLoanStructWithoutCollAmount(onChainQuote, sendAmount);
+        _borrowTransfers(loan, sendAmount, upfrontFee, callbacker, data);
     }
 
     function borrowWithOffChainQuote(
@@ -265,8 +265,8 @@ contract LenderVault is ReentrancyGuard, Initializable {
         loan.loanToken = loanOffChainQuote.loanToken;
         loan.expiry = uint40(loanOffChainQuote.expiry);
         loan.earliestRepay = uint40(loanOffChainQuote.earliestRepay);
-        loan.initRepayAmount = uint128(loanOffChainQuote.repayAmount);
-        loan.initLoanAmount = uint128(loanOffChainQuote.loanAmount);
+        loan.initRepayAmount = toUint128(loanOffChainQuote.repayAmount);
+        loan.initLoanAmount = toUint128(loanOffChainQuote.loanAmount);
         loan.hasCollCompartment = loanOffChainQuote.useCollCompartment;
 
         _borrowTransfers(
@@ -278,15 +278,12 @@ contract LenderVault is ReentrancyGuard, Initializable {
         );
     }
 
-    function _getFeeAndLoanExclCollAmount(
+    function _getFeeAndLoanStructWithoutCollAmount(
         DataTypes.OnChainQuote memory onChainQuote,
         uint256 sendAmount
-    ) internal view returns (uint256 feeAmount, DataTypes.Loan memory loan) {
+    ) internal view returns (uint256 upfrontFee, DataTypes.Loan memory loan) {
         uint256 loanAmount = (onChainQuote.loanPerCollUnit * sendAmount) /
             (10 ** IERC20Metadata(onChainQuote.collToken).decimals());
-        if (uint128(loanAmount) != loanAmount) {
-            revert Invalid();
-        }
         uint256 repayAmount;
         if (onChainQuote.isNegativeInterestRate) {
             repayAmount =
@@ -297,20 +294,16 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 (loanAmount * (BASE + onChainQuote.interestRatePctInBase)) /
                 BASE;
         }
-        if (uint128(repayAmount) != repayAmount) {
-            revert Invalid();
-        }
-
         loan.borrower = msg.sender;
         loan.collToken = onChainQuote.collToken;
         loan.loanToken = onChainQuote.loanToken;
-        loan.initLoanAmount = uint128(loanAmount);
-        loan.initRepayAmount = uint128(repayAmount);
+        loan.initLoanAmount = toUint128(loanAmount);
+        loan.initRepayAmount = toUint128(repayAmount);
         loan.expiry = uint40(block.timestamp + onChainQuote.tenor);
         loan.earliestRepay = uint40(
             block.timestamp + onChainQuote.timeUntilEarliestRepay
         );
-        feeAmount = (sendAmount * onChainQuote.upfrontFeePctInBase) / BASE;
+        upfrontFee = (sendAmount * onChainQuote.upfrontFeePctInBase) / BASE;
     }
 
     function _borrowTransfers(
@@ -367,10 +360,9 @@ contract LenderVault is ReentrancyGuard, Initializable {
             revert Invalid();
         }
 
-        uint256 reclaimable = tokenBalAfter - collTokenBalBefore - upfrontFee;
-        if (reclaimable != uint128(reclaimable)) {
-            revert Invalid();
-        }
+        uint128 reclaimable = toUint128(
+            tokenBalAfter - collTokenBalBefore - upfrontFee
+        );
 
         if (loan.hasCollCompartment) {
             (
@@ -385,8 +377,8 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 data
             );
         } else {
-            loan.initCollAmount = uint128(reclaimable);
-            lockedAmounts[loan.collToken] += uint128(reclaimable);
+            loan.initCollAmount = reclaimable;
+            lockedAmounts[loan.collToken] += reclaimable;
         }
         loans.push(loan);
     }
@@ -412,8 +404,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
         ) {
             revert Invalid();
         }
-        uint256 reclaimCollAmount = (loan.initCollAmount *
-            loanRepayInfo.repayAmount) / loan.initRepayAmount;
+        uint128 reclaimCollAmount = toUint128(
+            (loan.initCollAmount * loanRepayInfo.repayAmount) /
+                loan.initRepayAmount
+        );
 
         uint256 loanTokenBalBefore = IERC20Metadata(loanRepayInfo.loanToken)
             .balanceOf(address(this));
@@ -446,8 +440,9 @@ contract LenderVault is ReentrancyGuard, Initializable {
         uint256 loanTokenBalAfter = IERC20Metadata(loanRepayInfo.loanToken)
             .balanceOf(address(this));
 
-        uint256 loanTokenAmountReceived = loanTokenBalAfter -
-            loanTokenBalBefore;
+        uint128 loanTokenAmountReceived = toUint128(
+            loanTokenBalAfter - loanTokenBalBefore
+        );
         // uint256 collTokenBalAfter = IERC20Metadata(loanRepayInfo.collToken)
         //     .balanceOf(address(this));
 
@@ -462,12 +457,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
         //     revert Invalid();
         // }
 
-        loan.amountRepaidSoFar += uint128(loanTokenAmountReceived);
+        loan.amountRepaidSoFar += loanTokenAmountReceived;
         // only update lockedAmounts when no compartment
         if (!loan.hasCollCompartment) {
-            lockedAmounts[loanRepayInfo.collToken] -= uint128(
-                reclaimCollAmount
-            );
+            lockedAmounts[loanRepayInfo.collToken] -= reclaimCollAmount;
         }
     }
 
@@ -559,5 +552,12 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 _addrToCheck
             )
         ) revert Invalid();
+    }
+
+    function toUint128(uint256 x) internal pure returns (uint128 y) {
+        y = uint128(x);
+        if (y != x) {
+            revert Invalid();
+        }
     }
 }
