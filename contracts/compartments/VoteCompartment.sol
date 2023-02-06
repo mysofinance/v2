@@ -26,9 +26,10 @@ contract VoteCompartment is Initializable, ICompartment {
         address _collTokenAddr,
         uint256 _loanIdx,
         bytes memory
-    ) external initializer {
+    ) external initializer returns (uint256 collTokenBalAfter) {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
+        collTokenBalAfter = IERC20(_collTokenAddr).balanceOf(address(this));
         _delegate(_borrowerAddr, _collTokenAddr);
     }
 
@@ -45,11 +46,17 @@ contract VoteCompartment is Initializable, ICompartment {
 
     // transfer coll on repays
     function transferCollToBorrower(
-        uint256 amount,
+        uint256 reclaimCollAmount,
+        uint256 initCollAmount,
         address borrowerAddr,
         address collTokenAddr
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
+        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
+            address(this)
+        );
+        uint256 amount = (reclaimCollAmount * currentCompartmentBal) /
+            initCollAmount;
         IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
     }
 

@@ -5,6 +5,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
 import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
@@ -12,10 +13,10 @@ import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-contract LenderVault is ReentrancyGuard {
+contract LenderVault is ReentrancyGuard, Initializable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 BASE = 1e18;
+    uint256 constant BASE = 1e18;
 
     mapping(address => uint256) public lockedAmounts;
     mapping(bytes32 => bool) isConsumedQuote;
@@ -28,8 +29,6 @@ contract LenderVault is ReentrancyGuard {
 
     uint256 currLoanId;
     uint256 loanOffChainQuoteNonce;
-    address owner;
-    address newOwner;
     address compartmentFactory;
     address lenderVaultFactory;
 
@@ -46,25 +45,13 @@ contract LenderVault is ReentrancyGuard {
 
     event OnChainQuote(DataTypes.OnChainQuote onChainQuote, bool isActive);
 
-    constructor(address _lenderFactoryAddr, address _compartmentFactoryAddr) {
-        owner = msg.sender;
+    function initialize(
+        address _compartmentFactory,
+        address _lenderVaultFactory
+    ) external initializer {
+        compartmentFactory = _compartmentFactory;
+        lenderVaultFactory = _lenderVaultFactory;
         loanOffChainQuoteNonce = 1;
-        lenderVaultFactory = _lenderFactoryAddr;
-        compartmentFactory = _compartmentFactoryAddr;
-    }
-
-    function proposeNewOwner(address _newOwner) external {
-        if (msg.sender != owner || _newOwner == address(0)) {
-            revert Invalid();
-        }
-        newOwner = _newOwner;
-    }
-
-    function claimOwnership() external {
-        if (msg.sender != newOwner) {
-            revert Invalid();
-        }
-        owner = newOwner;
     }
 
     function invalidateQuotes() external {
@@ -99,6 +86,9 @@ contract LenderVault is ReentrancyGuard {
         if (amount > vaultBalance - lockedAmounts[token]) {
             revert Invalid();
         }
+        address owner = ILenderVaultFactory(lenderVaultFactory).vaultOwner(
+            address(this)
+        );
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
 
@@ -251,7 +241,10 @@ contract LenderVault is ReentrancyGuard {
             );
 
             if (
-                signer != owner ||
+                signer !=
+                ILenderVaultFactory(lenderVaultFactory).vaultOwner(
+                    address(this)
+                ) ||
                 loanOffChainQuote.validUntil < block.timestamp
             ) {
                 revert Invalid();
@@ -349,14 +342,14 @@ contract LenderVault is ReentrancyGuard {
             IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
         }
 
-        uint256 tokenBalAfter = IERC20Metadata(loan.loanToken).balanceOf(
-            address(this)
-        );
+        // uint256 tokenBalAfter = IERC20Metadata(loan.loanToken).balanceOf(
+        //     address(this)
+        // );
 
         // check exactly that at least correct loan amount is sent
-        if (loanTokenBalBefore - tokenBalAfter < loan.initLoanAmount) {
-            revert Invalid();
-        }
+        // if (loanTokenBalBefore - tokenBalAfter < loan.initLoanAmount) {
+        //     revert Invalid();
+        // }
 
         // send the vault full collateral amount
         IERC20Metadata(loan.collToken).safeTransferFrom(
@@ -365,7 +358,9 @@ contract LenderVault is ReentrancyGuard {
             sendAmount
         );
 
-        tokenBalAfter = IERC20Metadata(loan.collToken).balanceOf(address(this));
+        uint256 tokenBalAfter = IERC20Metadata(loan.collToken).balanceOf(
+            address(this)
+        );
 
         // test that upfrontFee is not bigger than post transfer fee on collateral
         if (tokenBalAfter - collTokenBalBefore < upfrontFee) {
@@ -422,12 +417,13 @@ contract LenderVault is ReentrancyGuard {
 
         uint256 loanTokenBalBefore = IERC20Metadata(loanRepayInfo.loanToken)
             .balanceOf(address(this));
-        uint256 collTokenBalBefore = IERC20Metadata(loanRepayInfo.collToken)
-            .balanceOf(address(this));
+        // uint256 collTokenBalBefore = IERC20Metadata(loanRepayInfo.collToken)
+        //     .balanceOf(address(this));
 
         if (loan.hasCollCompartment) {
             ICompartment(loan.collTokenCompartmentAddr).transferCollToBorrower(
                 reclaimCollAmount,
+                loan.initCollAmount,
                 loan.borrower,
                 loan.collToken
             );
@@ -452,19 +448,19 @@ contract LenderVault is ReentrancyGuard {
 
         uint256 loanTokenAmountReceived = loanTokenBalAfter -
             loanTokenBalBefore;
-        uint256 collTokenBalAfter = IERC20Metadata(loanRepayInfo.collToken)
-            .balanceOf(address(this));
+        // uint256 collTokenBalAfter = IERC20Metadata(loanRepayInfo.collToken)
+        //     .balanceOf(address(this));
 
         if (loanTokenAmountReceived < loanRepayInfo.repayAmount) {
             revert Invalid();
         }
         // balance only changes when no compartment
-        if (
-            !loan.hasCollCompartment &&
-            collTokenBalBefore - collTokenBalAfter < reclaimCollAmount
-        ) {
-            revert Invalid();
-        }
+        // if (
+        //     !loan.hasCollCompartment &&
+        //     collTokenBalBefore - collTokenBalAfter < reclaimCollAmount
+        // ) {
+        //     revert Invalid();
+        // }
 
         loan.amountRepaidSoFar += uint128(loanTokenAmountReceived);
         // only update lockedAmounts when no compartment
@@ -505,7 +501,7 @@ contract LenderVault is ReentrancyGuard {
             address(this)
         );
         IERC20Metadata(collToken).safeTransfer(
-            owner,
+            ILenderVaultFactory(lenderVaultFactory).vaultOwner(address(this)),
             currentCollTokenBalance - lockedAmounts[collToken]
         );
     }
@@ -534,22 +530,21 @@ contract LenderVault is ReentrancyGuard {
         returns (
             uint256 _currLoanId,
             uint256 _loanOffChainQuoteNonce,
-            address _owner,
-            address _newOwner,
             address _compartmentFactory,
             address _lenderFactory
         )
     {
         _currLoanId = currLoanId;
         _loanOffChainQuoteNonce = loanOffChainQuoteNonce;
-        _owner = owner;
-        _newOwner = newOwner;
         _compartmentFactory = compartmentFactory;
         _lenderFactory = lenderVaultFactory;
     }
 
-    function senderCheck() internal view {
-        if (msg.sender != owner) {
+    function senderCheck() internal {
+        address vaultOwner = ILenderVaultFactory(lenderVaultFactory).vaultOwner(
+            address(this)
+        );
+        if (msg.sender != vaultOwner) {
             revert Invalid();
         }
     }
