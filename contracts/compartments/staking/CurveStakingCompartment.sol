@@ -20,6 +20,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
 
     address public vaultAddr;
     uint256 public loanIdx;
+    address public veCrvPool;
 
     address public lenderFactory;
 
@@ -33,20 +34,31 @@ contract CurveStakingCompartment is Initializable, ICompartment {
         address _collTokenAddr,
         uint256 _loanIdx,
         bytes memory _data
-    ) external initializer {
+    ) external initializer returns (uint256 collTokenBalAfter) {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
+        //needed to move this inside initializer since sending to stake
+        // before returning control back to vault...
+        collTokenBalAfter = IERC20(_collTokenAddr).balanceOf(address(this));
         _stake(_borrowerAddr, _collTokenAddr, _data);
     }
 
     // transfer coll on repays
     // todo: withdraw from pool
     function transferCollToBorrower(
-        uint256 amount,
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
         address borrowerAddr,
         address collTokenAddr
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
+        // on rewards or staking, first need to checkpoint rewards possibly...
+        // also need to check if locked (haven't put that function in yet)
+        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
+            address(this)
+        ); // todo: this needs to be withdraw
+        uint256 amount = (repayAmount * currentCompartmentBal) /
+            repayAmountLeft;
         IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
     }
 
@@ -54,26 +66,34 @@ contract CurveStakingCompartment is Initializable, ICompartment {
     // but this is the general layout for all the staking compartments...
     // todo: add check that collToken is actually LP token for given crv pool by calling lp_token public getter???
     function _stake(
-        address borrowerAddr,
+        address,
         address collTokenAddr,
         bytes memory data
     ) internal {
         // todo: think about data clashing resolution, how much data is passed for all cases, including flash loan case...
         // this means decoding will have more data, but I'll leave as just one address for now
-        address crvPoolAddr = abi.decode(data, (address));
+        (address crvGaugeAddr, address _veCrvPool) = abi.decode(
+            data,
+            (address, address)
+        );
         if (
             !ILenderVaultFactory(lenderFactory).whitelistedAddrs(
-                DataTypes.WhiteListType.POOL,
-                crvPoolAddr
+                DataTypes.WhiteListType.STAKINGPOOL,
+                crvGaugeAddr
+            ) ||
+            !ILenderVaultFactory(lenderFactory).whitelistedAddrs(
+                DataTypes.WhiteListType.STAKINGPOOL,
+                _veCrvPool
             )
         ) revert InvalidPool();
-        IERC20(collTokenAddr).approve(crvPoolAddr, type(uint256).max);
+        veCrvPool = _veCrvPool;
+        IERC20(collTokenAddr).approve(crvGaugeAddr, type(uint256).max);
         uint256 currCollBalance = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
-        IStakeCompartment(crvPoolAddr).deposit(
+        IStakeCompartment(crvGaugeAddr).deposit(
             currCollBalance,
-            borrowerAddr,
+            address(this),
             true
         );
     }

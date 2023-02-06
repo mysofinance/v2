@@ -20,6 +20,7 @@ interface ICompartmentFactory {
         address borrowerAddr,
         address collTokenAddr,
         uint256 loanIdx,
+        uint256 collTokenBalBefore,
         bytes memory data
-    ) external returns (address);
+    ) external returns (address, uint128);
 }

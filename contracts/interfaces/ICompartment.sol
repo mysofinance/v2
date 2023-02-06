@@ -18,7 +18,7 @@ interface ICompartment {
         address collTokenAddr,
         uint256 loanIdx,
         bytes memory data
-    ) external;
+    ) external returns (uint256);
 
     /**
      * @notice function to unlock all collateral left in compartment
@@ -29,13 +29,17 @@ interface ICompartment {
 
     /**
      * @notice function to transfer some amount of collateral to borrower on repay
-     * @dev this function can only be called by vault and returns amount to borrower address
-     * @param amount amount of collateral token to send back to borrower
+     * @dev this function can only be called by vault and tranfers proportional amount
+     * of compartment collTokenBalance to borrower address. This needs use a proportion
+     * and not the amount to account for possible changes due to rewards accruing
+     * @param repayAmount amount of loan token being sent to vault
+     * @param repayAmountLeft amount of loan token still outstanding
      * @param borrowerAddr address of borrower receiving transfer
      * @param collTokenAddr address of collateral token being transferred
      */
     function transferCollToBorrower(
-        uint256 amount,
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
         address borrowerAddr,
         address collTokenAddr
     ) external;

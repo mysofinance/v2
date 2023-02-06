@@ -73,7 +73,8 @@ library DataTypes {
         STRATEGY,
         COMPARTMENT,
         FLASHLOAN,
-        POOL
+        STAKINGPOOL,
+        FACTORY
     }
 
     enum OnChainQuoteUpdateType {
