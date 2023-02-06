@@ -5,7 +5,7 @@ require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require("dotenv").config();
 
-const INFURA_API_KEY = process.env.INFURA_API_KEY;
+const INFURA_API_KEY = "764119145a6a4d09a1cf8f8c7a2c7b46"; // added for private repo, otherwise use process.env.INFURA_API_KEY;
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? '000000000000000000000000000000000000000000000000000000000000dead';
 

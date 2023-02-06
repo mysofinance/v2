@@ -8,7 +8,7 @@ const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60*60*24)
 
-describe('Vault and Test Token Deployment', function () {
+describe('Basic Local Tests', function () {
   async function setupTest() {
     const [vaultOwner, borrower, tokenDeployer] = await ethers.getSigners()
 

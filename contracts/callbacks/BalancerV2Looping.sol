@@ -7,8 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
 import {DataTypes} from "../DataTypes.sol";
 
-import "hardhat/console.sol";
-
 library BalancerDataTypes {
     enum SwapKind {
         GIVEN_IN,
@@ -81,8 +79,6 @@ contract BalancerV2Looping is IVaultCallback {
                 loan.initLoanAmount,
                 "0x"
             );
-        uint256 tmp = IERC20Metadata(loan.loanToken).balanceOf(address(this));
-        console.log("loan token bal", tmp);
         IERC20Metadata(loan.loanToken).approve(
             address(BalancerV2),
             loan.initLoanAmount
@@ -93,8 +89,6 @@ contract BalancerV2Looping is IVaultCallback {
             minSwapReceive,
             deadline
         );
-        uint256 tmp2 = IERC20Metadata(loan.collToken).balanceOf(loan.borrower);
-        console.log("coll token bal", tmp2);
     }
 
     function repayCallback(
