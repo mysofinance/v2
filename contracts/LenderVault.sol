@@ -422,8 +422,8 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
         if (loan.hasCollCompartment) {
             ICompartment(loan.collTokenCompartmentAddr).transferCollToBorrower(
-                reclaimCollAmount,
-                loan.initCollAmount,
+                loanRepayInfo.repayAmount,
+                loan.initRepayAmount - loan.amountRepaidSoFar,
                 loan.borrower,
                 loan.collToken
             );

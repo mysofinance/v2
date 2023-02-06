@@ -46,8 +46,8 @@ contract CurveStakingCompartment is Initializable, ICompartment {
     // transfer coll on repays
     // todo: withdraw from pool
     function transferCollToBorrower(
-        uint256 reclaimCollAmount,
-        uint256 initCollAmount,
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
         address borrowerAddr,
         address collTokenAddr
     ) external {
@@ -57,8 +57,8 @@ contract CurveStakingCompartment is Initializable, ICompartment {
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
         ); // todo: this needs to be withdraw
-        uint256 amount = (reclaimCollAmount * currentCompartmentBal) /
-            initCollAmount;
+        uint256 amount = (repayAmount * currentCompartmentBal) /
+            repayAmountLeft;
         IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
     }
 

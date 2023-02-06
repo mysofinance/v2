@@ -32,14 +32,14 @@ interface ICompartment {
      * @dev this function can only be called by vault and tranfers proportional amount
      * of compartment collTokenBalance to borrower address. This needs use a proportion
      * and not the amount to account for possible changes due to rewards accruing
-     * @param reclaimCollAmount amount of collateral token being reclaimed if no rewards/outside transfers
-     * @param initCollAmount amount of collateral token initially stored in loan
+     * @param repayAmount amount of loan token being sent to vault
+     * @param repayAmountLeft amount of loan token still outstanding
      * @param borrowerAddr address of borrower receiving transfer
      * @param collTokenAddr address of collateral token being transferred
      */
     function transferCollToBorrower(
-        uint256 reclaimCollAmount,
-        uint256 initCollAmount,
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
         address borrowerAddr,
         address collTokenAddr
     ) external;
