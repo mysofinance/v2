@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 import {DataTypes} from "../DataTypes.sol";
 
 interface ILenderVaultFactory {
-    function createCompartments(
+    function createCompartment(
         DataTypes.Loan memory loan,
         uint256 reclaimable,
         address implAddr,
