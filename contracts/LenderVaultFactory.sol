@@ -5,7 +5,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
+import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";

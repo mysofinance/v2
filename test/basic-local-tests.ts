@@ -24,7 +24,7 @@ describe('Vault and Test Token Deployment', function () {
     const lenderVault = await LenderVault.deploy()
     await lenderVault.deployed()
 
-    //deploy LenderVaultFactory
+    // deploy LenderVaultFactory
     const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
     await LenderVaultFactory.connect(vaultOwner)
     const lenderVaultFactory = await LenderVaultFactory.deploy(lenderVault.address)
@@ -52,15 +52,23 @@ describe('Vault and Test Token Deployment', function () {
     await usdc.mint(vaultOwner.address, ONE_USDC.mul(100000))
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
-    await lenderVaultFactory.addToWhitelist(0,usdc.address)
-    await lenderVaultFactory.addToWhitelist(0,weth.address)
+    // deploy balancer v2 callbacks
+    const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
+    await BalancerV2Looping.connect(vaultOwner)
+    const balancerV2Looping = await BalancerV2Looping.deploy()
+    await balancerV2Looping.deployed()
 
-    return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault }
+    // whitelist addrs
+    await lenderVaultFactory.addToWhitelist(0, usdc.address)
+    await lenderVaultFactory.addToWhitelist(0, weth.address)
+    await lenderVaultFactory.addToWhitelist(3, balancerV2Looping.address)
+
+    return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping }
   }
 
   describe('Off-Chain Quote Testing', function () {
     it('Should process off-chain quote correctly, without possibility of replaying', async function () {
-      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault } = await setupTest()
+      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(vaultOwner).transfer(firstLenderVault.address, ONE_USDC.mul(100000))
@@ -142,7 +150,7 @@ describe('Vault and Test Token Deployment', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should process on-chain quote correctly', async function () {
-      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault } = await setupTest()
+      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(vaultOwner).transfer(firstLenderVault.address, ONE_USDC.mul(100000))

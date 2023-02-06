@@ -5,7 +5,7 @@ require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
 require("dotenv").config();
 
-//const INFURA_API_KEY = process.env.INFURA_API_KEY;
+const INFURA_API_KEY = process.env.INFURA_API_KEY;
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? '000000000000000000000000000000000000000000000000000000000000dead';
 
@@ -14,8 +14,15 @@ console.log(`Using hardhat config with GOERLI_URL=${ALCHEMY_API_KEY} and PRIVATE
 const config: HardhatUserConfig = {
   solidity: "0.8.17",
   networks: {
+    hardhat: {
+      chainId: 31337,
+      forking: {
+        url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
+        blockNumber: 15200000
+      }
+    },
     goerli: {
-      url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`, //url: `https://goerli.infura.io/v3/${INFURA_API_KEY}`, //
+      url: `https://goerli.infura.io/v3/${INFURA_API_KEY}`,
       accounts: [PRIVATE_KEY]
     }
   },
