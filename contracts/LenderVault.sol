@@ -43,7 +43,11 @@ contract LenderVault is ReentrancyGuard, Initializable {
     error Invalid();
     error InvalidCompartmentAddr();
 
-    event OnChainQuote(DataTypes.OnChainQuote onChainQuote, bool isActive);
+    event OnChainQuote(
+        DataTypes.OnChainQuote onChainQuote,
+        DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
+        bool isActive
+    );
 
     function initialize(
         address _compartmentFactory,
@@ -123,10 +127,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
             }
             isOnChainQuote[onChainQuoteHash] = true;
             onChainQuotes.push(onChainQuote);
-            emit OnChainQuote(onChainQuote, true);
+            emit OnChainQuote(onChainQuote, onChainQuoteUpdateType, true);
         } else {
-            uint256 arrayLen = onChainQuotes.length;
-            if (oldOnChainQuoteId > arrayLen - 1) {
+            uint256 arrayLastIndex = onChainQuotes.length - 1;
+            if (oldOnChainQuoteId > arrayLastIndex) {
                 revert Invalid();
             }
             DataTypes.OnChainQuote memory oldOnChainQuote = onChainQuotes[
@@ -139,7 +143,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 onChainQuoteUpdateType ==
                 DataTypes.OnChainQuoteUpdateType.DELETE
             ) {
-                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[arrayLen - 1];
+                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[
+                    arrayLastIndex
+                ];
+
                 onChainQuotes.pop();
             } else {
                 whitelistCheck(
@@ -155,9 +162,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
                     revert Invalid();
                 }
                 isOnChainQuote[newOnChainQuoteHash] = true;
-                emit OnChainQuote(onChainQuote, true);
+                onChainQuotes[oldOnChainQuoteId] = onChainQuote;
+                emit OnChainQuote(onChainQuote, onChainQuoteUpdateType, true);
             }
-            emit OnChainQuote(oldOnChainQuote, false);
+            emit OnChainQuote(oldOnChainQuote, onChainQuoteUpdateType, false);
         }
     }
 

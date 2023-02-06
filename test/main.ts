@@ -6,7 +6,7 @@ const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
-const ONE_DAY = ethers.BigNumber.from(60*60*24)
+const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 
 describe('Vault and Test Token Deployment', function () {
   async function setupTest() {
@@ -34,8 +34,8 @@ describe('Vault and Test Token Deployment', function () {
     await lenderVaultFactory.addToWhitelist(5, compartmentFactory.address)
     await lenderVaultFactory.createVault(compartmentFactory.address)
 
-    const newlyCreatedVaultAddr = await lenderVaultFactory.registeredVaults(0);
-    const firstLenderVault = await LenderVault.attach(newlyCreatedVaultAddr);
+    const newlyCreatedVaultAddr = await lenderVaultFactory.registeredVaults(0)
+    const firstLenderVault = await LenderVault.attach(newlyCreatedVaultAddr)
 
     // deploy test tokens
     const MyERC20 = await ethers.getContractFactory('MyERC20')
@@ -52,8 +52,8 @@ describe('Vault and Test Token Deployment', function () {
     await usdc.mint(vaultOwner.address, ONE_USDC.mul(100000))
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
-    await lenderVaultFactory.addToWhitelist(0,usdc.address)
-    await lenderVaultFactory.addToWhitelist(0,weth.address)
+    await lenderVaultFactory.addToWhitelist(0, usdc.address)
+    await lenderVaultFactory.addToWhitelist(0, weth.address)
 
     return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault }
   }
@@ -86,7 +86,20 @@ describe('Vault and Test Token Deployment', function () {
         s: '0x0'
       }
       const payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'address', 'address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'bool', 'uint256'],
+        [
+          'address',
+          'address',
+          'address',
+          'uint256',
+          'uint256',
+          'uint256',
+          'uint256',
+          'uint256',
+          'uint256',
+          'uint256',
+          'bool',
+          'uint256'
+        ],
         [
           offChainQuote.borrower,
           offChainQuote.collToken,
@@ -123,7 +136,9 @@ describe('Vault and Test Token Deployment', function () {
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(firstLenderVault.address, MAX_UINT128)
-      await firstLenderVault.connect(borrower).borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')
+      await firstLenderVault
+        .connect(borrower)
+        .borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -135,8 +150,11 @@ describe('Vault and Test Token Deployment', function () {
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
       // borrower cannot replay quote
-      await expect(firstLenderVault.connect(borrower).borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')).to
-        .be.reverted
+      await expect(
+        firstLenderVault
+          .connect(borrower)
+          .borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')
+      ).to.be.reverted
     })
   })
 
@@ -161,7 +179,10 @@ describe('Vault and Test Token Deployment', function () {
         isNegativeInterestRate: false,
         useCollCompartment: false
       }
-      await firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 0, 0)
+
+      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 0, 0))
+        .to.emit(firstLenderVault, 'OnChainQuote')
+        .withArgs(Object.values(onChainQuote), 0, true)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -171,7 +192,9 @@ describe('Vault and Test Token Deployment', function () {
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(firstLenderVault.address, MAX_UINT128)
-      await firstLenderVault.connect(borrower).borrowWithOnChainQuote(onChainQuote, false, ONE_WETH, '0x0000000000000000000000000000000000000000', '0x')
+      await firstLenderVault
+        .connect(borrower)
+        .borrowWithOnChainQuote(onChainQuote, false, ONE_WETH, '0x0000000000000000000000000000000000000000', '0x')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -181,6 +204,48 @@ describe('Vault and Test Token Deployment', function () {
 
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+    })
+
+    it('Should update and delete on-chain quota successfully', async function () {
+      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(vaultOwner).transfer(firstLenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let onChainQuote = {
+        loanPerCollUnit: ONE_USDC.mul(1000),
+        interestRatePctInBase: BASE.mul(10).div(100),
+        upfrontFeePctInBase: BASE.mul(1).div(100),
+        collToken: weth.address,
+        loanToken: usdc.address,
+        tenor: ONE_DAY.mul(365).toNumber(),
+        timeUntilEarliestRepay: 0,
+        isNegativeInterestRate: false,
+        useCollCompartment: false
+      }
+
+      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 0, 0))
+        .to.emit(firstLenderVault, 'OnChainQuote')
+        .withArgs(Object.values(onChainQuote), 0, true)
+
+      onChainQuote.loanPerCollUnit = ONE_USDC.mul(900)
+
+      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 1, 0))
+        .to.emit(firstLenderVault, 'OnChainQuote')
+        .withArgs(Object.values(onChainQuote), 1, true)
+
+      expect((await firstLenderVault.connect(vaultOwner).onChainQuotes(0))?.['loanPerCollUnit']).to.equal(
+        onChainQuote.loanPerCollUnit
+      )
+
+      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 2, 0))
+        .to.emit(firstLenderVault, 'OnChainQuote')
+        .withArgs(Object.values(onChainQuote), 2, false)
+
+      await expect(firstLenderVault.connect(vaultOwner).onChainQuotes(0)).to.be.reverted
     })
   })
 })
