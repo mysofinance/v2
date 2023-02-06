@@ -78,11 +78,11 @@ contract CurveStakingCompartment is Initializable, ICompartment {
         );
         if (
             !ILenderVaultFactory(lenderFactory).whitelistedAddrs(
-                DataTypes.WhiteListType.POOL,
+                DataTypes.WhiteListType.STAKINGPOOL,
                 crvGaugeAddr
             ) ||
             !ILenderVaultFactory(lenderFactory).whitelistedAddrs(
-                DataTypes.WhiteListType.POOL,
+                DataTypes.WhiteListType.STAKINGPOOL,
                 _veCrvPool
             )
         ) revert InvalidPool();

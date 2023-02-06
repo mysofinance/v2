@@ -80,7 +80,7 @@ contract LenderVaultFactory is ILenderVaultFactory {
         whitelistedAddrs[_type][addrToWhitelist] = true;
     }
 
-    function createCompartments(
+    function createCompartment(
         DataTypes.Loan memory loan,
         uint256 reclaimable,
         address implAddr,

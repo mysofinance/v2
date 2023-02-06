@@ -73,7 +73,7 @@ library DataTypes {
         STRATEGY,
         COMPARTMENT,
         CALLBACK,
-        POOL,
+        STAKINGPOOL,
         FACTORY
     }
 
