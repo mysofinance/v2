@@ -11,6 +11,7 @@ import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 contract CollateralCompartmentFactory is ICompartmentFactory {
     error InvalidImplAddr();
     error ZeroAddr();
+    error Invalid();
 
     address[] compartmentImplementations;
     mapping(address => bool) public isValidImplementation;
@@ -74,12 +75,12 @@ contract CollateralCompartmentFactory is ICompartmentFactory {
         uint256 collTokenBalAfter = ICompartment(newCompartmentInstanceAddr)
             .initialize(vaultAddr, borrowerAddr, collTokenAddr, loanIdx, data);
 
+        uint256 initCollAmount = collTokenBalAfter - collTokenBalBefore;
+        if (initCollAmount != uint128(initCollAmount)) revert Invalid();
+
         isCompartment[newCompartmentInstanceAddr] = true;
         allCompartments.push(newCompartmentInstanceAddr);
 
-        return (
-            newCompartmentInstanceAddr,
-            uint128(collTokenBalAfter - collTokenBalBefore)
-        );
+        return (newCompartmentInstanceAddr, uint128(initCollAmount));
     }
 }

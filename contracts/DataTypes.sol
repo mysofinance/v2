@@ -73,7 +73,7 @@ library DataTypes {
         STRATEGY,
         COMPARTMENT,
         FLASHLOAN,
-        POOL,
+        STAKINGPOOL,
         FACTORY
     }
 

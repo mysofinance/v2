@@ -376,7 +376,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
             (
                 loan.collTokenCompartmentAddr,
                 loan.initCollAmount
-            ) = ILenderVaultFactory(lenderVaultFactory).createCompartments(
+            ) = ILenderVaultFactory(lenderVaultFactory).createCompartment(
                 loan,
                 reclaimable,
                 collTokenImplAddrs[loan.collToken],
