@@ -66,7 +66,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
     // but this is the general layout for all the staking compartments...
     // todo: add check that collToken is actually LP token for given crv pool by calling lp_token public getter???
     function _stake(
-        address borrowerAddr,
+        address,
         address collTokenAddr,
         bytes memory data
     ) internal {
@@ -93,7 +93,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
         );
         IStakeCompartment(crvGaugeAddr).deposit(
             currCollBalance,
-            borrowerAddr,
+            address(this),
             true
         );
     }
