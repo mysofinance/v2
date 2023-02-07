@@ -110,7 +110,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 onChainQuoteUpdateType ==
                 DataTypes.OnChainQuoteUpdateType.DELETE
             ) {
-                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[arrayLen - 1];
+                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[
+                    arrayLastIndex
+                ];
+
                 onChainQuotes.pop();
             } else {
                 bytes32 newOnChainQuoteHash = hashOnChainQuote(onChainQuote);
