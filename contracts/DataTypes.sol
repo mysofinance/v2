@@ -72,7 +72,7 @@ library DataTypes {
         TOKEN,
         STRATEGY,
         COMPARTMENT,
-        FLASHLOAN,
+        CALLBACK,
         STAKINGPOOL,
         FACTORY
     }

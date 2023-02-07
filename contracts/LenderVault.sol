@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {IVaultFlashCallback} from "./interfaces/IVaultFlashCallback.sol";
+import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
@@ -172,7 +172,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
         DataTypes.OnChainQuote memory onChainQuote,
         bool isAutoQuote,
         uint256 sendAmount,
-        address callbacker,
+        address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
         if (isAutoQuote) {
@@ -192,12 +192,12 @@ contract LenderVault is ReentrancyGuard, Initializable {
             uint256 upfrontFee,
             DataTypes.Loan memory loan
         ) = _getFeeAndLoanStructWithoutCollAmount(onChainQuote, sendAmount);
-        _borrowTransfers(loan, sendAmount, upfrontFee, callbacker, data);
+        _borrowTransfers(loan, sendAmount, upfrontFee, callbackAddr, data);
     }
 
     function borrowWithOffChainQuote(
         DataTypes.OffChainQuote calldata loanOffChainQuote,
-        address callbacker,
+        address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
         whitelistCheck(
@@ -277,7 +277,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
             loan,
             loanOffChainQuote.sendAmount,
             loanOffChainQuote.upfrontFee,
-            callbacker,
+            callbackAddr,
             data
         );
     }
@@ -314,7 +314,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
         DataTypes.Loan memory loan,
         uint256 sendAmount,
         uint256 upfrontFee,
-        address callbacker,
+        address callbackAddr,
         bytes calldata data
     ) internal {
         uint256 loanTokenBalBefore = IERC20Metadata(loan.loanToken).balanceOf(
@@ -334,9 +334,9 @@ contract LenderVault is ReentrancyGuard, Initializable {
             msg.sender,
             loan.initLoanAmount
         );
-        if (callbacker != address(0)) {
-            whitelistCheck(DataTypes.WhiteListType.FLASHLOAN, callbacker);
-            IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data);
+        if (callbackAddr != address(0)) {
+            whitelistCheck(DataTypes.WhiteListType.CALLBACK, callbackAddr);
+            IVaultCallback(callbackAddr).borrowCallback(loan, data);
         }
 
         // uint256 tokenBalAfter = IERC20Metadata(loan.loanToken).balanceOf(
@@ -389,7 +389,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
     function repay(
         DataTypes.LoanRepayInfo calldata loanRepayInfo,
-        address callbacker,
+        address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
         DataTypes.Loan memory loan = loans[loanRepayInfo.loanId];
@@ -432,8 +432,8 @@ contract LenderVault is ReentrancyGuard, Initializable {
             );
         }
 
-        if (callbacker != address(0)) {
-            IVaultFlashCallback(callbacker).vaultFlashCallback(loan, data); // todo: whitelist callbacker
+        if (callbackAddr != address(0)) {
+            IVaultCallback(callbackAddr).repayCallback(loan, data); // todo: whitelist callbackAddr
         }
         IERC20Metadata(loanRepayInfo.loanToken).safeTransferFrom(
             msg.sender,
