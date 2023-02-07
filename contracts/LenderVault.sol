@@ -27,7 +27,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
     mapping(address => address) collTokenImplAddrs;
     DataTypes.Loan[] public loans; // stores loans
 
-    uint256 currLoanId;
     uint256 loanOffChainQuoteNonce;
     address compartmentFactory;
     address lenderVaultFactory;
@@ -176,7 +175,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
         address callbacker,
         bytes calldata data
     ) external nonReentrant {
-        currLoanId += 1;
         if (isAutoQuote) {
             address strategyAddr = autoQuoteStrategy[onChainQuote.collToken][
                 onChainQuote.loanToken
@@ -264,8 +262,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 revert Invalid();
             }
         }
-
-        currLoanId += 1;
 
         DataTypes.Loan memory loan;
         loan.borrower = msg.sender;
@@ -535,7 +531,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
             address _lenderFactory
         )
     {
-        _currLoanId = currLoanId;
+        _currLoanId = loans.length;
         _loanOffChainQuoteNonce = loanOffChainQuoteNonce;
         _compartmentFactory = compartmentFactory;
         _lenderFactory = lenderVaultFactory;
