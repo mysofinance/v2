@@ -27,7 +27,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
     mapping(address => address) collTokenImplAddrs;
     DataTypes.Loan[] public loans; // stores loans
 
-    uint256 currLoanId;
     uint256 loanOffChainQuoteNonce;
     address compartmentFactory;
     address lenderVaultFactory;
@@ -43,7 +42,11 @@ contract LenderVault is ReentrancyGuard, Initializable {
     error Invalid();
     error InvalidCompartmentAddr();
 
-    event OnChainQuote(DataTypes.OnChainQuote onChainQuote, bool isActive);
+    event OnChainQuote(
+        DataTypes.OnChainQuote onChainQuote,
+        DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
+        bool isActive
+    );
 
     function initialize(
         address _compartmentFactory,
@@ -123,10 +126,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
             }
             isOnChainQuote[onChainQuoteHash] = true;
             onChainQuotes.push(onChainQuote);
-            emit OnChainQuote(onChainQuote, true);
+            emit OnChainQuote(onChainQuote, onChainQuoteUpdateType, true);
         } else {
-            uint256 arrayLen = onChainQuotes.length;
-            if (oldOnChainQuoteId > arrayLen - 1) {
+            uint256 arrayLastIndex = onChainQuotes.length - 1;
+            if (oldOnChainQuoteId > arrayLastIndex) {
                 revert Invalid();
             }
             DataTypes.OnChainQuote memory oldOnChainQuote = onChainQuotes[
@@ -139,7 +142,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 onChainQuoteUpdateType ==
                 DataTypes.OnChainQuoteUpdateType.DELETE
             ) {
-                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[arrayLen - 1];
+                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[
+                    arrayLastIndex
+                ];
+
                 onChainQuotes.pop();
             } else {
                 whitelistCheck(
@@ -155,9 +161,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
                     revert Invalid();
                 }
                 isOnChainQuote[newOnChainQuoteHash] = true;
-                emit OnChainQuote(onChainQuote, true);
+                onChainQuotes[oldOnChainQuoteId] = onChainQuote;
+                emit OnChainQuote(onChainQuote, onChainQuoteUpdateType, true);
             }
-            emit OnChainQuote(oldOnChainQuote, false);
+            emit OnChainQuote(oldOnChainQuote, onChainQuoteUpdateType, false);
         }
     }
 
@@ -168,7 +175,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
         address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
-        currLoanId += 1;
         if (isAutoQuote) {
             address strategyAddr = autoQuoteStrategy[onChainQuote.collToken][
                 onChainQuote.loanToken
@@ -256,8 +262,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 revert Invalid();
             }
         }
-
-        currLoanId += 1;
 
         DataTypes.Loan memory loan;
         loan.borrower = msg.sender;
@@ -527,7 +531,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
             address _lenderFactory
         )
     {
-        _currLoanId = currLoanId;
+        _currLoanId = loans.length;
         _loanOffChainQuoteNonce = loanOffChainQuoteNonce;
         _compartmentFactory = compartmentFactory;
         _lenderFactory = lenderVaultFactory;
