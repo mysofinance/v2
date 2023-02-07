@@ -16,8 +16,10 @@ contract LenderVaultFactory is ILenderVaultFactory {
     using SafeERC20 for IERC20Metadata;
 
     error InvalidCompartmentAddr();
+    error InvalidIndex();
     error InvalidSender();
     error InvalidFactory();
+    error InvalidVaultAddr();
     error Invalid();
 
     mapping(address => bool) public isRegisteredVault;
@@ -158,5 +160,193 @@ contract LenderVaultFactory is ILenderVaultFactory {
         vaultOwner[newVaultInstanceAddr] = msg.sender;
 
         return newVaultInstanceAddr;
+    }
+
+    function InvalidateQuotes(address vaultAddr) external {
+        checkVaultOwner(vaultAddr);
+        uint256 updatedNonce = ILenderVault(vaultAddr).invalidateQuotes();
+        emit UpdatedOffChainQuoteNonce(vaultAddr, updatedNonce);
+    }
+
+    function setAutoQuoteStrategy(
+        address vaultAddr,
+        address collToken,
+        address loanToken,
+        address strategyAddr
+    ) external {
+        checkVaultOwner(vaultAddr);
+        whitelistCheck(DataTypes.WhiteListType.STRATEGY, strategyAddr);
+        ILenderVault(vaultAddr).setAutoQuoteStrategy(
+            collToken,
+            loanToken,
+            strategyAddr
+        );
+        emit AutoQuoteStrategy(vaultAddr, collToken, loanToken, strategyAddr);
+    }
+
+    function setCollTokenImpl(
+        address vaultAddr,
+        address collToken,
+        address collTokenImplAddr
+    ) external {
+        checkVaultOwner(vaultAddr);
+        whitelistCheck(DataTypes.WhiteListType.COMPARTMENT, collTokenImplAddr);
+        ILenderVault(vaultAddr).setCollTokenImpl(collToken, collTokenImplAddr);
+        emit CollTokenCompartmentImpl(vaultAddr, collToken, collTokenImplAddr);
+    }
+
+    function withdraw(
+        address vaultAddr,
+        address token,
+        uint256 amount
+    ) external {
+        checkVaultOwner(vaultAddr);
+        whitelistCheck(DataTypes.WhiteListType.TOKEN, token);
+        ILenderVault(vaultAddr).withdraw(token, amount, vaultOwner[vaultAddr]);
+    }
+
+    function setOnChainQuote(
+        address vaultAddr,
+        DataTypes.OnChainQuote calldata onChainQuote,
+        DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
+        uint256 oldOnChainQuoteId
+    ) external {
+        checkVaultOwner(vaultAddr);
+        DataTypes.OnChainQuote memory oldOnChainQuote;
+        if (onChainQuoteUpdateType != DataTypes.OnChainQuoteUpdateType.ADD) {
+            (, , uint256 numOnChainQuotes, , ) = ILenderVault(vaultAddr)
+                .getVaultInfo();
+            if (
+                numOnChainQuotes == 0 ||
+                oldOnChainQuoteId > numOnChainQuotes - 1
+            ) revert InvalidIndex();
+            oldOnChainQuote = ILenderVault(vaultAddr).onChainQuotes(
+                oldOnChainQuoteId
+            );
+        }
+        if (onChainQuoteUpdateType != DataTypes.OnChainQuoteUpdateType.DELETE) {
+            whitelistCheck(
+                DataTypes.WhiteListType.TOKEN,
+                onChainQuote.loanToken
+            );
+            whitelistCheck(
+                DataTypes.WhiteListType.TOKEN,
+                onChainQuote.collToken
+            );
+        }
+        ILenderVault(vaultAddr).setOnChainQuote(
+            onChainQuote,
+            oldOnChainQuote,
+            onChainQuoteUpdateType,
+            oldOnChainQuoteId
+        );
+        if (onChainQuoteUpdateType != DataTypes.OnChainQuoteUpdateType.ADD) {
+            emit OnChainQuote(
+                vaultAddr,
+                oldOnChainQuote,
+                onChainQuoteUpdateType,
+                false
+            );
+        }
+        if (onChainQuoteUpdateType != DataTypes.OnChainQuoteUpdateType.DELETE) {
+            emit OnChainQuote(
+                vaultAddr,
+                onChainQuote,
+                onChainQuoteUpdateType,
+                true
+            );
+        }
+    }
+
+    function borrowWithOnChainQuote(
+        address vaultAddr,
+        DataTypes.OnChainQuote memory onChainQuote,
+        bool isAutoQuote,
+        uint256 sendAmount,
+        address callbackAddr,
+        bytes calldata data
+    ) external {
+        if (callbackAddr != address(0)) {
+            whitelistCheck(DataTypes.WhiteListType.CALLBACK, callbackAddr);
+        }
+        if (!isRegisteredVault[vaultAddr]) revert InvalidVaultAddr();
+        ILenderVault(vaultAddr).borrowWithOnChainQuote(
+            msg.sender,
+            onChainQuote,
+            isAutoQuote,
+            sendAmount,
+            callbackAddr,
+            data
+        );
+        // emit event here...
+    }
+
+    function borrowWithOffChainQuote(
+        address vaultAddr,
+        DataTypes.OffChainQuote calldata loanOffChainQuote,
+        address callbackAddr,
+        bytes calldata data
+    ) external {
+        if (callbackAddr != address(0)) {
+            whitelistCheck(DataTypes.WhiteListType.CALLBACK, callbackAddr);
+        }
+        if (!isRegisteredVault[vaultAddr]) revert InvalidVaultAddr();
+        whitelistCheck(
+            DataTypes.WhiteListType.TOKEN,
+            loanOffChainQuote.loanToken
+        );
+        whitelistCheck(
+            DataTypes.WhiteListType.TOKEN,
+            loanOffChainQuote.collToken
+        );
+        ILenderVault(vaultAddr).borrowWithOffChainQuote(
+            msg.sender,
+            loanOffChainQuote,
+            callbackAddr,
+            data
+        );
+        // emit event here...
+    }
+
+    function repay(
+        address vaultAddr,
+        DataTypes.LoanRepayInfo calldata loanRepayInfo,
+        address callbackAddr,
+        bytes calldata data
+    ) external {
+        if (callbackAddr != address(0)) {
+            whitelistCheck(DataTypes.WhiteListType.CALLBACK, callbackAddr);
+        }
+        if (!isRegisteredVault[vaultAddr]) revert InvalidVaultAddr();
+        ILenderVault(vaultAddr).repay(
+            msg.sender,
+            loanRepayInfo,
+            callbackAddr,
+            data
+        );
+        //emit event here...
+    }
+
+    function unlockCollateral(
+        address vaultAddr,
+        address collToken,
+        uint256[] calldata _loanIds
+    ) external {
+        address owner = vaultOwner[vaultAddr];
+        if (owner == address(0)) revert InvalidVaultAddr();
+        whitelistCheck(DataTypes.WhiteListType.TOKEN, collToken);
+        ILenderVault(vaultAddr).unlockCollateral(owner, collToken, _loanIds);
+        //emit event here...
+    }
+
+    function checkVaultOwner(address vaultAddr) internal view {
+        if (vaultOwner[vaultAddr] != msg.sender) revert InvalidSender();
+    }
+
+    function whitelistCheck(
+        DataTypes.WhiteListType _type,
+        address _addrToCheck
+    ) internal view {
+        if (!whitelistedAddrs[_type][_addrToCheck]) revert Invalid();
     }
 }

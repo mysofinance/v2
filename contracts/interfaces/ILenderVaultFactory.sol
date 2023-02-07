@@ -5,6 +5,31 @@ pragma solidity ^0.8.17;
 import {DataTypes} from "../DataTypes.sol";
 
 interface ILenderVaultFactory {
+    event AutoQuoteStrategy(
+        address indexed vaultAddr,
+        address collToken,
+        address loanToken,
+        address indexed strategyAddr
+    );
+
+    event CollTokenCompartmentImpl(
+        address indexed vaultAddr,
+        address indexed collToken,
+        address indexed collTokenImplAddr
+    );
+
+    event UpdatedOffChainQuoteNonce(
+        address indexed vaultAddr,
+        uint256 currentNonce
+    );
+
+    event OnChainQuote(
+        address indexed vaultAddr,
+        DataTypes.OnChainQuote onChainQuote,
+        DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
+        bool isActive
+    );
+
     function createCompartment(
         DataTypes.Loan memory loan,
         uint256 reclaimable,

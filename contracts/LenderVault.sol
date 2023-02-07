@@ -23,27 +23,15 @@ contract LenderVault is ReentrancyGuard, Initializable {
     mapping(bytes32 => bool) public isOnChainQuote;
     mapping(address => mapping(address => address)) public autoQuoteStrategy; // points to auto loan strategy for given coll/loan token pair
     DataTypes.OnChainQuote[] public onChainQuotes; // stores standing loan quotes
-    // for now remove public getter for byte code size purposes...
-    mapping(address => address) collTokenImplAddrs;
+    mapping(address => address) public collTokenImplAddrs;
     DataTypes.Loan[] public loans; // stores loans
 
-    uint256 currLoanId;
     uint256 loanOffChainQuoteNonce;
     address compartmentFactory;
     address lenderVaultFactory;
 
-    /*
-    can remove ILendingPool because also interest bearing tokens can be deposited 
-    by virtue of simple transfer; e.g. lender can also deposit an atoken and allow
-    borrowers to directly borrow the atoken; the repayment amount could then also be
-    set to be atoken such that on repayment any idle funds automatically continue earning
-    yield
-    */
-
     error Invalid();
     error InvalidCompartmentAddr();
-
-    event OnChainQuote(DataTypes.OnChainQuote onChainQuote, bool isActive);
 
     function initialize(
         address _compartmentFactory,
@@ -54,9 +42,12 @@ contract LenderVault is ReentrancyGuard, Initializable {
         loanOffChainQuoteNonce = 1;
     }
 
-    function invalidateQuotes() external {
-        senderCheck();
-        loanOffChainQuoteNonce += 1;
+    function invalidateQuotes()
+        external
+        returns (uint256 _currentOffChainNonce)
+    {
+        checkVaultFactorySender();
+        _currentOffChainNonce = ++loanOffChainQuoteNonce;
     }
 
     function setAutoQuoteStrategy(
@@ -64,8 +55,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
         address loanToken,
         address strategyAddr
     ) external {
-        senderCheck();
-        whitelistCheck(DataTypes.WhiteListType.STRATEGY, strategyAddr);
+        checkVaultFactorySender();
         autoQuoteStrategy[collToken][loanToken] = strategyAddr;
     }
 
@@ -75,40 +65,28 @@ contract LenderVault is ReentrancyGuard, Initializable {
         address collToken,
         address collTokenImplAddr
     ) external {
-        senderCheck();
-        whitelistCheck(DataTypes.WhiteListType.COMPARTMENT, collTokenImplAddr);
+        checkVaultFactorySender();
         collTokenImplAddrs[collToken] = collTokenImplAddr;
     }
 
-    function withdraw(address token, uint256 amount) external {
-        senderCheck();
+    function withdraw(address token, uint256 amount, address owner) external {
+        checkVaultFactorySender();
         uint256 vaultBalance = IERC20Metadata(token).balanceOf(address(this));
         if (amount > vaultBalance - lockedAmounts[token]) {
             revert Invalid();
         }
-        address owner = ILenderVaultFactory(lenderVaultFactory).vaultOwner(
-            address(this)
-        );
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
 
     function setOnChainQuote(
         DataTypes.OnChainQuote calldata onChainQuote,
+        DataTypes.OnChainQuote calldata oldOnChainQuote,
         DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
         uint256 oldOnChainQuoteId
     ) external {
-        senderCheck();
+        checkVaultFactorySender();
         if (onChainQuoteUpdateType == DataTypes.OnChainQuoteUpdateType.ADD) {
             // CASE 1: add on-chain quote
-            // remove address 0 check since this will be 0 address will not be allowed to be whitelisted in factory
-            whitelistCheck(
-                DataTypes.WhiteListType.TOKEN,
-                onChainQuote.loanToken
-            );
-            whitelistCheck(
-                DataTypes.WhiteListType.TOKEN,
-                onChainQuote.collToken
-            );
             if (
                 onChainQuote.collToken == onChainQuote.loanToken ||
                 onChainQuote.timeUntilEarliestRepay > onChainQuote.tenor ||
@@ -123,15 +101,8 @@ contract LenderVault is ReentrancyGuard, Initializable {
             }
             isOnChainQuote[onChainQuoteHash] = true;
             onChainQuotes.push(onChainQuote);
-            emit OnChainQuote(onChainQuote, true);
         } else {
             uint256 arrayLen = onChainQuotes.length;
-            if (oldOnChainQuoteId > arrayLen - 1) {
-                revert Invalid();
-            }
-            DataTypes.OnChainQuote memory oldOnChainQuote = onChainQuotes[
-                oldOnChainQuoteId
-            ];
             bytes32 oldOnChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
             isOnChainQuote[oldOnChainQuoteHash] = false;
 
@@ -142,33 +113,24 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 onChainQuotes[oldOnChainQuoteId] = onChainQuotes[arrayLen - 1];
                 onChainQuotes.pop();
             } else {
-                whitelistCheck(
-                    DataTypes.WhiteListType.TOKEN,
-                    onChainQuote.loanToken
-                );
-                whitelistCheck(
-                    DataTypes.WhiteListType.TOKEN,
-                    onChainQuote.collToken
-                );
                 bytes32 newOnChainQuoteHash = hashOnChainQuote(onChainQuote);
                 if (oldOnChainQuoteHash == newOnChainQuoteHash) {
                     revert Invalid();
                 }
                 isOnChainQuote[newOnChainQuoteHash] = true;
-                emit OnChainQuote(onChainQuote, true);
             }
-            emit OnChainQuote(oldOnChainQuote, false);
         }
     }
 
     function borrowWithOnChainQuote(
+        address borrower,
         DataTypes.OnChainQuote memory onChainQuote,
         bool isAutoQuote,
         uint256 sendAmount,
         address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
-        currLoanId += 1;
+        checkVaultFactorySender();
         if (isAutoQuote) {
             address strategyAddr = autoQuoteStrategy[onChainQuote.collToken][
                 onChainQuote.loanToken
@@ -185,23 +147,28 @@ contract LenderVault is ReentrancyGuard, Initializable {
         (
             uint256 upfrontFee,
             DataTypes.Loan memory loan
-        ) = _getFeeAndLoanStructWithoutCollAmount(onChainQuote, sendAmount);
-        _borrowTransfers(loan, sendAmount, upfrontFee, callbackAddr, data);
+        ) = _getFeeAndLoanStructWithoutCollAmount(
+                borrower,
+                onChainQuote,
+                sendAmount
+            );
+        _borrowTransfers(
+            borrower,
+            loan,
+            sendAmount,
+            upfrontFee,
+            callbackAddr,
+            data
+        );
     }
 
     function borrowWithOffChainQuote(
+        address borrower,
         DataTypes.OffChainQuote calldata loanOffChainQuote,
         address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
-        whitelistCheck(
-            DataTypes.WhiteListType.TOKEN,
-            loanOffChainQuote.loanToken
-        );
-        whitelistCheck(
-            DataTypes.WhiteListType.TOKEN,
-            loanOffChainQuote.collToken
-        );
+        checkVaultFactorySender();
         {
             bytes32 payloadHash = keccak256(
                 abi.encode(
@@ -251,16 +218,14 @@ contract LenderVault is ReentrancyGuard, Initializable {
             }
             if (
                 loanOffChainQuote.borrower != address(0) &&
-                loanOffChainQuote.borrower != msg.sender
+                loanOffChainQuote.borrower != borrower
             ) {
                 revert Invalid();
             }
         }
 
-        currLoanId += 1;
-
         DataTypes.Loan memory loan;
-        loan.borrower = msg.sender;
+        loan.borrower = borrower;
         loan.collToken = loanOffChainQuote.collToken;
         loan.loanToken = loanOffChainQuote.loanToken;
         loan.expiry = uint40(loanOffChainQuote.expiry);
@@ -270,6 +235,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
         loan.hasCollCompartment = loanOffChainQuote.useCollCompartment;
 
         _borrowTransfers(
+            borrower,
             loan,
             loanOffChainQuote.sendAmount,
             loanOffChainQuote.upfrontFee,
@@ -279,6 +245,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
     }
 
     function _getFeeAndLoanStructWithoutCollAmount(
+        address _borrower,
         DataTypes.OnChainQuote memory onChainQuote,
         uint256 sendAmount
     ) internal view returns (uint256 upfrontFee, DataTypes.Loan memory loan) {
@@ -294,7 +261,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 (loanAmount * (BASE + onChainQuote.interestRatePctInBase)) /
                 BASE;
         }
-        loan.borrower = msg.sender;
+        loan.borrower = _borrower;
         loan.collToken = onChainQuote.collToken;
         loan.loanToken = onChainQuote.loanToken;
         loan.initLoanAmount = toUint128(loanAmount);
@@ -307,6 +274,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
     }
 
     function _borrowTransfers(
+        address borrower,
         DataTypes.Loan memory loan,
         uint256 sendAmount,
         uint256 upfrontFee,
@@ -326,27 +294,19 @@ contract LenderVault is ReentrancyGuard, Initializable {
             address(this)
         );
 
+        // at transfers and callbacks return control back to factory, so less approvals?
+        // transfer tokens from borrower to factory then factory to vault...?
         IERC20Metadata(loan.loanToken).safeTransfer(
-            msg.sender,
+            borrower,
             loan.initLoanAmount
         );
         if (callbackAddr != address(0)) {
-            whitelistCheck(DataTypes.WhiteListType.CALLBACK, callbackAddr);
             IVaultCallback(callbackAddr).borrowCallback(loan, data);
         }
 
-        // uint256 tokenBalAfter = IERC20Metadata(loan.loanToken).balanceOf(
-        //     address(this)
-        // );
-
-        // check exactly that at least correct loan amount is sent
-        // if (loanTokenBalBefore - tokenBalAfter < loan.initLoanAmount) {
-        //     revert Invalid();
-        // }
-
         // send the vault full collateral amount
         IERC20Metadata(loan.collToken).safeTransferFrom(
-            msg.sender,
+            borrower,
             address(this),
             sendAmount
         );
@@ -384,12 +344,14 @@ contract LenderVault is ReentrancyGuard, Initializable {
     }
 
     function repay(
+        address borrower,
         DataTypes.LoanRepayInfo calldata loanRepayInfo,
         address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
+        checkVaultFactorySender();
         DataTypes.Loan memory loan = loans[loanRepayInfo.loanId];
-        if (msg.sender != loan.borrower) {
+        if (borrower != loan.borrower) {
             revert Invalid();
         }
         if (
@@ -411,8 +373,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
         uint256 loanTokenBalBefore = IERC20Metadata(loanRepayInfo.loanToken)
             .balanceOf(address(this));
-        // uint256 collTokenBalBefore = IERC20Metadata(loanRepayInfo.collToken)
-        //     .balanceOf(address(this));
 
         if (loan.hasCollCompartment) {
             ICompartment(loan.collTokenCompartmentAddr).transferCollToBorrower(
@@ -423,16 +383,16 @@ contract LenderVault is ReentrancyGuard, Initializable {
             );
         } else {
             IERC20Metadata(loanRepayInfo.collToken).safeTransfer(
-                msg.sender,
+                borrower,
                 reclaimCollAmount
             );
         }
 
         if (callbackAddr != address(0)) {
-            IVaultCallback(callbackAddr).repayCallback(loan, data); // todo: whitelist callbackAddr
+            IVaultCallback(callbackAddr).repayCallback(loan, data);
         }
         IERC20Metadata(loanRepayInfo.loanToken).safeTransferFrom(
-            msg.sender,
+            borrower,
             address(this),
             loanRepayInfo.repayAmount + loanRepayInfo.loanTokenTransferFees
         );
@@ -443,19 +403,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
         uint128 loanTokenAmountReceived = toUint128(
             loanTokenBalAfter - loanTokenBalBefore
         );
-        // uint256 collTokenBalAfter = IERC20Metadata(loanRepayInfo.collToken)
-        //     .balanceOf(address(this));
 
         if (loanTokenAmountReceived < loanRepayInfo.repayAmount) {
             revert Invalid();
         }
-        // balance only changes when no compartment
-        // if (
-        //     !loan.hasCollCompartment &&
-        //     collTokenBalBefore - collTokenBalAfter < reclaimCollAmount
-        // ) {
-        //     revert Invalid();
-        // }
 
         loan.amountRepaidSoFar += loanTokenAmountReceived;
         // only update lockedAmounts when no compartment
@@ -465,9 +416,11 @@ contract LenderVault is ReentrancyGuard, Initializable {
     }
 
     function unlockCollateral(
+        address owner,
         address collToken,
         uint256[] calldata _loanIds
     ) external {
+        checkVaultFactorySender();
         uint256 totalUnlockableColl;
         for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
@@ -494,7 +447,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
             address(this)
         );
         IERC20Metadata(collToken).safeTransfer(
-            ILenderVaultFactory(lenderVaultFactory).vaultOwner(address(this)),
+            owner,
             currentCollTokenBalance - lockedAmounts[collToken]
         );
     }
@@ -523,35 +476,22 @@ contract LenderVault is ReentrancyGuard, Initializable {
         returns (
             uint256 _currLoanId,
             uint256 _loanOffChainQuoteNonce,
+            uint256 _numOnChainQuotes,
             address _compartmentFactory,
             address _lenderFactory
         )
     {
-        _currLoanId = currLoanId;
+        _currLoanId = loans.length;
         _loanOffChainQuoteNonce = loanOffChainQuoteNonce;
+        _numOnChainQuotes = onChainQuotes.length;
         _compartmentFactory = compartmentFactory;
         _lenderFactory = lenderVaultFactory;
     }
 
-    function senderCheck() internal {
-        address vaultOwner = ILenderVaultFactory(lenderVaultFactory).vaultOwner(
-            address(this)
-        );
-        if (msg.sender != vaultOwner) {
+    function checkVaultFactorySender() internal view {
+        if (msg.sender != lenderVaultFactory) {
             revert Invalid();
         }
-    }
-
-    function whitelistCheck(
-        DataTypes.WhiteListType _type,
-        address _addrToCheck
-    ) internal {
-        if (
-            !ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
-                _type,
-                _addrToCheck
-            )
-        ) revert Invalid();
     }
 
     function toUint128(uint256 x) internal pure returns (uint128 y) {

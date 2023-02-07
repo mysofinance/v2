@@ -137,6 +137,7 @@ contract LoanRequestPool is ReentrancyGuard {
             executeLoanRequest.loanToken
         ).balanceOf(address(this));
         LenderVault(lenderVault).borrowWithOffChainQuote(
+            offChainQuote.borrower,
             offChainQuote,
             address(0),
             ""
