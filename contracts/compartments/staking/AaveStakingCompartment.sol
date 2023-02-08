@@ -10,7 +10,7 @@ import {ICompartment} from "../../interfaces/ICompartment.sol";
 import {ILenderVaultFactory} from "../../interfaces/ILenderVaultFactory.sol";
 import {DataTypes} from "../../DataTypes.sol";
 
-contract CurveStakingCompartment is Initializable, ICompartment {
+contract AaveStakingCompartment is Initializable, ICompartment {
     using SafeERC20 for IERC20;
 
     address public vaultAddr;
