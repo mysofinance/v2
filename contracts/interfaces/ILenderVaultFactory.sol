@@ -26,12 +26,12 @@ interface ILenderVaultFactory {
 
     function isRegisteredVault(address vaultAddr) external returns (bool);
 
-    function vaultOwner(address vaultAddr) external returns (address);
+    function vaultOwner(address vaultAddr) external view returns (address);
 
     function vaultNewOwner(address vaultAddr) external returns (address);
 
     function whitelistedAddrs(
         DataTypes.WhiteListType _type,
         address whitelistAddr
-    ) external returns (bool);
+    ) external view returns (bool);
 }

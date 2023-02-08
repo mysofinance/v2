@@ -32,7 +32,7 @@ library DataTypes {
         address borrower;
         address collToken;
         address loanToken;
-        uint256 sendAmount;
+        uint256 collAmount;
         uint256 loanAmount;
         uint256 expiry;
         uint256 earliestRepay;
@@ -81,5 +81,11 @@ library DataTypes {
         ADD,
         OVERWRITE,
         DELETE
+    }
+
+    enum QuoteType {
+        OnChainQuote,
+        AutoQuote,
+        OffChainQuote
     }
 }

@@ -54,6 +54,13 @@ describe('Basic Forked Mainnet Tests', function () {
     const lenderVaultFactory = await LenderVaultFactory.deploy(lenderVault.address)
     await lenderVaultFactory.deployed()
 
+    // deploy borrow gateway
+    const VAULT_REGISTRY_AND_CALLBACK_WHITELIST = lenderVaultFactory.address
+    const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
+    await BorrowerGateway.connect(tokenDeployer)
+    const borrowerGateway = await BorrowerGateway.deploy(VAULT_REGISTRY_AND_CALLBACK_WHITELIST)
+    await borrowerGateway.deployed()
+    
     // whitelist compartment factory and create first vault
     await lenderVaultFactory.addToWhitelist(5, compartmentFactory.address)
     await lenderVaultFactory.createVault(compartmentFactory.address)
@@ -97,12 +104,16 @@ describe('Basic Forked Mainnet Tests', function () {
     await lenderVaultFactory.addToWhitelist(0, weth.address)
     await lenderVaultFactory.addToWhitelist(3, balancerV2Looping.address)
 
-    return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping }
+    // lender connects his vault to borrow gateway and approve
+    await firstLenderVault.setBorrowerGateway(borrowerGateway.address)
+    await firstLenderVault.approve(borrowerGateway.address, usdc.address, MAX_UINT256)
+    
+    return { borrowerGateway, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping }
   }
 
   describe('On-Chain Quote Testing', function () {
     it('Should process atomic balancer swap correctly', async function () {
-      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping } = await setupTest()
+      const { borrowerGateway, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(vaultOwner).transfer(firstLenderVault.address, ONE_USDC.mul(100000))
@@ -129,19 +140,19 @@ describe('Basic Forked Mainnet Tests', function () {
       const balancerV2Pool = await new ethers.Contract(poolAddr, balancerV2PoolAbi, tokenDeployer)
 
       const PRECISION = 10000
-      const sendTolerance = BASE.mul(30).div(10000)
-      const collTokenFromBorrower = ONE_WETH.mul(BASE.sub(sendTolerance)).div(BASE)
-      const collTokenFromBorrowerNumber = Number(collTokenFromBorrower.mul(PRECISION).div(ONE_WETH).toString()) / PRECISION
+      const collBuffer = BASE.mul(990).div(1000)
+      const initCollFromBorrower = ONE_WETH.mul(collBuffer).div(BASE)
+      const initCollFromBorrowerNumber = Number(initCollFromBorrower.mul(PRECISION).div(ONE_WETH).toString()) / PRECISION
       const loanPerColl = Number(onChainQuote.loanPerCollUnit.mul(PRECISION).div(ONE_USDC).toString()) / PRECISION
       const swapFee = Number((await balancerV2Pool.getSwapFeePercentage()).mul(PRECISION).div(BASE).toString()) / PRECISION
       const balancerV2Vault = await new ethers.Contract("0xBA12222222228d8Ba445958a75a0704d566BF2C8", balancerV2VaultAbi, tokenDeployer)
       const balancerV2PoolTokens = await balancerV2Vault.getPoolTokens(poolId)
       const collTokenInDexPool = Number((balancerV2PoolTokens.tokens[0] == weth.address ? balancerV2PoolTokens.balances[0] : balancerV2PoolTokens.balances[1]).mul(PRECISION).div(ONE_WETH).toString()) / PRECISION
       const loanTokenInDexPool = Number((balancerV2PoolTokens.tokens[0] == usdc.address ? balancerV2PoolTokens.balances[0] : balancerV2PoolTokens.balances[1]).mul(PRECISION).div(ONE_USDC).toString()) / PRECISION
-      const sendAmountNumber = getLoopingSendAmount(collTokenFromBorrowerNumber, loanPerColl, collTokenInDexPool, loanTokenInDexPool, swapFee)
-      const sendAmount = ethers.BigNumber.from(Math.floor(sendAmountNumber * PRECISION)).mul(ONE_WETH).div(PRECISION)
-      console.log("sendAmountNumber to max. lever up: ", sendAmountNumber)
-      console.log("sendAmount to max. lever up: ", sendAmount)
+      const collSendAmountNumber = getLoopingSendAmount(initCollFromBorrowerNumber, loanPerColl, collTokenInDexPool, loanTokenInDexPool, swapFee)
+      const collSendAmount = ethers.BigNumber.from(Math.floor(collSendAmountNumber * PRECISION)).mul(ONE_WETH).div(PRECISION)
+      console.log("sendAmountNumber to max. lever up: ", collSendAmountNumber)
+      console.log("sendAmount to max. lever up: ", collSendAmount)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -150,13 +161,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const vaultUsdcBalPre = await usdc.balanceOf(firstLenderVault.address)
 
       // borrower approves and executes quote
-      await weth.connect(borrower).approve(firstLenderVault.address, MAX_UINT128)
-      await usdc.connect(borrower).approve(balancerV2Looping.address, MAX_UINT128)
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const isAutoQuote = false
       const slippageTolerance = BASE.mul(30).div(10000)
-      const minSwapReceive = sendAmount.sub(collTokenFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
+      const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
       console.log("minSwapReceive: ", minSwapReceive)
       const deadline = MAX_UINT128
-      const data = ethers.utils.defaultAbiCoder.encode(
+      const callbackAddr = balancerV2Looping.address
+      const callbackData = ethers.utils.defaultAbiCoder.encode(
         ['bytes32', 'uint256', 'uint256'],
         [
           poolId,
@@ -164,7 +176,7 @@ describe('Basic Forked Mainnet Tests', function () {
           deadline
         ]
       )
-      await firstLenderVault.connect(borrower).borrowWithOnChainQuote(onChainQuote, false, sendAmount, balancerV2Looping.address, data)
+      await borrowerGateway.connect(borrower).borrowWithOnChainQuote(firstLenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -173,12 +185,12 @@ describe('Basic Forked Mainnet Tests', function () {
       const vaultUsdcBalPost = await usdc.balanceOf(firstLenderVault.address)
 
       const borrowerWethBalDiffActual = borrowerWethBalPre.add(borrowerWethBalPost)
-      const borrowerWethBalDiffExpected = borrowerWethBalPre.sub(collTokenFromBorrower)
+      const borrowerWethBalDiffExpected = borrowerWethBalPre.sub(collSendAmount)
       const borrowerWethBalDiffComparison = Math.abs(Number(borrowerWethBalDiffActual.sub(borrowerWethBalDiffExpected).mul(PRECISION).div(borrowerWethBalDiffActual).div(ONE_WETH).toString())/PRECISION)
       expect(borrowerWethBalDiffComparison).to.be.lessThan(0.01)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(0) // borrower: no usdc change as all swapped for weth
-      expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(sendAmount)
-      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(onChainQuote.loanPerCollUnit.mul(sendAmount).div(ONE_WETH))
+      expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(collSendAmount)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(onChainQuote.loanPerCollUnit.mul(collSendAmount).div(ONE_WETH))
     })
   })
 })

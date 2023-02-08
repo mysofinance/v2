@@ -149,6 +149,7 @@ contract LenderVaultFactory is ILenderVaultFactory {
         );
 
         ILenderVault(newVaultInstanceAddr).initialize(
+            msg.sender,
             compartmentFactory,
             address(this)
         );

@@ -17,6 +17,8 @@ contract LenderVault is ReentrancyGuard, Initializable {
     using SafeERC20 for IERC20Metadata;
 
     uint256 constant BASE = 1e18;
+    address vaultOwner;
+    address borrowerGateway;
 
     mapping(address => uint256) public lockedAmounts;
     mapping(bytes32 => bool) isConsumedQuote;
@@ -49,17 +51,43 @@ contract LenderVault is ReentrancyGuard, Initializable {
     );
 
     function initialize(
+        address _vaultOwner,
         address _compartmentFactory,
         address _lenderVaultFactory
     ) external initializer {
+        vaultOwner = _vaultOwner;
         compartmentFactory = _compartmentFactory;
         lenderVaultFactory = _lenderVaultFactory;
         loanOffChainQuoteNonce = 1;
     }
 
-    function invalidateQuotes() external {
+    function approve(
+        address spender,
+        address token,
+        uint256 allowance
+    ) external {
+        senderCheck();
+        IERC20Metadata(token).approve(spender, allowance);
+    }
+
+    function setBorrowerGateway(address _borrowerGateway) external {
+        senderCheck();
+        borrowerGateway = _borrowerGateway;
+    }
+
+    function invalidateOffChainQuoteNonce() external {
         senderCheck();
         loanOffChainQuoteNonce += 1;
+    }
+
+    function invalidateOffChainQuote(bytes32 offChainQuoteHash) external {
+        if (
+            (msg.sender != vaultOwner && msg.sender != borrowerGateway) ||
+            isConsumedQuote[offChainQuoteHash]
+        ) {
+            revert();
+        }
+        isConsumedQuote[offChainQuoteHash] = true;
     }
 
     function setAutoQuoteStrategy(
@@ -70,6 +98,58 @@ contract LenderVault is ReentrancyGuard, Initializable {
         senderCheck();
         whitelistCheck(DataTypes.WhiteListType.STRATEGY, strategyAddr);
         autoQuoteStrategy[collToken][loanToken] = strategyAddr;
+    }
+
+    function getLoanInfoForOnChainQuote(
+        address borrower,
+        uint256 collSendAmount,
+        DataTypes.OnChainQuote calldata onChainQuote
+    ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
+        loan.borrower = borrower;
+        uint256 loanAmount = (onChainQuote.loanPerCollUnit * collSendAmount) /
+            (10 ** IERC20Metadata(onChainQuote.collToken).decimals());
+        uint256 repayAmount;
+        if (onChainQuote.isNegativeInterestRate) {
+            repayAmount =
+                (loanAmount * (BASE - onChainQuote.interestRatePctInBase)) /
+                BASE;
+        } else {
+            repayAmount =
+                (loanAmount * (BASE + onChainQuote.interestRatePctInBase)) /
+                BASE;
+        }
+        upfrontFee = (collSendAmount * onChainQuote.upfrontFeePctInBase) / BASE;
+        loan.loanToken = onChainQuote.loanToken;
+        loan.collToken = onChainQuote.collToken;
+        loan.initCollAmount = toUint128(collSendAmount - upfrontFee);
+        loan.initLoanAmount = toUint128(loanAmount);
+        loan.initRepayAmount = toUint128(repayAmount);
+        loan.expiry = uint40(block.timestamp + onChainQuote.tenor);
+        loan.earliestRepay = uint40(
+            block.timestamp + onChainQuote.timeUntilEarliestRepay
+        );
+    }
+
+    function getLoanInfoForOffChainQuote(
+        address borrower,
+        DataTypes.OffChainQuote calldata offChainQuote
+    ) external pure returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
+        loan.borrower = borrower;
+        loan.loanToken = offChainQuote.loanToken;
+        loan.collToken = offChainQuote.collToken;
+        loan.initCollAmount = toUint128(offChainQuote.collAmount);
+        loan.initLoanAmount = toUint128(offChainQuote.loanAmount);
+        loan.initRepayAmount = toUint128(offChainQuote.repayAmount);
+        loan.expiry = uint40(offChainQuote.expiry);
+        loan.earliestRepay = uint40(offChainQuote.earliestRepay);
+        upfrontFee = offChainQuote.upfrontFee;
+    }
+
+    function addLoan(DataTypes.Loan calldata loan) external {
+        if (msg.sender != borrowerGateway) {
+            revert();
+        }
+        loans.push(loan);
     }
 
     // don't need to verify that collToken is a valid whitelisted token cause that
@@ -104,14 +184,9 @@ contract LenderVault is ReentrancyGuard, Initializable {
         if (onChainQuoteUpdateType == DataTypes.OnChainQuoteUpdateType.ADD) {
             // CASE 1: add on-chain quote
             // remove address 0 check since this will be 0 address will not be allowed to be whitelisted in factory
-            whitelistCheck(
-                DataTypes.WhiteListType.TOKEN,
-                onChainQuote.loanToken
-            );
-            whitelistCheck(
-                DataTypes.WhiteListType.TOKEN,
-                onChainQuote.collToken
-            );
+            if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
+                revert();
+            }
             if (
                 onChainQuote.collToken == onChainQuote.loanToken ||
                 onChainQuote.timeUntilEarliestRepay > onChainQuote.tenor ||
@@ -148,14 +223,11 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
                 onChainQuotes.pop();
             } else {
-                whitelistCheck(
-                    DataTypes.WhiteListType.TOKEN,
-                    onChainQuote.loanToken
-                );
-                whitelistCheck(
-                    DataTypes.WhiteListType.TOKEN,
-                    onChainQuote.collToken
-                );
+                if (
+                    !isValidPair(onChainQuote.loanToken, onChainQuote.collToken)
+                ) {
+                    revert();
+                }
                 bytes32 newOnChainQuoteHash = hashOnChainQuote(onChainQuote);
                 if (oldOnChainQuoteHash == newOnChainQuoteHash) {
                     revert Invalid();
@@ -168,304 +240,97 @@ contract LenderVault is ReentrancyGuard, Initializable {
         }
     }
 
-    function borrowWithOnChainQuote(
-        DataTypes.OnChainQuote memory onChainQuote,
-        bool isAutoQuote,
-        uint256 sendAmount,
-        address callbackAddr,
-        bytes calldata data
-    ) external nonReentrant {
-        if (isAutoQuote) {
-            address strategyAddr = autoQuoteStrategy[onChainQuote.collToken][
-                onChainQuote.loanToken
-            ];
-            if (strategyAddr == address(0)) {
-                revert Invalid();
-            }
-            onChainQuote = IAutoQuoteStrategy(strategyAddr).getOnChainQuote();
-        } else {
-            if (!isOnChainQuote[hashOnChainQuote(onChainQuote)]) {
-                revert Invalid();
-            }
+    function isValidOnChainQuote(
+        DataTypes.OnChainQuote memory onChainQuote
+    ) external view returns (bool) {
+        if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
+            return false;
         }
-        (
-            uint256 upfrontFee,
-            DataTypes.Loan memory loan
-        ) = _getFeeAndLoanStructWithoutCollAmount(onChainQuote, sendAmount);
-        _borrowTransfers(loan, sendAmount, upfrontFee, callbackAddr, data);
+        return isOnChainQuote[hashOnChainQuote(onChainQuote)];
     }
 
-    function borrowWithOffChainQuote(
-        DataTypes.OffChainQuote calldata loanOffChainQuote,
-        address callbackAddr,
-        bytes calldata data
-    ) external nonReentrant {
-        whitelistCheck(
-            DataTypes.WhiteListType.TOKEN,
-            loanOffChainQuote.loanToken
-        );
-        whitelistCheck(
-            DataTypes.WhiteListType.TOKEN,
-            loanOffChainQuote.collToken
-        );
+    function isValidAutoQuote(
+        DataTypes.OnChainQuote memory onChainQuote
+    ) external view returns (bool) {
+        if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
+            return false;
+        }
+        return
+            autoQuoteStrategy[onChainQuote.collToken][onChainQuote.loanToken] !=
+            address(0);
+    }
+
+    function isValidOffChainQuote(
+        address borrower,
+        DataTypes.OffChainQuote calldata offChainQuote
+    ) external view returns (bool isValid, bytes32 offChainQuoteHash) {
         {
-            bytes32 payloadHash = keccak256(
+            if (
+                !isValidPair(offChainQuote.loanToken, offChainQuote.collToken)
+            ) {
+                isValid = false;
+            }
+            offChainQuoteHash = keccak256(
                 abi.encode(
-                    loanOffChainQuote.borrower,
-                    loanOffChainQuote.collToken,
-                    loanOffChainQuote.loanToken,
-                    loanOffChainQuote.sendAmount,
-                    loanOffChainQuote.loanAmount,
-                    loanOffChainQuote.expiry,
-                    loanOffChainQuote.earliestRepay,
-                    loanOffChainQuote.repayAmount,
-                    loanOffChainQuote.validUntil,
-                    loanOffChainQuote.upfrontFee,
-                    loanOffChainQuote.useCollCompartment,
-                    loanOffChainQuote.nonce
+                    offChainQuote.borrower,
+                    offChainQuote.collToken,
+                    offChainQuote.loanToken,
+                    offChainQuote.collAmount,
+                    offChainQuote.loanAmount,
+                    offChainQuote.expiry,
+                    offChainQuote.earliestRepay,
+                    offChainQuote.repayAmount,
+                    offChainQuote.validUntil,
+                    offChainQuote.upfrontFee,
+                    offChainQuote.useCollCompartment,
+                    offChainQuote.nonce
                 )
             );
             if (
-                isConsumedQuote[payloadHash] ||
-                loanOffChainQuote.nonce >= loanOffChainQuoteNonce
+                isConsumedQuote[offChainQuoteHash] ||
+                offChainQuote.nonce >= loanOffChainQuoteNonce
             ) {
-                revert Invalid();
+                isValid = false;
             }
-            isConsumedQuote[payloadHash] = true;
-
             bytes32 messageHash = keccak256(
                 abi.encodePacked(
                     "\x19Ethereum Signed Message:\n32",
-                    payloadHash
+                    offChainQuoteHash
                 )
             );
             address signer = ecrecover(
                 messageHash,
-                loanOffChainQuote.v,
-                loanOffChainQuote.r,
-                loanOffChainQuote.s
+                offChainQuote.v,
+                offChainQuote.r,
+                offChainQuote.s
             );
 
             if (
-                signer !=
-                ILenderVaultFactory(lenderVaultFactory).vaultOwner(
-                    address(this)
-                ) ||
-                loanOffChainQuote.validUntil < block.timestamp
+                signer != vaultOwner ||
+                offChainQuote.validUntil < block.timestamp
             ) {
-                revert Invalid();
+                isValid = false;
             }
-            if (
-                loanOffChainQuote.borrower != address(0) &&
-                loanOffChainQuote.borrower != msg.sender
-            ) {
-                revert Invalid();
+            if (borrower == address(0) || borrower != offChainQuote.borrower) {
+                isValid = false;
             }
         }
-
-        DataTypes.Loan memory loan;
-        loan.borrower = msg.sender;
-        loan.collToken = loanOffChainQuote.collToken;
-        loan.loanToken = loanOffChainQuote.loanToken;
-        loan.expiry = uint40(loanOffChainQuote.expiry);
-        loan.earliestRepay = uint40(loanOffChainQuote.earliestRepay);
-        loan.initRepayAmount = toUint128(loanOffChainQuote.repayAmount);
-        loan.initLoanAmount = toUint128(loanOffChainQuote.loanAmount);
-        loan.hasCollCompartment = loanOffChainQuote.useCollCompartment;
-
-        _borrowTransfers(
-            loan,
-            loanOffChainQuote.sendAmount,
-            loanOffChainQuote.upfrontFee,
-            callbackAddr,
-            data
-        );
+        isValid = true;
     }
 
-    function _getFeeAndLoanStructWithoutCollAmount(
-        DataTypes.OnChainQuote memory onChainQuote,
-        uint256 sendAmount
-    ) internal view returns (uint256 upfrontFee, DataTypes.Loan memory loan) {
-        uint256 loanAmount = (onChainQuote.loanPerCollUnit * sendAmount) /
-            (10 ** IERC20Metadata(onChainQuote.collToken).decimals());
-        uint256 repayAmount;
-        if (onChainQuote.isNegativeInterestRate) {
-            repayAmount =
-                (loanAmount * (BASE - onChainQuote.interestRatePctInBase)) /
-                BASE;
-        } else {
-            repayAmount =
-                (loanAmount * (BASE + onChainQuote.interestRatePctInBase)) /
-                BASE;
-        }
-        loan.borrower = msg.sender;
-        loan.collToken = onChainQuote.collToken;
-        loan.loanToken = onChainQuote.loanToken;
-        loan.initLoanAmount = toUint128(loanAmount);
-        loan.initRepayAmount = toUint128(repayAmount);
-        loan.expiry = uint40(block.timestamp + onChainQuote.tenor);
-        loan.earliestRepay = uint40(
-            block.timestamp + onChainQuote.timeUntilEarliestRepay
-        );
-        upfrontFee = (sendAmount * onChainQuote.upfrontFeePctInBase) / BASE;
-    }
-
-    function _borrowTransfers(
-        DataTypes.Loan memory loan,
-        uint256 sendAmount,
-        uint256 upfrontFee,
-        address callbackAddr,
-        bytes calldata data
-    ) internal {
-        uint256 loanTokenBalBefore = IERC20Metadata(loan.loanToken).balanceOf(
-            address(this)
-        );
-        if (
-            loanTokenBalBefore - lockedAmounts[loan.loanToken] <
-            loan.initLoanAmount
-        ) {
-            revert();
-        }
-        uint256 collTokenBalBefore = IERC20Metadata(loan.collToken).balanceOf(
-            address(this)
-        );
-
-        IERC20Metadata(loan.loanToken).safeTransfer(
-            msg.sender,
-            loan.initLoanAmount
-        );
-        if (callbackAddr != address(0)) {
-            whitelistCheck(DataTypes.WhiteListType.CALLBACK, callbackAddr);
-            IVaultCallback(callbackAddr).borrowCallback(loan, data);
-        }
-
-        // uint256 tokenBalAfter = IERC20Metadata(loan.loanToken).balanceOf(
-        //     address(this)
-        // );
-
-        // check exactly that at least correct loan amount is sent
-        // if (loanTokenBalBefore - tokenBalAfter < loan.initLoanAmount) {
-        //     revert Invalid();
-        // }
-
-        // send the vault full collateral amount
-        IERC20Metadata(loan.collToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            sendAmount
-        );
-
-        uint256 tokenBalAfter = IERC20Metadata(loan.collToken).balanceOf(
-            address(this)
-        );
-
-        // test that upfrontFee is not bigger than post transfer fee on collateral
-        if (tokenBalAfter - collTokenBalBefore < upfrontFee) {
-            revert Invalid();
-        }
-
-        uint128 reclaimable = toUint128(
-            tokenBalAfter - collTokenBalBefore - upfrontFee
-        );
-
-        if (loan.hasCollCompartment) {
-            (
-                loan.collTokenCompartmentAddr,
-                loan.initCollAmount
-            ) = ILenderVaultFactory(lenderVaultFactory).createCompartment(
-                loan,
-                reclaimable,
-                collTokenImplAddrs[loan.collToken],
-                compartmentFactory,
-                loans.length,
-                data
+    function isValidPair(
+        address loanToken,
+        address collToken
+    ) internal view returns (bool) {
+        return
+            ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
+                DataTypes.WhiteListType.TOKEN,
+                loanToken
+            ) &&
+            ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
+                DataTypes.WhiteListType.TOKEN,
+                collToken
             );
-        } else {
-            loan.initCollAmount = reclaimable;
-            lockedAmounts[loan.collToken] += reclaimable;
-        }
-        loans.push(loan);
-    }
-
-    function repay(
-        DataTypes.LoanRepayInfo calldata loanRepayInfo,
-        address callbackAddr,
-        bytes calldata data
-    ) external nonReentrant {
-        DataTypes.Loan memory loan = loans[loanRepayInfo.loanId];
-        if (msg.sender != loan.borrower) {
-            revert Invalid();
-        }
-        if (
-            block.timestamp < loan.earliestRepay ||
-            block.timestamp >= loan.expiry
-        ) {
-            revert Invalid();
-        }
-        if (
-            loanRepayInfo.repayAmount >
-            loan.initRepayAmount - loan.amountRepaidSoFar
-        ) {
-            revert Invalid();
-        }
-        uint128 reclaimCollAmount = toUint128(
-            (loan.initCollAmount * loanRepayInfo.repayAmount) /
-                loan.initRepayAmount
-        );
-
-        uint256 loanTokenBalBefore = IERC20Metadata(loanRepayInfo.loanToken)
-            .balanceOf(address(this));
-        // uint256 collTokenBalBefore = IERC20Metadata(loanRepayInfo.collToken)
-        //     .balanceOf(address(this));
-
-        if (loan.hasCollCompartment) {
-            ICompartment(loan.collTokenCompartmentAddr).transferCollToBorrower(
-                loanRepayInfo.repayAmount,
-                loan.initRepayAmount - loan.amountRepaidSoFar,
-                loan.borrower,
-                loan.collToken
-            );
-        } else {
-            IERC20Metadata(loanRepayInfo.collToken).safeTransfer(
-                msg.sender,
-                reclaimCollAmount
-            );
-        }
-
-        if (callbackAddr != address(0)) {
-            IVaultCallback(callbackAddr).repayCallback(loan, data); // todo: whitelist callbackAddr
-        }
-        IERC20Metadata(loanRepayInfo.loanToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            loanRepayInfo.repayAmount + loanRepayInfo.loanTokenTransferFees
-        );
-
-        uint256 loanTokenBalAfter = IERC20Metadata(loanRepayInfo.loanToken)
-            .balanceOf(address(this));
-
-        uint128 loanTokenAmountReceived = toUint128(
-            loanTokenBalAfter - loanTokenBalBefore
-        );
-        // uint256 collTokenBalAfter = IERC20Metadata(loanRepayInfo.collToken)
-        //     .balanceOf(address(this));
-
-        if (loanTokenAmountReceived < loanRepayInfo.repayAmount) {
-            revert Invalid();
-        }
-        // balance only changes when no compartment
-        // if (
-        //     !loan.hasCollCompartment &&
-        //     collTokenBalBefore - collTokenBalAfter < reclaimCollAmount
-        // ) {
-        //     revert Invalid();
-        // }
-
-        loan.amountRepaidSoFar += loanTokenAmountReceived;
-        // only update lockedAmounts when no compartment
-        if (!loan.hasCollCompartment) {
-            lockedAmounts[loanRepayInfo.collToken] -= reclaimCollAmount;
-        }
     }
 
     function unlockCollateral(
@@ -537,10 +402,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
         _lenderFactory = lenderVaultFactory;
     }
 
-    function senderCheck() internal {
-        address vaultOwner = ILenderVaultFactory(lenderVaultFactory).vaultOwner(
-            address(this)
-        );
+    function senderCheck() internal view {
         if (msg.sender != vaultOwner) {
             revert Invalid();
         }
@@ -549,7 +411,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
     function whitelistCheck(
         DataTypes.WhiteListType _type,
         address _addrToCheck
-    ) internal {
+    ) internal view {
         if (
             !ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
                 _type,

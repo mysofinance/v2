@@ -8,7 +8,7 @@ import {LenderVault} from "./LenderVault.sol";
 
 contract LoanRequestPool is ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
-
+    /*
     mapping(address => bool) public isAcceptedToken;
     mapping(address => uint256) public myLoanRequestId;
     DataTypes.LoanRequest[] public openLoanRequests;
@@ -161,4 +161,5 @@ contract LoanRequestPool is ReentrancyGuard {
             offChainQuote.loanAmount
         );
     }
+    */
 }

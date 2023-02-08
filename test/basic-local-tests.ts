@@ -12,7 +12,7 @@ describe('Basic Local Tests', function () {
   async function setupTest() {
     const [vaultOwner, borrower, tokenDeployer] = await ethers.getSigners()
 
-    //deploy CompartmentFactory
+    // deploy CompartmentFactory
     const CompartmentFactory = await ethers.getContractFactory('CollateralCompartmentFactory')
     await CompartmentFactory.connect(vaultOwner)
     const compartmentFactory = await CompartmentFactory.deploy(['0x0000000000000000000000000000000000000001'])
@@ -29,6 +29,13 @@ describe('Basic Local Tests', function () {
     await LenderVaultFactory.connect(vaultOwner)
     const lenderVaultFactory = await LenderVaultFactory.deploy(lenderVault.address)
     await lenderVaultFactory.deployed()
+
+    // deploy borrow gateway
+    const VAULT_REGISTRY_AND_CALLBACK_WHITELIST = lenderVaultFactory.address
+    const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
+    await BorrowerGateway.connect(tokenDeployer)
+    const borrowerGateway = await BorrowerGateway.deploy(VAULT_REGISTRY_AND_CALLBACK_WHITELIST)
+    await borrowerGateway.deployed()
 
     // whitelist compartment factory and create first vault
     await lenderVaultFactory.addToWhitelist(5, compartmentFactory.address)
@@ -52,23 +59,20 @@ describe('Basic Local Tests', function () {
     await usdc.mint(vaultOwner.address, ONE_USDC.mul(100000))
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
-    // deploy balancer v2 callbacks
-    const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
-    await BalancerV2Looping.connect(vaultOwner)
-    const balancerV2Looping = await BalancerV2Looping.deploy()
-    await balancerV2Looping.deployed()
-
     // whitelist addrs
     await lenderVaultFactory.addToWhitelist(0, usdc.address)
     await lenderVaultFactory.addToWhitelist(0, weth.address)
-    await lenderVaultFactory.addToWhitelist(3, balancerV2Looping.address)
+    
+    // lender connects his vault to borrow gateway and approve
+    await firstLenderVault.setBorrowerGateway(borrowerGateway.address)
+    await firstLenderVault.approve(borrowerGateway.address, usdc.address, MAX_UINT256)
 
-    return { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping }
+    return { borrowerGateway, lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault }
   }
 
   describe('Off-Chain Quote Testing', function () {
     it('Should process off-chain quote correctly, without possibility of replaying', async function () {
-      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping } =
+      const { borrowerGateway, lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault } =
         await setupTest()
 
       // lenderVault owner deposits usdc
@@ -81,7 +85,7 @@ describe('Basic Local Tests', function () {
         borrower: borrower.address,
         collToken: weth.address,
         loanToken: usdc.address,
-        sendAmount: ONE_WETH,
+        collAmount: ONE_WETH.sub(ONE_WETH.mul(50).div(10000)),
         loanAmount: ONE_USDC.mul(1000),
         expiry: timestamp + 60 * 60 * 24 * 30,
         earliestRepay: timestamp,
@@ -113,7 +117,7 @@ describe('Basic Local Tests', function () {
           offChainQuote.borrower,
           offChainQuote.collToken,
           offChainQuote.loanToken,
-          offChainQuote.sendAmount,
+          offChainQuote.collAmount,
           offChainQuote.loanAmount,
           offChainQuote.expiry,
           offChainQuote.earliestRepay,
@@ -143,11 +147,14 @@ describe('Basic Local Tests', function () {
       const vaultWethBalPre = await weth.balanceOf(firstLenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(firstLenderVault.address)
 
-      // borrower approves and executes quote
-      await weth.connect(borrower).approve(firstLenderVault.address, MAX_UINT128)
-      await firstLenderVault
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = offChainQuote.collAmount.add(offChainQuote.upfrontFee)
+      const callbackAddr = '0x0000000000000000000000000000000000000000'
+      const callbackData = '0x'
+      await borrowerGateway
         .connect(borrower)
-        .borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')
+        .borrowWithOffChainQuote(firstLenderVault.address, borrower.address, collSendAmount, offChainQuote, callbackAddr, callbackData)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -160,16 +167,16 @@ describe('Basic Local Tests', function () {
 
       // borrower cannot replay quote
       await expect(
-        firstLenderVault
-          .connect(borrower)
-          .borrowWithOffChainQuote(offChainQuote, '0x0000000000000000000000000000000000000000', '0x')
+        borrowerGateway
+        .connect(borrower)
+        .borrowWithOffChainQuote(firstLenderVault.address, borrower.address, collSendAmount, offChainQuote, callbackAddr, callbackData)
       ).to.be.reverted
     })
   })
 
   describe('On-Chain Quote Testing', function () {
     it('Should process on-chain quote correctly', async function () {
-      const { lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping } =
+      const { borrowerGateway, lenderVault, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault } =
         await setupTest()
 
       // lenderVault owner deposits usdc
@@ -178,7 +185,7 @@ describe('Basic Local Tests', function () {
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      let onChainQuote = {
+      const onChainQuote = {
         loanPerCollUnit: ONE_USDC.mul(1000),
         interestRatePctInBase: BASE.mul(10).div(100),
         upfrontFeePctInBase: BASE.mul(1).div(100),
@@ -199,12 +206,16 @@ describe('Basic Local Tests', function () {
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
       const vaultWethBalPre = await weth.balanceOf(firstLenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(firstLenderVault.address)
-
-      // borrower approves and executes quote
-      await weth.connect(borrower).approve(firstLenderVault.address, MAX_UINT128)
-      await firstLenderVault
+      
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const isAutoQuote = false
+      const callbackAddr = '0x0000000000000000000000000000000000000000'
+      const callbackData = '0x'
+      await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(onChainQuote, false, ONE_WETH, '0x0000000000000000000000000000000000000000', '0x')
+        .borrowWithOnChainQuote(firstLenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
