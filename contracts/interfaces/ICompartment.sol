@@ -3,6 +3,10 @@
 pragma solidity ^0.8.17;
 
 interface ICompartment {
+    //shared compartment errors
+    error InvalidSender();
+    error InvalidPool();
+
     /**
      * @notice function to initialize collateral compartment
      * @dev factory creates clone and then initializes implementation contract
