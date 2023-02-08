@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
-import {ICrvStaking} from "../../interfaces/compartments/staking/ICrvStaking.sol";
+import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {ICompartment} from "../../interfaces/ICompartment.sol";
 import {ILenderVaultFactory} from "../../interfaces/ILenderVaultFactory.sol";
 import {DataTypes} from "../../DataTypes.sol";
@@ -62,7 +62,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
         // withdraw proportion of gauge amount
         uint256 withdrawAmount = (repayAmount * currentStakedBal) /
             repayAmountLeft;
-        ICrvStaking(_liqGaugeAddr).withdraw(withdrawAmount);
+        IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         // now check lp token balance of compartment
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
@@ -94,13 +94,13 @@ contract CurveStakingCompartment is Initializable, ICompartment {
             )
         ) revert InvalidPool();
         */
-        address lpTokenAddrForGauge = ICrvStaking(_liqGaugeAddr).lp_token();
+        address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
         if (lpTokenAddrForGauge != collTokenAddr) {
             revert IncorrectGaugeForLpToken();
         }
         liqGaugeAddr = _liqGaugeAddr;
         IERC20(collTokenAddr).approve(_liqGaugeAddr, type(uint256).max);
-        ICrvStaking(_liqGaugeAddr).deposit(amount, address(this));
+        IStakingHelper(_liqGaugeAddr).deposit(amount, address(this));
     }
 
     // unlockColl this would be called on defaults
@@ -112,7 +112,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
             address(this)
         );
         // withdraw all remaining staked tokens
-        ICrvStaking(_liqGaugeAddr).withdraw(currentStakedBal);
+        IStakingHelper(_liqGaugeAddr).withdraw(currentStakedBal);
         // now get lp token balance
         uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
             address(this)
