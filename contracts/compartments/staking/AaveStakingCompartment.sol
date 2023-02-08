@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
-import {ICrvStaking} from "../../interfaces/compartments/staking/ICrvStaking.sol";
 import {ICompartment} from "../../interfaces/ICompartment.sol";
 import {ILenderVaultFactory} from "../../interfaces/ILenderVaultFactory.sol";
 import {DataTypes} from "../../DataTypes.sol";

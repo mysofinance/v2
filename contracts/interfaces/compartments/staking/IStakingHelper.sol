@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.17;
 
-interface ICrvStaking {
+interface IStakingHelper {
     /**
      * @notice Deposit `value` LP tokens, curve type take pools
      * @dev Depositing also claims pending reward tokens
@@ -18,5 +18,23 @@ interface ICrvStaking {
      */
     function withdraw(uint256 value) external;
 
+    /**
+     * @notice returns lpToken address for crv style gauge
+     */
     function lp_token() external view returns (address);
+
+    /**
+     * @notice stakesEverything in cvx style reward pool
+     */
+    function stakeAll() external;
+
+    /**
+     * @notice returns lpToken address for cvx style reward pool
+     */
+    function staking_token() external view returns (address);
+
+    /**
+     * @notice returns reward token address for cvx reward pool
+     */
+    function reward_token() external view returns (address);
 }
