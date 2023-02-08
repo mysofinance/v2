@@ -24,7 +24,17 @@ interface IStakingHelper {
     function lp_token() external view returns (address);
 
     /**
-     * @notice stakesEverything in cvx style rewardPool
+     * @notice stakesEverything in cvx style reward pool
      */
     function stakeAll() external;
+
+    /**
+     * @notice returns lpToken address for cvx style reward pool
+     */
+    function staking_token() external view returns (address);
+
+    /**
+     * @notice returns reward token address for cvx reward pool
+     */
+    function reward_token() external view returns (address);
 }
