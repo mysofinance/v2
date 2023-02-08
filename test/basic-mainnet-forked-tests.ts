@@ -198,10 +198,6 @@ describe('Basic Forked Mainnet Tests', function () {
     const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
     await aaveAutoQuoteStrategy1.deployed()
 
-    // test retrieiving autoquote
-    const onChainQuote = await aaveAutoQuoteStrategy1.getOnChainQuote();
-    console.log("onChainQuote from Aave strategy:", onChainQuote)
-
     // whitelist autoquote strategy
     await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
 
@@ -214,13 +210,21 @@ describe('Basic Forked Mainnet Tests', function () {
     // borrower approves borrower gateway
     await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
+    // test retrieiving autoquote
+    const onChainQuote = await aaveAutoQuoteStrategy1.getOnChainQuote();
+    console.log("onChainQuote from Aave strategy:", onChainQuote)
+
     // borrower uses quote to borrow
     const collSendAmount = ONE_WETH
     const isAutoQuote = true
     const callbackAddr = '0x0000000000000000000000000000000000000000'
     const callbackData = '0x'
-    const bal = await weth.balanceOf(borrower.address)
-    console.log(bal)
     await borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+    const loan = await lenderVault.loans(0)
+    const expectedLoanAmount = collSendAmount.mul(onChainQuote.loanPerCollUnit).div(ONE_WETH)
+    const expectedRepayAmount = expectedLoanAmount.mul(BASE.add(onChainQuote.interestRatePctInBase)).div(BASE)
+    expect(loan.initCollAmount).to.equal(collSendAmount)
+    expect(loan.initLoanAmount).to.equal(expectedLoanAmount)
+    expect(loan.initRepayAmount).to.equal(expectedRepayAmount)
   })
 })
