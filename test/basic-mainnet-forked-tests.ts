@@ -132,7 +132,7 @@ describe('Basic Forked Mainnet Tests', function () {
         isNegativeInterestRate: false,
         useCollCompartment: false
       }
-      await firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 0, 0)
+      await firstLenderVault.connect(vaultOwner).addOnChainQuote(onChainQuote)
 
       // Balancer V2 integration: calculate which send amount would be needed to max. lever up in 1-click
       const poolAddr = "0x96646936b91d6B9D7D0c47C496AfBF3D6ec7B6f8"

@@ -13,18 +13,18 @@ interface ILenderVault {
 
     function loans(uint256 index) external view returns (DataTypes.Loan memory);
 
-    function isValidOnChainQuote(
+    function doesAcceptOnChainQuote(
         DataTypes.OnChainQuote calldata onChainQuote
-    ) external view returns (bool isValid);
+    ) external view returns (bool doesAccept);
 
-    function isValidAutoQuote(
+    function doesAcceptAutoQuote(
         DataTypes.OnChainQuote calldata onChainQuote
-    ) external view returns (bool isValid);
+    ) external view returns (bool doesAccept);
 
-    function isValidOffChainQuote(
+    function doesAcceptOffChainQuote(
         address borrower,
         DataTypes.OffChainQuote calldata offChainQuote
-    ) external view returns (bool isValid, bytes32 offChainQuoteHash);
+    ) external view returns (bool doesAccept, bytes32 offChainQuoteHash);
 
     function getLoanInfoForOnChainQuote(
         address borrower,

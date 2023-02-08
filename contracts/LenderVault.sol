@@ -24,7 +24,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
     mapping(bytes32 => bool) isConsumedQuote;
     mapping(bytes32 => bool) public isOnChainQuote;
     mapping(address => mapping(address => address)) public autoQuoteStrategy; // points to auto loan strategy for given coll/loan token pair
-    DataTypes.OnChainQuote[] public onChainQuotes; // stores standing loan quotes
     // for now remove public getter for byte code size purposes...
     mapping(address => address) collTokenImplAddrs;
     DataTypes.Loan[] public loans; // stores loans
@@ -46,7 +45,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
     event OnChainQuote(
         DataTypes.OnChainQuote onChainQuote,
-        DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
+        bytes32 onChainQuoteHash,
         bool isActive
     );
 
@@ -175,72 +174,53 @@ contract LenderVault is ReentrancyGuard, Initializable {
         IERC20Metadata(token).safeTransfer(owner, amount);
     }
 
-    function setOnChainQuote(
-        DataTypes.OnChainQuote calldata onChainQuote,
-        DataTypes.OnChainQuoteUpdateType onChainQuoteUpdateType,
-        uint256 oldOnChainQuoteId
+    function addOnChainQuote(
+        DataTypes.OnChainQuote calldata onChainQuote
     ) external {
         senderCheck();
-        if (onChainQuoteUpdateType == DataTypes.OnChainQuoteUpdateType.ADD) {
-            // CASE 1: add on-chain quote
-            // remove address 0 check since this will be 0 address will not be allowed to be whitelisted in factory
-            if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
-                revert();
-            }
-            if (
-                onChainQuote.collToken == onChainQuote.loanToken ||
-                onChainQuote.timeUntilEarliestRepay > onChainQuote.tenor ||
-                (onChainQuote.isNegativeInterestRate &&
-                    onChainQuote.interestRatePctInBase > BASE)
-            ) {
-                revert Invalid();
-            }
-            bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
-            if (isOnChainQuote[onChainQuoteHash]) {
-                revert Invalid();
-            }
-            isOnChainQuote[onChainQuoteHash] = true;
-            onChainQuotes.push(onChainQuote);
-            emit OnChainQuote(onChainQuote, onChainQuoteUpdateType, true);
-        } else {
-            uint256 arrayLastIndex = onChainQuotes.length - 1;
-            if (oldOnChainQuoteId > arrayLastIndex) {
-                revert Invalid();
-            }
-            DataTypes.OnChainQuote memory oldOnChainQuote = onChainQuotes[
-                oldOnChainQuoteId
-            ];
-            bytes32 oldOnChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
-            isOnChainQuote[oldOnChainQuoteHash] = false;
-
-            if (
-                onChainQuoteUpdateType ==
-                DataTypes.OnChainQuoteUpdateType.DELETE
-            ) {
-                onChainQuotes[oldOnChainQuoteId] = onChainQuotes[
-                    arrayLastIndex
-                ];
-
-                onChainQuotes.pop();
-            } else {
-                if (
-                    !isValidPair(onChainQuote.loanToken, onChainQuote.collToken)
-                ) {
-                    revert();
-                }
-                bytes32 newOnChainQuoteHash = hashOnChainQuote(onChainQuote);
-                if (oldOnChainQuoteHash == newOnChainQuoteHash) {
-                    revert Invalid();
-                }
-                isOnChainQuote[newOnChainQuoteHash] = true;
-                onChainQuotes[oldOnChainQuoteId] = onChainQuote;
-                emit OnChainQuote(onChainQuote, onChainQuoteUpdateType, true);
-            }
-            emit OnChainQuote(oldOnChainQuote, onChainQuoteUpdateType, false);
+        if (!isValidOnChainQuote(onChainQuote)) {
+            revert Invalid();
         }
+        bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
+        if (isOnChainQuote[onChainQuoteHash]) {
+            revert Invalid();
+        }
+        isOnChainQuote[onChainQuoteHash] = true;
+        emit OnChainQuote(onChainQuote, onChainQuoteHash, true);
     }
 
-    function isValidOnChainQuote(
+    function updateOnChainQuote(
+        DataTypes.OnChainQuote calldata oldOnChainQuote,
+        DataTypes.OnChainQuote calldata newOnChainQuote
+    ) external {
+        senderCheck();
+        if (!isValidOnChainQuote(newOnChainQuote)) {
+            revert Invalid();
+        }
+        bytes32 onChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
+        if (isOnChainQuote[onChainQuoteHash]) {
+            revert Invalid();
+        }
+        isOnChainQuote[onChainQuoteHash] = false;
+        emit OnChainQuote(oldOnChainQuote, onChainQuoteHash, false);
+        onChainQuoteHash = hashOnChainQuote(newOnChainQuote);
+        isOnChainQuote[onChainQuoteHash] = true;
+        emit OnChainQuote(newOnChainQuote, onChainQuoteHash, true);
+    }
+
+    function deleteOnChainQuote(
+        DataTypes.OnChainQuote calldata onChainQuote
+    ) external {
+        senderCheck();
+        bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
+        if (!isOnChainQuote[onChainQuoteHash]) {
+            revert Invalid();
+        }
+        isOnChainQuote[onChainQuoteHash] = false;
+        emit OnChainQuote(onChainQuote, onChainQuoteHash, false);
+    }
+
+    function doesAcceptOnChainQuote(
         DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool) {
         if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
@@ -249,7 +229,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
         return isOnChainQuote[hashOnChainQuote(onChainQuote)];
     }
 
-    function isValidAutoQuote(
+    function doesAcceptAutoQuote(
         DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool) {
         if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
@@ -260,15 +240,15 @@ contract LenderVault is ReentrancyGuard, Initializable {
             address(0);
     }
 
-    function isValidOffChainQuote(
+    function doesAcceptOffChainQuote(
         address borrower,
         DataTypes.OffChainQuote calldata offChainQuote
-    ) external view returns (bool isValid, bytes32 offChainQuoteHash) {
+    ) external view returns (bool doesAccept, bytes32 offChainQuoteHash) {
         {
             if (
                 !isValidPair(offChainQuote.loanToken, offChainQuote.collToken)
             ) {
-                isValid = false;
+                doesAccept = false;
             }
             offChainQuoteHash = keccak256(
                 abi.encode(
@@ -290,7 +270,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 isConsumedQuote[offChainQuoteHash] ||
                 offChainQuote.nonce >= loanOffChainQuoteNonce
             ) {
-                isValid = false;
+                doesAccept = false;
             }
             bytes32 messageHash = keccak256(
                 abi.encodePacked(
@@ -309,13 +289,13 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 signer != vaultOwner ||
                 offChainQuote.validUntil < block.timestamp
             ) {
-                isValid = false;
+                doesAccept = false;
             }
             if (borrower == address(0) || borrower != offChainQuote.borrower) {
-                isValid = false;
+                doesAccept = false;
             }
         }
-        isValid = true;
+        doesAccept = true;
     }
 
     function isValidPair(
@@ -425,5 +405,15 @@ contract LenderVault is ReentrancyGuard, Initializable {
         if (y != x) {
             revert Invalid();
         }
+    }
+
+    function isValidOnChainQuote(
+        DataTypes.OnChainQuote calldata onChainQuote
+    ) internal pure returns (bool isValid) {
+        isValid = !(onChainQuote.collToken == onChainQuote.loanToken ||
+            onChainQuote.timeUntilEarliestRepay > onChainQuote.tenor ||
+            (onChainQuote.isNegativeInterestRate &&
+                onChainQuote.interestRatePctInBase > BASE) ||
+            onChainQuote.upfrontFeePctInBase > BASE);
     }
 }

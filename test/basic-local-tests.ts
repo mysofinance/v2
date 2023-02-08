@@ -197,9 +197,34 @@ describe('Basic Local Tests', function () {
         useCollCompartment: false
       }
 
-      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 0, 0))
+      const payload = ethers.utils.defaultAbiCoder.encode(
+        [
+          'uint256',
+          'uint256',
+          'uint256',
+          'address',
+          'address',
+          'uint256',
+          'uint256',
+          'bool',
+          'bool'
+        ],
+        [
+          onChainQuote.loanPerCollUnit,
+          onChainQuote.interestRatePctInBase,
+          onChainQuote.upfrontFeePctInBase,
+          onChainQuote.collToken,
+          onChainQuote.loanToken,
+          onChainQuote.tenor,
+          onChainQuote.timeUntilEarliestRepay,
+          onChainQuote.isNegativeInterestRate,
+          onChainQuote.useCollCompartment
+        ]
+      )
+      const onChainQuoteHash = ethers.utils.keccak256(payload)
+      await expect(firstLenderVault.connect(vaultOwner).addOnChainQuote(onChainQuote))
         .to.emit(firstLenderVault, 'OnChainQuote')
-        .withArgs(Object.values(onChainQuote), 0, true)
+        .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -247,26 +272,69 @@ describe('Basic Local Tests', function () {
         isNegativeInterestRate: false,
         useCollCompartment: false
       }
+      let payload = ethers.utils.defaultAbiCoder.encode(
+        [
+          'uint256',
+          'uint256',
+          'uint256',
+          'address',
+          'address',
+          'uint256',
+          'uint256',
+          'bool',
+          'bool'
+        ],
+        [
+          onChainQuote.loanPerCollUnit,
+          onChainQuote.interestRatePctInBase,
+          onChainQuote.upfrontFeePctInBase,
+          onChainQuote.collToken,
+          onChainQuote.loanToken,
+          onChainQuote.tenor,
+          onChainQuote.timeUntilEarliestRepay,
+          onChainQuote.isNegativeInterestRate,
+          onChainQuote.useCollCompartment
+        ]
+      )
+      let onChainQuoteHash = ethers.utils.keccak256(payload)
 
-      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 0, 0))
+      await expect(firstLenderVault.connect(vaultOwner).addOnChainQuote(onChainQuote))
         .to.emit(firstLenderVault, 'OnChainQuote')
-        .withArgs(Object.values(onChainQuote), 0, true)
+        .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)
 
       onChainQuote.loanPerCollUnit = ONE_USDC.mul(900)
-
-      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 1, 0))
-        .to.emit(firstLenderVault, 'OnChainQuote')
-        .withArgs(Object.values(onChainQuote), 1, true)
-
-      expect((await firstLenderVault.connect(vaultOwner).onChainQuotes(0))?.['loanPerCollUnit']).to.equal(
-        onChainQuote.loanPerCollUnit
+      payload = ethers.utils.defaultAbiCoder.encode(
+        [
+          'uint256',
+          'uint256',
+          'uint256',
+          'address',
+          'address',
+          'uint256',
+          'uint256',
+          'bool',
+          'bool'
+        ],
+        [
+          onChainQuote.loanPerCollUnit,
+          onChainQuote.interestRatePctInBase,
+          onChainQuote.upfrontFeePctInBase,
+          onChainQuote.collToken,
+          onChainQuote.loanToken,
+          onChainQuote.tenor,
+          onChainQuote.timeUntilEarliestRepay,
+          onChainQuote.isNegativeInterestRate,
+          onChainQuote.useCollCompartment
+        ]
       )
-
-      await expect(firstLenderVault.connect(vaultOwner).setOnChainQuote(onChainQuote, 2, 0))
+      onChainQuoteHash = ethers.utils.keccak256(payload)
+      await expect(firstLenderVault.connect(vaultOwner).addOnChainQuote(onChainQuote))
         .to.emit(firstLenderVault, 'OnChainQuote')
-        .withArgs(Object.values(onChainQuote), 2, false)
+        .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)
 
-      await expect(firstLenderVault.connect(vaultOwner).onChainQuotes(0)).to.be.reverted
+      await expect(firstLenderVault.connect(vaultOwner).deleteOnChainQuote(onChainQuote))
+        .to.emit(firstLenderVault, 'OnChainQuote')
+        .withArgs(Object.values(onChainQuote), onChainQuoteHash, false)
     })
   })
 })

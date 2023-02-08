@@ -27,9 +27,9 @@ contract BorrowerGateway is ReentrancyGuard {
         address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
-        (bool isValid, bytes32 offChainQuoteHash) = ILenderVault(lenderVault)
-            .isValidOffChainQuote(borrower, offChainQuote);
-        if (!isValid) {
+        (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(lenderVault)
+            .doesAcceptOffChainQuote(borrower, offChainQuote);
+        if (!doesAccept) {
             revert();
         }
         ILenderVault(lenderVault).invalidateOffChainQuote(offChainQuoteHash);
@@ -73,13 +73,13 @@ contract BorrowerGateway is ReentrancyGuard {
         }
         if (
             !isAutoQuote &&
-            !ILenderVault(lenderVault).isValidOnChainQuote(onChainQuote)
+            !ILenderVault(lenderVault).doesAcceptOnChainQuote(onChainQuote)
         ) {
             revert();
         }
         if (
             isAutoQuote &&
-            !ILenderVault(lenderVault).isValidAutoQuote(onChainQuote)
+            !ILenderVault(lenderVault).doesAcceptAutoQuote(onChainQuote)
         ) {
             revert();
         }
