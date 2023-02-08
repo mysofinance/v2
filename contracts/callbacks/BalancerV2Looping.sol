@@ -54,11 +54,6 @@ contract BalancerV2Looping is IVaultCallback {
         DataTypes.Loan calldata loan,
         bytes calldata data
     ) external {
-        IERC20Metadata(loan.loanToken).safeTransferFrom(
-            loan.borrower,
-            address(this),
-            loan.initLoanAmount
-        );
         BalancerDataTypes.FundManagement
             memory fundManagement = BalancerDataTypes.FundManagement(
                 address(this), // swap payer

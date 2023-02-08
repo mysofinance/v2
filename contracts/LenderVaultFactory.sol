@@ -10,6 +10,7 @@ import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
+import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVaultFactory is ILenderVaultFactory {
@@ -22,35 +23,21 @@ contract LenderVaultFactory is ILenderVaultFactory {
 
     mapping(address => bool) public isRegisteredVault;
     address[] public registeredVaults;
-    mapping(address => address) public vaultOwner;
-    mapping(address => address) public vaultNewOwner;
 
     mapping(DataTypes.WhiteListType => mapping(address => bool))
         public whitelistedAddrs;
 
-    address public factoryController;
-    address public newFactoryController;
+    address public addressRegistry;
     address public lenderVaultImpl;
+    address public borrowerGateway;
+    address compartmentFactory = address(0);
 
-    constructor(address _lenderVaultImpl) {
-        factoryController = msg.sender;
+    constructor(address _addressRegistry, address _lenderVaultImpl) {
+        addressRegistry = _addressRegistry;
         lenderVaultImpl = _lenderVaultImpl;
     }
 
-    function proposeNewController(address _newController) external {
-        if (msg.sender != factoryController || _newController == address(0)) {
-            revert InvalidSender();
-        }
-        newFactoryController = _newController;
-    }
-
-    function claimFactoryControl() external {
-        if (msg.sender != newFactoryController) {
-            revert InvalidSender();
-        }
-        factoryController = newFactoryController;
-    }
-
+    /* TODO: move this to vault
     function proposeNewVaultOwner(
         address vaultAddr,
         address _newOwner
@@ -69,17 +56,9 @@ contract LenderVaultFactory is ILenderVaultFactory {
         }
         vaultOwner[vaultAddr] = currVaultNewOwner;
     }
+    */
 
-    function addToWhitelist(
-        DataTypes.WhiteListType _type,
-        address addrToWhitelist
-    ) external {
-        if (msg.sender != factoryController || addrToWhitelist == address(0)) {
-            revert InvalidSender();
-        }
-        whitelistedAddrs[_type][addrToWhitelist] = true;
-    }
-
+    /* TODO: move this to borrower gateway, as this doesn't directly relate to lender interactions */
     function createCompartment(
         DataTypes.Loan memory loan,
         uint256 reclaimable,
@@ -88,7 +67,7 @@ contract LenderVaultFactory is ILenderVaultFactory {
         uint256 numLoans,
         bytes memory data
     ) external returns (address compartmentAddr, uint128 initCollAmount) {
-        if (!isRegisteredVault[msg.sender]) revert InvalidSender();
+        //if (!isRegisteredVault[msg.sender]) revert InvalidSender();
         bytes32 salt = keccak256(
             abi.encode(
                 implAddr,
@@ -132,14 +111,7 @@ contract LenderVaultFactory is ILenderVaultFactory {
         }
     }
 
-    function createVault(
-        address compartmentFactory
-    ) external returns (address) {
-        if (
-            !whitelistedAddrs[DataTypes.WhiteListType.FACTORY][
-                compartmentFactory
-            ]
-        ) revert InvalidFactory();
+    function createVault() external returns (address) {
         bytes32 salt = keccak256(
             abi.encodePacked(lenderVaultImpl, compartmentFactory, msg.sender)
         );
@@ -149,13 +121,12 @@ contract LenderVaultFactory is ILenderVaultFactory {
         );
 
         ILenderVault(newVaultInstanceAddr).initialize(
-            compartmentFactory,
-            address(this)
+            msg.sender,
+            addressRegistry,
+            compartmentFactory
         );
 
-        isRegisteredVault[newVaultInstanceAddr] = true;
-        registeredVaults.push(newVaultInstanceAddr);
-        vaultOwner[newVaultInstanceAddr] = msg.sender;
+        IAddressRegistry(addressRegistry).addLenderVault(newVaultInstanceAddr);
 
         return newVaultInstanceAddr;
     }
