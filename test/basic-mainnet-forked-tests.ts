@@ -34,39 +34,41 @@ function getLoopingSendAmount(collTokenFromBorrower: number, loanPerColl:number,
 
 describe('Basic Forked Mainnet Tests', function () {
   async function setupTest() {
-    const [vaultOwner, borrower, tokenDeployer] = await ethers.getSigners()
+    const [lender, borrower, team] = await ethers.getSigners()
+    /* ************************************ */
+    /* DEPLOYMENT OF SYSTEM CONTRACTS START */
+    /* ************************************ */
+    // deploy address registry
+    const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
+    const addressRegistry = await AddressRegistry.connect(team).deploy()
+    await addressRegistry.deployed()
 
-    //deploy CompartmentFactory
-    const CompartmentFactory = await ethers.getContractFactory('CollateralCompartmentFactory')
-    await CompartmentFactory.connect(vaultOwner)
-    const compartmentFactory = await CompartmentFactory.deploy(['0x0000000000000000000000000000000000000001'])
-    await compartmentFactory.deployed()
+    // deploy borrower gate way
+    const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
+    const borrowerGateway = await BorrowerGateway.connect(team).deploy(addressRegistry.address)
+    await borrowerGateway.deployed()
 
-    // deploy lenderVault
-    const LenderVault = await ethers.getContractFactory('LenderVault')
-    await LenderVault.connect(vaultOwner)
-    const lenderVault = await LenderVault.deploy()
-    await lenderVault.deployed()
+    // deploy lender vault implementation
+    const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
+    const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
+    await lenderVaultImplementation.deployed()
 
     // deploy LenderVaultFactory
     const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
-    await LenderVaultFactory.connect(vaultOwner)
-    const lenderVaultFactory = await LenderVaultFactory.deploy(lenderVault.address)
+    const lenderVaultFactory = await LenderVaultFactory.connect(team).deploy(addressRegistry.address, lenderVaultImplementation.address)
     await lenderVaultFactory.deployed()
 
-    // deploy borrow gateway
-    const VAULT_REGISTRY_AND_CALLBACK_WHITELIST = lenderVaultFactory.address
-    const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
-    await BorrowerGateway.connect(tokenDeployer)
-    const borrowerGateway = await BorrowerGateway.deploy(VAULT_REGISTRY_AND_CALLBACK_WHITELIST)
-    await borrowerGateway.deployed()
-    
-    // whitelist compartment factory and create first vault
-    await lenderVaultFactory.addToWhitelist(5, compartmentFactory.address)
-    await lenderVaultFactory.createVault(compartmentFactory.address)
+    // set lender vault factory on address registry (immutable) 
+    addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
+    addressRegistry.setBorrowerGateway(borrowerGateway.address)
+    /* ********************************** */
+    /* DEPLOYMENT OF SYSTEM CONTRACTS END */
+    /* ********************************** */
 
-    const newlyCreatedVaultAddr = await lenderVaultFactory.registeredVaults(0);
-    const firstLenderVault = await LenderVault.attach(newlyCreatedVaultAddr);
+    // create a vault
+    await lenderVaultFactory.connect(lender).createVault()
+    const lenderVaultAddr = await addressRegistry.registeredVaults(0)
+    const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
 
     // prepare USDC balances
     const USDC_ADDRESS ="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -82,7 +84,7 @@ describe('Basic Forked Mainnet Tests', function () {
     });
     const masterMinter = await ethers.getSigner(USDC_MASTER_MINTER);
     await usdc.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128);
-    await usdc.connect(masterMinter).mint(vaultOwner.address, MAX_UINT128);
+    await usdc.connect(masterMinter).mint(lender.address, MAX_UINT128);
 
     // prepare WETH balance
     const WETH_ADDRESS ="0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
@@ -95,28 +97,23 @@ describe('Basic Forked Mainnet Tests', function () {
 
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
-    await BalancerV2Looping.connect(vaultOwner)
+    await BalancerV2Looping.connect(lender)
     const balancerV2Looping = await BalancerV2Looping.deploy()
     await balancerV2Looping.deployed()
 
     // whitelist addrs
-    await lenderVaultFactory.addToWhitelist(0, usdc.address)
-    await lenderVaultFactory.addToWhitelist(0, weth.address)
-    await lenderVaultFactory.addToWhitelist(3, balancerV2Looping.address)
+    await addressRegistry.connect(team).toggleTokenPair(weth.address, usdc.address)
+    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
 
-    // lender connects his vault to borrow gateway and approve
-    await firstLenderVault.setBorrowerGateway(borrowerGateway.address)
-    await firstLenderVault.approve(borrowerGateway.address, usdc.address, MAX_UINT256)
-    
-    return { borrowerGateway, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping }
+    return { borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping }
   }
 
   describe('On-Chain Quote Testing', function () {
     it('Should process atomic balancer swap correctly', async function () {
-      const { borrowerGateway, vaultOwner, borrower, tokenDeployer, usdc, weth, firstLenderVault, balancerV2Looping } = await setupTest()
+      const { borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
-      await usdc.connect(vaultOwner).transfer(firstLenderVault.address, ONE_USDC.mul(100000))
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -132,12 +129,12 @@ describe('Basic Forked Mainnet Tests', function () {
         isNegativeInterestRate: false,
         useCollCompartment: false
       }
-      await firstLenderVault.connect(vaultOwner).addOnChainQuote(onChainQuote)
+      await lenderVault.connect(lender).addOnChainQuote(onChainQuote)
 
       // Balancer V2 integration: calculate which send amount would be needed to max. lever up in 1-click
       const poolAddr = "0x96646936b91d6B9D7D0c47C496AfBF3D6ec7B6f8"
       const poolId = "0x96646936b91d6b9d7d0c47c496afbf3d6ec7b6f8000200000000000000000019" // look up via getPoolId() on bal pool
-      const balancerV2Pool = await new ethers.Contract(poolAddr, balancerV2PoolAbi, tokenDeployer)
+      const balancerV2Pool = await new ethers.Contract(poolAddr, balancerV2PoolAbi, team) // could be any signer, here used team
 
       const PRECISION = 10000
       const collBuffer = BASE.mul(990).div(1000)
@@ -145,7 +142,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const initCollFromBorrowerNumber = Number(initCollFromBorrower.mul(PRECISION).div(ONE_WETH).toString()) / PRECISION
       const loanPerColl = Number(onChainQuote.loanPerCollUnit.mul(PRECISION).div(ONE_USDC).toString()) / PRECISION
       const swapFee = Number((await balancerV2Pool.getSwapFeePercentage()).mul(PRECISION).div(BASE).toString()) / PRECISION
-      const balancerV2Vault = await new ethers.Contract("0xBA12222222228d8Ba445958a75a0704d566BF2C8", balancerV2VaultAbi, tokenDeployer)
+      const balancerV2Vault = await new ethers.Contract("0xBA12222222228d8Ba445958a75a0704d566BF2C8", balancerV2VaultAbi, team) // could be any signer, here used team
       const balancerV2PoolTokens = await balancerV2Vault.getPoolTokens(poolId)
       const collTokenInDexPool = Number((balancerV2PoolTokens.tokens[0] == weth.address ? balancerV2PoolTokens.balances[0] : balancerV2PoolTokens.balances[1]).mul(PRECISION).div(ONE_WETH).toString()) / PRECISION
       const loanTokenInDexPool = Number((balancerV2PoolTokens.tokens[0] == usdc.address ? balancerV2PoolTokens.balances[0] : balancerV2PoolTokens.balances[1]).mul(PRECISION).div(ONE_USDC).toString()) / PRECISION
@@ -157,8 +154,8 @@ describe('Basic Forked Mainnet Tests', function () {
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
-      const vaultWethBalPre = await weth.balanceOf(firstLenderVault.address)
-      const vaultUsdcBalPre = await usdc.balanceOf(firstLenderVault.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -176,13 +173,13 @@ describe('Basic Forked Mainnet Tests', function () {
           deadline
         ]
       )
-      await borrowerGateway.connect(borrower).borrowWithOnChainQuote(firstLenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+      await borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
-      const vaultWethBalPost = await weth.balanceOf(firstLenderVault.address)
-      const vaultUsdcBalPost = await usdc.balanceOf(firstLenderVault.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
       const borrowerWethBalDiffActual = borrowerWethBalPre.add(borrowerWethBalPost)
       const borrowerWethBalDiffExpected = borrowerWethBalPre.sub(collSendAmount)

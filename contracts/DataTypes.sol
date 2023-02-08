@@ -76,16 +76,4 @@ library DataTypes {
         STAKINGPOOL,
         FACTORY
     }
-
-    enum OnChainQuoteUpdateType {
-        ADD,
-        OVERWRITE,
-        DELETE
-    }
-
-    enum QuoteType {
-        OnChainQuote,
-        AutoQuote,
-        OffChainQuote
-    }
 }

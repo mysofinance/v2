@@ -76,6 +76,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
             data,
             (address, address)
         );
+        /* todo: update to addressregistry based lookups
         if (
             !ILenderVaultFactory(lenderFactory).whitelistedAddrs(
                 DataTypes.WhiteListType.STAKINGPOOL,
@@ -86,6 +87,7 @@ contract CurveStakingCompartment is Initializable, ICompartment {
                 _veCrvPool
             )
         ) revert InvalidPool();
+        */
         veCrvPool = _veCrvPool;
         IERC20(collTokenAddr).approve(crvGaugeAddr, type(uint256).max);
         uint256 currCollBalance = IERC20(collTokenAddr).balanceOf(

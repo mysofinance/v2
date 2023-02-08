@@ -7,9 +7,11 @@ import {DataTypes} from "../DataTypes.sol";
 interface ILenderVault {
     function initialize(
         address vaultOwner,
-        address compartmentFactory,
-        address lenderVaultFactory
+        address addressRegistry,
+        address compartmentFactory
     ) external;
+
+    function vaultOwner() external view returns (address);
 
     function loans(uint256 index) external view returns (DataTypes.Loan memory);
 
@@ -40,4 +42,10 @@ interface ILenderVault {
     function addLoan(DataTypes.Loan memory loan) external;
 
     function invalidateOffChainQuote(bytes32 offChainQuoteHash) external;
+
+    function transferTo(
+        address token,
+        address recipient,
+        uint256 amount
+    ) external;
 }

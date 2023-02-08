@@ -11,6 +11,7 @@ import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
 import {ICompartment} from "./interfaces/ICompartment.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
+import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVault is ReentrancyGuard, Initializable {
@@ -18,19 +19,18 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
     uint256 constant BASE = 1e18;
     address vaultOwner;
-    address borrowerGateway;
+    address addressRegistry;
 
     mapping(address => uint256) public lockedAmounts;
     mapping(bytes32 => bool) isConsumedQuote;
     mapping(bytes32 => bool) public isOnChainQuote;
     mapping(address => mapping(address => address)) public autoQuoteStrategy; // points to auto loan strategy for given coll/loan token pair
     // for now remove public getter for byte code size purposes...
-    mapping(address => address) collTokenImplAddrs;
+    // todo: check if this is needed mapping(address => address) collTokenImplAddrs;
     DataTypes.Loan[] public loans; // stores loans
 
     uint256 loanOffChainQuoteNonce;
     address compartmentFactory;
-    address lenderVaultFactory;
 
     /*
     can remove ILendingPool because also interest bearing tokens can be deposited 
@@ -41,7 +41,6 @@ contract LenderVault is ReentrancyGuard, Initializable {
     */
 
     error Invalid();
-    error InvalidCompartmentAddr();
 
     event OnChainQuote(
         DataTypes.OnChainQuote onChainQuote,
@@ -51,27 +50,13 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
     function initialize(
         address _vaultOwner,
-        address _compartmentFactory,
-        address _lenderVaultFactory
+        address _addressRegistry,
+        address _compartmentFactory
     ) external initializer {
         vaultOwner = _vaultOwner;
+        addressRegistry = _addressRegistry;
         compartmentFactory = _compartmentFactory;
-        lenderVaultFactory = _lenderVaultFactory;
         loanOffChainQuoteNonce = 1;
-    }
-
-    function approve(
-        address spender,
-        address token,
-        uint256 allowance
-    ) external {
-        senderCheck();
-        IERC20Metadata(token).approve(spender, allowance);
-    }
-
-    function setBorrowerGateway(address _borrowerGateway) external {
-        senderCheck();
-        borrowerGateway = _borrowerGateway;
     }
 
     function invalidateOffChainQuoteNonce() external {
@@ -81,12 +66,25 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
     function invalidateOffChainQuote(bytes32 offChainQuoteHash) external {
         if (
-            (msg.sender != vaultOwner && msg.sender != borrowerGateway) ||
+            (msg.sender != vaultOwner &&
+                msg.sender !=
+                IAddressRegistry(addressRegistry).borrowerGateway()) ||
             isConsumedQuote[offChainQuoteHash]
         ) {
             revert();
         }
         isConsumedQuote[offChainQuoteHash] = true;
+    }
+
+    function transferTo(
+        address token,
+        address recipient,
+        uint256 amount
+    ) external {
+        if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
+            revert();
+        }
+        IERC20Metadata(token).safeTransfer(recipient, amount);
     }
 
     function setAutoQuoteStrategy(
@@ -95,7 +93,13 @@ contract LenderVault is ReentrancyGuard, Initializable {
         address strategyAddr
     ) external {
         senderCheck();
-        whitelistCheck(DataTypes.WhiteListType.STRATEGY, strategyAddr);
+        if (
+            !IAddressRegistry(addressRegistry).isWhitelistedAutoQuoteStrategy(
+                strategyAddr
+            )
+        ) {
+            revert();
+        }
         autoQuoteStrategy[collToken][loanToken] = strategyAddr;
     }
 
@@ -145,21 +149,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
     }
 
     function addLoan(DataTypes.Loan calldata loan) external {
-        if (msg.sender != borrowerGateway) {
+        if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert();
         }
         loans.push(loan);
-    }
-
-    // don't need to verify that collToken is a valid whitelisted token cause that
-    // would not be allowed through on the orders anyways
-    function setCollTokenImpl(
-        address collToken,
-        address collTokenImplAddr
-    ) external {
-        senderCheck();
-        whitelistCheck(DataTypes.WhiteListType.COMPARTMENT, collTokenImplAddr);
-        collTokenImplAddrs[collToken] = collTokenImplAddr;
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -168,10 +161,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
         if (amount > vaultBalance - lockedAmounts[token]) {
             revert Invalid();
         }
-        address owner = ILenderVaultFactory(lenderVaultFactory).vaultOwner(
-            address(this)
-        );
-        IERC20Metadata(token).safeTransfer(owner, amount);
+        IERC20Metadata(token).safeTransfer(vaultOwner, amount);
     }
 
     function addOnChainQuote(
@@ -223,7 +213,12 @@ contract LenderVault is ReentrancyGuard, Initializable {
     function doesAcceptOnChainQuote(
         DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool) {
-        if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
+        if (
+            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
+                onChainQuote.collToken,
+                onChainQuote.loanToken
+            )
+        ) {
             return false;
         }
         return isOnChainQuote[hashOnChainQuote(onChainQuote)];
@@ -232,7 +227,12 @@ contract LenderVault is ReentrancyGuard, Initializable {
     function doesAcceptAutoQuote(
         DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool) {
-        if (!isValidPair(onChainQuote.loanToken, onChainQuote.collToken)) {
+        if (
+            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
+                onChainQuote.collToken,
+                onChainQuote.loanToken
+            )
+        ) {
             return false;
         }
         return
@@ -244,73 +244,58 @@ contract LenderVault is ReentrancyGuard, Initializable {
         address borrower,
         DataTypes.OffChainQuote calldata offChainQuote
     ) external view returns (bool doesAccept, bytes32 offChainQuoteHash) {
-        {
-            if (
-                !isValidPair(offChainQuote.loanToken, offChainQuote.collToken)
-            ) {
-                doesAccept = false;
-            }
-            offChainQuoteHash = keccak256(
-                abi.encode(
-                    offChainQuote.borrower,
-                    offChainQuote.collToken,
-                    offChainQuote.loanToken,
-                    offChainQuote.collAmount,
-                    offChainQuote.loanAmount,
-                    offChainQuote.expiry,
-                    offChainQuote.earliestRepay,
-                    offChainQuote.repayAmount,
-                    offChainQuote.validUntil,
-                    offChainQuote.upfrontFee,
-                    offChainQuote.useCollCompartment,
-                    offChainQuote.nonce
-                )
-            );
-            if (
-                isConsumedQuote[offChainQuoteHash] ||
-                offChainQuote.nonce >= loanOffChainQuoteNonce
-            ) {
-                doesAccept = false;
-            }
-            bytes32 messageHash = keccak256(
-                abi.encodePacked(
-                    "\x19Ethereum Signed Message:\n32",
-                    offChainQuoteHash
-                )
-            );
-            address signer = ecrecover(
-                messageHash,
-                offChainQuote.v,
-                offChainQuote.r,
-                offChainQuote.s
-            );
+        if (
+            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
+                offChainQuote.collToken,
+                offChainQuote.loanToken
+            )
+        ) {
+            doesAccept = false;
+        }
+        offChainQuoteHash = keccak256(
+            abi.encode(
+                offChainQuote.borrower,
+                offChainQuote.collToken,
+                offChainQuote.loanToken,
+                offChainQuote.collAmount,
+                offChainQuote.loanAmount,
+                offChainQuote.expiry,
+                offChainQuote.earliestRepay,
+                offChainQuote.repayAmount,
+                offChainQuote.validUntil,
+                offChainQuote.upfrontFee,
+                offChainQuote.useCollCompartment,
+                offChainQuote.nonce
+            )
+        );
+        if (
+            isConsumedQuote[offChainQuoteHash] ||
+            offChainQuote.nonce >= loanOffChainQuoteNonce
+        ) {
+            doesAccept = false;
+        }
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                offChainQuoteHash
+            )
+        );
+        address signer = ecrecover(
+            messageHash,
+            offChainQuote.v,
+            offChainQuote.r,
+            offChainQuote.s
+        );
 
-            if (
-                signer != vaultOwner ||
-                offChainQuote.validUntil < block.timestamp
-            ) {
-                doesAccept = false;
-            }
-            if (borrower == address(0) || borrower != offChainQuote.borrower) {
-                doesAccept = false;
-            }
+        if (
+            signer != vaultOwner || offChainQuote.validUntil < block.timestamp
+        ) {
+            doesAccept = false;
+        }
+        if (borrower == address(0) || borrower != offChainQuote.borrower) {
+            doesAccept = false;
         }
         doesAccept = true;
-    }
-
-    function isValidPair(
-        address loanToken,
-        address collToken
-    ) internal view returns (bool) {
-        return
-            ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
-                DataTypes.WhiteListType.TOKEN,
-                loanToken
-            ) &&
-            ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
-                DataTypes.WhiteListType.TOKEN,
-                collToken
-            );
     }
 
     function unlockCollateral(
@@ -321,6 +306,9 @@ contract LenderVault is ReentrancyGuard, Initializable {
         for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
             DataTypes.Loan storage loan = loans[_loanIds[i]];
+            if (loan.collToken != collToken) {
+                revert();
+            }
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
                 if (loan.hasCollCompartment) {
                     ICompartment(loan.collTokenCompartmentAddr)
@@ -343,7 +331,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
             address(this)
         );
         IERC20Metadata(collToken).safeTransfer(
-            ILenderVaultFactory(lenderVaultFactory).vaultOwner(address(this)),
+            vaultOwner,
             currentCollTokenBalance - lockedAmounts[collToken]
         );
     }
@@ -366,38 +354,10 @@ contract LenderVault is ReentrancyGuard, Initializable {
         );
     }
 
-    function getVaultInfo()
-        external
-        view
-        returns (
-            uint256 _currLoanId,
-            uint256 _loanOffChainQuoteNonce,
-            address _compartmentFactory,
-            address _lenderFactory
-        )
-    {
-        _currLoanId = loans.length;
-        _loanOffChainQuoteNonce = loanOffChainQuoteNonce;
-        _compartmentFactory = compartmentFactory;
-        _lenderFactory = lenderVaultFactory;
-    }
-
     function senderCheck() internal view {
         if (msg.sender != vaultOwner) {
             revert Invalid();
         }
-    }
-
-    function whitelistCheck(
-        DataTypes.WhiteListType _type,
-        address _addrToCheck
-    ) internal view {
-        if (
-            !ILenderVaultFactory(lenderVaultFactory).whitelistedAddrs(
-                _type,
-                _addrToCheck
-            )
-        ) revert Invalid();
     }
 
     function toUint128(uint256 x) internal pure returns (uint128 y) {

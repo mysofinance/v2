@@ -7,14 +7,15 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract BorrowerGateway is ReentrancyGuard {
-    address immutable VAULT_REGISTRY_AND_CALLBACK_WHITELIST;
+    address immutable addressRegistry;
 
-    constructor(address vaultRegistry) {
-        VAULT_REGISTRY_AND_CALLBACK_WHITELIST = vaultRegistry;
+    constructor(address _addressRegistry) {
+        addressRegistry = _addressRegistry;
     }
 
     using SafeERC20 for IERC20Metadata;
@@ -27,6 +28,10 @@ contract BorrowerGateway is ReentrancyGuard {
         address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
+        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+            revert();
+        }
+
         (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(lenderVault)
             .doesAcceptOffChainQuote(borrower, offChainQuote);
         if (!doesAccept) {
@@ -65,10 +70,7 @@ contract BorrowerGateway is ReentrancyGuard {
         // 2. BorrowGateway then pulls collTOken from borrower to lender vault
         // 3. Finally, BorrowGateway updates lender vault storage state
 
-        if (
-            !ILenderVaultFactory(VAULT_REGISTRY_AND_CALLBACK_WHITELIST)
-                .isRegisteredVault(lenderVault)
-        ) {
+        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
         }
         if (
@@ -106,23 +108,21 @@ contract BorrowerGateway is ReentrancyGuard {
         bytes calldata data
     ) internal {
         if (callbackAddr == address(0)) {
-            IERC20Metadata(loan.loanToken).safeTransferFrom(
-                lenderVault,
+            ILenderVault(lenderVault).transferTo(
+                loan.loanToken,
                 loan.borrower,
                 loan.initLoanAmount
             );
         } else {
             if (
-                !ILenderVaultFactory(VAULT_REGISTRY_AND_CALLBACK_WHITELIST)
-                    .whitelistedAddrs(
-                        DataTypes.WhiteListType.CALLBACK,
-                        callbackAddr
-                    )
+                !IAddressRegistry(addressRegistry).isWhitelistedCallbackAddr(
+                    callbackAddr
+                )
             ) {
                 revert();
             }
-            IERC20Metadata(loan.loanToken).safeTransferFrom(
-                lenderVault,
+            ILenderVault(lenderVault).transferTo(
+                loan.loanToken,
                 callbackAddr,
                 loan.initLoanAmount
             );
