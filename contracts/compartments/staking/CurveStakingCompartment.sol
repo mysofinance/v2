@@ -14,8 +14,6 @@ import {DataTypes} from "../../DataTypes.sol";
 contract CurveStakingCompartment is Initializable, ICompartment {
     using SafeERC20 for IERC20;
 
-    error InvalidSender();
-    error InvalidPool();
     error IncorrectGaugeForLpToken();
 
     address public vaultAddr;
@@ -49,7 +47,6 @@ contract CurveStakingCompartment is Initializable, ICompartment {
     }
 
     // transfer coll on repays
-    // todo: withdraw from pool
     function transferCollToBorrower(
         uint256 repayAmount,
         uint256 repayAmountLeft,
@@ -107,7 +104,6 @@ contract CurveStakingCompartment is Initializable, ICompartment {
     }
 
     // unlockColl this would be called on defaults
-    // todo: withdraw from pool
     function unlockCollToVault(address collTokenAddr) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
