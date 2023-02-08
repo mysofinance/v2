@@ -5,10 +5,10 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVoteCompartment} from "../interfaces/IVoteCompartment.sol";
-import {ICompartment} from "../interfaces/ICompartment.sol";
-import {ILenderVault} from "../interfaces/ILenderVault.sol";
-import {DataTypes} from "../DataTypes.sol";
+import {IVoteCompartment} from "../../interfaces/compartments/voting/IVoteCompartment.sol";
+import {ICompartment} from "../../interfaces/ICompartment.sol";
+import {ILenderVault} from "../../interfaces/ILenderVault.sol";
+import {DataTypes} from "../../DataTypes.sol";
 
 // start simple with just an example voting and rewards implementation
 // could make a mapping later for more flexibility
