@@ -10,27 +10,22 @@ import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
 
-// start simple with just an example voting and rewards implementation
-// could make a mapping later for more flexibility
-contract VoteCompartment is
-    Initializable //, IBorrowerCompartment {
-{
+contract VoteCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
-    error InvalidSender();
 
     address public vaultAddr;
     uint256 public loanIdx;
 
     function initialize(
         address _vaultAddr,
+        address,
         address _borrowerAddr,
         address _collTokenAddr,
         uint256 _loanIdx,
         bytes memory
-    ) external initializer returns (uint256 collTokenBalAfter) {
+    ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
-        collTokenBalAfter = IERC20(_collTokenAddr).balanceOf(address(this));
         _delegate(_borrowerAddr, _collTokenAddr);
     }
 

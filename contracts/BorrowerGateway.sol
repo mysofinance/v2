@@ -47,7 +47,9 @@ contract BorrowerGateway is ReentrancyGuard {
             offChainQuote.borrowerCompartmentImplementation,
             lenderVault,
             borrower,
-            loanId
+            loan.collToken,
+            loanId,
+            data
         );
         processTransfers(
             lenderVault,
@@ -102,7 +104,9 @@ contract BorrowerGateway is ReentrancyGuard {
             onChainQuote.borrowerCompartmentImplementation,
             lenderVault,
             borrower,
-            loanId
+            loan.collToken,
+            loanId,
+            data
         );
         processTransfers(
             lenderVault,
@@ -119,23 +123,30 @@ contract BorrowerGateway is ReentrancyGuard {
         address borrowerCompartmentImplementation,
         address lenderVault,
         address borrower,
-        uint256 loanId
+        address collToken,
+        uint256 loanId,
+        bytes memory data
     ) internal returns (address collReceiver) {
         if (borrowerCompartmentImplementation != address(0)) {
+            address _addressRegistry = addressRegistry;
             if (
-                IAddressRegistry(addressRegistry).isWhitelistedCollTokenHandler(
-                    borrowerCompartmentImplementation
-                )
+                IAddressRegistry(_addressRegistry)
+                    .isWhitelistedCollTokenHandler(
+                        borrowerCompartmentImplementation
+                    )
             ) {
                 revert();
             }
             collReceiver = IBorrowerCompartmentFactory(
-                IAddressRegistry(addressRegistry).borrowerCompartmentFactory()
+                IAddressRegistry(_addressRegistry).borrowerCompartmentFactory()
             ).createCompartment(
                     borrowerCompartmentImplementation,
                     lenderVault,
+                    _addressRegistry,
                     borrower,
-                    loanId
+                    collToken,
+                    loanId,
+                    data
                 );
         } else {
             collReceiver = lenderVault;
