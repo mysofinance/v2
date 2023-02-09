@@ -17,17 +17,4 @@ interface IStakeCompartment {
         address collTokenAddr,
         address stakeAddr
     ) external;
-
-    /**
-     * @notice Deposit `value` LP tokens, curve type take pools
-     * @dev Depositing also claims pending reward tokens
-     * @param value Number of tokens to deposit
-     * @param depositAddr Address to deposit for
-     * @param claimRewards boolean to claim rewards
-     */
-    function deposit(
-        uint256 value,
-        address depositAddr,
-        bool claimRewards
-    ) external;
 }

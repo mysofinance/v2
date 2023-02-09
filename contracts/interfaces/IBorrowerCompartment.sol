@@ -2,22 +2,22 @@
 
 pragma solidity ^0.8.17;
 
-interface ICompartment {
+interface IBorrowerCompartment {
+    //shared compartment errors
+    error InvalidSender();
+    error InvalidPool();
+
     /**
      * @notice function to initialize collateral compartment
      * @dev factory creates clone and then initializes implementation contract
      * @param vaultAddr address of vault
      * @param borrowerAddr address of borrower
-     * @param collTokenAddr address of coll token
-     * @param loanIdx index of the loan
-     * @param data data needed possibly if stake or rewards pool
+     * @param loanId index of the loan
      */
     function initialize(
         address vaultAddr,
         address borrowerAddr,
-        address collTokenAddr,
-        uint256 loanIdx,
-        bytes memory data
+        uint256 loanId
     ) external returns (uint256);
 
     /**

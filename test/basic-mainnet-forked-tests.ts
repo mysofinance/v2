@@ -58,9 +58,17 @@ describe('Basic Forked Mainnet Tests', function () {
     const lenderVaultFactory = await LenderVaultFactory.connect(team).deploy(addressRegistry.address, lenderVaultImplementation.address)
     await lenderVaultFactory.deployed()
 
-    // set lender vault factory on address registry (immutable) 
+    // deploy borrower compartment factory
+    const BorrowerCompartmentFactory = await ethers.getContractFactory('BorrowerCompartmentFactory')
+    await BorrowerCompartmentFactory.connect(team)
+    const borrowerCompartmentFactory = await BorrowerCompartmentFactory.deploy()
+    await borrowerCompartmentFactory.deployed()
+
+    // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable) 
     addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
     addressRegistry.setBorrowerGateway(borrowerGateway.address)
+    addressRegistry.setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
+
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
     /* ********************************** */
@@ -127,7 +135,7 @@ describe('Basic Forked Mainnet Tests', function () {
         tenor: ONE_DAY.mul(365),
         timeUntilEarliestRepay: 0,
         isNegativeInterestRate: false,
-        useCollCompartment: false
+        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
       }
       await lenderVault.connect(lender).addOnChainQuote(onChainQuote)
 

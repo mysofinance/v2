@@ -5,9 +5,10 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
-import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {IBorrowerCompartmentFactory} from "./interfaces/IBorrowerCompartmentFactory.sol";
+import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
@@ -41,9 +42,16 @@ contract BorrowerGateway is ReentrancyGuard {
         (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
             lenderVault
         ).getLoanInfoForOffChainQuote(borrower, offChainQuote);
-        ILenderVault(lenderVault).addLoan(loan);
+        uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
+        address collReceiver = getCollReceiver(
+            offChainQuote.borrowerCompartmentImplementation,
+            lenderVault,
+            borrower,
+            loanId
+        );
         processTransfers(
             lenderVault,
+            collReceiver,
             collSendAmount,
             loan,
             upfrontFee,
@@ -88,9 +96,17 @@ contract BorrowerGateway is ReentrancyGuard {
         (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
             lenderVault
         ).getLoanInfoForOnChainQuote(borrower, collSendAmount, onChainQuote);
-        ILenderVault(lenderVault).addLoan(loan);
+        uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
+
+        address collReceiver = getCollReceiver(
+            onChainQuote.borrowerCompartmentImplementation,
+            lenderVault,
+            borrower,
+            loanId
+        );
         processTransfers(
             lenderVault,
+            collReceiver,
             collSendAmount,
             loan,
             upfrontFee,
@@ -99,8 +115,36 @@ contract BorrowerGateway is ReentrancyGuard {
         );
     }
 
+    function getCollReceiver(
+        address borrowerCompartmentImplementation,
+        address lenderVault,
+        address borrower,
+        uint256 loanId
+    ) internal returns (address collReceiver) {
+        if (borrowerCompartmentImplementation != address(0)) {
+            if (
+                IAddressRegistry(addressRegistry).isWhitelistedCollTokenHandler(
+                    borrowerCompartmentImplementation
+                )
+            ) {
+                revert();
+            }
+            collReceiver = IBorrowerCompartmentFactory(
+                IAddressRegistry(addressRegistry).borrowerCompartmentFactory()
+            ).createCompartment(
+                    borrowerCompartmentImplementation,
+                    lenderVault,
+                    borrower,
+                    loanId
+                );
+        } else {
+            collReceiver = lenderVault;
+        }
+    }
+
     function processTransfers(
         address lenderVault,
+        address collReceiver,
         uint256 collSendAmount,
         DataTypes.Loan memory loan,
         uint256 upfrontFee,
@@ -134,7 +178,7 @@ contract BorrowerGateway is ReentrancyGuard {
         );
         IERC20Metadata(loan.collToken).safeTransferFrom(
             loan.borrower,
-            lenderVault,
+            collReceiver,
             collSendAmount
         );
         collTokenReceived =
