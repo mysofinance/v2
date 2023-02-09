@@ -13,7 +13,13 @@ import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract BorrowerGateway is ReentrancyGuard {
+    // putting fees in borrow gateway since borrower always pays this upfront
+    // also will allow less transfers and gas cost to leave fee here
+    uint256 constant BASE = 1e18;
+    uint256 constant YEAR_IN_SECONDS = 31_536_000; // 365*24*3600
+    uint256 constant MAX_FEE = 5e16; // 5% max in base
     address immutable addressRegistry;
+    uint256 public protocolFee; // in BASE
 
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
@@ -22,6 +28,10 @@ contract BorrowerGateway is ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
 
     error UnregisteredVault();
+    error InvalidSender();
+    error InvalidFee();
+
+    event NewProtocolFee(uint256 _newFee);
 
     function borrowWithOffChainQuote(
         address lenderVault,
@@ -200,6 +210,17 @@ contract BorrowerGateway is ReentrancyGuard {
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
             revert();
         }
+    }
+
+    function setNewProtocolFee(uint256 _newFee) external {
+        if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
+            revert InvalidSender();
+        }
+        if (_newFee > MAX_FEE) {
+            revert InvalidFee();
+        }
+        protocolFee = _newFee;
+        emit NewProtocolFee(_newFee);
     }
 
     /*
