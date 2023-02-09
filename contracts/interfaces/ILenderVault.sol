@@ -5,15 +5,13 @@ pragma solidity ^0.8.17;
 import {DataTypes} from "../DataTypes.sol";
 
 interface ILenderVault {
-    function initialize(
-        address vaultOwner,
-        address addressRegistry,
-        address compartmentFactory
-    ) external;
+    function initialize(address vaultOwner, address addressRegistry) external;
 
     function vaultOwner() external view returns (address);
 
-    function loans(uint256 index) external view returns (DataTypes.Loan memory);
+    function loans(
+        uint256 index
+    ) external view returns (DataTypes.Loan memory loan);
 
     function doesAcceptOnChainQuote(
         DataTypes.OnChainQuote calldata onChainQuote
@@ -39,7 +37,9 @@ interface ILenderVault {
         DataTypes.OffChainQuote calldata offChainQuote
     ) external returns (DataTypes.Loan memory loan, uint256 upfrontFee);
 
-    function addLoan(DataTypes.Loan memory loan) external;
+    function addLoan(
+        DataTypes.Loan memory loan
+    ) external returns (uint256 loanId);
 
     function invalidateOffChainQuote(bytes32 offChainQuoteHash) external;
 

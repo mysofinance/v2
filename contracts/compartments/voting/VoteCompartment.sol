@@ -6,14 +6,17 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVoteCompartment} from "../../interfaces/compartments/voting/IVoteCompartment.sol";
-import {ICompartment} from "../../interfaces/ICompartment.sol";
+import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
 
 // start simple with just an example voting and rewards implementation
 // could make a mapping later for more flexibility
-contract VoteCompartment is Initializable, ICompartment {
+contract VoteCompartment is
+    Initializable //, IBorrowerCompartment {
+{
     using SafeERC20 for IERC20;
+    error InvalidSender();
 
     address public vaultAddr;
     uint256 public loanIdx;
