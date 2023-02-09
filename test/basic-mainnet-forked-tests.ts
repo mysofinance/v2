@@ -401,6 +401,8 @@ describe('Basic Forked Mainnet Tests', function () {
         ethers.utils.hexZeroPad(locallyCRVBalance.toHexString(), 32)
       ])
 
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
       // get pre balances
       const borrowerCRVBalPre = await crvInstance.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
@@ -409,12 +411,12 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(borrowerCRVBalPre).to.equal(locallyCRVBalance)
       expect(vaultCRVBalPre).to.equal(BigNumber.from(0))
+      expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
       await addressRegistry.connect(team).toggleTokenPair(crvTokenAddress, usdc.address)
 
       // lender deposits usdc
-      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // borrower approves borrower gateway
       await crvInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -433,7 +435,7 @@ describe('Basic Forked Mainnet Tests', function () {
       }
 
       const payload = ethers.utils.defaultAbiCoder.encode(
-        ['uint256', 'uint256', 'uint256', 'address', 'address', 'uint256', 'uint256', 'bool', 'bool'],
+        ['uint256', 'uint256', 'uint256', 'address', 'address', 'uint256', 'uint256', 'bool', 'address'],
         [
           onChainQuote.loanPerCollUnit,
           onChainQuote.interestRatePctInBase,
@@ -446,6 +448,7 @@ describe('Basic Forked Mainnet Tests', function () {
           onChainQuote.borrowerCompartmentImplementation
         ]
       )
+
       const onChainQuoteHash = ethers.utils.keccak256(payload)
 
       await expect(lenderVault.connect(lender).addOnChainQuote(onChainQuote))
@@ -473,9 +476,9 @@ describe('Basic Forked Mainnet Tests', function () {
         )
 
       // check balance post borrow
-      const borroweCRVBalPost = await weth.balanceOf(borrower.address)
+      const borroweCRVBalPost = await crvInstance.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
-      const vaultCRVBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultCRVBalPost = await crvInstance.balanceOf(lenderVault.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
       expect(borrowerCRVBalPre.sub(borroweCRVBalPost)).to.equal(vaultCRVBalPost.sub(vaultCRVBalPre))
