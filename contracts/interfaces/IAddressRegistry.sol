@@ -24,6 +24,8 @@ interface IAddressRegistry {
 
     function borrowerCompartmentFactory() external view returns (address);
 
+    function owner() external view returns (address);
+
     function setLenderVaultFactory(address addr) external;
 
     function setBorrowerGateway(address addr) external;
