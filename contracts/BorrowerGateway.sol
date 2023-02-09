@@ -204,7 +204,7 @@ contract BorrowerGateway is ReentrancyGuard {
             protocolFee *
             (loan.expiry - block.timestamp)) / (BASE * YEAR_IN_SECONDS);
 
-        if (protocolFeeAmount < collSendAmount) {
+        if (collSendAmount < protocolFeeAmount) {
             revert InsufficientSendAmount();
         }
 
@@ -223,7 +223,7 @@ contract BorrowerGateway is ReentrancyGuard {
             IERC20Metadata(loan.collToken).balanceOf(lenderVault) -
             collTokenReceived;
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
-            revert InsufficientSendAmount();
+            revert(); // InsufficientSendAmount();
         }
     }
 
