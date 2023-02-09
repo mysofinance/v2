@@ -33,6 +33,7 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
     ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
+
         //needed to move this inside initializer since sending to stake
         // before returning control back to vault...
         uint256 collTokenBal = IERC20(_collTokenAddr).balanceOf(address(this));

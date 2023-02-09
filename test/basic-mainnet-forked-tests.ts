@@ -381,9 +381,7 @@ describe('Basic Forked Mainnet Tests', function () {
       // create curve staking implementation
       const CurveStakingCompartmentImplementation = await ethers.getContractFactory('CurveStakingCompartment')
       await CurveStakingCompartmentImplementation.connect(team)
-      const curveStakingCompartmentImplementation = await CurveStakingCompartmentImplementation.deploy(
-        lenderVaultFactory.address
-      )
+      const curveStakingCompartmentImplementation = await CurveStakingCompartmentImplementation.deploy()
       await curveStakingCompartmentImplementation.deployed()
 
       // increase borrower CRV balance
@@ -400,22 +398,20 @@ describe('Basic Forked Mainnet Tests', function () {
         ethers.utils.hexZeroPad(locallyCRVBalance.toHexString(), 32)
       ])
 
+      // lender deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // get pre balances
       const borrowerCRVBalPre = await crvInstance.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
-      const vaultCRVBalPre = await crvInstance.balanceOf(lenderVault.address)
+      const vaultCRVBalPre = BigNumber.from(0) // compartment balance
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
       expect(borrowerCRVBalPre).to.equal(locallyCRVBalance)
-      expect(vaultCRVBalPre).to.equal(BigNumber.from(0))
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
       await addressRegistry.connect(team).toggleTokenPair(crvTokenAddress, usdc.address)
-
-      // lender deposits usdc
 
       // borrower approves borrower gateway
       await crvInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -462,7 +458,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const callbackAddr = '0x0000000000000000000000000000000000000000'
       const callbackData = '0x'
 
-      await borrowerGateway
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
@@ -474,10 +470,16 @@ describe('Basic Forked Mainnet Tests', function () {
           callbackData
         )
 
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const collTokenCompartmentAddr = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })?.args?.['collTokenCompartmentAddr']
+
       // check balance post borrow
       const borroweCRVBalPost = await crvInstance.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
-      const vaultCRVBalPost = await crvInstance.balanceOf(lenderVault.address)
+      const vaultCRVBalPost = await crvInstance.balanceOf(collTokenCompartmentAddr)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
       expect(borrowerCRVBalPre.sub(borroweCRVBalPost)).to.equal(vaultCRVBalPost.sub(vaultCRVBalPre))

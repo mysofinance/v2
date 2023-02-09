@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0
+
+pragma solidity 0.8.17;
+
+interface IBorrowerGateway {
+    event Borrow(
+        address indexed borrower,
+        address collToken,
+        address loanToken,
+        uint40 expiry,
+        uint40 earliestRepay,
+        uint128 initCollAmount,
+        uint128 initLoanAmount,
+        uint128 initRepayAmount,
+        uint128 amountRepaidSoFar,
+        bool collUnlocked,
+        address collTokenCompartmentAddr
+    );
+}
