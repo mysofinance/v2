@@ -13,8 +13,7 @@ import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract BorrowerGateway is ReentrancyGuard {
-    // putting fees in borrow gateway since borrower always pays this upfront
-    // also will allow less transfers and gas cost to leave fee here
+    // putting fee info in borrow gateway since borrower always pays this upfront
     uint256 constant BASE = 1e18;
     uint256 constant YEAR_IN_SECONDS = 31_536_000; // 365*24*3600
     uint256 constant MAX_FEE = 5e16; // 5% max in base
@@ -30,6 +29,7 @@ contract BorrowerGateway is ReentrancyGuard {
     error UnregisteredVault();
     error InvalidSender();
     error InvalidFee();
+    error InsufficientSendAmount();
 
     event NewProtocolFee(uint256 _newFee);
 
@@ -199,16 +199,31 @@ contract BorrowerGateway is ReentrancyGuard {
         uint256 collTokenReceived = IERC20Metadata(loan.collToken).balanceOf(
             lenderVault
         );
+
+        uint256 protocolFeeAmount = ((loan.initCollAmount + upfrontFee) *
+            protocolFee *
+            (loan.expiry - block.timestamp)) / (BASE * YEAR_IN_SECONDS);
+
+        if (protocolFeeAmount < collSendAmount) {
+            revert InsufficientSendAmount();
+        }
+
+        IERC20Metadata(loan.collToken).safeTransferFrom(
+            loan.borrower,
+            IAddressRegistry(addressRegistry).owner(),
+            protocolFeeAmount
+        );
+
         IERC20Metadata(loan.collToken).safeTransferFrom(
             loan.borrower,
             collReceiver,
-            collSendAmount
+            collSendAmount - protocolFeeAmount
         );
         collTokenReceived =
             IERC20Metadata(loan.collToken).balanceOf(lenderVault) -
             collTokenReceived;
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
-            revert();
+            revert InsufficientSendAmount();
         }
     }
 
