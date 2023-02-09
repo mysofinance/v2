@@ -5,17 +5,12 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
+import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
-import {ILenderVaultFactory} from "../../interfaces/ILenderVaultFactory.sol";
-import {DataTypes} from "../../DataTypes.sol";
 
-contract CurveStakingCompartment is
-    Initializable // IBorrowerCompartment {
-{
+contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
-    error InvalidSender();
 
     error IncorrectGaugeForLpToken();
 
@@ -28,25 +23,20 @@ contract CurveStakingCompartment is
     address internal constant CRV_ADDR =
         0xD533a949740bb3306d119CC777fa900bA034cd52;
 
-    address public lenderFactory;
-
-    constructor(address _lenderFactory) {
-        lenderFactory = _lenderFactory;
-    }
-
     function initialize(
         address _vaultAddr,
-        address _borrowerAddr,
+        address _registryAddr,
+        address,
         address _collTokenAddr,
         uint256 _loanIdx,
         bytes memory _data
-    ) external initializer returns (uint256 collTokenBalAfter) {
+    ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
         //needed to move this inside initializer since sending to stake
         // before returning control back to vault...
-        collTokenBalAfter = IERC20(_collTokenAddr).balanceOf(address(this));
-        _stake(_borrowerAddr, _collTokenAddr, collTokenBalAfter, _data);
+        uint256 collTokenBal = IERC20(_collTokenAddr).balanceOf(address(this));
+        _stake(_registryAddr, _collTokenAddr, collTokenBal, _data);
     }
 
     // transfer coll on repays
@@ -83,20 +73,17 @@ contract CurveStakingCompartment is
     }
 
     function _stake(
-        address,
+        address registryAddr,
         address collTokenAddr,
         uint256 amount,
         bytes memory data
     ) internal {
         address _liqGaugeAddr = abi.decode(data, (address));
-        /* todo: update to address registry based
         if (
-            !ILenderVaultFactory(lenderFactory).whitelistedAddrs(
-                DataTypes.WhiteListType.STAKINGPOOL,
-                liqGaugeAddr
+            !IAddressRegistry(registryAddr).isWhitelistedCollTokenHandler(
+                _liqGaugeAddr
             )
         ) revert InvalidPool();
-        */
         address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
         if (lpTokenAddrForGauge != collTokenAddr) {
             revert IncorrectGaugeForLpToken();
