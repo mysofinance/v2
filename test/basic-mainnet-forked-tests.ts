@@ -153,6 +153,7 @@ describe('Basic Forked Mainnet Tests', function () {
     return {
       addressRegistry,
       borrowerGateway,
+      borrowerCompartmentFactory,
       lenderVaultImplementation,
       lender,
       borrower,
@@ -160,6 +161,7 @@ describe('Basic Forked Mainnet Tests', function () {
       usdc,
       weth,
       lenderVault,
+      lenderVaultFactory,
       balancerV2Looping
     }
   }
@@ -365,27 +367,24 @@ describe('Basic Forked Mainnet Tests', function () {
     it('Should proceed Curve staking correctly', async () => {
       const {
         borrowerGateway,
-        lenderVaultImplementation,
+        borrowerCompartmentFactory,
         lender,
         borrower,
         team,
         usdc,
         weth,
         lenderVault,
+        lenderVaultFactory,
         addressRegistry
       } = await setupTest()
 
       // create curve staking implementation
-      /*const CurveStakingCompartmentImplementation = await ethers.getContractFactory('CurveStakingCompartment')
+      const CurveStakingCompartmentImplementation = await ethers.getContractFactory('CurveStakingCompartment')
       await CurveStakingCompartmentImplementation.connect(team)
-      const curveStakingCompartmentImplementation = await CurveStakingCompartmentImplementation.deploy(team.address)
+      const curveStakingCompartmentImplementation = await CurveStakingCompartmentImplementation.deploy(
+        lenderVaultFactory.address
+      )
       await curveStakingCompartmentImplementation.deployed()
-
-      // create compartment factory with curve implementation
-      const CompartmentFactory = await ethers.getContractFactory('CollateralCompartmentFactory')
-      await CompartmentFactory.connect(team)
-      const compartmentFactory = await CompartmentFactory.deploy([curveStakingCompartmentImplementation.address])
-      await compartmentFactory.deployed()*/
 
       // increase borrower CRV balance
       const locallyCRVBalance = ethers.BigNumber.from(10).pow(18)
@@ -431,7 +430,7 @@ describe('Basic Forked Mainnet Tests', function () {
         tenor: ONE_DAY.mul(365),
         timeUntilEarliestRepay: 0,
         isNegativeInterestRate: false,
-        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
+        borrowerCompartmentImplementation: curveStakingCompartmentImplementation.address
       }
 
       const payload = ethers.utils.defaultAbiCoder.encode(
