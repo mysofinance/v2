@@ -35,23 +35,20 @@ describe('Basic Local Tests', function () {
     const lenderVaultFactory = await LenderVaultFactory.connect(team).deploy(addressRegistry.address, lenderVaultImplementation.address)
     await lenderVaultFactory.deployed()
 
-    // set lender vault factory on address registry (immutable) 
+    // deploy borrower compartment factory
+    const BorrowerCompartmentFactory = await ethers.getContractFactory('BorrowerCompartmentFactory')
+    await BorrowerCompartmentFactory.connect(team)
+    const borrowerCompartmentFactory = await BorrowerCompartmentFactory.deploy()
+    await borrowerCompartmentFactory.deployed()
+
+    // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable) 
     addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
     addressRegistry.setBorrowerGateway(borrowerGateway.address)
+    addressRegistry.setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
+
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
     /* ********************************** */
-    
-    /*
-    // deploy CompartmentFactory
-    const CompartmentFactory = await ethers.getContractFactory('CollateralCompartmentFactory')
-    await CompartmentFactory.connect(team)
-    const compartmentFactory = await CompartmentFactory.deploy(['0x0000000000000000000000000000000000000001'])
-    await compartmentFactory.deployed()
-
-    // whitelist compartment factory and create first vault
-    await lenderVaultFactory.addToWhitelist(5, compartmentFactory.address)
-    */
 
     // create a vault
     await lenderVaultFactory.connect(lender).createVault()
@@ -101,7 +98,7 @@ describe('Basic Local Tests', function () {
         repayAmount: ONE_USDC.mul(1010),
         validUntil: timestamp + 60,
         upfrontFee: ONE_WETH.mul(50).div(10000),
-        useCollCompartment: false,
+        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000',
         nonce: 0,
         v: 0,
         r: '0x0',
@@ -119,7 +116,7 @@ describe('Basic Local Tests', function () {
           'uint256',
           'uint256',
           'uint256',
-          'bool',
+          'address',
           'uint256'
         ],
         [
@@ -133,7 +130,7 @@ describe('Basic Local Tests', function () {
           offChainQuote.repayAmount,
           offChainQuote.validUntil,
           offChainQuote.upfrontFee,
-          offChainQuote.useCollCompartment,
+          offChainQuote.borrowerCompartmentImplementation,
           offChainQuote.nonce
         ]
       )
@@ -203,7 +200,7 @@ describe('Basic Local Tests', function () {
         tenor: ONE_DAY.mul(365),
         timeUntilEarliestRepay: 0,
         isNegativeInterestRate: false,
-        useCollCompartment: false
+        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000',
       }
 
       const payload = ethers.utils.defaultAbiCoder.encode(
@@ -216,7 +213,7 @@ describe('Basic Local Tests', function () {
           'uint256',
           'uint256',
           'bool',
-          'bool'
+          'address'
         ],
         [
           onChainQuote.loanPerCollUnit,
@@ -227,7 +224,7 @@ describe('Basic Local Tests', function () {
           onChainQuote.tenor,
           onChainQuote.timeUntilEarliestRepay,
           onChainQuote.isNegativeInterestRate,
-          onChainQuote.useCollCompartment
+          onChainQuote.borrowerCompartmentImplementation
         ]
       )
       const onChainQuoteHash = ethers.utils.keccak256(payload)
@@ -280,7 +277,7 @@ describe('Basic Local Tests', function () {
         tenor: ONE_DAY.mul(365).toNumber(),
         timeUntilEarliestRepay: 0,
         isNegativeInterestRate: false,
-        useCollCompartment: false
+        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000',
       }
       let payload = ethers.utils.defaultAbiCoder.encode(
         [
@@ -292,7 +289,7 @@ describe('Basic Local Tests', function () {
           'uint256',
           'uint256',
           'bool',
-          'bool'
+          'address'
         ],
         [
           onChainQuote.loanPerCollUnit,
@@ -303,7 +300,7 @@ describe('Basic Local Tests', function () {
           onChainQuote.tenor,
           onChainQuote.timeUntilEarliestRepay,
           onChainQuote.isNegativeInterestRate,
-          onChainQuote.useCollCompartment
+          onChainQuote.borrowerCompartmentImplementation
         ]
       )
       let onChainQuoteHash = ethers.utils.keccak256(payload)
@@ -323,7 +320,7 @@ describe('Basic Local Tests', function () {
           'uint256',
           'uint256',
           'bool',
-          'bool'
+          'address'
         ],
         [
           onChainQuote.loanPerCollUnit,
@@ -334,7 +331,7 @@ describe('Basic Local Tests', function () {
           onChainQuote.tenor,
           onChainQuote.timeUntilEarliestRepay,
           onChainQuote.isNegativeInterestRate,
-          onChainQuote.useCollCompartment
+          onChainQuote.borrowerCompartmentImplementation
         ]
       )
       onChainQuoteHash = ethers.utils.keccak256(payload)

@@ -6,6 +6,7 @@ contract AddressRegistry {
     address public owner;
     address public lenderVaultFactory;
     address public borrowerGateway;
+    address public borrowerCompartmentFactory;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => bool)) public isWhitelistedTokenPair;
     mapping(address => bool) public isWhitelistedCallbackAddr;
@@ -35,6 +36,16 @@ contract AddressRegistry {
             revert();
         }
         borrowerGateway = addr;
+    }
+
+    function setBorrowerCompartmentFactory(address addr) external {
+        if (msg.sender != owner) {
+            revert();
+        }
+        if (borrowerCompartmentFactory != address(0)) {
+            revert();
+        }
+        borrowerCompartmentFactory = addr;
     }
 
     function toggleTokenPair(address collToken, address loanToken) external {

@@ -89,6 +89,6 @@ contract AaveAutoQuoteStrategy1 is IAutoQuoteStrategy {
             RAY;
         onChainQuote.timeUntilEarliestRepay = 0;
         onChainQuote.isNegativeInterestRate = false;
-        onChainQuote.useCollCompartment = false;
+        onChainQuote.borrowerCompartmentImplementation = address(0);
     }
 }

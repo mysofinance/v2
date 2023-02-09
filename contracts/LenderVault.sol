@@ -6,20 +6,20 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
-import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
-import {ICompartment} from "./interfaces/ICompartment.sol";
-import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
-import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
+import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
+import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
+import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-contract LenderVault is ReentrancyGuard, Initializable {
+contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     using SafeERC20 for IERC20Metadata;
 
     uint256 constant BASE = 1e18;
-    address vaultOwner;
-    address addressRegistry;
+    address public vaultOwner;
+    address public addressRegistry;
 
     mapping(address => uint256) public lockedAmounts;
     mapping(bytes32 => bool) isConsumedQuote;
@@ -27,10 +27,9 @@ contract LenderVault is ReentrancyGuard, Initializable {
     mapping(address => mapping(address => address)) public autoQuoteStrategy; // points to auto loan strategy for given coll/loan token pair
     // for now remove public getter for byte code size purposes...
     // todo: check if this is needed mapping(address => address) collTokenImplAddrs;
-    DataTypes.Loan[] public loans; // stores loans
+    DataTypes.Loan[] _loans; // stores loans
 
     uint256 loanOffChainQuoteNonce;
-    address compartmentFactory;
 
     /*
     can remove ILendingPool because also interest bearing tokens can be deposited 
@@ -50,13 +49,20 @@ contract LenderVault is ReentrancyGuard, Initializable {
 
     function initialize(
         address _vaultOwner,
-        address _addressRegistry,
-        address _compartmentFactory
+        address _addressRegistry
     ) external initializer {
         vaultOwner = _vaultOwner;
         addressRegistry = _addressRegistry;
-        compartmentFactory = _compartmentFactory;
         loanOffChainQuoteNonce = 1;
+    }
+
+    function loans(
+        uint256 loanId
+    ) external view returns (DataTypes.Loan memory loan) {
+        if (loanId > _loans.length - 1) {
+            revert();
+        }
+        loan = _loans[loanId];
     }
 
     function invalidateOffChainQuoteNonce() external {
@@ -148,11 +154,14 @@ contract LenderVault is ReentrancyGuard, Initializable {
         upfrontFee = offChainQuote.upfrontFee;
     }
 
-    function addLoan(DataTypes.Loan calldata loan) external {
+    function addLoan(
+        DataTypes.Loan calldata loan
+    ) external returns (uint256 loanId) {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert();
         }
-        loans.push(loan);
+        loanId = _loans.length;
+        _loans.push(loan);
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -264,7 +273,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 offChainQuote.repayAmount,
                 offChainQuote.validUntil,
                 offChainQuote.upfrontFee,
-                offChainQuote.useCollCompartment,
+                offChainQuote.borrowerCompartmentImplementation,
                 offChainQuote.nonce
             )
         );
@@ -305,13 +314,13 @@ contract LenderVault is ReentrancyGuard, Initializable {
         uint256 totalUnlockableColl;
         for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
-            DataTypes.Loan storage loan = loans[_loanIds[i]];
+            DataTypes.Loan storage loan = _loans[_loanIds[i]];
             if (loan.collToken != collToken) {
                 revert();
             }
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
                 if (loan.hasCollCompartment) {
-                    ICompartment(loan.collTokenCompartmentAddr)
+                    IBorrowerCompartment(loan.collTokenCompartmentAddr)
                         .unlockCollToVault(loan.collToken);
                 } else {
                     tmp =
@@ -349,7 +358,7 @@ contract LenderVault is ReentrancyGuard, Initializable {
                 onChainQuote.tenor,
                 onChainQuote.timeUntilEarliestRepay,
                 onChainQuote.isNegativeInterestRate,
-                onChainQuote.useCollCompartment
+                onChainQuote.borrowerCompartmentImplementation
             )
         );
     }

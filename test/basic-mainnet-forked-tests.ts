@@ -101,9 +101,17 @@ describe('Basic Forked Mainnet Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
-    // set lender vault factory on address registry (immutable)
+    // deploy borrower compartment factory
+    const BorrowerCompartmentFactory = await ethers.getContractFactory('BorrowerCompartmentFactory')
+    await BorrowerCompartmentFactory.connect(team)
+    const borrowerCompartmentFactory = await BorrowerCompartmentFactory.deploy()
+    await borrowerCompartmentFactory.deployed()
+
+    // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
     addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
     addressRegistry.setBorrowerGateway(borrowerGateway.address)
+    addressRegistry.setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
+
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
     /* ********************************** */
@@ -186,7 +194,7 @@ describe('Basic Forked Mainnet Tests', function () {
         tenor: ONE_DAY.mul(365),
         timeUntilEarliestRepay: 0,
         isNegativeInterestRate: false,
-        useCollCompartment: false
+        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
       }
       await lenderVault.connect(lender).addOnChainQuote(onChainQuote)
 
@@ -368,7 +376,7 @@ describe('Basic Forked Mainnet Tests', function () {
       } = await setupTest()
 
       // create curve staking implementation
-      const CurveStakingCompartmentImplementation = await ethers.getContractFactory('CurveStakingCompartment')
+      /*const CurveStakingCompartmentImplementation = await ethers.getContractFactory('CurveStakingCompartment')
       await CurveStakingCompartmentImplementation.connect(team)
       const curveStakingCompartmentImplementation = await CurveStakingCompartmentImplementation.deploy(team.address)
       await curveStakingCompartmentImplementation.deployed()
@@ -377,10 +385,10 @@ describe('Basic Forked Mainnet Tests', function () {
       const CompartmentFactory = await ethers.getContractFactory('CollateralCompartmentFactory')
       await CompartmentFactory.connect(team)
       const compartmentFactory = await CompartmentFactory.deploy([curveStakingCompartmentImplementation.address])
-      await compartmentFactory.deployed()
+      await compartmentFactory.deployed()*/
 
       // increase borrower CRV balance
-      const locallyCRVBalance = ethers.BigNumber.from(1)
+      const locallyCRVBalance = ethers.BigNumber.from(10).pow(18)
       const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
       const CRV_SLOT = 3
       const crvInstance = new ethers.Contract(crvTokenAddress, crvTokenAbi, borrower.provider)
@@ -399,7 +407,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const vaultCRVBalPre = await crvInstance.balanceOf(lenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
-      expect(borrowerCRVBalPre).to.equal(BigNumber.from(1))
+      expect(borrowerCRVBalPre).to.equal(locallyCRVBalance)
       expect(vaultCRVBalPre).to.equal(BigNumber.from(0))
 
       // whitelist token pair
@@ -421,7 +429,7 @@ describe('Basic Forked Mainnet Tests', function () {
         tenor: ONE_DAY.mul(365),
         timeUntilEarliestRepay: 0,
         isNegativeInterestRate: false,
-        useCollCompartment: true
+        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
       }
 
       const payload = ethers.utils.defaultAbiCoder.encode(
@@ -435,10 +443,11 @@ describe('Basic Forked Mainnet Tests', function () {
           onChainQuote.tenor,
           onChainQuote.timeUntilEarliestRepay,
           onChainQuote.isNegativeInterestRate,
-          onChainQuote.useCollCompartment
+          onChainQuote.borrowerCompartmentImplementation
         ]
       )
       const onChainQuoteHash = ethers.utils.keccak256(payload)
+
       await expect(lenderVault.connect(lender).addOnChainQuote(onChainQuote))
         .to.emit(lenderVault, 'OnChainQuote')
         .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)

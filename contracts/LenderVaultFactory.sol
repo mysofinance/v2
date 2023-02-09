@@ -2,35 +2,16 @@
 
 pragma solidity 0.8.17;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
-import {ICompartmentFactory} from "./interfaces/ICompartmentFactory.sol";
-import {ICompartment} from "./interfaces/ICompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVaultFactory is ILenderVaultFactory {
-    using SafeERC20 for IERC20Metadata;
-
-    error InvalidCompartmentAddr();
-    error InvalidSender();
-    error InvalidFactory();
-    error Invalid();
-
-    mapping(address => bool) public isRegisteredVault;
-    address[] public registeredVaults;
-
-    mapping(DataTypes.WhiteListType => mapping(address => bool))
-        public whitelistedAddrs;
-
     address public addressRegistry;
     address public lenderVaultImpl;
-    address public borrowerGateway;
-    address compartmentFactory = address(0);
 
     constructor(address _addressRegistry, address _lenderVaultImpl) {
         addressRegistry = _addressRegistry;
@@ -59,6 +40,7 @@ contract LenderVaultFactory is ILenderVaultFactory {
     */
 
     /* TODO: move this to borrower gateway, as this doesn't directly relate to lender interactions */
+    /*
     function createCompartment(
         DataTypes.Loan memory loan,
         uint256 reclaimable,
@@ -110,24 +92,15 @@ contract LenderVaultFactory is ILenderVaultFactory {
             revert InvalidCompartmentAddr();
         }
     }
+    */
 
-    function createVault() external returns (address) {
-        bytes32 salt = keccak256(
-            abi.encodePacked(lenderVaultImpl, compartmentFactory, msg.sender)
-        );
-        address newVaultInstanceAddr = Clones.cloneDeterministic(
-            lenderVaultImpl,
-            salt
-        );
-
-        ILenderVault(newVaultInstanceAddr).initialize(
+    function createVault() external returns (address newLenderVaultAddr) {
+        bytes32 salt = keccak256(abi.encodePacked(lenderVaultImpl, msg.sender));
+        newLenderVaultAddr = Clones.cloneDeterministic(lenderVaultImpl, salt);
+        ILenderVault(newLenderVaultAddr).initialize(
             msg.sender,
-            addressRegistry,
-            compartmentFactory
+            addressRegistry
         );
-
-        IAddressRegistry(addressRegistry).addLenderVault(newVaultInstanceAddr);
-
-        return newVaultInstanceAddr;
+        IAddressRegistry(addressRegistry).addLenderVault(newLenderVaultAddr);
     }
 }
