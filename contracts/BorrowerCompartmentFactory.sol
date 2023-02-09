@@ -10,8 +10,11 @@ contract BorrowerCompartmentFactory is IBorrowerCompartmentFactory {
     function createCompartment(
         address borrowerCompartmentImplementation,
         address lenderVault,
+        address registryAddr,
         address borrower,
-        uint256 loanId
+        address collToken,
+        uint256 loanId,
+        bytes memory data
     ) external returns (address newBorrowerCompartment) {
         bytes32 salt = keccak256(
             abi.encodePacked(
@@ -28,8 +31,11 @@ contract BorrowerCompartmentFactory is IBorrowerCompartmentFactory {
 
         IBorrowerCompartment(newBorrowerCompartment).initialize(
             lenderVault,
+            registryAddr,
             borrower,
-            loanId
+            collToken,
+            loanId,
+            data
         );
     }
 }

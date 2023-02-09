@@ -6,7 +6,10 @@ interface IBorrowerCompartmentFactory {
     function createCompartment(
         address borrowerCompartmentImplementation,
         address lenderVault,
+        address registryAddr,
         address borrower,
-        uint256 loanId
+        address collToken,
+        uint256 loanId,
+        bytes memory data
     ) external returns (address newBorrowerCompartment);
 }
