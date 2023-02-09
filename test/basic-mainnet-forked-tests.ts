@@ -113,12 +113,12 @@ describe('Basic Forked Mainnet Tests', function () {
     await addressRegistry.connect(team).toggleTokenPair(weth.address, usdc.address)
     await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
 
-    return { borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping }
+    return { addressRegistry, borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping }
   }
 
   describe('On-Chain Quote Testing', function () {
     it('Should process atomic balancer swap correctly', async function () {
-      const { borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } = await setupTest()
+      const { addressRegistry, borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -197,5 +197,42 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(collSendAmount)
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(onChainQuote.loanPerCollUnit.mul(collSendAmount).div(ONE_WETH))
     })
+  })
+
+  it('Should handle auto-quotes correctly', async function () {
+    const { addressRegistry, borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } = await setupTest()
+    // deploy an autoquote strategy
+    const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
+    const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
+    await aaveAutoQuoteStrategy1.deployed()
+
+    // whitelist autoquote strategy
+    await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
+
+    // lender subscribes to strategy
+    await lenderVault.connect(lender).setAutoQuoteStrategy(weth.address, usdc.address, aaveAutoQuoteStrategy1.address)
+    
+    // lender deposits usdc
+    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+    // borrower approves borrower gateway
+    await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+    // test retrieiving autoquote
+    const onChainQuote = await aaveAutoQuoteStrategy1.getOnChainQuote();
+    console.log("onChainQuote from Aave strategy:", onChainQuote)
+
+    // borrower uses quote to borrow
+    const collSendAmount = ONE_WETH
+    const isAutoQuote = true
+    const callbackAddr = '0x0000000000000000000000000000000000000000'
+    const callbackData = '0x'
+    await borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+    const loan = await lenderVault.loans(0)
+    const expectedLoanAmount = collSendAmount.mul(onChainQuote.loanPerCollUnit).div(ONE_WETH)
+    const expectedRepayAmount = expectedLoanAmount.mul(BASE.add(onChainQuote.interestRatePctInBase)).div(BASE)
+    expect(loan.initCollAmount).to.equal(collSendAmount)
+    expect(loan.initLoanAmount).to.equal(expectedLoanAmount)
+    expect(loan.initRepayAmount).to.equal(expectedRepayAmount)
   })
 })
