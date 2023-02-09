@@ -21,6 +21,8 @@ contract BorrowerGateway is ReentrancyGuard {
 
     using SafeERC20 for IERC20Metadata;
 
+    error UnregisteredVault();
+
     function borrowWithOffChainQuote(
         address lenderVault,
         address borrower,
@@ -30,7 +32,7 @@ contract BorrowerGateway is ReentrancyGuard {
         bytes calldata data
     ) external nonReentrant {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert UnregisteredVault();
         }
 
         (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(lenderVault)
@@ -81,7 +83,7 @@ contract BorrowerGateway is ReentrancyGuard {
         // 3. Finally, BorrowGateway updates lender vault storage state
 
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert UnregisteredVault();
         }
         if (
             !isAutoQuote &&
@@ -204,29 +206,15 @@ contract BorrowerGateway is ReentrancyGuard {
 
     function repay(
         DataTypes.LoanRepayInfo calldata loanRepayInfo,
+        address vaultAddr,
         address callbackAddr,
         bytes calldata data
     ) external nonReentrant {
-        DataTypes.Loan memory loan = loans[loanRepayInfo.loanId];
-        if (msg.sender != loan.borrower) {
-            revert Invalid();
+        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+            revert UnregisteredVault();
         }
-        if (
-            block.timestamp < loan.earliestRepay ||
-            block.timestamp >= loan.expiry
-        ) {
-            revert Invalid();
-        }
-        if (
-            loanRepayInfo.repayAmount >
-            loan.initRepayAmount - loan.amountRepaidSoFar
-        ) {
-            revert Invalid();
-        }
-        uint128 reclaimCollAmount = toUint128(
-            (loan.initCollAmount * loanRepayInfo.repayAmount) /
-                loan.initRepayAmount
-        );
+        DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(loanRepayInfo.loanId);
+        uint128 reclaimCollAmount = ILenderVault(vaultAddr).validateRepayInfo(msg.sender, loan, loanRepayInfo);
 
         uint256 loanTokenBalBefore = IERC20Metadata(loanRepayInfo.loanToken)
             .balanceOf(address(this));
@@ -248,7 +236,7 @@ contract BorrowerGateway is ReentrancyGuard {
         }
 
         if (callbackAddr != address(0)) {
-            IVaultCallback(callbackAddr).repayCallback(loan, data); // todo: whitelist callbackAddr
+            IVaultCallback(callbackAddr).repayCallback(loan, data);
         }
         IERC20Metadata(loanRepayInfo.loanToken).safeTransferFrom(
             msg.sender,

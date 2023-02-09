@@ -48,4 +48,10 @@ interface ILenderVault {
         address recipient,
         uint256 amount
     ) external;
+
+    function validateRepayInfo(
+        address borrower,
+        DataTypes.Loan memory loan,
+        DataTypes.LoanRepayInfo memory loanRepayInfo
+    ) external view returns (uint128 reclaimCollAmount);
 }

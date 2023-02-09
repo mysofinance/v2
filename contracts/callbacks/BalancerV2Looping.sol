@@ -91,3 +91,36 @@ contract BalancerV2Looping is IVaultCallback {
         bytes calldata data
     ) external {}
 }
+
+/*BalancerDataTypes.FundManagement
+            memory fundManagement = BalancerDataTypes.FundManagement(
+                address(this), // swap payer
+                false, // use payer's internal balance
+                payable(loanQuote.borrower), // swap receiver
+                false // user receiver's internal balance
+            );
+        (bytes32 poolId, uint256 minSwapReceive, uint256 deadline) = abi.decode(
+            data,
+            (bytes32, uint256, uint256)
+        );
+        BalancerDataTypes.SingleSwap memory singleSwap = BalancerDataTypes
+            .SingleSwap(
+                poolId,
+                BalancerDataTypes.SwapKind.GIVEN_OUT,
+                IBalancerAsset(loanQuote.collToken),
+                IBalancerAsset(loanQuote.loanToken),
+                repayAmount,
+                "0x"
+            );
+        // todo: could calculate this better using bal math inGivenOut
+        IERC20Metadata(loanQuote.collToken).approve(
+            address(BalancerV2),
+            reclaimableColl
+        );
+        IBalancerVault(BalancerV2).swap(
+            singleSwap,
+            fundManagement,
+            minSwapReceive,
+            deadline
+        );
+    }*/
