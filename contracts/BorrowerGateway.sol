@@ -50,6 +50,7 @@ contract BorrowerGateway is ReentrancyGuard {
             loanId
         );
         processTransfers(
+            lenderVault,
             collReceiver,
             collSendAmount,
             loan,
@@ -104,6 +105,7 @@ contract BorrowerGateway is ReentrancyGuard {
             loanId
         );
         processTransfers(
+            lenderVault,
             collReceiver,
             collSendAmount,
             loan,
@@ -142,6 +144,7 @@ contract BorrowerGateway is ReentrancyGuard {
 
     function processTransfers(
         address lenderVault,
+        address collReceiver,
         uint256 collSendAmount,
         DataTypes.Loan memory loan,
         uint256 upfrontFee,
@@ -175,7 +178,7 @@ contract BorrowerGateway is ReentrancyGuard {
         );
         IERC20Metadata(loan.collToken).safeTransferFrom(
             loan.borrower,
-            lenderVault,
+            collReceiver,
             collSendAmount
         );
         collTokenReceived =
