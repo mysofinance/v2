@@ -7,8 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
-import {ILenderVaultFactory} from "../../interfaces/ILenderVaultFactory.sol";
-import {DataTypes} from "../../DataTypes.sol";
 
 contract AaveStakingCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
