@@ -6,10 +6,16 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
+import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
+import "hardhat/console.sol";
 
-contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
+contract CurveStakingCompartment is
+    Initializable,
+    IStakeCompartment,
+    IBorrowerCompartment
+{
     using SafeERC20 for IERC20;
 
     error IncorrectGaugeForLpToken();
@@ -25,18 +31,12 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
 
     function initialize(
         address _vaultAddr,
-        address _registryAddr,
         address,
-        address _collTokenAddr,
-        uint256 _loanIdx,
-        bytes memory _data
+        address,
+        uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
-        //needed to move this inside initializer since sending to stake
-        // before returning control back to vault...
-        uint256 collTokenBal = IERC20(_collTokenAddr).balanceOf(address(this));
-        _stake(_registryAddr, _collTokenAddr, collTokenBal, _data);
     }
 
     // transfer coll on repays
@@ -72,13 +72,16 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
         IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
     }
 
-    function _stake(
+    function stake(
         address registryAddr,
         address collTokenAddr,
-        uint256 amount,
         bytes memory data
-    ) internal {
+    ) external {
+        uint256 amount = IERC20(collTokenAddr).balanceOf(address(this));
+
+        console.log(amount);
         address _liqGaugeAddr = abi.decode(data, (address));
+        console.log(_liqGaugeAddr);
         if (
             !IAddressRegistry(registryAddr).isWhitelistedCollTokenHandler(
                 _liqGaugeAddr
