@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
@@ -120,6 +121,12 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         ) {
             revert Invalid();
         }
+        // if(loan.hasCollCompartment){
+
+        // }
+        // else{
+
+        // }
         reclaimCollAmount = toUint128(
             (loan.initCollAmount * loanRepayInfo.repayAmount) /
                 loan.initRepayAmount
@@ -170,12 +177,19 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         loan.earliestRepay = uint40(
             block.timestamp + onChainQuote.timeUntilEarliestRepay
         );
+        if (onChainQuote.borrowerCompartmentImplementation != address(0)) {
+            loan = setCompartmentLoanData(
+                onChainQuote.borrowerCompartmentImplementation,
+                borrower,
+                loan
+            );
+        }
     }
 
     function getLoanInfoForOffChainQuote(
         address borrower,
         DataTypes.OffChainQuote calldata offChainQuote
-    ) external pure returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
+    ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
         loan.borrower = borrower;
         loan.loanToken = offChainQuote.loanToken;
         loan.collToken = offChainQuote.collToken;
@@ -185,6 +199,13 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         loan.expiry = uint40(offChainQuote.expiry);
         loan.earliestRepay = uint40(offChainQuote.earliestRepay);
         upfrontFee = offChainQuote.upfrontFee;
+        if (offChainQuote.borrowerCompartmentImplementation != address(0)) {
+            loan = setCompartmentLoanData(
+                offChainQuote.borrowerCompartmentImplementation,
+                borrower,
+                loan
+            );
+        }
     }
 
     function addLoan(
@@ -417,5 +438,27 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
             (onChainQuote.isNegativeInterestRate &&
                 onChainQuote.interestRatePctInBase > BASE) ||
             onChainQuote.upfrontFeePctInBase > BASE);
+    }
+
+    function setCompartmentLoanData(
+        address borrowerCompartmentImplementation,
+        address borrower,
+        DataTypes.Loan memory loan
+    ) internal view returns (DataTypes.Loan memory) {
+        loan.hasCollCompartment = true;
+        bytes32 salt = keccak256(
+            abi.encodePacked(
+                borrowerCompartmentImplementation,
+                address(this),
+                borrower,
+                _loans.length
+            )
+        );
+        loan.collTokenCompartmentAddr = Clones.predictDeterministicAddress(
+            borrowerCompartmentImplementation,
+            salt,
+            IAddressRegistry(addressRegistry).borrowerCompartmentFactory()
+        );
+        return loan;
     }
 }
