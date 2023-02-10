@@ -261,11 +261,12 @@ contract BorrowerGateway is ReentrancyGuard {
         //     .balanceOf(address(this));
 
         if (loan.hasCollCompartment) {
-            ICompartment(loan.collTokenCompartmentAddr).transferCollToBorrower(
+            ICompartment(loan.collTokenCompartmentAddr).transferCollFromCompartment(
                 loanRepayInfo.repayAmount,
                 loan.initRepayAmount - loan.amountRepaidSoFar,
                 loan.borrower,
-                loan.collToken
+                loan.collToken,
+                callbackAddr
             );
         } else {
             IERC20Metadata(loanRepayInfo.collToken).safeTransfer(

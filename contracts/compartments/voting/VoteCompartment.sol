@@ -41,11 +41,12 @@ contract VoteCompartment is Initializable, IBorrowerCompartment {
     }
 
     // transfer coll on repays
-    function transferCollToBorrower(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,
-        address collTokenAddr
+        address collTokenAddr,
+        address callbackAddr
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
@@ -53,7 +54,11 @@ contract VoteCompartment is Initializable, IBorrowerCompartment {
         );
         uint256 amount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
-        IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
+        if (callbackAddr == address(0)) {
+            IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
+        } else {
+            IERC20(collTokenAddr).safeTransfer(callbackAddr, amount);
+        }
     }
 
     // unlockColl this would be called on defaults

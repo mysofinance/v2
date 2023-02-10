@@ -42,11 +42,13 @@ interface IBorrowerCompartment {
      * @param repayAmountLeft amount of loan token still outstanding
      * @param borrowerAddr address of borrower receiving transfer
      * @param collTokenAddr address of collateral token being transferred
+     * @param callbackAddr address to send collateral to instead of borrower if using callback
      */
-    function transferCollToBorrower(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,
-        address collTokenAddr
+        address collTokenAddr,
+        address callbackAddr
     ) external;
 }

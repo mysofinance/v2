@@ -27,11 +27,12 @@ contract AaveStakingCompartment is Initializable, IBorrowerCompartment {
     }
 
     // transfer coll on repays
-    function transferCollToBorrower(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,
-        address collTokenAddr
+        address collTokenAddr,
+        address callbackAddr
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         // check coll token balance of compartment
@@ -41,7 +42,11 @@ contract AaveStakingCompartment is Initializable, IBorrowerCompartment {
         // transfer proportion of compartment coll token balance
         uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
-        IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
+        if (callbackAddr == address(0)) {
+            IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
+        } else {
+            IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
+        }
     }
 
     // unlockColl this would be called on defaults

@@ -40,11 +40,12 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
     }
 
     // transfer coll on repays
-    function transferCollToBorrower(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,
-        address collTokenAddr
+        address collTokenAddr,
+        address callbackAddr
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
@@ -63,7 +64,11 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
         // transfer proportion of compartment lp token balance
         uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
-        IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
+        if (callbackAddr == address(0)) {
+            IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
+        } else {
+            IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
+        }
         // check crv token balance
         uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
         // transfer proportion of crv token balance

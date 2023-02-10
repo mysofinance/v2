@@ -121,12 +121,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         ) {
             revert Invalid();
         }
-        // if(loan.hasCollCompartment){
-
-        // }
-        // else{
-
-        // }
+        //reclaimCollAmount will be overwritten by compartments later
         reclaimCollAmount = toUint128(
             (loan.initCollAmount * loanRepayInfo.repayAmount) /
                 loan.initRepayAmount
