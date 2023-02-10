@@ -368,7 +368,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 revert();
             }
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
-                if (loan.hasCollCompartment) {
+                if (loan.collTokenCompartmentAddr != address(0)) {
                     IBorrowerCompartment(loan.collTokenCompartmentAddr)
                         .unlockCollToVault(loan.collToken);
                 } else {
