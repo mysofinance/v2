@@ -166,20 +166,9 @@ describe('Basic Forked Mainnet Tests', function () {
     }
   }
 
-  /*describe('On-Chain Quote Testing', function () {
+  describe('On-Chain Quote Testing', function () {
     it('Should process atomic balancer swap correctly', async function () {
-      const {
-        addressRegistry,
-        borrowerGateway,
-        lenderVaultImplementation,
-        lender,
-        borrower,
-        team,
-        usdc,
-        weth,
-        lenderVault,
-        balancerV2Looping
-      } = await setupTest()
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -306,18 +295,8 @@ describe('Basic Forked Mainnet Tests', function () {
   })
 
   it('Should handle auto-quotes correctly', async function () {
-    const {
-      addressRegistry,
-      borrowerGateway,
-      lenderVaultImplementation,
-      lender,
-      borrower,
-      team,
-      usdc,
-      weth,
-      lenderVault,
-      balancerV2Looping
-    } = await setupTest()
+    const { addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } =
+      await setupTest()
     // deploy an autoquote strategy
     const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
     const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
@@ -361,22 +340,12 @@ describe('Basic Forked Mainnet Tests', function () {
     expect(loan.initCollAmount).to.equal(collSendAmount)
     expect(loan.initLoanAmount).to.equal(expectedLoanAmount)
     expect(loan.initRepayAmount).to.equal(expectedRepayAmount)
-  })*/
+  })
 
   describe('Compartment Testing', function () {
-    it('Should proceed Curve staking correctly', async () => {
-      const {
-        borrowerGateway,
-        borrowerCompartmentFactory,
-        lender,
-        borrower,
-        team,
-        usdc,
-        weth,
-        lenderVault,
-        lenderVaultFactory,
-        addressRegistry
-      } = await setupTest()
+    it('Should proceed Curve LP staking correctly', async () => {
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, lenderVaultFactory, addressRegistry } =
+        await setupTest()
 
       // create curve staking implementation
       const CurveStakingCompartmentImplementation = await ethers.getContractFactory('CurveStakingCompartment')
@@ -386,9 +355,11 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // increase borrower CRV balance
       const locallyCRVBalance = ethers.BigNumber.from(10).pow(18)
-      const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
-      const CRV_SLOT = 3
+      const crvTokenAddress = '0xEd4064f376cB8d68F770FB1Ff088a3d0F3FF5c4d' // LP crvCRVETH
+      const crvGaugeAddress = '0x1cEBdB0856dd985fAe9b8fEa2262469360B8a3a6'
+      const CRV_SLOT = 5
       const crvInstance = new ethers.Contract(crvTokenAddress, crvTokenAbi, borrower.provider)
+      const crvGaugeInstance = new ethers.Contract(crvGaugeAddress, crvTokenAbi, borrower.provider)
 
       // Get storage slot index
       const index = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [CRV_SLOT, borrower.address])
@@ -412,6 +383,9 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // whitelist token pair
       await addressRegistry.connect(team).toggleTokenPair(crvTokenAddress, usdc.address)
+
+      // whitelist gauge crv-eth contract
+      await addressRegistry.connect(team).toggleCollTokenHandler(crvGaugeAddress)
 
       // borrower approves borrower gateway
       await crvInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -456,7 +430,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_CRV
       const isAutoQuote = false
       const callbackAddr = '0x0000000000000000000000000000000000000000'
-      const callbackData = '0x'
+      const callbackData = '0x0000000000000000000000001cebdb0856dd985fae9b8fea2262469360b8a3a6' //crv-ETH
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -482,7 +456,10 @@ describe('Basic Forked Mainnet Tests', function () {
       const vaultCRVBalPost = await crvInstance.balanceOf(collTokenCompartmentAddr)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
-      expect(borrowerCRVBalPre.sub(borroweCRVBalPost)).to.equal(vaultCRVBalPost.sub(vaultCRVBalPre))
+      const compartmentGaugeBalPost = await crvGaugeInstance.balanceOf(collTokenCompartmentAddr)
+
+      expect(compartmentGaugeBalPost).to.equal(borrowerCRVBalPre)
+      expect(borrowerCRVBalPre.sub(borroweCRVBalPost)).to.not.equal(vaultCRVBalPost.sub(vaultCRVBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
     })
   })

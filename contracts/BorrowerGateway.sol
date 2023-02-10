@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBorrowerCompartmentFactory} from "./interfaces/IBorrowerCompartmentFactory.sol";
+import {IStakeCompartment} from "./interfaces/compartments/staking/IStakeCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
@@ -49,8 +50,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             lenderVault,
             borrower,
             loan.collToken,
-            loanId,
-            data
+            loanId
         );
 
         if (offChainQuote.borrowerCompartmentImplementation != address(0)) {
@@ -125,8 +125,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             lenderVault,
             borrower,
             onChainQuote.collToken,
-            loanId,
-            data
+            loanId
         );
 
         if (onChainQuote.borrowerCompartmentImplementation != address(0)) {
@@ -163,8 +162,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         address lenderVault,
         address borrower,
         address collToken,
-        uint256 loanId,
-        bytes memory data
+        uint256 loanId
     ) internal returns (address collReceiver) {
         if (borrowerCompartmentImplementation != address(0)) {
             address _addressRegistry = addressRegistry;
@@ -181,11 +179,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             ).createCompartment(
                     borrowerCompartmentImplementation,
                     lenderVault,
-                    _addressRegistry,
                     borrower,
                     collToken,
-                    loanId,
-                    data
+                    loanId
                 );
         } else {
             collReceiver = lenderVault;
@@ -238,6 +234,14 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
             revert();
+        }
+
+        if (loan.collTokenCompartmentAddr != address(0)) {
+            IStakeCompartment(loan.collTokenCompartmentAddr).stake(
+                addressRegistry,
+                loan.collToken,
+                data
+            );
         }
     }
 
