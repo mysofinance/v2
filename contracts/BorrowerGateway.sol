@@ -48,12 +48,18 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             revert UnregisteredVault();
         }
 
-        (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(lenderVault)
-            .doesAcceptOffChainQuote(borrower, offChainQuote);
-        if (!doesAccept) {
-            revert();
+        {
+            (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(
+                lenderVault
+            ).doesAcceptOffChainQuote(borrower, offChainQuote);
+            if (!doesAccept) {
+                revert();
+            }
+            ILenderVault(lenderVault).invalidateOffChainQuote(
+                offChainQuoteHash
+            );
         }
-        ILenderVault(lenderVault).invalidateOffChainQuote(offChainQuoteHash);
+
         (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
             lenderVault
         ).getLoanInfoForOffChainQuote(borrower, offChainQuote);
@@ -247,6 +253,12 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.borrower,
             IAddressRegistry(addressRegistry).owner(),
             protocolFeeAmount
+        );
+
+        IERC20Metadata(loan.collToken).safeTransferFrom(
+            loan.borrower,
+            collReceiver,
+            collSendAmount - protocolFeeAmount
         );
 
         collTokenReceived =

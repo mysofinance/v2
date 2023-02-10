@@ -87,16 +87,14 @@ contract CurveStakingCompartment is
         uint256 gaugeIndex = abi.decode(data, (uint256));
         console.log(gaugeIndex);
 
-        uint128 numGauges = uint128(
-            IStakingHelper(GAUGE_CONTROLLER).n_gauges()
-        );
-        if (numGauges == 0 || gaugeIndex < numGauges - 1) {
-            revert InvalidGaugeIndex();
-        }
         address _liqGaugeAddr = IStakingHelper(GAUGE_CONTROLLER).gauges(
-            numGauges
+            gaugeIndex
         );
         console.log(_liqGaugeAddr);
+
+        if (_liqGaugeAddr == address(0)) {
+            revert InvalidGaugeIndex();
+        }
 
         address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
         if (lpTokenAddrForGauge != collTokenAddr) {
