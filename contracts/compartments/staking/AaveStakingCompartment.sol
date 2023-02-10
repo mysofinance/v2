@@ -14,6 +14,8 @@ contract AaveStakingCompartment is Initializable, IBorrowerCompartment {
     address public vaultAddr;
     uint256 public loanIdx;
 
+    fallback() external {}
+
     function initialize(
         address _vaultAddr,
         address,

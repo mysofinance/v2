@@ -41,7 +41,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         uint256 collSendAmount,
         DataTypes.OffChainQuote calldata offChainQuote,
         address callbackAddr,
-        bytes calldata data
+        bytes calldata callbackData,
+        bytes calldata compartmentData
     ) external nonReentrant {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
@@ -65,10 +66,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loanId
         );
 
-        if (offChainQuote.borrowerCompartmentImplementation != address(0)) {
-            loan.collTokenCompartmentAddr = collReceiver;
-        }
-
         processTransfers(
             lenderVault,
             collReceiver,
@@ -76,7 +73,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan,
             upfrontFee,
             callbackAddr,
-            data
+            callbackData,
+            compartmentData
         );
 
         emit Borrow(
@@ -101,7 +99,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypes.OnChainQuote calldata onChainQuote,
         bool isAutoQuote,
         address callbackAddr,
-        bytes calldata data
+        bytes calldata callbackData,
+        bytes calldata compartmentData
     ) external nonReentrant {
         // borrow gateway just forwards data to respective vault and orchestrates transfers
         // borrow gateway is oblivious towards and specific borrow details, and only fwds info
@@ -140,10 +139,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loanId
         );
 
-        if (onChainQuote.borrowerCompartmentImplementation != address(0)) {
-            loan.collTokenCompartmentAddr = collReceiver;
-        }
-
         processTransfers(
             lenderVault,
             collReceiver,
@@ -151,7 +146,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan,
             upfrontFee,
             callbackAddr,
-            data
+            callbackData,
+            compartmentData
         );
 
         emit Borrow(
@@ -207,7 +203,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypes.Loan memory loan,
         uint256 upfrontFee,
         address callbackAddr,
-        bytes calldata data
+        bytes calldata callbackData,
+        bytes calldata compartmentData
     ) internal {
         if (callbackAddr == address(0)) {
             ILenderVault(lenderVault).transferTo(
@@ -228,7 +225,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 callbackAddr,
                 loan.initLoanAmount
             );
-            IVaultCallback(callbackAddr).borrowCallback(loan, data);
+            IVaultCallback(callbackAddr).borrowCallback(loan, callbackData);
         }
 
         uint256 collTokenReceived = IERC20Metadata(loan.collToken).balanceOf(
@@ -252,12 +249,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             protocolFeeAmount
         );
 
-        IERC20Metadata(loan.collToken).safeTransferFrom(
-            loan.borrower,
-            collReceiver,
-            collSendAmount - protocolFeeAmount
-        );
-
         collTokenReceived =
             IERC20Metadata(loan.collToken).balanceOf(collReceiver) -
             collTokenReceived;
@@ -270,15 +261,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             IStakeCompartment(loan.collTokenCompartmentAddr).stake(
                 addressRegistry,
                 loan.collToken,
-                data
-            );
-        }
-
-        if (loan.collTokenCompartmentAddr != address(0)) {
-            IStakeCompartment(loan.collTokenCompartmentAddr).stake(
-                addressRegistry,
-                loan.collToken,
-                data
+                compartmentData
             );
         }
     }

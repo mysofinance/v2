@@ -440,7 +440,6 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         address borrower,
         DataTypes.Loan memory loan
     ) internal view returns (DataTypes.Loan memory) {
-        loan.hasCollCompartment = true;
         bytes32 salt = keccak256(
             abi.encodePacked(
                 borrowerCompartmentImplementation,

@@ -19,6 +19,7 @@ contract CurveStakingCompartment is
     using SafeERC20 for IERC20;
 
     error IncorrectGaugeForLpToken();
+    error InvalidGaugeIndex();
 
     address public vaultAddr;
     uint256 public loanIdx;
@@ -28,6 +29,8 @@ contract CurveStakingCompartment is
     //separate BAL and AURA instances?
     address internal constant CRV_ADDR =
         0xD533a949740bb3306d119CC777fa900bA034cd52;
+    address internal constant GAUGE_CONTROLLER =
+        0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB;
 
     function initialize(
         address _vaultAddr,
@@ -77,21 +80,24 @@ contract CurveStakingCompartment is
         IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
     }
 
-    function stake(
-        address registryAddr,
-        address collTokenAddr,
-        bytes memory data
-    ) external {
+    function stake(address, address collTokenAddr, bytes memory data) external {
         uint256 amount = IERC20(collTokenAddr).balanceOf(address(this));
 
         console.log(amount);
-        address _liqGaugeAddr = abi.decode(data, (address));
+        uint256 gaugeIndex = abi.decode(data, (uint256));
+        console.log(gaugeIndex);
+
+        uint128 numGauges = uint128(
+            IStakingHelper(GAUGE_CONTROLLER).n_gauges()
+        );
+        if (numGauges == 0 || gaugeIndex < numGauges - 1) {
+            revert InvalidGaugeIndex();
+        }
+        address _liqGaugeAddr = IStakingHelper(GAUGE_CONTROLLER).gauges(
+            numGauges
+        );
         console.log(_liqGaugeAddr);
-        if (
-            !IAddressRegistry(registryAddr).isWhitelistedCollTokenHandler(
-                _liqGaugeAddr
-            )
-        ) revert InvalidPool();
+
         address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
         if (lpTokenAddrForGauge != collTokenAddr) {
             revert IncorrectGaugeForLpToken();

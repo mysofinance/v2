@@ -37,4 +37,8 @@ interface IStakingHelper {
      * @notice returns reward token address for cvx reward pool
      */
     function reward_token() external view returns (address);
+
+    function gauges(uint256 index) external view returns (address);
+
+    function n_gauges() external view returns (int128);
 }

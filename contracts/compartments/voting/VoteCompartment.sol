@@ -5,6 +5,7 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IVoteCompartment} from "../../interfaces/compartments/voting/IVoteCompartment.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
@@ -18,13 +19,26 @@ contract VoteCompartment is Initializable, IBorrowerCompartment {
 
     function initialize(
         address _vaultAddr,
-        address _borrowerAddr,
-        address _collTokenAddr,
+        address,
+        address,
         uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
-        _delegate(_borrowerAddr, _collTokenAddr);
+    }
+
+    function stake(
+        address registryAddr,
+        address collTokenAddr,
+        bytes memory data
+    ) external {
+        if (msg.sender != IAddressRegistry(registryAddr).borrowerGateway()) {
+            revert InvalidSender();
+        }
+        address _delegatee = abi.decode(data, (address));
+        if (_delegatee != address(0)) {
+            _delegate(_delegatee, collTokenAddr);
+        }
     }
 
     function redirectDelegates(address newDelegatee) external {
