@@ -257,6 +257,7 @@ describe('Basic Forked Mainnet Tests', function () {
         ['bytes32', 'uint256', 'uint256'],
         [poolId, minSwapReceive, deadline]
       )
+      const compartmentData = '0x'
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
@@ -266,7 +267,8 @@ describe('Basic Forked Mainnet Tests', function () {
           onChainQuote,
           isAutoQuote,
           callbackAddr,
-          callbackData
+          callbackData,
+          compartmentData
         )
 
       // check balance post borrow
@@ -323,6 +325,7 @@ describe('Basic Forked Mainnet Tests', function () {
     const isAutoQuote = true
     const callbackAddr = '0x0000000000000000000000000000000000000000'
     const callbackData = '0x'
+    const compartmentData = '0x'
     await borrowerGateway
       .connect(borrower)
       .borrowWithOnChainQuote(
@@ -332,7 +335,8 @@ describe('Basic Forked Mainnet Tests', function () {
         onChainQuote,
         isAutoQuote,
         callbackAddr,
-        callbackData
+        callbackData,
+        compartmentData
       )
     const loan = await lenderVault.loans(0)
     const expectedLoanAmount = collSendAmount.mul(onChainQuote.loanPerCollUnit).div(ONE_WETH)
@@ -430,7 +434,8 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_CRV
       const isAutoQuote = false
       const callbackAddr = '0x0000000000000000000000000000000000000000'
-      const callbackData = '0x0000000000000000000000001cebdb0856dd985fae9b8fea2262469360b8a3a6' //crv-ETH
+      const callbackData = '0x'
+      const compartmentData = '0x0000000000000000000000000000000000000000000000000000000000000054' //crv-ETH gauge index      
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -441,7 +446,8 @@ describe('Basic Forked Mainnet Tests', function () {
           onChainQuote,
           isAutoQuote,
           callbackAddr,
-          callbackData
+          callbackData,
+          compartmentData
         )
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()

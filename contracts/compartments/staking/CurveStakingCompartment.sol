@@ -19,6 +19,7 @@ contract CurveStakingCompartment is
     using SafeERC20 for IERC20;
 
     error IncorrectGaugeForLpToken();
+    error InvalidGaugeIndex();
 
     address public vaultAddr;
     uint256 public loanIdx;
@@ -28,6 +29,8 @@ contract CurveStakingCompartment is
     //separate BAL and AURA instances?
     address internal constant CRV_ADDR =
         0xD533a949740bb3306d119CC777fa900bA034cd52;
+    address internal constant GAUGE_CONTROLLER =
+        0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB;
 
     function initialize(
         address _vaultAddr,
@@ -40,11 +43,12 @@ contract CurveStakingCompartment is
     }
 
     // transfer coll on repays
-    function transferCollToBorrower(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,
-        address collTokenAddr
+        address collTokenAddr,
+        address callbackAddr
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
@@ -63,7 +67,11 @@ contract CurveStakingCompartment is
         // transfer proportion of compartment lp token balance
         uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
-        IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
+        if (callbackAddr == address(0)) {
+            IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
+        } else {
+            IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
+        }
         // check crv token balance
         uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
         // transfer proportion of crv token balance
@@ -72,21 +80,22 @@ contract CurveStakingCompartment is
         IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
     }
 
-    function stake(
-        address registryAddr,
-        address collTokenAddr,
-        bytes memory data
-    ) external {
+    function stake(address, address collTokenAddr, bytes memory data) external {
         uint256 amount = IERC20(collTokenAddr).balanceOf(address(this));
 
         console.log(amount);
-        address _liqGaugeAddr = abi.decode(data, (address));
+        uint256 gaugeIndex = abi.decode(data, (uint256));
+        console.log(gaugeIndex);
+
+        address _liqGaugeAddr = IStakingHelper(GAUGE_CONTROLLER).gauges(
+            gaugeIndex
+        );
         console.log(_liqGaugeAddr);
-        if (
-            !IAddressRegistry(registryAddr).isWhitelistedCollTokenHandler(
-                _liqGaugeAddr
-            )
-        ) revert InvalidPool();
+
+        if (_liqGaugeAddr == address(0)) {
+            revert InvalidGaugeIndex();
+        }
+
         address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
         if (lpTokenAddrForGauge != collTokenAddr) {
             revert IncorrectGaugeForLpToken();
