@@ -7,12 +7,14 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBorrowerCompartmentFactory} from "./interfaces/IBorrowerCompartmentFactory.sol";
+import {IStakeCompartment} from "./interfaces/compartments/staking/IStakeCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
+import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
 
-contract BorrowerGateway is ReentrancyGuard {
+contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     // putting fee info in borrow gateway since borrower always pays this upfront
     uint256 constant BASE = 1e18;
     uint256 constant YEAR_IN_SECONDS = 31_536_000; // 365*24*3600
@@ -60,9 +62,13 @@ contract BorrowerGateway is ReentrancyGuard {
             lenderVault,
             borrower,
             loan.collToken,
-            loanId,
-            data
+            loanId
         );
+
+        if (offChainQuote.borrowerCompartmentImplementation != address(0)) {
+            loan.collTokenCompartmentAddr = collReceiver;
+        }
+
         processTransfers(
             lenderVault,
             collReceiver,
@@ -71,6 +77,20 @@ contract BorrowerGateway is ReentrancyGuard {
             upfrontFee,
             callbackAddr,
             data
+        );
+
+        emit Borrow(
+            loan.borrower,
+            loan.collToken,
+            loan.loanToken,
+            loan.expiry,
+            loan.earliestRepay,
+            loan.initCollAmount,
+            loan.initLoanAmount,
+            loan.initRepayAmount,
+            loan.amountRepaidSoFar,
+            loan.collUnlocked,
+            loan.collTokenCompartmentAddr
         );
     }
 
@@ -116,10 +136,14 @@ contract BorrowerGateway is ReentrancyGuard {
             onChainQuote.borrowerCompartmentImplementation,
             lenderVault,
             borrower,
-            loan.collToken,
-            loanId,
-            data
+            onChainQuote.collToken,
+            loanId
         );
+
+        if (onChainQuote.borrowerCompartmentImplementation != address(0)) {
+            loan.collTokenCompartmentAddr = collReceiver;
+        }
+
         processTransfers(
             lenderVault,
             collReceiver,
@@ -129,6 +153,20 @@ contract BorrowerGateway is ReentrancyGuard {
             callbackAddr,
             data
         );
+
+        emit Borrow(
+            loan.borrower,
+            loan.collToken,
+            loan.loanToken,
+            loan.expiry,
+            loan.earliestRepay,
+            loan.initCollAmount,
+            loan.initLoanAmount,
+            loan.initRepayAmount,
+            loan.amountRepaidSoFar,
+            loan.collUnlocked,
+            loan.collTokenCompartmentAddr
+        );
     }
 
     function getCollReceiver(
@@ -136,8 +174,7 @@ contract BorrowerGateway is ReentrancyGuard {
         address lenderVault,
         address borrower,
         address collToken,
-        uint256 loanId,
-        bytes memory data
+        uint256 loanId
     ) internal returns (address collReceiver) {
         if (borrowerCompartmentImplementation != address(0)) {
             address _addressRegistry = addressRegistry;
@@ -154,11 +191,9 @@ contract BorrowerGateway is ReentrancyGuard {
             ).createCompartment(
                     borrowerCompartmentImplementation,
                     lenderVault,
-                    _addressRegistry,
                     borrower,
                     collToken,
-                    loanId,
-                    data
+                    loanId
                 );
         } else {
             collReceiver = lenderVault;
@@ -197,7 +232,7 @@ contract BorrowerGateway is ReentrancyGuard {
         }
 
         uint256 collTokenReceived = IERC20Metadata(loan.collToken).balanceOf(
-            lenderVault
+            collReceiver
         );
 
         uint256 protocolFeeAmount = ((loan.initCollAmount + upfrontFee) *
@@ -219,11 +254,29 @@ contract BorrowerGateway is ReentrancyGuard {
             collReceiver,
             collSendAmount - protocolFeeAmount
         );
+
         collTokenReceived =
-            IERC20Metadata(loan.collToken).balanceOf(lenderVault) -
+            IERC20Metadata(loan.collToken).balanceOf(collReceiver) -
             collTokenReceived;
+
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
             revert(); // InsufficientSendAmount();
+        }
+
+        if (loan.collTokenCompartmentAddr != address(0)) {
+            IStakeCompartment(loan.collTokenCompartmentAddr).stake(
+                addressRegistry,
+                loan.collToken,
+                data
+            );
+        }
+
+        if (loan.collTokenCompartmentAddr != address(0)) {
+            IStakeCompartment(loan.collTokenCompartmentAddr).stake(
+                addressRegistry,
+                loan.collToken,
+                data
+            );
         }
     }
 

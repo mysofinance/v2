@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
 library DataTypes {
@@ -12,7 +13,6 @@ library DataTypes {
         uint128 initRepayAmount;
         uint128 amountRepaidSoFar;
         bool collUnlocked;
-        bool hasCollCompartment;
         address collTokenCompartmentAddr;
     }
 

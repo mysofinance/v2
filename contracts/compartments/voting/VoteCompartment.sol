@@ -18,11 +18,9 @@ contract VoteCompartment is Initializable, IBorrowerCompartment {
 
     function initialize(
         address _vaultAddr,
-        address,
         address _borrowerAddr,
         address _collTokenAddr,
-        uint256 _loanIdx,
-        bytes memory
+        uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;

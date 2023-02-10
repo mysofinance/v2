@@ -18,9 +18,7 @@ contract AaveStakingCompartment is Initializable, IBorrowerCompartment {
         address _vaultAddr,
         address,
         address,
-        address,
-        uint256 _loanIdx,
-        bytes memory
+        uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
