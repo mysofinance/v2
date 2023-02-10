@@ -19,6 +19,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
 
     uint256 constant BASE = 1e18;
     address public vaultOwner;
+    address public newVaultOwner;
     address public addressRegistry;
 
     mapping(address => uint256) public lockedAmounts;
@@ -31,15 +32,8 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
 
     uint256 loanOffChainQuoteNonce;
 
-    /*
-    can remove ILendingPool because also interest bearing tokens can be deposited 
-    by virtue of simple transfer; e.g. lender can also deposit an atoken and allow
-    borrowers to directly borrow the atoken; the repayment amount could then also be
-    set to be atoken such that on repayment any idle funds automatically continue earning
-    yield
-    */
-
     error Invalid();
+    error InvalidLoanIndex();
 
     event OnChainQuote(
         DataTypes.OnChainQuote onChainQuote,
@@ -56,11 +50,24 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         loanOffChainQuoteNonce = 1;
     }
 
+    function proposeNewVaultOwner(address _newOwner) external {
+        senderCheck();
+        newVaultOwner = _newOwner;
+    }
+
+    function claimVaultOwnership() external {
+        if (msg.sender != newVaultOwner) {
+            revert Invalid();
+        }
+        vaultOwner = newVaultOwner;
+    }
+
     function loans(
         uint256 loanId
     ) external view returns (DataTypes.Loan memory loan) {
-        if (loanId > _loans.length - 1) {
-            revert();
+        uint256 loanLen = _loans.length;
+        if (loanLen == 0 || loanId > loanLen - 1) {
+            revert InvalidLoanIndex();
         }
         loan = _loans[loanId];
     }
@@ -91,6 +98,32 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
             revert();
         }
         IERC20Metadata(token).safeTransfer(recipient, amount);
+    }
+
+    function validateRepayInfo(
+        address borrower,
+        DataTypes.Loan memory loan,
+        DataTypes.LoanRepayInfo memory loanRepayInfo
+    ) external view returns (uint128 reclaimCollAmount) {
+        if (borrower != loan.borrower) {
+            revert Invalid();
+        }
+        if (
+            block.timestamp < loan.earliestRepay ||
+            block.timestamp >= loan.expiry
+        ) {
+            revert Invalid();
+        }
+        if (
+            loanRepayInfo.repayAmount >
+            loan.initRepayAmount - loan.amountRepaidSoFar
+        ) {
+            revert Invalid();
+        }
+        reclaimCollAmount = toUint128(
+            (loan.initCollAmount * loanRepayInfo.repayAmount) /
+                loan.initRepayAmount
+        );
     }
 
     function setAutoQuoteStrategy(
