@@ -52,7 +52,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     }
 
     function proposeNewVaultOwner(address _newOwner) external {
-        senderCheck();
+        senderCheckOwner();
         newVaultOwner = _newOwner;
     }
 
@@ -74,7 +74,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     }
 
     function invalidateOffChainQuoteNonce() external {
-        senderCheck();
+        senderCheckOwner();
         loanOffChainQuoteNonce += 1;
     }
 
@@ -95,9 +95,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         address recipient,
         uint256 amount
     ) external {
-        if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
-            revert();
-        }
+        senderCheckGateway();
         IERC20Metadata(token).safeTransfer(recipient, amount);
     }
 
@@ -105,7 +103,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         address borrower,
         DataTypes.Loan memory loan,
         DataTypes.LoanRepayInfo memory loanRepayInfo
-    ) external view returns (uint128 reclaimCollAmount) {
+    ) external view {
         if (borrower != loan.borrower) {
             revert Invalid();
         }
@@ -121,11 +119,29 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         ) {
             revert Invalid();
         }
-        //reclaimCollAmount will be overwritten by compartments later
-        reclaimCollAmount = toUint128(
-            (loan.initCollAmount * loanRepayInfo.repayAmount) /
-                loan.initRepayAmount
-        );
+    }
+
+    function updateLoanInfo(
+        DataTypes.Loan memory loan,
+        uint256 repayAmount,
+        uint256 loanId,
+        uint256 collAmount,
+        bool isRepay
+    ) external {
+        senderCheckGateway();
+        if (isRepay) {
+            loan.amountRepaidSoFar += toUint128(repayAmount);
+        }
+
+        // only update lockedAmounts when no compartment
+        if (loan.collTokenCompartmentAddr != address(0)) {
+            if (isRepay) {
+                lockedAmounts[loan.collToken] -= collAmount;
+            } else {
+                lockedAmounts[loan.collToken] += collAmount;
+            }
+        }
+        _loans[loanId] = loan;
     }
 
     function setAutoQuoteStrategy(
@@ -133,7 +149,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         address loanToken,
         address strategyAddr
     ) external {
-        senderCheck();
+        senderCheckOwner();
         if (
             !IAddressRegistry(addressRegistry).isWhitelistedAutoQuoteStrategy(
                 strategyAddr
@@ -165,7 +181,9 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         upfrontFee = (collSendAmount * onChainQuote.upfrontFeePctInBase) / BASE;
         loan.loanToken = onChainQuote.loanToken;
         loan.collToken = onChainQuote.collToken;
-        loan.initCollAmount = toUint128(collSendAmount - upfrontFee);
+        loan.initCollAmount = toUint128(
+            collSendAmount - upfrontFee - onChainQuote.expectedTransferFee
+        );
         loan.initLoanAmount = toUint128(loanAmount);
         loan.initRepayAmount = toUint128(repayAmount);
         loan.expiry = uint40(block.timestamp + onChainQuote.tenor);
@@ -206,15 +224,13 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     function addLoan(
         DataTypes.Loan calldata loan
     ) external returns (uint256 loanId) {
-        if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
-            revert();
-        }
+        senderCheckGateway();
         loanId = _loans.length;
         _loans.push(loan);
     }
 
     function withdraw(address token, uint256 amount) external {
-        senderCheck();
+        senderCheckOwner();
         uint256 vaultBalance = IERC20Metadata(token).balanceOf(address(this));
         if (amount > vaultBalance - lockedAmounts[token]) {
             revert Invalid();
@@ -225,7 +241,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     function addOnChainQuote(
         DataTypes.OnChainQuote calldata onChainQuote
     ) external {
-        senderCheck();
+        senderCheckOwner();
         if (!isValidOnChainQuote(onChainQuote)) {
             revert Invalid();
         }
@@ -241,7 +257,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         DataTypes.OnChainQuote calldata oldOnChainQuote,
         DataTypes.OnChainQuote calldata newOnChainQuote
     ) external {
-        senderCheck();
+        senderCheckOwner();
         if (!isValidOnChainQuote(newOnChainQuote)) {
             revert Invalid();
         }
@@ -259,7 +275,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     function deleteOnChainQuote(
         DataTypes.OnChainQuote calldata onChainQuote
     ) external {
-        senderCheck();
+        senderCheckOwner();
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[onChainQuoteHash]) {
             revert Invalid();
@@ -412,9 +428,15 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         );
     }
 
-    function senderCheck() internal view {
+    function senderCheckOwner() internal view {
         if (msg.sender != vaultOwner) {
             revert Invalid();
+        }
+    }
+
+    function senderCheckGateway() internal view {
+        if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
+            revert();
         }
     }
 

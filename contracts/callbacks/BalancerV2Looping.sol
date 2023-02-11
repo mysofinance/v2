@@ -88,6 +88,7 @@ contract BalancerV2Looping is IVaultCallback {
 
     function repayCallback(
         DataTypes.Loan calldata loanQuote,
+        DataTypes.LoanRepayInfo calldata loanRepayInfo,
         bytes calldata data
     ) external {}
 }
