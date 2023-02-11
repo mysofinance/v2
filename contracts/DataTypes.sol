@@ -20,6 +20,7 @@ library DataTypes {
         uint256 loanPerCollUnit;
         uint256 interestRatePctInBase;
         uint256 upfrontFeePctInBase;
+        uint256 expectedTransferFee;
         address collToken;
         address loanToken;
         uint40 tenor;
@@ -51,7 +52,7 @@ library DataTypes {
         address loanToken;
         uint256 loanId;
         uint256 repayAmount;
-        uint256 loanTokenTransferFees;
+        uint256 repaySendAmount;
     }
 
     struct LoanRequest {

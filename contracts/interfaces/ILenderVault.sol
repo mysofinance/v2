@@ -53,5 +53,13 @@ interface ILenderVault {
         address borrower,
         DataTypes.Loan memory loan,
         DataTypes.LoanRepayInfo memory loanRepayInfo
-    ) external view returns (uint128 reclaimCollAmount);
+    ) external view;
+
+    function updateLoanInfo(
+        DataTypes.Loan memory loan,
+        uint256 repayAmount,
+        uint256 loanId,
+        uint256 collAmount,
+        bool isRepay
+    ) external;
 }
