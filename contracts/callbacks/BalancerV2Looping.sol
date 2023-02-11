@@ -65,6 +65,8 @@ contract BalancerV2Looping is IVaultCallback {
             data,
             (bytes32, uint256, uint256)
         );
+        // underflow if loan token transfer fees from vault to callbackAddr...?
+        // maybe need a loanTokenBalBefore var passed in?
         BalancerDataTypes.SingleSwap memory singleSwap = BalancerDataTypes
             .SingleSwap(
                 poolId,
@@ -86,9 +88,11 @@ contract BalancerV2Looping is IVaultCallback {
         );
     }
 
+    // todo: implement repayCallback and use collTokenBalBefore, to account for collToken transfer fees
     function repayCallback(
         DataTypes.Loan calldata loanQuote,
         DataTypes.LoanRepayInfo calldata loanRepayInfo,
+        uint256 collTokenBalBefore,
         bytes calldata data
     ) external {}
 }
