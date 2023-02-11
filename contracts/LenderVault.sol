@@ -141,7 +141,9 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 lockedAmounts[loan.collToken] += collAmount;
             }
         }
-        _loans[loanId] = loan;
+        if (isRepay || loan.collTokenCompartmentAddr != address(0)) {
+            _loans[loanId] = loan;
+        }
     }
 
     function setAutoQuoteStrategy(
