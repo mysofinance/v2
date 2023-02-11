@@ -323,6 +323,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             ) {
                 revert();
             }
+            uint256 collTokenBalBefore = IERC20(loan.collToken).balanceOf(
+                callbackAddr
+            );
             if (loan.collTokenCompartmentAddr != address(0)) {
                 IBorrowerCompartment(loan.collTokenCompartmentAddr)
                     .transferCollFromCompartment(
@@ -335,6 +338,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 IVaultCallback(callbackAddr).repayCallback(
                     loan,
                     loanRepayInfo,
+                    collTokenBalBefore,
                     callbackData
                 );
             } else {
@@ -346,6 +350,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 IVaultCallback(callbackAddr).repayCallback(
                     loan,
                     loanRepayInfo,
+                    collTokenBalBefore,
                     callbackData
                 );
             }
