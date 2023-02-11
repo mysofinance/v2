@@ -196,6 +196,7 @@ describe('Basic Local Tests', function () {
         loanPerCollUnit: ONE_USDC.mul(1000),
         interestRatePctInBase: BASE.mul(10).div(100),
         upfrontFeePctInBase: BASE.mul(1).div(100),
+        expectedTransferFee: 0,
         collToken: weth.address,
         loanToken: usdc.address,
         tenor: ONE_DAY.mul(365),
@@ -206,6 +207,7 @@ describe('Basic Local Tests', function () {
 
       const payload = ethers.utils.defaultAbiCoder.encode(
         [
+          'uint256',
           'uint256',
           'uint256',
           'uint256',
@@ -220,6 +222,7 @@ describe('Basic Local Tests', function () {
           onChainQuote.loanPerCollUnit,
           onChainQuote.interestRatePctInBase,
           onChainQuote.upfrontFeePctInBase,
+          onChainQuote.expectedTransferFee,
           onChainQuote.collToken,
           onChainQuote.loanToken,
           onChainQuote.tenor,
@@ -274,6 +277,7 @@ describe('Basic Local Tests', function () {
         loanPerCollUnit: ONE_USDC.mul(1000),
         interestRatePctInBase: BASE.mul(10).div(100),
         upfrontFeePctInBase: BASE.mul(1).div(100),
+        expectedTransferFee: 0,
         collToken: weth.address,
         loanToken: usdc.address,
         tenor: ONE_DAY.mul(365).toNumber(),
@@ -283,6 +287,7 @@ describe('Basic Local Tests', function () {
       }
       let payload = ethers.utils.defaultAbiCoder.encode(
         [
+          'uint256',
           'uint256',
           'uint256',
           'uint256',
@@ -297,6 +302,7 @@ describe('Basic Local Tests', function () {
           onChainQuote.loanPerCollUnit,
           onChainQuote.interestRatePctInBase,
           onChainQuote.upfrontFeePctInBase,
+          onChainQuote.expectedTransferFee,
           onChainQuote.collToken,
           onChainQuote.loanToken,
           onChainQuote.tenor,
@@ -317,6 +323,7 @@ describe('Basic Local Tests', function () {
           'uint256',
           'uint256',
           'uint256',
+          'uint256',
           'address',
           'address',
           'uint256',
@@ -328,6 +335,7 @@ describe('Basic Local Tests', function () {
           onChainQuote.loanPerCollUnit,
           onChainQuote.interestRatePctInBase,
           onChainQuote.upfrontFeePctInBase,
+          onChainQuote.expectedTransferFee,
           onChainQuote.collToken,
           onChainQuote.loanToken,
           onChainQuote.tenor,

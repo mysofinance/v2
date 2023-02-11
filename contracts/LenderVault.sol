@@ -418,6 +418,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 onChainQuote.loanPerCollUnit,
                 onChainQuote.interestRatePctInBase,
                 onChainQuote.upfrontFeePctInBase,
+                onChainQuote.expectedTransferFee,
                 onChainQuote.collToken,
                 onChainQuote.loanToken,
                 onChainQuote.tenor,
