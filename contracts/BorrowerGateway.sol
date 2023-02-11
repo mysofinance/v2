@@ -85,6 +85,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         );
 
         emit Borrow(
+            lenderVault,
             loan.borrower,
             loan.collToken,
             loan.loanToken,
@@ -166,6 +167,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         );
 
         emit Borrow(
+            lenderVault,
             loan.borrower,
             loan.collToken,
             loan.loanToken,
@@ -413,5 +415,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             reclaimCollAmount,
             true
         );
+
+        emit Repay(vaultAddr, loanRepayInfo.loanId, loanRepayInfo.repayAmount);
     }
 }

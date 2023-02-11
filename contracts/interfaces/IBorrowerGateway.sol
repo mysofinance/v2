@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 
 interface IBorrowerGateway {
     event Borrow(
+        address indexed vaultAddr,
         address indexed borrower,
         address collToken,
         address loanToken,
@@ -15,5 +16,11 @@ interface IBorrowerGateway {
         uint128 amountRepaidSoFar,
         bool collUnlocked,
         address collTokenCompartmentAddr
+    );
+
+    event Repay(
+        address indexed vaultAddr,
+        uint256 indexed loanId,
+        uint256 repayAmount
     );
 }
