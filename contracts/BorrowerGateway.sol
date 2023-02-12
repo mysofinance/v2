@@ -300,14 +300,14 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.initRepayAmount;
         if (callbackAddr == address(0)) {
             if (loan.collTokenCompartmentAddr != address(0)) {
-                IBorrowerCompartment(loan.collTokenCompartmentAddr)
-                    .transferCollFromCompartment(
-                        loanRepayInfo.repayAmount,
-                        loan.initRepayAmount - loan.amountRepaidSoFar,
-                        loan.borrower,
-                        loan.collToken,
-                        callbackAddr
-                    );
+                ILenderVault(lenderVault).transferFromCompartment(
+                    loanRepayInfo.repayAmount,
+                    loan.initRepayAmount - loan.amountRepaidSoFar,
+                    loan.borrower,
+                    loan.collToken,
+                    callbackAddr,
+                    loan.collTokenCompartmentAddr
+                );
             } else {
                 ILenderVault(lenderVault).transferTo(
                     loan.collToken,
@@ -327,14 +327,14 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 callbackAddr
             );
             if (loan.collTokenCompartmentAddr != address(0)) {
-                IBorrowerCompartment(loan.collTokenCompartmentAddr)
-                    .transferCollFromCompartment(
-                        loanRepayInfo.repayAmount,
-                        loan.initRepayAmount - loan.amountRepaidSoFar,
-                        loan.borrower,
-                        loan.collToken,
-                        callbackAddr
-                    );
+                ILenderVault(lenderVault).transferFromCompartment(
+                    loanRepayInfo.repayAmount,
+                    loan.initRepayAmount - loan.amountRepaidSoFar,
+                    loan.borrower,
+                    loan.collToken,
+                    callbackAddr,
+                    loan.collTokenCompartmentAddr
+                );
                 IVaultCallback(callbackAddr).repayCallback(
                     loan,
                     collTokenBalBefore,

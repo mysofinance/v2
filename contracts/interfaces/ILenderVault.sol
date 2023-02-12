@@ -49,6 +49,15 @@ interface ILenderVault {
         uint256 amount
     ) external;
 
+    function transferFromCompartment(
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
+        address borrowerAddr,
+        address collTokenAddr,
+        address callbackAddr,
+        address collTokenCompartmentAddr
+    ) external;
+
     function validateRepayInfo(
         address borrower,
         DataTypes.Loan memory loan,
