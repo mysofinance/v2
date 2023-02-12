@@ -337,7 +337,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                     );
                 IVaultCallback(callbackAddr).repayCallback(
                     loan,
-                    loanRepayInfo,
                     collTokenBalBefore,
                     callbackData
                 );
@@ -349,7 +348,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 );
                 IVaultCallback(callbackAddr).repayCallback(
                     loan,
-                    loanRepayInfo,
                     collTokenBalBefore,
                     callbackData
                 );

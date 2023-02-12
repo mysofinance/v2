@@ -21,6 +21,7 @@ library DataTypes {
         uint256 interestRatePctInBase;
         uint256 upfrontFeePctInBase;
         uint256 expectedTransferFee;
+        uint256 minCollAmount;
         address collToken;
         address loanToken;
         uint40 tenor;

@@ -181,6 +181,7 @@ describe('Basic Forked Mainnet Tests', function () {
         interestRatePctInBase: BASE.mul(10).div(100),
         upfrontFeePctInBase: BASE.mul(1).div(100),
         expectedTransferFee: 0,
+        minCollAmount: 0,
         collToken: weth.address,
         loanToken: usdc.address,
         tenor: ONE_DAY.mul(365),
@@ -401,6 +402,7 @@ describe('Basic Forked Mainnet Tests', function () {
         interestRatePctInBase: BASE.mul(10).div(100),
         upfrontFeePctInBase: BASE.mul(1).div(100),
         expectedTransferFee: 0,
+        minCollAmount: 0,
         collToken: crvTokenAddress,
         loanToken: usdc.address,
         tenor: ONE_DAY.mul(365),
@@ -410,12 +412,13 @@ describe('Basic Forked Mainnet Tests', function () {
       }
 
       const payload = ethers.utils.defaultAbiCoder.encode(
-        ['uint256', 'uint256', 'uint256', 'uint256', 'address', 'address', 'uint256', 'uint256', 'bool', 'address'],
+        ['uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address', 'uint256', 'uint256', 'bool', 'address'],
         [
           onChainQuote.loanPerCollUnit,
           onChainQuote.interestRatePctInBase,
           onChainQuote.upfrontFeePctInBase,
           onChainQuote.expectedTransferFee,
+          onChainQuote.minCollAmount,
           onChainQuote.collToken,
           onChainQuote.loanToken,
           onChainQuote.tenor,
