@@ -181,6 +181,13 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 BASE;
         }
         upfrontFee = (collSendAmount * onChainQuote.upfrontFeePctInBase) / BASE;
+        // minimum coll amount to prevent griefing attacks or small unlocks that aren't worth it
+        if (
+            collSendAmount - upfrontFee - onChainQuote.expectedTransferFee <
+            onChainQuote.minCollAmount
+        ) {
+            revert(); // revert InsufficientCollAmount();
+        }
         loan.loanToken = onChainQuote.loanToken;
         loan.collToken = onChainQuote.collToken;
         loan.initCollAmount = toUint128(
@@ -421,6 +428,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 onChainQuote.interestRatePctInBase,
                 onChainQuote.upfrontFeePctInBase,
                 onChainQuote.expectedTransferFee,
+                onChainQuote.minCollAmount,
                 onChainQuote.collToken,
                 onChainQuote.loanToken,
                 onChainQuote.tenor,
