@@ -80,7 +80,11 @@ contract CurveStakingCompartment is
         IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
     }
 
-    function stake(address registryAddr, address collTokenAddr, bytes memory data) external {
+    function stake(
+        address registryAddr,
+        address collTokenAddr,
+        bytes memory data
+    ) external {
         if (msg.sender != IAddressRegistry(registryAddr).borrowerGateway()) {
             revert InvalidSender();
         }
