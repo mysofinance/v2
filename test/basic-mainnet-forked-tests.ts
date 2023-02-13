@@ -59,16 +59,6 @@ const crvTokenAbi = [
   }
 ]
 
-const crvStakeAbi = [
-  {
-    name: 'stake',
-    outputs: [],
-    inputs: [{ type: 'uint256', name: 'gaugeIndex' }],
-    stateMutability: 'nonpayable',
-    type: 'function'
-  }
-]
-
 function getLoopingSendAmount(
   collTokenFromBorrower: number,
   loanPerColl: number,
@@ -479,9 +469,9 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })?.args?.['collTokenCompartmentAddr']
 
-      const crvCompartment = await new ethers.Contract(collTokenCompartmentAddr, crvStakeAbi, team)
+      const crvCompInstance = await curveStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
-      await crvCompartment.connect(borrower).stake(compartmentData)
+      await crvCompInstance.connect(borrower).stake(compartmentData);
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
