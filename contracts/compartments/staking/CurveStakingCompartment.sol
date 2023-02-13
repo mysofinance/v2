@@ -9,13 +9,11 @@ import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
+import {ILenderVault} from "../../interfaces/ILenderVault.sol";
+import {DataTypes} from "../../DataTypes.sol";
 import "hardhat/console.sol";
 
-contract CurveStakingCompartment is
-    Initializable,
-    IStakeCompartment,
-    IBorrowerCompartment
-{
+contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
 
     error IncorrectGaugeForLpToken();
@@ -40,6 +38,34 @@ contract CurveStakingCompartment is
     ) external initializer {
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
+    }
+
+    function stake(uint256 gaugeIndex) external {
+        DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(loanIdx);
+        if (msg.sender != loan.borrower) {
+            revert InvalidSender();
+        }
+
+        uint256 amount = IERC20(loan.collToken).balanceOf(address(this));
+
+        console.log(amount);
+
+        address _liqGaugeAddr = IStakingHelper(GAUGE_CONTROLLER).gauges(
+            gaugeIndex
+        );
+        console.log(_liqGaugeAddr);
+
+        if (_liqGaugeAddr == address(0)) {
+            revert InvalidGaugeIndex();
+        }
+
+        address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
+        if (lpTokenAddrForGauge != loan.collToken) {
+            revert IncorrectGaugeForLpToken();
+        }
+        liqGaugeAddr = _liqGaugeAddr;
+        IERC20(loan.collToken).approve(_liqGaugeAddr, type(uint256).max);
+        IStakingHelper(_liqGaugeAddr).deposit(amount, address(this));
     }
 
     // transfer coll on repays
@@ -78,38 +104,6 @@ contract CurveStakingCompartment is
         uint256 crvTokenAmount = (repayAmount * currentCrvBal) /
             repayAmountLeft;
         IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
-    }
-
-    function stake(
-        address registryAddr,
-        address collTokenAddr,
-        bytes memory data
-    ) external {
-        if (msg.sender != IAddressRegistry(registryAddr).borrowerGateway()) {
-            revert InvalidSender();
-        }
-        uint256 amount = IERC20(collTokenAddr).balanceOf(address(this));
-
-        console.log(amount);
-        uint256 gaugeIndex = abi.decode(data, (uint256));
-        console.log(gaugeIndex);
-
-        address _liqGaugeAddr = IStakingHelper(GAUGE_CONTROLLER).gauges(
-            gaugeIndex
-        );
-        console.log(_liqGaugeAddr);
-
-        if (_liqGaugeAddr == address(0)) {
-            revert InvalidGaugeIndex();
-        }
-
-        address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
-        if (lpTokenAddrForGauge != collTokenAddr) {
-            revert IncorrectGaugeForLpToken();
-        }
-        liqGaugeAddr = _liqGaugeAddr;
-        IERC20(collTokenAddr).approve(_liqGaugeAddr, type(uint256).max);
-        IStakingHelper(_liqGaugeAddr).deposit(amount, address(this));
     }
 
     // unlockColl this would be called on defaults

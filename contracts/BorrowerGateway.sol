@@ -42,8 +42,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         uint256 collSendAmount,
         DataTypes.OffChainQuote calldata offChainQuote,
         address callbackAddr,
-        bytes calldata callbackData,
-        bytes calldata compartmentData
+        bytes calldata callbackData
     ) external nonReentrant {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
@@ -80,8 +79,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan,
             upfrontFee,
             callbackAddr,
-            callbackData,
-            compartmentData
+            callbackData
         );
 
         emit Borrow(
@@ -107,8 +105,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypes.OnChainQuote calldata onChainQuote,
         bool isAutoQuote,
         address callbackAddr,
-        bytes calldata callbackData,
-        bytes calldata compartmentData
+        bytes calldata callbackData
     ) external nonReentrant {
         // borrow gateway just forwards data to respective vault and orchestrates transfers
         // borrow gateway is oblivious towards and specific borrow details, and only fwds info
@@ -154,8 +151,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan,
             upfrontFee,
             callbackAddr,
-            callbackData,
-            compartmentData
+            callbackData
         );
 
         ILenderVault(lenderVault).updateLoanInfo(
@@ -220,8 +216,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypes.Loan memory loan,
         uint256 upfrontFee,
         address callbackAddr,
-        bytes calldata callbackData,
-        bytes calldata compartmentData
+        bytes calldata callbackData
     ) internal {
         if (callbackAddr == address(0)) {
             ILenderVault(lenderVault).transferTo(
@@ -277,14 +272,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
             revert(); // InsufficientSendAmount();
-        }
-
-        if (loan.collTokenCompartmentAddr != address(0)) {
-            IStakeCompartment(loan.collTokenCompartmentAddr).stake(
-                addressRegistry,
-                loan.collToken,
-                compartmentData
-            );
         }
     }
 

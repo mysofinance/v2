@@ -59,6 +59,18 @@ const crvTokenAbi = [
   }
 ]
 
+const crvStakeAbi = [
+  {
+    name: 'stake',
+    outputs: [],
+    inputs: [
+      { type: 'uint256', name: 'gaugeIndex' }
+    ],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+]
+
 function getLoopingSendAmount(
   collTokenFromBorrower: number,
   loanPerColl: number,
@@ -259,7 +271,6 @@ describe('Basic Forked Mainnet Tests', function () {
         ['bytes32', 'uint256', 'uint256'],
         [poolId, minSwapReceive, deadline]
       )
-      const compartmentData = '0x'
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
@@ -269,8 +280,7 @@ describe('Basic Forked Mainnet Tests', function () {
           onChainQuote,
           isAutoQuote,
           callbackAddr,
-          callbackData,
-          compartmentData
+          callbackData
         )
 
       // check balance post borrow
@@ -327,7 +337,6 @@ describe('Basic Forked Mainnet Tests', function () {
     const isAutoQuote = true
     const callbackAddr = '0x0000000000000000000000000000000000000000'
     const callbackData = '0x'
-    const compartmentData = '0x'
     await borrowerGateway
       .connect(borrower)
       .borrowWithOnChainQuote(
@@ -337,8 +346,7 @@ describe('Basic Forked Mainnet Tests', function () {
         onChainQuote,
         isAutoQuote,
         callbackAddr,
-        callbackData,
-        compartmentData
+        callbackData
       )
     const loan = await lenderVault.loans(0)
     const expectedLoanAmount = collSendAmount.mul(onChainQuote.loanPerCollUnit).div(ONE_WETH)
@@ -441,7 +449,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const isAutoQuote = false
       const callbackAddr = '0x0000000000000000000000000000000000000000'
       const callbackData = '0x'
-      const compartmentData = '0x0000000000000000000000000000000000000000000000000000000000000054' //crv-ETH gauge index      
+      const compartmentData = 84 //crv-ETH gauge index      
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -452,8 +460,7 @@ describe('Basic Forked Mainnet Tests', function () {
           onChainQuote,
           isAutoQuote,
           callbackAddr,
-          callbackData,
-          compartmentData
+          callbackData
         )
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
@@ -462,8 +469,12 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })?.args?.['collTokenCompartmentAddr']
 
+      const crvCompartment = await new ethers.Contract(collTokenCompartmentAddr, crvStakeAbi, team)
+
+      await crvCompartment.connect(borrower).stake(compartmentData);
+
       // check balance post borrow
-      const borroweCRVBalPost = await crvInstance.balanceOf(borrower.address)
+      const borrowerCRVBalPost = await crvInstance.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
       const vaultCRVBalPost = await crvInstance.balanceOf(collTokenCompartmentAddr)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
@@ -471,7 +482,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const compartmentGaugeBalPost = await crvGaugeInstance.balanceOf(collTokenCompartmentAddr)
 
       expect(compartmentGaugeBalPost).to.equal(borrowerCRVBalPre)
-      expect(borrowerCRVBalPre.sub(borroweCRVBalPost)).to.not.equal(vaultCRVBalPost.sub(vaultCRVBalPre))
+      expect(borrowerCRVBalPre.sub(borrowerCRVBalPost)).to.not.equal(vaultCRVBalPost.sub(vaultCRVBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
     })
   })
