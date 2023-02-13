@@ -16,6 +16,7 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
 
     error IncorrectGaugeForLpToken();
     error InvalidGaugeIndex();
+    error AlreadyStaked();
 
     address public vaultAddr;
     uint256 public loanIdx;
@@ -42,6 +43,9 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(loanIdx);
         if (msg.sender != loan.borrower) {
             revert InvalidSender();
+        }
+        if (liqGaugeAddr != address(0)) {
+            revert AlreadyStaked();
         }
 
         uint256 amount = IERC20(loan.collToken).balanceOf(address(this));
@@ -73,9 +77,10 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
+        bool isStaked = _liqGaugeAddr != address(0);
         // check staked balance in gauge if gaugeAddr has been set
         // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
-        if (_liqGaugeAddr != address(0)) {
+        if (isStaked) {
             uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
                 address(this)
             );
@@ -88,9 +93,10 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
-        // transfer proportion of compartment lp token balance
-        uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
-            repayAmountLeft;
+        // transfer proportion of compartment lp token balance if never staked, else all balance if staked
+        uint256 lpTokenAmount = isStaked
+            ? currentCompartmentBal
+            : (repayAmount * currentCompartmentBal) / repayAmountLeft;
         // if callback send directly there, else to borrower
         if (callbackAddr == address(0)) {
             IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
