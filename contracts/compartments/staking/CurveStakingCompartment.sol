@@ -6,12 +6,10 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
-import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
-import "hardhat/console.sol";
 
 contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
@@ -48,12 +46,9 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
 
         uint256 amount = IERC20(loan.collToken).balanceOf(address(this));
 
-        console.log(amount);
-
         address _liqGaugeAddr = IStakingHelper(GAUGE_CONTROLLER).gauges(
             gaugeIndex
         );
-        console.log(_liqGaugeAddr);
 
         if (_liqGaugeAddr == address(0)) {
             revert InvalidGaugeIndex();
