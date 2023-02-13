@@ -469,7 +469,7 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })?.args?.['collTokenCompartmentAddr']
 
-      const crvCompInstance = await curveStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
+      const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
       await crvCompInstance.connect(borrower).stake(compartmentData);
 
