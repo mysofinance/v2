@@ -78,26 +78,31 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
-        // check staked balance in gauge
-        uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
-            address(this)
-        );
-        // withdraw proportion of gauge amount
-        uint256 withdrawAmount = (repayAmount * currentStakedBal) /
-            repayAmountLeft;
-        IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
-        // now check lp token balance of compartment
+        // check staked balance in gauge if gaugeAddr has been set
+        // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
+        if (_liqGaugeAddr != address(0)) {
+            uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
+                address(this)
+            );
+            // withdraw proportion of gauge amount
+            uint256 withdrawAmount = (repayAmount * currentStakedBal) /
+                repayAmountLeft;
+            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+        }
+        // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
         // transfer proportion of compartment lp token balance
         uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
+        // if callback send directly there, else to borrower
         if (callbackAddr == address(0)) {
             IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
         } else {
             IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
         }
+        //rest of rewards are always sent to borrower, not for callback
         // check crv token balance
         uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
         // transfer proportion of crv token balance
@@ -110,12 +115,17 @@ contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
     function unlockCollToVault(address collTokenAddr) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
-        // check staked balance in gauge
-        uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
-            address(this)
-        );
-        // withdraw all remaining staked tokens
-        IStakingHelper(_liqGaugeAddr).withdraw(currentStakedBal);
+        // check staked balance in gauge if gaugeAddr has been set
+        // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
+        if (_liqGaugeAddr != address(0)) {
+            // check staked balance in gauge
+            uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
+                address(this)
+            );
+            // withdraw all remaining staked tokens
+            IStakingHelper(_liqGaugeAddr).withdraw(currentStakedBal);
+        }
+
         // now get lp token balance
         uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
             address(this)
