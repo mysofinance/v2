@@ -11,7 +11,7 @@ import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
 
-contract CurveStakingCompartment is Initializable, IBorrowerCompartment {
+contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
 
     error IncorrectGaugeForLpToken();

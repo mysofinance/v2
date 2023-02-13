@@ -360,10 +360,10 @@ describe('Basic Forked Mainnet Tests', function () {
         await setupTest()
 
       // create curve staking implementation
-      const CurveStakingCompartmentImplementation = await ethers.getContractFactory('CurveStakingCompartment')
-      await CurveStakingCompartmentImplementation.connect(team)
-      const curveStakingCompartmentImplementation = await CurveStakingCompartmentImplementation.deploy()
-      await curveStakingCompartmentImplementation.deployed()
+      const CurveLPStakingCompartmentImplementation = await ethers.getContractFactory('CurveLPStakingCompartment')
+      await CurveLPStakingCompartmentImplementation.connect(team)
+      const curveLPStakingCompartmentImplementation = await CurveLPStakingCompartmentImplementation.deploy()
+      await curveLPStakingCompartmentImplementation.deployed()
 
       // increase borrower CRV balance
       const locallyCRVBalance = ethers.BigNumber.from(10).pow(18)
@@ -414,7 +414,7 @@ describe('Basic Forked Mainnet Tests', function () {
         tenor: ONE_DAY.mul(365),
         timeUntilEarliestRepay: 0,
         isNegativeInterestRate: false,
-        borrowerCompartmentImplementation: curveStakingCompartmentImplementation.address
+        borrowerCompartmentImplementation: curveLPStakingCompartmentImplementation.address
       }
 
       const payload = ethers.utils.defaultAbiCoder.encode(
