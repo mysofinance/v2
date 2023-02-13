@@ -5,7 +5,6 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IStakeCompartment} from "../../interfaces/compartments/staking/IStakeCompartment.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 
 contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
@@ -16,8 +15,6 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
 
     // arbitrum WETH address
     address constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-
-    fallback() external {}
 
     function initialize(
         address _vaultAddr,

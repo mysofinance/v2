@@ -5,8 +5,8 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
-import {IVoteCompartment} from "../../interfaces/compartments/voting/IVoteCompartment.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
@@ -27,29 +27,14 @@ contract VoteCompartment is Initializable, IBorrowerCompartment {
         loanIdx = _loanIdx;
     }
 
-    function stake(
-        address registryAddr,
-        address collTokenAddr,
-        bytes memory data
-    ) external {
-        if (msg.sender != IAddressRegistry(registryAddr).borrowerGateway()) {
+    function delegate(address _delegatee) external {
+        DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(loanIdx);
+        if (msg.sender != loan.borrower) {
             revert InvalidSender();
         }
-        address _delegatee = abi.decode(data, (address));
         if (_delegatee != address(0)) {
-            _delegate(_delegatee, collTokenAddr);
+            IVotes(loan.collToken).delegate(_delegatee);
         }
-    }
-
-    function redirectDelegates(address newDelegatee) external {
-        DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(loanIdx);
-        address borrowerAddr = loan.borrower;
-        if (msg.sender != borrowerAddr) revert InvalidSender();
-        _delegate(newDelegatee, loan.collToken);
-    }
-
-    function _delegate(address delegatee, address collTokenAddr) internal {
-        IVoteCompartment(collTokenAddr).delegate(delegatee);
     }
 
     // transfer coll on repays

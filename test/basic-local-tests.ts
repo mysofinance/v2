@@ -158,10 +158,9 @@ describe('Basic Local Tests', function () {
       const collSendAmount = offChainQuote.collAmount.add(offChainQuote.upfrontFee)
       const callbackAddr = '0x0000000000000000000000000000000000000000'
       const callbackData = '0x'
-      const compartmentData = '0x'
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOffChainQuote(lenderVault.address, borrower.address, collSendAmount, offChainQuote, callbackAddr, callbackData, compartmentData)
+        .borrowWithOffChainQuote(lenderVault.address, borrower.address, collSendAmount, offChainQuote, callbackAddr, callbackData)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -176,7 +175,7 @@ describe('Basic Local Tests', function () {
       await expect(
         borrowerGateway
         .connect(borrower)
-        .borrowWithOffChainQuote(lenderVault.address, borrower.address, collSendAmount, offChainQuote, callbackAddr, callbackData, compartmentData)
+        .borrowWithOffChainQuote(lenderVault.address, borrower.address, collSendAmount, offChainQuote, callbackAddr, callbackData)
       ).to.be.reverted
     })
   })
@@ -251,10 +250,9 @@ describe('Basic Local Tests', function () {
       const isAutoQuote = false
       const callbackAddr = '0x0000000000000000000000000000000000000000'
       const callbackData = '0x'
-      const compartmentData = '0x'
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData, compartmentData)
+        .borrowWithOnChainQuote(lenderVault.address, borrower.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
