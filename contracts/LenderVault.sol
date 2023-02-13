@@ -14,7 +14,6 @@ import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
-import "hardhat/console.sol";
 
 contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     using SafeERC20 for IERC20Metadata;
@@ -431,9 +430,6 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 i++;
             }
         }
-
-        console.log(totalUnlockableColl);
-        console.log(lockedAmounts[collToken]);
 
         lockedAmounts[collToken] -= totalUnlockableColl;
         uint256 currentCollTokenBalance = IERC20Metadata(collToken).balanceOf(
