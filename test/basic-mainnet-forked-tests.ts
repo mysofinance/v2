@@ -1,6 +1,8 @@
 import { expect } from 'chai'
-import { utils, BigNumber } from 'ethers'
+import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
+import { LenderVault } from '../typechain-types'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
@@ -39,7 +41,7 @@ const balancerV2PoolAbi = [
   }
 ]
 
-const crvTokenAbi = [
+const collTokenAbi = [
   {
     name: 'balanceOf',
     outputs: [{ type: 'uint256', name: '' }],
@@ -56,6 +58,15 @@ const crvTokenAbi = [
     ],
     stateMutability: 'nonpayable',
     type: 'function'
+  },
+  {
+    name: 'getCurrentVotes',
+    constant: true,
+    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+    outputs: [{ internalType: 'uint96', name: '', type: 'uint96' }],
+    payable: false,
+    stateMutability: 'view',
+    type: 'function'
   }
 ]
 
@@ -70,6 +81,62 @@ function getLoopingSendAmount(
   const q = -collTokenInDexPool * collTokenFromBorrower
   const collTokenReceivedFromDex = -p / 2 + Math.sqrt(Math.pow(p, 2) / 4 - q)
   return collTokenReceivedFromDex + collTokenFromBorrower
+}
+
+const createOnChainRequest = async ({
+  lender,
+  collToken,
+  loanToken,
+  borrowerCompartmentImplementation,
+  lenderVault,
+  loanPerCollUnit
+}: {
+  lender: SignerWithAddress
+  collToken: string
+  loanToken: string
+  borrowerCompartmentImplementation: string
+  lenderVault: LenderVault
+  loanPerCollUnit: BigNumber
+}) => {
+  //
+  let onChainQuote = {
+    loanPerCollUnit,
+    interestRatePctInBase: BASE.mul(10).div(100),
+    upfrontFeePctInBase: BASE.mul(1).div(100),
+    expectedTransferFee: 0,
+    minCollAmount: 0,
+    collToken: collToken,
+    loanToken: loanToken,
+    tenor: ONE_DAY.mul(365),
+    timeUntilEarliestRepay: 0,
+    isNegativeInterestRate: false,
+    borrowerCompartmentImplementation: borrowerCompartmentImplementation
+  }
+
+  const payload = ethers.utils.defaultAbiCoder.encode(
+    ['uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address', 'uint256', 'uint256', 'bool', 'address'],
+    [
+      onChainQuote.loanPerCollUnit,
+      onChainQuote.interestRatePctInBase,
+      onChainQuote.upfrontFeePctInBase,
+      onChainQuote.expectedTransferFee,
+      onChainQuote.minCollAmount,
+      onChainQuote.collToken,
+      onChainQuote.loanToken,
+      onChainQuote.tenor,
+      onChainQuote.timeUntilEarliestRepay,
+      onChainQuote.isNegativeInterestRate,
+      onChainQuote.borrowerCompartmentImplementation
+    ]
+  )
+
+  const onChainQuoteHash = ethers.utils.keccak256(payload)
+
+  await expect(lenderVault.connect(lender).addOnChainQuote(onChainQuote))
+    .to.emit(lenderVault, 'OnChainQuote')
+    .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)
+
+  return onChainQuote
 }
 
 describe('Basic Forked Mainnet Tests', function () {
@@ -360,8 +427,8 @@ describe('Basic Forked Mainnet Tests', function () {
       const crvTokenAddress = '0xEd4064f376cB8d68F770FB1Ff088a3d0F3FF5c4d' // LP crvCRVETH
       const crvGaugeAddress = '0x1cEBdB0856dd985fAe9b8fEa2262469360B8a3a6'
       const CRV_SLOT = 5
-      const crvInstance = new ethers.Contract(crvTokenAddress, crvTokenAbi, borrower.provider)
-      const crvGaugeInstance = new ethers.Contract(crvGaugeAddress, crvTokenAbi, borrower.provider)
+      const crvInstance = new ethers.Contract(crvTokenAddress, collTokenAbi, borrower.provider)
+      const crvGaugeInstance = new ethers.Contract(crvGaugeAddress, collTokenAbi, borrower.provider)
 
       // Get storage slot index
       const index = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [CRV_SLOT, borrower.address])
@@ -392,57 +459,16 @@ describe('Basic Forked Mainnet Tests', function () {
       // borrower approves borrower gateway
       await crvInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
-      //
-      let onChainQuote = {
-        loanPerCollUnit: ONE_USDC.mul(1000),
-        interestRatePctInBase: BASE.mul(10).div(100),
-        upfrontFeePctInBase: BASE.mul(1).div(100),
-        expectedTransferFee: 0,
-        minCollAmount: 0,
+      const ONE_CRV = BigNumber.from(10).pow(18)
+
+      const onChainQuote = await createOnChainRequest({
+        lender,
         collToken: crvTokenAddress,
         loanToken: usdc.address,
-        tenor: ONE_DAY.mul(365),
-        timeUntilEarliestRepay: 0,
-        isNegativeInterestRate: false,
-        borrowerCompartmentImplementation: curveLPStakingCompartmentImplementation.address
-      }
-
-      const payload = ethers.utils.defaultAbiCoder.encode(
-        [
-          'uint256',
-          'uint256',
-          'uint256',
-          'uint256',
-          'uint256',
-          'address',
-          'address',
-          'uint256',
-          'uint256',
-          'bool',
-          'address'
-        ],
-        [
-          onChainQuote.loanPerCollUnit,
-          onChainQuote.interestRatePctInBase,
-          onChainQuote.upfrontFeePctInBase,
-          onChainQuote.expectedTransferFee,
-          onChainQuote.minCollAmount,
-          onChainQuote.collToken,
-          onChainQuote.loanToken,
-          onChainQuote.tenor,
-          onChainQuote.timeUntilEarliestRepay,
-          onChainQuote.isNegativeInterestRate,
-          onChainQuote.borrowerCompartmentImplementation
-        ]
-      )
-
-      const onChainQuoteHash = ethers.utils.keccak256(payload)
-
-      await expect(lenderVault.connect(lender).addOnChainQuote(onChainQuote))
-        .to.emit(lenderVault, 'OnChainQuote')
-        .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)
-
-      const ONE_CRV = BigNumber.from(10).pow(18)
+        borrowerCompartmentImplementation: curveLPStakingCompartmentImplementation.address,
+        lenderVault,
+        loanPerCollUnit: ONE_USDC.mul(1000)
+      })
 
       // borrow with on chain quote
       const collSendAmount = ONE_CRV
@@ -471,7 +497,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
-      await crvCompInstance.connect(borrower).stake(compartmentData);
+      await crvCompInstance.connect(borrower).stake(compartmentData)
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -481,6 +507,102 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(compartmentGaugeBalPost).to.equal(borrowerCRVBalPre)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+    })
+
+    it('Should proceed voting correctly', async () => {
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, lenderVaultFactory, addressRegistry } =
+        await setupTest()
+
+      // create curve staking implementation
+      const VotingCompartmentImplementation = await ethers.getContractFactory('VoteCompartment')
+      await VotingCompartmentImplementation.connect(team)
+      const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
+      await votingCompartmentImplementation.deployed()
+
+      // increase borrower UNI balance
+      const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
+      const collTokenAddress = '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984' // UNI
+      const UNI_SLOT = 4
+      const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
+
+      // Get storage slot index
+      const index = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [borrower.address, UNI_SLOT])
+      await ethers.provider.send('hardhat_setStorageAt', [
+        collTokenAddress,
+        index.toString(),
+        ethers.utils.hexZeroPad(locallyUNIBalance.toHexString(), 32)
+      ])
+
+      // lender deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // get pre balances
+      const borrowerUNIBalPre = await collInstance.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultUNIBalPre = BigNumber.from(0) // compartment balance
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      expect(borrowerUNIBalPre).to.equal(locallyUNIBalance)
+      expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).toggleTokenPair(collTokenAddress, usdc.address)
+
+      // borrower approves borrower gateway
+      await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const ONE_UNI = BigNumber.from(10).pow(18)
+
+      const onChainQuote = await createOnChainRequest({
+        lender: lender,
+        collToken: collTokenAddress,
+        loanToken: usdc.address,
+        borrowerCompartmentImplementation: votingCompartmentImplementation.address,
+        lenderVault,
+        loanPerCollUnit: ONE_USDC.mul(1000)
+      })
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_UNI
+      const isAutoQuote = false
+      const callbackAddr = '0x0000000000000000000000000000000000000000'
+      const callbackData = '0x'
+      const compartmentData = '0x'
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          borrower.address,
+          collSendAmount,
+          onChainQuote,
+          isAutoQuote,
+          callbackAddr,
+          callbackData
+        )
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const collTokenCompartmentAddr = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })?.args?.['collTokenCompartmentAddr']
+
+      const uniCompInstance = await votingCompartmentImplementation.attach(collTokenCompartmentAddr)
+
+      await uniCompInstance.connect(borrower).delegate(borrower.address)
+
+      // check balance post borrow
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const borroweUNIBalPost = await collInstance.balanceOf(borrower.address)
+      const vaultUNIBalPost = await collInstance.balanceOf(collTokenCompartmentAddr)
+
+      const borrowerVotesPost = await collInstance.getCurrentVotes(borrower.address)
+
+      expect(borrowerVotesPost).to.equal(borrowerUNIBalPre)
+
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+      expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre))
     })
   })
 })
