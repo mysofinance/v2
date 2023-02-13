@@ -93,7 +93,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.initRepayAmount,
             loan.amountRepaidSoFar,
             loan.collUnlocked,
-            loan.collTokenCompartmentAddr
+            loan.collTokenCompartmentAddr,
+            loanId
         );
     }
 
@@ -173,7 +174,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.initRepayAmount,
             loan.amountRepaidSoFar,
             loan.collUnlocked,
-            loan.collTokenCompartmentAddr
+            loan.collTokenCompartmentAddr,
+            loanId
         );
     }
 

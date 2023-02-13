@@ -15,7 +15,8 @@ interface IBorrowerGateway {
         uint128 initRepayAmount,
         uint128 amountRepaidSoFar,
         bool collUnlocked,
-        address collTokenCompartmentAddr
+        address collTokenCompartmentAddr,
+        uint256 loanId
     );
 
     event Repay(
