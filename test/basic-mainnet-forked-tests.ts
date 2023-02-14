@@ -467,7 +467,7 @@ describe('Basic Forked Mainnet Tests', function () {
   })
 
   describe('Compartment Testing', function () {
-    it('Should proceed Curve LP staking/repay correctly', async () => {
+    it('Should process Curve LP staking/repay correctly', async () => {
       const { borrowerGateway, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
 
       // create curve staking implementation
@@ -588,10 +588,10 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(borrowerCRVRepayBalPost).to.equal(locallyCRVBalance)
     })
 
-    it('Should proceed voting correctly', async () => {
+    it('Should delegate voting correctly', async () => {
       const { borrowerGateway, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
 
-      // create curve staking implementation
+      // create uni staking implementation
       const VotingCompartmentImplementation = await ethers.getContractFactory('VoteCompartment')
       await VotingCompartmentImplementation.connect(team)
       const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
@@ -666,6 +666,8 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const uniCompInstance = await votingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
+      const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
+
       await uniCompInstance.connect(borrower).delegate(borrower.address)
 
       // check balance post borrow
@@ -677,6 +679,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowerVotesPost = await collInstance.getCurrentVotes(borrower.address)
 
       expect(borrowerVotesPost).to.equal(borrowerUNIBalPre)
+      expect(borrowerVotesPreDelegation).to.equal(0)
 
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
       expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre))
