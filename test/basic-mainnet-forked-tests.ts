@@ -207,6 +207,20 @@ describe('Basic Forked Mainnet Tests', function () {
     await ethers.provider.send('hardhat_setBalance', [borrower.address, '0x204FCE5E3E25026110000000'])
     await weth.connect(borrower).deposit({ value: ONE_WETH.mul(1) })
 
+    // prepare PAXG balances
+    const PAXG_ADDRESS = '0x45804880De22913dAFE09f4980848ECE6EcbAf78'
+    const SUPPLY_CONTROLLER = '0xE25a329d385f77df5D4eD56265babe2b99A5436e'
+    const paxg = await ethers.getContractAt('IPAXG', PAXG_ADDRESS)
+    await ethers.provider.send('hardhat_setBalance', [SUPPLY_CONTROLLER, '0x56BC75E2D63100000'])
+    await hre.network.provider.request({
+      method: 'hardhat_impersonateAccount',
+      params: [SUPPLY_CONTROLLER]
+    })
+    const supplyController = await ethers.getSigner(SUPPLY_CONTROLLER)
+
+    await paxg.connect(supplyController).increaseSupply('800000000000000000000000000')
+    await paxg.connect(supplyController).transfer(borrower.address, '800000000000000000000000000')
+
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
     await BalancerV2Looping.connect(lender)
@@ -215,6 +229,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
     // whitelist addrs
     await addressRegistry.connect(team).toggleTokenPair(weth.address, usdc.address)
+    await addressRegistry.connect(team).toggleTokenPair(paxg.address,usdc.address)
     await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
 
     return {
