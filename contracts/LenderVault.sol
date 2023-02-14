@@ -153,7 +153,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         }
 
         // only update lockedAmounts when no compartment
-        if (loan.collTokenCompartmentAddr != address(0)) {
+        if (loan.collTokenCompartmentAddr == address(0)) {
             if (isRepay) {
                 lockedAmounts[loan.collToken] -= collAmount;
             } else {
@@ -405,9 +405,11 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         uint256[] calldata _loanIds
     ) external {
         uint256 totalUnlockableColl;
+
         for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
             DataTypes.Loan storage loan = _loans[_loanIds[i]];
+
             if (loan.collToken != collToken) {
                 revert();
             }
@@ -428,10 +430,12 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 i++;
             }
         }
+
         lockedAmounts[collToken] -= totalUnlockableColl;
         uint256 currentCollTokenBalance = IERC20Metadata(collToken).balanceOf(
             address(this)
         );
+
         IERC20Metadata(collToken).safeTransfer(
             vaultOwner,
             currentCollTokenBalance - lockedAmounts[collToken]
