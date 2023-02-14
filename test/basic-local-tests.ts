@@ -165,7 +165,6 @@ describe('Basic Local Tests', function () {
         .connect(borrower)
         .borrowWithOffChainQuote(
           lenderVault.address,
-          borrower.address,
           collSendAmount,
           offChainQuote,
           callbackAddr,
@@ -187,7 +186,6 @@ describe('Basic Local Tests', function () {
           .connect(borrower)
           .borrowWithOffChainQuote(
             lenderVault.address,
-            borrower.address,
             collSendAmount,
             offChainQuote,
             callbackAddr,
@@ -271,7 +269,6 @@ describe('Basic Local Tests', function () {
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          borrower.address,
           collSendAmount,
           onChainQuote,
           isAutoQuote,

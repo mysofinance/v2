@@ -330,7 +330,6 @@ describe('Basic Forked Mainnet Tests', function () {
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          borrower.address,
           collSendAmount,
           onChainQuote,
           isAutoQuote,
@@ -396,7 +395,6 @@ describe('Basic Forked Mainnet Tests', function () {
       .connect(borrower)
       .borrowWithOnChainQuote(
         lenderVault.address,
-        borrower.address,
         collSendAmount,
         onChainQuote,
         isAutoQuote,
@@ -443,7 +441,6 @@ describe('Basic Forked Mainnet Tests', function () {
       .connect(borrower)
       .borrowWithOnChainQuote(
         lenderVault.address,
-        borrower.address,
         collSendAmount,
         onChainQuote,
         isAutoQuote,
@@ -534,7 +531,6 @@ describe('Basic Forked Mainnet Tests', function () {
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          borrower.address,
           collSendAmount,
           onChainQuote,
           isAutoQuote,
@@ -650,7 +646,6 @@ describe('Basic Forked Mainnet Tests', function () {
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          borrower.address,
           collSendAmount,
           onChainQuote,
           isAutoQuote,

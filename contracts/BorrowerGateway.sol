@@ -37,7 +37,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     function borrowWithOffChainQuote(
         address lenderVault,
-        address borrower,
         uint256 collSendAmount,
         DataTypes.OffChainQuote calldata offChainQuote,
         address callbackAddr,
@@ -50,7 +49,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         {
             (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(
                 lenderVault
-            ).doesAcceptOffChainQuote(borrower, offChainQuote);
+            ).doesAcceptOffChainQuote(msg.sender, offChainQuote);
             if (!doesAccept) {
                 revert();
             }
@@ -61,12 +60,12 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
             lenderVault
-        ).getLoanInfoForOffChainQuote(borrower, offChainQuote);
+        ).getLoanInfoForOffChainQuote(msg.sender, offChainQuote);
         uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
         address collReceiver = getCollReceiver(
             offChainQuote.borrowerCompartmentImplementation,
             lenderVault,
-            borrower,
+            loan.borrower,
             loan.collToken,
             loanId
         );
@@ -100,7 +99,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     function borrowWithOnChainQuote(
         address lenderVault,
-        address borrower,
         uint256 collSendAmount,
         DataTypes.OnChainQuote calldata onChainQuote,
         bool isAutoQuote,
@@ -133,13 +131,13 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         }
         (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
             lenderVault
-        ).getLoanInfoForOnChainQuote(borrower, collSendAmount, onChainQuote);
+        ).getLoanInfoForOnChainQuote(msg.sender, collSendAmount, onChainQuote);
         uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
 
         address collReceiver = getCollReceiver(
             onChainQuote.borrowerCompartmentImplementation,
             lenderVault,
-            borrower,
+            loan.borrower,
             onChainQuote.collToken,
             loanId
         );
