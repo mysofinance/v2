@@ -474,7 +474,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
     expect(lenderWethBalPre).to.equal(BigNumber.from(0))
 
-    await lenderVault.connect(lender).unlockCollateral(weth.address, [0])
+    await lenderVault.connect(lender).unlockCollateral(weth.address, [0], true)
 
     const lenderWethBalPost = await weth.balanceOf(lender.address)
 
