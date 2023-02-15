@@ -187,7 +187,11 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         DataTypes.OnChainQuote calldata onChainQuote
     ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
         loan.borrower = borrower;
-        uint256 loanAmount = (onChainQuote.loanPerCollUnit * collSendAmount) /
+        if (collSendAmount < onChainQuote.expectedTransferFee) {
+            revert(); // InsufficientSendAmount();
+        }
+        uint256 loanAmount = (onChainQuote.loanPerCollUnit *
+            (collSendAmount - onChainQuote.expectedTransferFee)) /
             (10 ** IERC20Metadata(onChainQuote.collToken).decimals());
         uint256 repayAmount;
         if (onChainQuote.isNegativeInterestRate) {

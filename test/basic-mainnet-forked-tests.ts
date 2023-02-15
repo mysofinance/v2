@@ -8,9 +8,11 @@ const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
+const ONE_PAXG = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
+const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 
 const balancerV2VaultAbi = [
   {
@@ -229,7 +231,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
     // whitelist addrs
     await addressRegistry.connect(team).toggleTokenPair(weth.address, usdc.address)
-    await addressRegistry.connect(team).toggleTokenPair(paxg.address,usdc.address)
+    await addressRegistry.connect(team).toggleTokenPair(paxg.address, usdc.address)
     await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
 
     return {
@@ -242,6 +244,7 @@ describe('Basic Forked Mainnet Tests', function () {
       team,
       usdc,
       weth,
+      paxg,
       lenderVault,
       lenderVaultFactory,
       balancerV2Looping
@@ -693,6 +696,67 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
       expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre))
+    })
+  })
+
+  describe('Testing with token transfer fees', function () {
+    it('Should process onChain quote with fees', async function () {
+      const { borrowerGateway, lender, borrower, usdc, paxg, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let onChainQuote = {
+        loanPerCollUnit: ONE_USDC.mul(1000),
+        interestRatePctInBase: BASE.mul(10).div(100),
+        upfrontFeePctInBase: BASE.mul(1).div(100),
+        expectedTransferFee: ONE_PAXG.mul(2).div(9998),
+        minCollAmount: 0,
+        collToken: paxg.address,
+        loanToken: usdc.address,
+        tenor: ONE_DAY.mul(365),
+        timeUntilEarliestRepay: 0,
+        isNegativeInterestRate: false,
+        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
+      }
+      await lenderVault.connect(lender).addOnChainQuote(onChainQuote)
+
+      // check balance pre borrow
+      const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPre = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const isAutoQuote = false
+      const collSendAmount = ONE_PAXG.mul(10000).div(9998)
+      const callbackAddr = ZERO_ADDR
+      const callbackData = '0x'
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          onChainQuote,
+          isAutoQuote,
+          callbackAddr,
+          callbackData
+        )
+
+      // check balance post borrow
+      const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPost = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      
+      expect(borrowerPaxgBalPre.sub(borrowerPaxgBalPost)).to.equal(collSendAmount)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(ONE_USDC.mul(1000))
+      expect(Math.abs(Number(vaultPaxgBalPost.sub(vaultPaxgBalPre).sub(collSendAmount.mul(9998).div(10000).toString())))).to.lessThanOrEqual(1)
+      expect(Math.abs(Number(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(onChainQuote.loanPerCollUnit.mul(collSendAmount.mul(9998)).div(10000).div(ONE_PAXG)).toString()))).to.lessThanOrEqual(1)
     })
   })
 })
