@@ -74,7 +74,7 @@ describe('Basic Local Tests', function () {
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
     // whitelist addrs
-    await addressRegistry.connect(team).toggleTokenPair(weth.address, usdc.address)
+    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
 
     return { borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault }
   }

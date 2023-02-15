@@ -209,7 +209,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
             collSendAmount - upfrontFee - onChainQuote.expectedTransferFee <
             onChainQuote.minCollAmount
         ) {
-            revert(); // revert InsufficientCollAmount();
+            revert(); // revert InsufficientSendAmount();
         }
         loan.loanToken = onChainQuote.loanToken;
         loan.collToken = onChainQuote.collToken;
