@@ -244,7 +244,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         );
 
         // protocol fees on whole sendAmount
-        // this will make calculation of upfrontFee be protocolFee + (collSendAmount - protocolFee)*(tokenFee/collUnit)
+        // this will make calculation of upfrontFee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
         uint256 protocolFeeAmount = ((collSendAmount) *
             protocolFee *
             (loan.expiry - block.timestamp)) / (BASE * YEAR_IN_SECONDS);
