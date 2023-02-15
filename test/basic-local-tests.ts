@@ -45,9 +45,16 @@ describe('Basic Local Tests', function () {
     await borrowerCompartmentFactory.deployed()
 
     // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
-    addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
-    addressRegistry.setBorrowerGateway(borrowerGateway.address)
-    addressRegistry.setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
+    await expect(addressRegistry.connect(lender).setLenderVaultFactory(lenderVaultFactory.address)).to.be.reverted
+    addressRegistry.connect(team).setLenderVaultFactory(lenderVaultFactory.address)
+    await expect(addressRegistry.connect(team).setLenderVaultFactory('0x0000000000000000000000000000000000000001')).to.be.reverted
+    await expect(addressRegistry.connect(lender).setBorrowerGateway(borrowerGateway.address)).to.be.reverted
+    addressRegistry.connect(team).setBorrowerGateway(borrowerGateway.address)
+    await expect(addressRegistry.connect(team).setBorrowerGateway('0x0000000000000000000000000000000000000001')).to.be.reverted
+    await expect(addressRegistry.connect(lender).setBorrowerCompartmentFactory(borrowerGateway.address)).to.be.reverted
+    addressRegistry.connect(team).setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
+    await expect(addressRegistry.connect(team).setBorrowerCompartmentFactory('0x0000000000000000000000000000000000000001')).to.be.reverted
+
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
@@ -74,8 +81,14 @@ describe('Basic Local Tests', function () {
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
     // whitelist addrs
+    await expect(addressRegistry.connect(lender).toggleTokens([weth.address])).to.be.reverted
     await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
+    await addressRegistry.connect(team).toggleTokens(['0x0000000000000000000000000000000000000000'])
+    expect(await addressRegistry.isWhitelistedToken('0x0000000000000000000000000000000000000000')).to.be.false
 
+    //test lenderVault check works
+    await expect(addressRegistry.connect(team).addLenderVault(lenderVaultAddr)).to.be.reverted
+    
     return { borrowerGateway, lenderVaultImplementation, lender, borrower, team, usdc, weth, lenderVault }
   }
 
