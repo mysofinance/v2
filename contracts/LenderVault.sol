@@ -406,7 +406,8 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
 
     function unlockCollateral(
         address collToken,
-        uint256[] calldata _loanIds
+        uint256[] calldata _loanIds,
+        bool autoWithdraw
     ) external {
         uint256 totalUnlockableColl;
 
@@ -436,14 +437,16 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         }
 
         lockedAmounts[collToken] -= totalUnlockableColl;
-        uint256 currentCollTokenBalance = IERC20Metadata(collToken).balanceOf(
-            address(this)
-        );
+        // if collToken is not used by vault as loan token too
+        if (autoWithdraw) {
+            uint256 currentCollTokenBalance = IERC20Metadata(collToken)
+                .balanceOf(address(this));
 
-        IERC20Metadata(collToken).safeTransfer(
-            vaultOwner,
-            currentCollTokenBalance - lockedAmounts[collToken]
-        );
+            IERC20Metadata(collToken).safeTransfer(
+                vaultOwner,
+                currentCollTokenBalance - lockedAmounts[collToken]
+            );
+        }
     }
 
     function hashOnChainQuote(
