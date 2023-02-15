@@ -5,6 +5,8 @@ pragma solidity ^0.8.17;
 interface IAddressRegistry {
     function isWhitelistedCallbackAddr(address) external view returns (bool);
 
+    function isWhitelistedToken(address) external view returns (bool);
+
     function isWhitelistedCollTokenHandler(
         address
     ) external view returns (bool);
@@ -34,7 +36,7 @@ interface IAddressRegistry {
 
     function addLenderVault(address addr) external;
 
-    function toggleTokenPair(address addr) external;
+    function toggleTokens(address[] memory addrs) external;
 
     function toggleCallbackAddr(address addr) external;
 

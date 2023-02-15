@@ -8,7 +8,8 @@ contract AddressRegistry {
     address public borrowerGateway;
     address public borrowerCompartmentFactory;
     mapping(address => bool) public isRegisteredVault;
-    mapping(address => mapping(address => bool)) public isWhitelistedTokenPair;
+    mapping(address => bool) public isWhitelistedToken;
+    //mapping(address => mapping(address => bool)) isWhitelistedTokenPair;
     mapping(address => bool) public isWhitelistedCallbackAddr;
     mapping(address => bool) public isWhitelistedCollTokenHandler;
     mapping(address => bool) public isWhitelistedAutoQuoteStrategy;
@@ -48,13 +49,18 @@ contract AddressRegistry {
         borrowerCompartmentFactory = addr;
     }
 
-    function toggleTokenPair(address collToken, address loanToken) external {
+    function toggleTokens(address[] memory tokens) external {
         if (msg.sender != owner) {
             revert();
         }
-        isWhitelistedTokenPair[collToken][loanToken] = !isWhitelistedTokenPair[
-            collToken
-        ][loanToken];
+        for (uint i = 0; i < tokens.length; i++) {
+            if (tokens[i] != address(0)) {
+                isWhitelistedToken[tokens[i]] = !isWhitelistedToken[tokens[i]];
+            }
+            unchecked {
+                i++;
+            }
+        }
     }
 
     function toggleCallbackAddr(address addr) external {
@@ -91,5 +97,13 @@ contract AddressRegistry {
         }
         isRegisteredVault[addr] = true;
         registeredVaults.push(addr);
+    }
+
+    function isWhitelistedTokenPair(
+        address collToken,
+        address loanToken
+    ) external view returns (bool) {
+        return
+            !(isWhitelistedToken[collToken] && isWhitelistedToken[loanToken]);
     }
 }
