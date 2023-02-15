@@ -243,9 +243,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             collReceiver
         );
 
-        // protocol fees only on what lender vault actually receives
-        // so any token transfer fees to protocol owner don't hurt lender...
-        uint256 protocolFeeAmount = ((loan.initCollAmount + upfrontFee) *
+        // protocol fees on whole sendAmount
+        // this will make calculation of upfrontFee be protocolFee + (collSendAmount - protocolFee)*(tokenFee/collUnit)
+        uint256 protocolFeeAmount = ((collSendAmount) *
             protocolFee *
             (loan.expiry - block.timestamp)) / (BASE * YEAR_IN_SECONDS);
 
