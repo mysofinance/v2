@@ -4,6 +4,7 @@ coverage
 coverage.json
 typechain
 typechain-types
+v1.2-venv
 
 # Hardhat files
 cache

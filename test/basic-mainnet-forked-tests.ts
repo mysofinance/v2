@@ -232,6 +232,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
     // whitelist addrs
     await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address])
+    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address)).to.be.reverted
     await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
 
     return {
@@ -389,6 +390,7 @@ describe('Basic Forked Mainnet Tests', function () {
     await aaveAutoQuoteStrategy1.deployed()
 
     // whitelist autoquote strategy
+    await expect(addressRegistry.connect(lender).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.reverted
     await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
 
     // lender subscribes to strategy
@@ -522,6 +524,7 @@ describe('Basic Forked Mainnet Tests', function () {
       await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
 
       // whitelist gauge crv-eth contract
+      await expect(addressRegistry.connect(lender).toggleCollTokenHandler(crvGaugeAddress)).to.be.reverted
       await addressRegistry.connect(team).toggleCollTokenHandler(crvGaugeAddress)
 
       // borrower approves borrower gateway
@@ -759,7 +762,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(Math.abs(Number(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(onChainQuote.loanPerCollUnit.mul(collSendAmount.mul(9998)).div(10000).div(ONE_PAXG)).toString()))).to.lessThanOrEqual(1)
     })
 
-    it('Should process onChain quote with fees', async function () {
+    it('Should process onChain quote with fees including protocol fee', async function () {
       const { borrowerGateway, lender, borrower, team, usdc, paxg, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc

@@ -9,7 +9,6 @@ contract AddressRegistry {
     address public borrowerCompartmentFactory;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => bool) public isWhitelistedToken;
-    //mapping(address => mapping(address => bool)) isWhitelistedTokenPair;
     mapping(address => bool) public isWhitelistedCallbackAddr;
     mapping(address => bool) public isWhitelistedCollTokenHandler;
     mapping(address => bool) public isWhitelistedAutoQuoteStrategy;

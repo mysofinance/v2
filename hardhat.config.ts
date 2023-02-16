@@ -26,6 +26,9 @@ const config: HardhatUserConfig = {
       accounts: [PRIVATE_KEY]
     }
   },
+  mocha: {
+    timeout: 100000000,
+  },
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
