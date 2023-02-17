@@ -28,6 +28,8 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         0xD533a949740bb3306d119CC777fa900bA034cd52;
     address internal constant GAUGE_CONTROLLER =
         0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB;
+    address internal constant CRV_MINTER_ADDR =
+        0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
 
     function initialize(
         address _vaultAddr,
@@ -87,6 +89,8 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
             // withdraw proportion of gauge amount
             uint256 withdrawAmount = (repayAmount * currentStakedBal) /
                 repayAmountLeft;
+
+            IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
             IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         }
         // now check lp token balance of compartment which will be portion unstaked (could have never been staked)

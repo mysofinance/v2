@@ -19,6 +19,12 @@ interface IStakingHelper {
     function withdraw(uint256 value) external;
 
     /**
+     * @notice Mint allocated tokens for the caller based on a single gauge.
+     * @param gaugeAddr address to get mintable amount from
+     */
+    function mint(address gaugeAddr) external;
+
+    /**
      * @notice returns lpToken address for crv style gauge
      */
     function lp_token() external view returns (address);
