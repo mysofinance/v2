@@ -174,6 +174,28 @@ describe('Basic Local Tests', function () {
       const collSendAmount = offChainQuote.collAmount.add(offChainQuote.upfrontFee)
       const callbackAddr = '0x0000000000000000000000000000000000000000'
       const callbackData = '0x'
+      // unregistered vault address reverts
+      await expect(borrowerGateway
+        .connect(borrower)
+        .borrowWithOffChainQuote(
+          lender.address,
+          collSendAmount,
+          offChainQuote,
+          callbackAddr,
+          callbackData
+        )).to.be.revertedWithCustomError(borrowerGateway, 'UnregisteredVault')
+
+      // if borrower is not msg.sender, reverts
+      await expect(borrowerGateway
+        .connect(team)
+        .borrowWithOffChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          offChainQuote,
+          callbackAddr,
+          callbackData
+        )).to.be.reverted
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOffChainQuote(
