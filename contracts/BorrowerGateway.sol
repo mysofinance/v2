@@ -111,7 +111,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // all lenderVaults need to approve BorrowGateway
 
         // 1. BorrowGateway "optimistically" pulls loanToken from lender vault: either transfers directly to (a) borrower or (b) callbacker for further processing
-        // 2. BorrowGateway then pulls collTOken from borrower to lender vault
+        // 2. BorrowGateway then pulls collToken from borrower to lender vault
         // 3. Finally, BorrowGateway updates lender vault storage state
 
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {

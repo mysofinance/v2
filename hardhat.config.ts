@@ -3,6 +3,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@nomiclabs/hardhat-ethers";
 require('hardhat-abi-exporter');
 require('hardhat-contract-sizer');
+require('solidity-coverage');
 require("dotenv").config();
 
 const INFURA_API_KEY = "764119145a6a4d09a1cf8f8c7a2c7b46"; // added for private repo, otherwise use process.env.INFURA_API_KEY;
