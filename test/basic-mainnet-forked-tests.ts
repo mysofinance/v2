@@ -585,7 +585,7 @@ describe('Basic Forked Mainnet Tests', function () {
       // whitelist token pair
       await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
 
-      // whitelist gauge crv-eth contract
+      // whitelist gauge contract
       await expect(addressRegistry.connect(lender).toggleCollTokenHandler(crvGaugeAddress)).to.be.reverted
       await addressRegistry.connect(team).toggleCollTokenHandler(crvGaugeAddress)
 
