@@ -127,9 +127,11 @@ const collTokenAbi = [
     type: 'function'
   },
   {
-    name: 'gauges',
-    outputs: [{ type: 'address', name: '' }],
-    inputs: [{ type: 'uint256', name: 'arg0' }],
+    constant: true,
+    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+    name: 'earned',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    payable: false,
     stateMutability: 'view',
     type: 'function'
   }
@@ -529,12 +531,14 @@ describe('Basic Forked Mainnet Tests', function () {
       collTokenAddress,
       collTokeSlot,
       crvGaugeAddress,
-      crvGaugeIndex
+      crvGaugeIndex,
+      rewardTokenAddress
     }: {
       collTokenAddress: string
       collTokeSlot: number
       crvGaugeAddress: string
       crvGaugeIndex: number
+      rewardTokenAddress?: string
     }) => {
       const { borrowerGateway, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
 
@@ -552,6 +556,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const crvInstance = new ethers.Contract(crvTokenAddress, collTokenAbi, borrower.provider)
       const crvLPInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
       const crvGaugeInstance = new ethers.Contract(crvGaugeAddress, collTokenAbi, borrower.provider)
+      const rewardTokenInstance = new ethers.Contract(rewardTokenAddress || '0', collTokenAbi, borrower.provider)
 
       const gaugeControllerInstance = new ethers.Contract(gaugeControllerAddress, collTokenAbi, borrower.provider)
 
@@ -618,6 +623,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
       const loanId = borrowEvent?.args?.['loanId']
       const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const loanExpiry = borrowEvent?.args?.['expiry']
 
       const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
@@ -642,12 +648,19 @@ describe('Basic Forked Mainnet Tests', function () {
       ])
 
       // The total amount of CRV, both mintable and already minted
-      const totalGaugeRewardAmountOfCRV = await crvGaugeInstance.claimable_tokens(collTokenCompartmentAddr)
+      const totalGaugeRewardCRV = await crvGaugeInstance.claimable_tokens(collTokenCompartmentAddr)
+      let totalGaugeRewardToken = 0
+
+      if (rewardTokenAddress) {
+        totalGaugeRewardToken = await crvGaugeInstance.claimable_reward(collTokenCompartmentAddr, rewardTokenAddress)
+
+        expect(totalGaugeRewardToken).to.not.equal(BigNumber.from(0))
+      }
 
       // check balance pre repay
       const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
 
-      expect(totalGaugeRewardAmountOfCRV).to.not.equal(BigNumber.from(0))
+      expect(totalGaugeRewardCRV).to.not.equal(BigNumber.from(0))
       expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
 
       // repay
@@ -668,9 +681,15 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowerCRVBalancePost = await crvInstance.balanceOf(borrower.address)
       const borrowerCRVLpRepayBalPost = await crvLPInstance.balanceOf(borrower.address)
 
-      expect(borrowerCRVBalancePost.toString().substring(0, 3)).to.equal(
-        totalGaugeRewardAmountOfCRV.toString().substring(0, 3)
-      )
+      expect(borrowerCRVBalancePost.toString().substring(0, 3)).to.equal(totalGaugeRewardCRV.toString().substring(0, 3))
+
+      if (rewardTokenAddress) {
+        const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
+
+        expect(borrowerRewardTokenBalancePost.toString().substring(0, 3)).to.equal(
+          totalGaugeRewardToken.toString().substring(0, 3)
+        )
+      }
 
       expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance)
 
@@ -700,15 +719,17 @@ describe('Basic Forked Mainnet Tests', function () {
       })
     })
 
-    it('Should process Curve LP staking in LGauge v2 with additional rewards and repay correctly', async () => {
-      const collTokenAddress = '0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490' // LP 3pool
-      const crvGaugeAddress = '0xbfcf63294ad7105dea65aa58f8ae5be2d9d0952a'
+    it('Should process Curve LP staking in LGauge v2 with LDO rewards and repay correctly', async () => {
+      const collTokenAddress = '0x06325440D014e39736583c165C2963BA99fAf14E' // LP steth
+      const crvGaugeAddress = '0x182B723a58739a9c974cFDB385ceaDb237453c28'
+      const lidoTokenAddress = '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32'
 
       await stakeInLiquidityGauge({
         collTokenAddress,
-        collTokeSlot: 3,
+        collTokeSlot: 2,
         crvGaugeAddress,
-        crvGaugeIndex: 9
+        crvGaugeIndex: 27,
+        rewardTokenAddress: lidoTokenAddress
       })
     })
 

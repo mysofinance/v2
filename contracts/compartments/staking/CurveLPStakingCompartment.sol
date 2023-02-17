@@ -79,6 +79,7 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
+        address _rewardTokenAddr = address(0);
         bool isStaked = _liqGaugeAddr != address(0);
         // check staked balance in gauge if gaugeAddr has been set
         // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
@@ -91,7 +92,19 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
                 repayAmountLeft;
 
             IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
-            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+
+            try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
+                address rewardTokenAddr
+            ) {
+                if (rewardTokenAddr != address(0)) {
+                    _rewardTokenAddr = rewardTokenAddr;
+                    IStakingHelper(_liqGaugeAddr).claim_rewards();
+                }
+
+                IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+            } catch {
+                IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+            }
         }
         // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
@@ -114,6 +127,20 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         uint256 crvTokenAmount = (repayAmount * currentCrvBal) /
             repayAmountLeft;
         IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
+
+        if (_rewardTokenAddr != address(0)) {
+            uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr).balanceOf(
+                address(this)
+            );
+
+            uint256 rewardTokenAmount = (repayAmount * currentRewardTokenBal) /
+                repayAmountLeft;
+
+            IERC20(_rewardTokenAddr).safeTransfer(
+                borrowerAddr,
+                rewardTokenAmount
+            );
+        }
     }
 
     // unlockColl this would be called on defaults
