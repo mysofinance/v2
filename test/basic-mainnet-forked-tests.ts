@@ -137,6 +137,37 @@ const collTokenAbi = [
   }
 ]
 
+const aavePoolAbi = [
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'asset',
+        type: 'address'
+      },
+      {
+        internalType: 'uint256',
+        name: 'amount',
+        type: 'uint256'
+      },
+      {
+        internalType: 'address',
+        name: 'onBehalfOf',
+        type: 'address'
+      },
+      {
+        internalType: 'uint16',
+        name: 'referralCode',
+        type: 'uint16'
+      }
+    ],
+    name: 'supply',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+]
+
 function getLoopingSendAmount(
   collTokenFromBorrower: number,
   loanPerColl: number,
@@ -755,6 +786,101 @@ describe('Basic Forked Mainnet Tests', function () {
         crvGaugeAddress,
         crvGaugeIndex: 192
       })
+    })
+
+    it('Should process aToken borrow/repay correctly with rewards', async () => {
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
+
+      // create curve staking implementation
+      const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
+      await AaveStakingCompartmentImplementation.connect(team)
+      const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
+      await aaveStakingCompartmentImplementation.deployed()
+
+      // increase borrower aWETH balance
+      const locallyCollBalance = ethers.BigNumber.from(10).pow(18)
+      const collTokenAddress = '0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8' // aave WETH
+      const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
+
+      const poolAddress = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2'
+      const poolInstacne = new ethers.Contract(poolAddress, aavePoolAbi, borrower.provider)
+
+      // supply aave pool
+      await weth.connect(borrower).approve(poolAddress, MAX_UINT256)
+      await poolInstacne.connect(borrower).supply(weth.address, locallyCollBalance, borrower.address, '0')
+
+      // lender deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // get pre balances
+      const borrowerCollBalPre = await collInstance.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      expect(borrowerCollBalPre).to.be.above(locallyCollBalance)
+      expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
+
+      // borrower approves borrower gateway
+      await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const onChainQuote = await createOnChainRequest({
+        lender,
+        collToken: collTokenAddress,
+        loanToken: usdc.address,
+        borrowerCompartmentImplementation: aaveStakingCompartmentImplementation.address,
+        lenderVault,
+        loanPerCollUnit: ONE_USDC.mul(1000)
+      })
+
+      // borrow with on chain quote
+      const collSendAmount = BigNumber.from(10).pow(18)
+      const isAutoQuote = false
+      const callbackAddr = '0x0000000000000000000000000000000000000000'
+      const callbackData = '0x'
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })
+
+      const loanId = borrowEvent?.args?.['loanId']
+      const repayAmount = borrowEvent?.args?.['initRepayAmount']
+
+      // check balance post borrow
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+
+      // borrower approves borrower gateway
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // repay
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .repay(
+            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, repaySendAmount: repayAmount },
+            lenderVault.address,
+            callbackAddr,
+            callbackData
+          )
+      )
+        .to.emit(borrowerGateway, 'Repay')
+        .withArgs(lenderVault.address, loanId, repayAmount)
+
+      // check balance post repay
+      const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
+
+      expect(borrowerCollRepayBalPost).to.be.above(borrowerCollBalPre)
     })
 
     it('Should delegate voting correctly', async () => {
