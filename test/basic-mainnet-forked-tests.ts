@@ -730,7 +730,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const partialRepay = async () => {
         const coeffRepay = 2
-        const partialPepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
+        const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
 
         // partial repay
         await expect(
@@ -739,8 +739,8 @@ describe('Basic Forked Mainnet Tests', function () {
               collToken: collTokenAddress,
               loanToken: usdc.address,
               loanId,
-              repayAmount: partialPepayAmount,
-              repaySendAmount: partialPepayAmount
+              repayAmount: partialRepayAmount,
+              repaySendAmount: partialRepayAmount
             },
             lenderVault.address,
             callbackAddr,
@@ -748,7 +748,7 @@ describe('Basic Forked Mainnet Tests', function () {
           )
         )
           .to.emit(borrowerGateway, 'Repay')
-          .withArgs(lenderVault.address, loanId, partialPepayAmount)
+          .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
         // check balance post repay
         const borrowerCRVBalancePost = await crvInstance.balanceOf(borrower.address)
@@ -864,11 +864,11 @@ describe('Basic Forked Mainnet Tests', function () {
       const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
 
       const poolAddress = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2'
-      const poolInstacne = new ethers.Contract(poolAddress, aavePoolAbi, borrower.provider)
+      const poolInstance = new ethers.Contract(poolAddress, aavePoolAbi, borrower.provider)
 
       // supply aave pool
       await weth.connect(borrower).approve(poolAddress, MAX_UINT256)
-      await poolInstacne.connect(borrower).supply(weth.address, locallyCollBalance, borrower.address, '0')
+      await poolInstance.connect(borrower).supply(weth.address, locallyCollBalance, borrower.address, '0')
 
       // lender deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
