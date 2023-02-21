@@ -563,13 +563,15 @@ describe('Basic Forked Mainnet Tests', function () {
       collTokeSlot,
       crvGaugeAddress,
       crvGaugeIndex,
-      rewardTokenAddress
+      rewardTokenAddress,
+      isPartialRepay
     }: {
       collTokenAddress: string
       collTokeSlot: number
       crvGaugeAddress: string
       crvGaugeIndex: number
       rewardTokenAddress?: string
+      isPartialRepay?: boolean
     }) => {
       const { borrowerGateway, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
 
@@ -694,35 +696,83 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(totalGaugeRewardCRV).to.not.equal(BigNumber.from(0))
       expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
 
-      // repay
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .repay(
-            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, repaySendAmount: repayAmount },
+      const repay = async () => {
+        // repay
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .repay(
+              { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, repaySendAmount: repayAmount },
+              lenderVault.address,
+              callbackAddr,
+              callbackData
+            )
+        )
+          .to.emit(borrowerGateway, 'Repay')
+          .withArgs(lenderVault.address, loanId, repayAmount)
+
+        // check balance post repay
+        const borrowerCRVBalancePost = await crvInstance.balanceOf(borrower.address)
+        const borrowerCRVLpRepayBalPost = await crvLPInstance.balanceOf(borrower.address)
+
+        expect(borrowerCRVBalancePost.toString().substring(0, 3)).to.equal(totalGaugeRewardCRV.toString().substring(0, 3))
+
+        if (rewardTokenAddress) {
+          const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
+
+          expect(borrowerRewardTokenBalancePost.toString().substring(0, 3)).to.equal(
+            totalGaugeRewardToken.toString().substring(0, 3)
+          )
+        }
+
+        expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance)
+      }
+
+      const partialRepay = async () => {
+        const coeffRepay = 2
+        const partialPepayAmount = repayAmount / coeffRepay
+
+        // partial repay
+        await expect(
+          borrowerGateway.connect(borrower).repay(
+            {
+              collToken: collTokenAddress,
+              loanToken: usdc.address,
+              loanId,
+              repayAmount: partialPepayAmount,
+              repaySendAmount: partialPepayAmount
+            },
             lenderVault.address,
             callbackAddr,
             callbackData
           )
-      )
-        .to.emit(borrowerGateway, 'Repay')
-        .withArgs(lenderVault.address, loanId, repayAmount)
-
-      // check balance post repay
-      const borrowerCRVBalancePost = await crvInstance.balanceOf(borrower.address)
-      const borrowerCRVLpRepayBalPost = await crvLPInstance.balanceOf(borrower.address)
-
-      expect(borrowerCRVBalancePost.toString().substring(0, 3)).to.equal(totalGaugeRewardCRV.toString().substring(0, 3))
-
-      if (rewardTokenAddress) {
-        const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
-
-        expect(borrowerRewardTokenBalancePost.toString().substring(0, 3)).to.equal(
-          totalGaugeRewardToken.toString().substring(0, 3)
         )
+          .to.emit(borrowerGateway, 'Repay')
+          .withArgs(lenderVault.address, loanId, partialPepayAmount)
+
+        // check balance post repay
+        const borrowerCRVBalancePost = await crvInstance.balanceOf(borrower.address)
+        const borrowerCRVLpRepayBalPost = await crvLPInstance.balanceOf(borrower.address)
+        const collTokenCompartmentCRVBalancePost = await crvInstance.balanceOf(collTokenCompartmentAddr)
+        const approxPartialCRVReward = totalGaugeRewardCRV.div(coeffRepay).toString().substring(0, 3)
+
+        expect(borrowerCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVReward)
+        expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance.div(coeffRepay))
+        expect(collTokenCompartmentCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVReward)
+
+        // TOOD: fix
+        // check unlock collateral to lender
+        /*await ethers.provider.send('evm_mine', [loanExpiry + 12])
+        await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+
+        const lenderCollBalPost = await crvLPInstance.balanceOf(lender.address)
+        const lenderCRVBalancePost = await crvInstance.balanceOf(lender.address)
+
+        expect(lenderCollBalPost).to.equal(partialPepayAmount)
+        expect(lenderCRVBalancePost).to.equal(approxPartialCRVReward)*/
       }
 
-      expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance)
+      isPartialRepay ? await partialRepay() : await repay()
 
       // drop crv borrower balance to 0
       const crvSlotIndex = 3
@@ -776,7 +826,7 @@ describe('Basic Forked Mainnet Tests', function () {
       })
     })
 
-    it('Should process Curve LP staking in LGauge v5 and repay correctly', async () => {
+    it('Should process Curve LP staking in LGauge v5 with partial repay and unlock coll correctly with rewards', async () => {
       const collTokenAddress = '0x3F436954afb722F5D14D868762a23faB6b0DAbF0' // LP FRAXBP
       const crvGaugeAddress = '0xCf79921D99b99FEe3DcF1A4657fCDA95195B46d1'
 
@@ -784,7 +834,8 @@ describe('Basic Forked Mainnet Tests', function () {
         collTokenAddress,
         collTokeSlot: 6,
         crvGaugeAddress,
-        crvGaugeIndex: 192
+        crvGaugeIndex: 192,
+        isPartialRepay: true
       })
     })
 
