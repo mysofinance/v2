@@ -27,8 +27,6 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     mapping(bytes32 => bool) isConsumedQuote;
     mapping(bytes32 => bool) public isOnChainQuote;
     mapping(address => mapping(address => address)) public autoQuoteStrategy; // points to auto loan strategy for given coll/loan token pair
-    // for now remove public getter for byte code size purposes...
-    // todo: check if this is needed mapping(address => address) collTokenImplAddrs;
     DataTypes.Loan[] _loans; // stores loans
 
     uint256 loanOffChainQuoteNonce;
