@@ -176,10 +176,7 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         );
 
         // transfer  the compartment lp token balance
-        IERC20(collTokenAddr).safeTransfer(
-            address(this),
-            currentCompartmentBal
-        );
+        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCompartmentBal);
 
         //rest of rewards are always sent to borrower, not for callback
         // check crv token balance
