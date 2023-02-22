@@ -379,6 +379,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
             revert UnregisteredVault();
         }
+
         DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(
             loanRepayInfo.loanId
         );

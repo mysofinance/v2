@@ -28,6 +28,8 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         0xD533a949740bb3306d119CC777fa900bA034cd52;
     address internal constant GAUGE_CONTROLLER =
         0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB;
+    address internal constant CRV_MINTER_ADDR =
+        0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
 
     function initialize(
         address _vaultAddr,
@@ -67,6 +69,36 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         IStakingHelper(_liqGaugeAddr).deposit(amount, address(this));
     }
 
+    function withdrawCollFromGauge(
+        uint256 repayAmount,
+        uint256 repayAmountLeft
+    ) internal returns (address _rewardTokenAddr) {
+        address _liqGaugeAddr = liqGaugeAddr;
+
+        uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
+            address(this)
+        );
+
+        // withdraw proportion of gauge amount
+        uint256 withdrawAmount = (repayAmount * currentStakedBal) /
+            repayAmountLeft;
+
+        IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
+
+        try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
+            address rewardTokenAddr
+        ) {
+            if (rewardTokenAddr != address(0)) {
+                _rewardTokenAddr = rewardTokenAddr;
+                IStakingHelper(_liqGaugeAddr).claim_rewards();
+            }
+
+            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+        } catch {
+            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+        }
+    }
+
     // transfer coll on repays
     function transferCollFromCompartment(
         uint256 repayAmount,
@@ -77,18 +109,17 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
     ) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
+        address _rewardTokenAddr = address(0);
         bool isStaked = _liqGaugeAddr != address(0);
         // check staked balance in gauge if gaugeAddr has been set
         // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
         if (isStaked) {
-            uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
-                address(this)
+            _rewardTokenAddr = withdrawCollFromGauge(
+                repayAmount,
+                repayAmountLeft
             );
-            // withdraw proportion of gauge amount
-            uint256 withdrawAmount = (repayAmount * currentStakedBal) /
-                repayAmountLeft;
-            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         }
+
         // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
@@ -110,32 +141,59 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         uint256 crvTokenAmount = (repayAmount * currentCrvBal) /
             repayAmountLeft;
         IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
+
+        if (_rewardTokenAddr != address(0)) {
+            uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr).balanceOf(
+                address(this)
+            );
+
+            uint256 rewardTokenAmount = (repayAmount * currentRewardTokenBal) /
+                repayAmountLeft;
+
+            IERC20(_rewardTokenAddr).safeTransfer(
+                borrowerAddr,
+                rewardTokenAmount
+            );
+        }
     }
 
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
         if (msg.sender != vaultAddr) revert InvalidSender();
+
         address _liqGaugeAddr = liqGaugeAddr;
+        address _rewardTokenAddr = address(0);
+        bool isStaked = _liqGaugeAddr != address(0);
         // check staked balance in gauge if gaugeAddr has been set
         // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
-        if (_liqGaugeAddr != address(0)) {
-            // check staked balance in gauge
-            uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
-                address(this)
-            );
-            // withdraw all remaining staked tokens
-            IStakingHelper(_liqGaugeAddr).withdraw(currentStakedBal);
+        if (isStaked) {
+            _rewardTokenAddr = withdrawCollFromGauge(uint256(1), uint256(1));
         }
 
-        // now get lp token balance
-        uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
+        // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
+        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
-        // transfer all to vault
-        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
-        // now get crv token balance
-        uint256 currentCrvBalance = IERC20(CRV_ADDR).balanceOf(address(this));
-        // transfer all to vault
-        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCrvBalance);
+
+        // transfer  the compartment lp token balance
+        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCompartmentBal);
+
+        //rest of rewards are always sent to borrower, not for callback
+        // check crv token balance
+        uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
+
+        // transfer crv token balance
+        IERC20(CRV_ADDR).safeTransfer(vaultAddr, currentCrvBal);
+
+        if (_rewardTokenAddr != address(0)) {
+            uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr).balanceOf(
+                address(this)
+            );
+
+            IERC20(_rewardTokenAddr).safeTransfer(
+                vaultAddr,
+                currentRewardTokenBal
+            );
+        }
     }
 }
