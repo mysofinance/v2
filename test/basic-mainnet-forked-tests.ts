@@ -1,15 +1,8 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { LenderVault } from '../typechain-types'
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import {
-  balancerV2VaultAbi,
-  balancerV2PoolAbi,
-  collTokenAbi,
-  aavePoolAbi,
-  crvRewardsDistributorAbi
-} from "./abi"
+import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi } from './abi'
+import { createOnChainRequest } from './helpers'
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
@@ -33,62 +26,6 @@ function getLoopingSendAmount(
   const q = -collTokenInDexPool * collTokenFromBorrower
   const collTokenReceivedFromDex = -p / 2 + Math.sqrt(Math.pow(p, 2) / 4 - q)
   return collTokenReceivedFromDex + collTokenFromBorrower
-}
-
-const createOnChainRequest = async ({
-  lender,
-  collToken,
-  loanToken,
-  borrowerCompartmentImplementation,
-  lenderVault,
-  loanPerCollUnit
-}: {
-  lender: SignerWithAddress
-  collToken: string
-  loanToken: string
-  borrowerCompartmentImplementation: string
-  lenderVault: LenderVault
-  loanPerCollUnit: BigNumber
-}) => {
-  //
-  let onChainQuote = {
-    loanPerCollUnit,
-    interestRatePctInBase: BASE.mul(10).div(100),
-    upfrontFeePctInBase: BASE.mul(1).div(100),
-    expectedTransferFee: 0,
-    minCollAmount: 0,
-    collToken,
-    loanToken: loanToken,
-    tenor: ONE_DAY.mul(90),
-    timeUntilEarliestRepay: 0,
-    isNegativeInterestRate: false,
-    borrowerCompartmentImplementation: borrowerCompartmentImplementation
-  }
-
-  const payload = ethers.utils.defaultAbiCoder.encode(
-    ['uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address', 'uint256', 'uint256', 'bool', 'address'],
-    [
-      onChainQuote.loanPerCollUnit,
-      onChainQuote.interestRatePctInBase,
-      onChainQuote.upfrontFeePctInBase,
-      onChainQuote.expectedTransferFee,
-      onChainQuote.minCollAmount,
-      onChainQuote.collToken,
-      onChainQuote.loanToken,
-      onChainQuote.tenor,
-      onChainQuote.timeUntilEarliestRepay,
-      onChainQuote.isNegativeInterestRate,
-      onChainQuote.borrowerCompartmentImplementation
-    ]
-  )
-
-  const onChainQuoteHash = ethers.utils.keccak256(payload)
-
-  await expect(lenderVault.connect(lender).addOnChainQuote(onChainQuote))
-    .to.emit(lenderVault, 'OnChainQuote')
-    .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)
-
-  return onChainQuote
 }
 
 describe('Basic Forked Mainnet Tests', function () {
@@ -184,7 +121,7 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     const ldoHolder = await ethers.getSigner(LDO_HOLDER)
- 
+
     await ldo.connect(ldoHolder).transfer(team.address, '10000000000000000000000')
 
     // deploy balancer v2 callbacks
@@ -455,14 +392,17 @@ describe('Basic Forked Mainnet Tests', function () {
       // increase borrower CRV balance
       const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
       const gaugeControllerAddress = '0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB'
-      
 
       const locallyCollBalance = ethers.BigNumber.from(10).pow(18)
       const crvInstance = new ethers.Contract(crvTokenAddress, collTokenAbi, borrower.provider)
       const crvLPInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
       const crvGaugeInstance = new ethers.Contract(crvGaugeAddress, collTokenAbi, borrower.provider)
       //const rewardContractInstance = new ethers.Contract(rewardContractAddress || '0', collTokenAbi, borrower.provider)
-      const rewardDistributionInstance = new ethers.Contract(rewardsDistributionAddress || '0', crvRewardsDistributorAbi, borrower.provider)
+      const rewardDistributionInstance = new ethers.Contract(
+        rewardsDistributionAddress || '0',
+        crvRewardsDistributorAbi,
+        borrower.provider
+      )
       const rewardTokenInstance = new ethers.Contract(rewardTokenAddress || '0', collTokenAbi, borrower.provider)
       //const stableSwapInstance = new ethers.Contract(stableSwapAddress || '0', stableSwapAbi, borrower.provider)
 
@@ -561,7 +501,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       if (rewardTokenAddress) {
         rewardTokenBalPreCompartment = await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
-        if(rewardsDistributionAddress){
+        if (rewardsDistributionAddress) {
           await ldo.connect(team).transfer(rewardDistributionInstance.address, '100000000000000000000')
           await rewardDistributionInstance.connect(team).start_next_rewards_period()
         }
@@ -569,13 +509,14 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // check balance pre repay
       const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
-    
 
       expect(totalGaugeRewardCRV).to.not.equal(BigNumber.from(0))
       expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
 
       const repay = async () => {
-        const borrowerRewardTokenBalancePre = rewardTokenAddress ? await rewardTokenInstance.balanceOf(borrower.address): BigNumber.from(0)
+        const borrowerRewardTokenBalancePre = rewardTokenAddress
+          ? await rewardTokenInstance.balanceOf(borrower.address)
+          : BigNumber.from(0)
         // repay
         await expect(
           borrowerGateway
@@ -607,8 +548,12 @@ describe('Basic Forked Mainnet Tests', function () {
         const coeffRepay = 2
         const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
 
-        const borrowerRewardTokenBalancePre = rewardTokenAddress ? await rewardTokenInstance.balanceOf(borrower.address): BigNumber.from(0)
-        const compartmentRewardTokenBalancePre = rewardTokenAddress ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr): BigNumber.from(0)
+        const borrowerRewardTokenBalancePre = rewardTokenAddress
+          ? await rewardTokenInstance.balanceOf(borrower.address)
+          : BigNumber.from(0)
+        const compartmentRewardTokenBalancePre = rewardTokenAddress
+          ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
+          : BigNumber.from(0)
         // partial repay
         await expect(
           borrowerGateway.connect(borrower).repay(
@@ -648,30 +593,37 @@ describe('Basic Forked Mainnet Tests', function () {
           .toString()
           .substring(0, 3)
         let compartmentRewardTokenBalancePost = BigNumber.from(0)
-        
+
         if (rewardTokenAddress) {
           const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
           compartmentRewardTokenBalancePost = await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
           expect(borrowerRewardTokenBalancePost).to.be.greaterThan(borrowerRewardTokenBalancePre)
-          if(borrowerRewardTokenBalancePost.gt(borrowerRewardTokenBalancePre)){
-            expect(borrowerRewardTokenBalancePost.sub(borrowerRewardTokenBalancePre).sub(compartmentRewardTokenBalancePost)).to.be.equal(0)
-          
+          if (borrowerRewardTokenBalancePost.gt(borrowerRewardTokenBalancePre)) {
+            expect(
+              borrowerRewardTokenBalancePost.sub(borrowerRewardTokenBalancePre).sub(compartmentRewardTokenBalancePost)
+            ).to.be.equal(0)
           }
         }
 
         // unlock collateral
-        const lenderVaultRewardTokenBalancePreUnlock = rewardTokenAddress ? await rewardTokenInstance.balanceOf(lenderVault.address) : BigNumber.from(0)
+        const lenderVaultRewardTokenBalancePreUnlock = rewardTokenAddress
+          ? await rewardTokenInstance.balanceOf(lenderVault.address)
+          : BigNumber.from(0)
         await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], false)
-        const compartmentRewardTokenBalancePostUnlock = rewardTokenAddress ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr) : BigNumber.from(0)
+        const compartmentRewardTokenBalancePostUnlock = rewardTokenAddress
+          ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
+          : BigNumber.from(0)
 
         // check vault balance
         const lenderVaultCollBalPost = await crvLPInstance.balanceOf(lenderVault.address)
         const lenderVaultCRVBalancePost = await crvInstance.balanceOf(lenderVault.address)
-        const lenderVaultRewardTokenBalancePostUnlock = rewardTokenAddress ? await rewardTokenInstance.balanceOf(lenderVault.address) : BigNumber.from(0)
+        const lenderVaultRewardTokenBalancePostUnlock = rewardTokenAddress
+          ? await rewardTokenInstance.balanceOf(lenderVault.address)
+          : BigNumber.from(0)
 
         expect(lenderVaultCollBalPost).to.equal(locallyCollBalance.div(coeffRepay))
         expect(lenderVaultCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVPostReward)
-        if(compartmentRewardTokenBalancePost.gt(0) && lenderVaultRewardTokenBalancePostUnlock.gt(0)){
+        if (compartmentRewardTokenBalancePost.gt(0) && lenderVaultRewardTokenBalancePostUnlock.gt(0)) {
           expect(compartmentRewardTokenBalancePostUnlock).to.be.equal(0)
           /**todo: write check on partial repay reward to vault */
         }

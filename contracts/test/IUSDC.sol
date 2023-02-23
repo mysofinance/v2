@@ -11,4 +11,6 @@ interface IUSDC is IERC20Metadata {
     ) external;
 
     function mint(address account, uint256 amount) external;
+
+    function bridgeMint(address account, uint256 amount) external;
 }
