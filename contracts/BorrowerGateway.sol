@@ -7,12 +7,11 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBorrowerCompartmentFactory} from "./interfaces/IBorrowerCompartmentFactory.sol";
-import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
-import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
+import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
 contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     // putting fee info in borrow gateway since borrower always pays this upfront
@@ -38,32 +37,37 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     function borrowWithOffChainQuote(
         address lenderVault,
         uint256 collSendAmount,
+        uint256 expectedTransferFee,
         DataTypes.OffChainQuote calldata offChainQuote,
+        uint256 quoteTupleIdx,
         address callbackAddr,
         bytes calldata callbackData
     ) external nonReentrant {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
         }
-
-        {
-            (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(
-                lenderVault
-            ).doesAcceptOffChainQuote(msg.sender, offChainQuote);
-            if (!doesAccept) {
-                revert();
-            }
-            ILenderVault(lenderVault).invalidateOffChainQuote(
-                offChainQuoteHash
-            );
+        address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
+        if (
+            !IQuoteHandler(quoteHandler).doesAcceptOffChainQuote(
+                msg.sender,
+                lenderVault,
+                offChainQuote
+            )
+        ) {
+            revert();
         }
-
-        (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
-            lenderVault
-        ).getLoanInfoForOffChainQuote(msg.sender, offChainQuote);
+        (DataTypes.Loan memory loan, uint256 upfrontFee) = IQuoteHandler(
+            quoteHandler
+        ).fromQuoteToLoanInfo(
+                msg.sender,
+                collSendAmount,
+                expectedTransferFee,
+                offChainQuote.quote,
+                quoteTupleIdx
+            );
         uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
         address collReceiver = getCollReceiver(
-            offChainQuote.borrowerCompartmentImplementation,
+            offChainQuote.quote.borrowerCompartmentImplementation,
             lenderVault,
             loan.borrower,
             loan.collToken,
@@ -100,8 +104,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     function borrowWithOnChainQuote(
         address lenderVault,
         uint256 collSendAmount,
-        DataTypes.OnChainQuote calldata onChainQuote,
-        bool isAutoQuote,
+        uint256 expectedTransferFee,
+        DataTypes.Quote calldata quote,
+        uint256 quoteTupleIdx,
         address callbackAddr,
         bytes calldata callbackData
     ) external nonReentrant {
@@ -117,28 +122,32 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
         }
+        address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
         if (
-            !isAutoQuote &&
-            !ILenderVault(lenderVault).doesAcceptOnChainQuote(onChainQuote)
+            !IQuoteHandler(quoteHandler).doesAcceptOnChainQuote(
+                msg.sender,
+                lenderVault,
+                quote
+            )
         ) {
             revert();
         }
-        if (
-            isAutoQuote &&
-            !ILenderVault(lenderVault).doesAcceptAutoQuote(onChainQuote)
-        ) {
-            revert();
-        }
-        (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
-            lenderVault
-        ).getLoanInfoForOnChainQuote(msg.sender, collSendAmount, onChainQuote);
+        (DataTypes.Loan memory loan, uint256 upfrontFee) = IQuoteHandler(
+            quoteHandler
+        ).fromQuoteToLoanInfo(
+                msg.sender,
+                collSendAmount,
+                expectedTransferFee,
+                quote,
+                quoteTupleIdx
+            );
         uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
 
         address collReceiver = getCollReceiver(
-            onChainQuote.borrowerCompartmentImplementation,
+            quote.borrowerCompartmentImplementation,
             lenderVault,
             loan.borrower,
-            onChainQuote.collToken,
+            quote.collToken,
             loanId
         );
 
