@@ -6,10 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
-import {IBorrowerCompartmentFactory} from "./interfaces/IBorrowerCompartmentFactory.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
@@ -134,13 +134,22 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         }
     }
 
-    function prepareLoanAndUpfrontFee(
+    function processQuote(
         address borrower,
         uint256 collSendAmount,
         uint256 expectedTransferFee,
         DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypes.QuoteTuple calldata quoteTuple
-    ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
+    )
+        external
+        returns (
+            DataTypes.Loan memory loan,
+            uint256 loanId,
+            uint256 upfrontFee,
+            address collReceiver
+        )
+    {
+        senderCheckGateway();
         loan.borrower = borrower;
         if (collSendAmount < expectedTransferFee) {
             revert(); // InsufficientSendAmount();
@@ -177,25 +186,20 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         loan.earliestRepay = uint40(
             block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
-        if (generalQuoteInfo.borrowerCompartmentImplementation != address(0)) {
-            address compartmentFactory = IAddressRegistry(addressRegistry)
-                .borrowerCompartmentFactory();
-            IBorrowerCompartmentFactory(compartmentFactory)
-                .predictCompartmentAddress(
-                    generalQuoteInfo.borrowerCompartmentImplementation,
-                    address(this),
-                    borrower,
-                    _loans.length
-                );
-        }
-    }
 
-    function addLoan(
-        DataTypes.Loan calldata loan
-    ) external returns (uint256 loanId) {
-        senderCheckGateway();
+        if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {
+            collReceiver = address(this);
+        } else {
+            collReceiver = createCollCompartment(
+                generalQuoteInfo.borrowerCompartmentImplementation,
+                borrower,
+                generalQuoteInfo.collToken,
+                _loans.length
+            );
+            loan.collTokenCompartmentAddr = collReceiver;
+        }
+        loanId = _loans.length;
         _loans.push(loan);
-        loanId = _loans.length - 1;
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -250,6 +254,39 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
                 currentCollTokenBalance - lockedAmounts[collToken]
             );
         }
+    }
+
+    function createCollCompartment(
+        address borrowerCompartmentImplementation,
+        address borrower,
+        address collToken,
+        uint256 loanId
+    ) internal returns (address collCompartment) {
+        if (
+            IAddressRegistry(addressRegistry).isWhitelistedCollTokenHandler(
+                borrowerCompartmentImplementation
+            )
+        ) {
+            revert();
+        }
+        bytes32 salt = keccak256(
+            abi.encodePacked(
+                borrowerCompartmentImplementation,
+                address(this),
+                borrower,
+                loanId
+            )
+        );
+        collCompartment = Clones.cloneDeterministic(
+            borrowerCompartmentImplementation,
+            salt
+        );
+        IBorrowerCompartment(collCompartment).initialize(
+            address(this),
+            borrower,
+            collToken,
+            loanId
+        );
     }
 
     function senderCheckOwner() internal view {

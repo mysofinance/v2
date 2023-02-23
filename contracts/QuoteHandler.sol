@@ -119,7 +119,7 @@ contract QuoteHandler {
 
     function addAutoQuoteStrategy() external {}
 
-    function doesAcceptOnChainQuote(
+    function doesVaultAcceptOnChainQuote(
         address borrower,
         address lenderVault,
         DataTypes.OnChainQuote memory onChainQuote
@@ -141,7 +141,7 @@ contract QuoteHandler {
         return isOnChainQuote[lenderVault][hashOnChainQuote(onChainQuote)];
     }
 
-    function doesAcceptAutoQuote(
+    function doesVaultAcceptAutoQuote(
         address borrower,
         address /*lenderVault*/,
         DataTypes.OnChainQuote memory onChainQuote
@@ -168,7 +168,7 @@ contract QuoteHandler {
         */
     }
 
-    function doesAcceptOffChainQuote(
+    function doesVaultAcceptOffChainQuote(
         address borrower,
         address lenderVault,
         DataTypes.OffChainQuote calldata offChainQuote,

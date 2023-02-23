@@ -26,8 +26,6 @@ interface IAddressRegistry {
 
     function quoteHandler() external view returns (address);
 
-    function borrowerCompartmentFactory() external view returns (address);
-
     function owner() external view returns (address);
 
     function setLenderVaultFactory(address addr) external;
@@ -35,8 +33,6 @@ interface IAddressRegistry {
     function setBorrowerGateway(address addr) external;
 
     function setQuoteHandler(address addr) external;
-
-    function setBorrowerCompartmentFactory(address addr) external;
 
     function addLenderVault(address addr) external;
 

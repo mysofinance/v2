@@ -13,10 +13,6 @@ interface ILenderVault {
         uint256 index
     ) external view returns (DataTypes.Loan memory loan);
 
-    function addLoan(
-        DataTypes.Loan memory loan
-    ) external returns (uint256 loanId);
-
     function transferTo(
         address token,
         address recipient,
@@ -46,11 +42,18 @@ interface ILenderVault {
         bool isRepay
     ) external;
 
-    function prepareLoanAndUpfrontFee(
+    function processQuote(
         address borrower,
         uint256 collSendAmount,
         uint256 expectedTransferFee,
         DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypes.QuoteTuple calldata quoteTuple
-    ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee);
+    )
+        external
+        returns (
+            DataTypes.Loan memory loan,
+            uint256 loanId,
+            uint256 upfrontFee,
+            address collReceiver
+        );
 }

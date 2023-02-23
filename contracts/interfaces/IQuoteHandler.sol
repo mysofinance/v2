@@ -5,7 +5,7 @@ pragma solidity ^0.8.17;
 import {DataTypes} from "../DataTypes.sol";
 
 interface IQuoteHandler {
-    function doesAcceptOffChainQuote(
+    function doesVaultAcceptOffChainQuote(
         address borrower,
         address lenderVault,
         DataTypes.OffChainQuote calldata offChainQuote,
@@ -13,7 +13,7 @@ interface IQuoteHandler {
         bytes32[] memory proof
     ) external view returns (bool);
 
-    function doesAcceptOnChainQuote(
+    function doesVaultAcceptOnChainQuote(
         address borrower,
         address lenderVault,
         DataTypes.OnChainQuote memory onChainQuote

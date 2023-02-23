@@ -9,7 +9,6 @@ contract AddressRegistry is IAddressRegistry {
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
-    address public borrowerCompartmentFactory;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => bool) public isWhitelistedToken;
     mapping(address => bool) public isWhitelistedCallbackAddr;
@@ -49,16 +48,6 @@ contract AddressRegistry is IAddressRegistry {
             revert();
         }
         quoteHandler = addr;
-    }
-
-    function setBorrowerCompartmentFactory(address addr) external {
-        if (msg.sender != owner) {
-            revert();
-        }
-        if (borrowerCompartmentFactory != address(0)) {
-            revert();
-        }
-        borrowerCompartmentFactory = addr;
     }
 
     function toggleTokens(address[] memory tokens) external {

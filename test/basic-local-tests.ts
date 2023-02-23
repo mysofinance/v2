@@ -46,12 +46,6 @@ describe('Basic Local Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
-    // deploy borrower compartment factory
-    const BorrowerCompartmentFactory = await ethers.getContractFactory('BorrowerCompartmentFactory')
-    await BorrowerCompartmentFactory.connect(team)
-    const borrowerCompartmentFactory = await BorrowerCompartmentFactory.deploy()
-    await borrowerCompartmentFactory.deployed()
-
     // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
     await expect(addressRegistry.connect(lender).setLenderVaultFactory(lenderVaultFactory.address)).to.be.reverted
     await addressRegistry.connect(team).setLenderVaultFactory(lenderVaultFactory.address)
@@ -60,10 +54,6 @@ describe('Basic Local Tests', function () {
     await addressRegistry.connect(team).setBorrowerGateway(borrowerGateway.address)
     await addressRegistry.connect(team).setQuoteHandler(quoteHandler.address)
     await expect(addressRegistry.connect(team).setBorrowerGateway('0x0000000000000000000000000000000000000001')).to.be.reverted
-    await expect(addressRegistry.connect(lender).setBorrowerCompartmentFactory(borrowerGateway.address)).to.be.reverted
-    await addressRegistry.connect(team).setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
-    await expect(addressRegistry.connect(team).setBorrowerCompartmentFactory('0x0000000000000000000000000000000000000001')).to.be.reverted
-
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
