@@ -3,6 +3,13 @@ import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import { LenderVault } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import {
+  balancerV2VaultAbi,
+  balancerV2PoolAbi,
+  collTokenAbi,
+  aavePoolAbi,
+  crvRewardsDistributorAbi
+} from "./abi"
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
@@ -14,159 +21,6 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const YEAR_IN_SECONDS = 31_536_000
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
-
-const balancerV2VaultAbi = [
-  {
-    inputs: [{ internalType: 'bytes32', name: 'poolId', type: 'bytes32' }],
-    name: 'getPoolTokens',
-    outputs: [
-      { internalType: 'contract IERC20[]', name: 'tokens', type: 'address[]' },
-      { internalType: 'uint256[]', name: 'balances', type: 'uint256[]' },
-      { internalType: 'uint256', name: 'lastChangeBlock', type: 'uint256' }
-    ],
-    stateMutability: 'view',
-    type: 'function'
-  }
-]
-const balancerV2PoolAbi = [
-  {
-    inputs: [],
-    name: 'getSwapFeePercentage',
-    outputs: [
-      {
-        internalType: 'uint256',
-        name: '',
-        type: 'uint256'
-      }
-    ],
-    stateMutability: 'view',
-    type: 'function'
-  }
-]
-
-const collTokenAbi = [
-  {
-    name: 'balanceOf',
-    outputs: [{ type: 'uint256', name: '' }],
-    inputs: [{ type: 'address', name: 'arg0' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    name: 'approve',
-    outputs: [{ type: 'bool', name: '' }],
-    inputs: [
-      { type: 'address', name: '_spender' },
-      { type: 'uint256', name: '_value' }
-    ],
-    stateMutability: 'nonpayable',
-    type: 'function'
-  },
-  {
-    name: 'getCurrentVotes',
-    constant: true,
-    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
-    outputs: [{ internalType: 'uint96', name: '', type: 'uint96' }],
-    payable: false,
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    stateMutability: 'view',
-    type: 'function',
-    name: 'claimable_tokens',
-    inputs: [{ name: 'addr', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    stateMutability: 'view',
-    type: 'function',
-    name: 'claimable_reward',
-    inputs: [
-      { name: '_user', type: 'address' },
-      { name: '_reward_token', type: 'address' }
-    ],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    stateMutability: 'view',
-    type: 'function',
-    name: 'claimed_reward',
-    inputs: [
-      { name: '_addr', type: 'address' },
-      { name: '_token', type: 'address' }
-    ],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    stateMutability: 'view',
-    type: 'function',
-    name: 'reward_count',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    stateMutability: 'view',
-    type: 'function',
-    name: 'reward_tokens',
-    inputs: [{ name: 'arg0', type: 'uint256' }],
-    outputs: [{ name: '', type: 'address' }]
-  },
-  {
-    stateMutability: 'view',
-    type: 'function',
-    name: 'integrate_fraction',
-    inputs: [{ name: 'arg0', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }]
-  },
-  {
-    name: 'gauge_types',
-    outputs: [{ type: 'int128', name: '' }],
-    inputs: [{ type: 'address', name: '_addr' }],
-    stateMutability: 'view',
-    type: 'function'
-  },
-  {
-    constant: true,
-    inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
-    name: 'earned',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    payable: false,
-    stateMutability: 'view',
-    type: 'function'
-  }
-]
-
-const aavePoolAbi = [
-  {
-    inputs: [
-      {
-        internalType: 'address',
-        name: 'asset',
-        type: 'address'
-      },
-      {
-        internalType: 'uint256',
-        name: 'amount',
-        type: 'uint256'
-      },
-      {
-        internalType: 'address',
-        name: 'onBehalfOf',
-        type: 'address'
-      },
-      {
-        internalType: 'uint16',
-        name: 'referralCode',
-        type: 'uint16'
-      }
-    ],
-    name: 'supply',
-    outputs: [],
-    stateMutability: 'nonpayable',
-    type: 'function'
-  }
-]
 
 function getLoopingSendAmount(
   collTokenFromBorrower: number,
@@ -319,6 +173,20 @@ describe('Basic Forked Mainnet Tests', function () {
     await paxg.connect(supplyController).increaseSupply('800000000000000000000000000')
     await paxg.connect(supplyController).transfer(borrower.address, '800000000000000000000000000')
 
+    // prepare LDO balances
+    const LDO_ADDRESS = '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32'
+    const LDO_HOLDER = '0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c'
+    const ldo = await ethers.getContractAt('IWETH', LDO_ADDRESS)
+    await ethers.provider.send('hardhat_setBalance', [LDO_HOLDER, '0x56BC75E2D63100000'])
+    await hre.network.provider.request({
+      method: 'hardhat_impersonateAccount',
+      params: [LDO_HOLDER]
+    })
+
+    const ldoHolder = await ethers.getSigner(LDO_HOLDER)
+ 
+    await ldo.connect(ldoHolder).transfer(team.address, '10000000000000000000000')
+
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
     await BalancerV2Looping.connect(lender)
@@ -341,6 +209,7 @@ describe('Basic Forked Mainnet Tests', function () {
       usdc,
       weth,
       paxg,
+      ldo,
       lenderVault,
       lenderVaultFactory,
       balancerV2Looping
@@ -560,20 +429,22 @@ describe('Basic Forked Mainnet Tests', function () {
   describe('Compartment Testing', function () {
     const stakeInLiquidityGauge = async ({
       collTokenAddress,
-      collTokeSlot,
+      collTokenSlot,
       crvGaugeAddress,
       crvGaugeIndex,
       rewardTokenAddress,
-      isPartialRepay
+      isPartialRepay,
+      rewardsDistributionAddress
     }: {
       collTokenAddress: string
-      collTokeSlot: number
+      collTokenSlot: number
       crvGaugeAddress: string
       crvGaugeIndex: number
       rewardTokenAddress?: string
       isPartialRepay?: boolean
+      rewardsDistributionAddress?: string
     }) => {
-      const { borrowerGateway, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
+      const { borrowerGateway, lender, borrower, team, usdc, ldo, lenderVault, addressRegistry } = await setupTest()
 
       // create curve staking implementation
       const CurveLPStakingCompartmentImplementation = await ethers.getContractFactory('CurveLPStakingCompartment')
@@ -584,12 +455,16 @@ describe('Basic Forked Mainnet Tests', function () {
       // increase borrower CRV balance
       const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
       const gaugeControllerAddress = '0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB'
+      
 
       const locallyCollBalance = ethers.BigNumber.from(10).pow(18)
       const crvInstance = new ethers.Contract(crvTokenAddress, collTokenAbi, borrower.provider)
       const crvLPInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
       const crvGaugeInstance = new ethers.Contract(crvGaugeAddress, collTokenAbi, borrower.provider)
+      //const rewardContractInstance = new ethers.Contract(rewardContractAddress || '0', collTokenAbi, borrower.provider)
+      const rewardDistributionInstance = new ethers.Contract(rewardsDistributionAddress || '0', crvRewardsDistributorAbi, borrower.provider)
       const rewardTokenInstance = new ethers.Contract(rewardTokenAddress || '0', collTokenAbi, borrower.provider)
+      //const stableSwapInstance = new ethers.Contract(stableSwapAddress || '0', stableSwapAbi, borrower.provider)
 
       const gaugeControllerInstance = new ethers.Contract(gaugeControllerAddress, collTokenAbi, borrower.provider)
 
@@ -597,7 +472,7 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(gaugeControllerInstance.connect(borrower).gauge_types(crvGaugeAddress)).to.be.not.reverted
 
       // Get coll storage slot index
-      const collIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [collTokeSlot, borrower.address])
+      const collIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [collTokenSlot, borrower.address])
       await ethers.provider.send('hardhat_setStorageAt', [
         collTokenAddress,
         collIndex.toString(),
@@ -682,21 +557,25 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // The total amount of CRV, both mintable and already minted
       const totalGaugeRewardCRV = await crvGaugeInstance.claimable_tokens(collTokenCompartmentAddr)
-      let totalGaugeRewardToken = 0
+      let rewardTokenBalPreCompartment = BigNumber.from(0)
 
       if (rewardTokenAddress) {
-        totalGaugeRewardToken = await crvGaugeInstance.claimable_reward(collTokenCompartmentAddr, rewardTokenAddress)
-
-        //expect(totalGaugeRewardToken).to.not.equal(BigNumber.from(0))
+        rewardTokenBalPreCompartment = await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
+        if(rewardsDistributionAddress){
+          await ldo.connect(team).transfer(rewardDistributionInstance.address, '100000000000000000000')
+          await rewardDistributionInstance.connect(team).start_next_rewards_period()
+        }
       }
 
       // check balance pre repay
       const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
+    
 
       expect(totalGaugeRewardCRV).to.not.equal(BigNumber.from(0))
       expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
 
       const repay = async () => {
+        const borrowerRewardTokenBalancePre = rewardTokenAddress ? await rewardTokenInstance.balanceOf(borrower.address): BigNumber.from(0)
         // repay
         await expect(
           borrowerGateway
@@ -719,12 +598,8 @@ describe('Basic Forked Mainnet Tests', function () {
 
         if (rewardTokenAddress) {
           const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
-
-          /*expect(borrowerRewardTokenBalancePost.toString().substring(0, 3)).to.equal(
-            totalGaugeRewardToken.toString().substring(0, 3)
-          )*/
+          expect(borrowerRewardTokenBalancePost).to.be.greaterThan(borrowerRewardTokenBalancePre)
         }
-
         expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance)
       }
 
@@ -732,6 +607,8 @@ describe('Basic Forked Mainnet Tests', function () {
         const coeffRepay = 2
         const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
 
+        const borrowerRewardTokenBalancePre = rewardTokenAddress ? await rewardTokenInstance.balanceOf(borrower.address): BigNumber.from(0)
+        const compartmentRewardTokenBalancePre = rewardTokenAddress ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr): BigNumber.from(0)
         // partial repay
         await expect(
           borrowerGateway.connect(borrower).repay(
@@ -770,16 +647,34 @@ describe('Basic Forked Mainnet Tests', function () {
           .add(totalGaugeRewardCRV.div(coeffRepay))
           .toString()
           .substring(0, 3)
+        let compartmentRewardTokenBalancePost = BigNumber.from(0)
+        
+        if (rewardTokenAddress) {
+          const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
+          compartmentRewardTokenBalancePost = await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
+          expect(borrowerRewardTokenBalancePost).to.be.greaterThan(borrowerRewardTokenBalancePre)
+          if(borrowerRewardTokenBalancePost.gt(borrowerRewardTokenBalancePre)){
+            expect(borrowerRewardTokenBalancePost.sub(borrowerRewardTokenBalancePre).sub(compartmentRewardTokenBalancePost)).to.be.equal(0)
+          
+          }
+        }
 
         // unlock collateral
+        const lenderVaultRewardTokenBalancePreUnlock = rewardTokenAddress ? await rewardTokenInstance.balanceOf(lenderVault.address) : BigNumber.from(0)
         await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], false)
+        const compartmentRewardTokenBalancePostUnlock = rewardTokenAddress ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr) : BigNumber.from(0)
 
         // check vault balance
         const lenderVaultCollBalPost = await crvLPInstance.balanceOf(lenderVault.address)
         const lenderVaultCRVBalancePost = await crvInstance.balanceOf(lenderVault.address)
+        const lenderVaultRewardTokenBalancePostUnlock = rewardTokenAddress ? await rewardTokenInstance.balanceOf(lenderVault.address) : BigNumber.from(0)
 
         expect(lenderVaultCollBalPost).to.equal(locallyCollBalance.div(coeffRepay))
         expect(lenderVaultCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVPostReward)
+        if(compartmentRewardTokenBalancePost.gt(0) && lenderVaultRewardTokenBalancePostUnlock.gt(0)){
+          expect(compartmentRewardTokenBalancePostUnlock).to.be.equal(0)
+          /**todo: write check on partial repay reward to vault */
+        }
       }
 
       isPartialRepay ? await partialRepay() : await repay()
@@ -804,7 +699,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       await stakeInLiquidityGauge({
         collTokenAddress,
-        collTokeSlot: 3,
+        collTokenSlot: 3,
         crvGaugeAddress,
         crvGaugeIndex: 9
       })
@@ -814,13 +709,32 @@ describe('Basic Forked Mainnet Tests', function () {
       const collTokenAddress = '0x06325440D014e39736583c165C2963BA99fAf14E' // LP steth
       const crvGaugeAddress = '0x182B723a58739a9c974cFDB385ceaDb237453c28'
       const lidoTokenAddress = '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32'
+      const rewardsDistributionAddress = '0x753D5167C31fBEB5b49624314d74A957Eb271709'
 
       await stakeInLiquidityGauge({
         collTokenAddress,
-        collTokeSlot: 2,
+        collTokenSlot: 2,
         crvGaugeAddress,
         crvGaugeIndex: 27,
-        rewardTokenAddress: lidoTokenAddress
+        rewardTokenAddress: lidoTokenAddress,
+        rewardsDistributionAddress
+      })
+    })
+
+    it('Should process Curve LP staking in LGauge v2 with LDO rewards and partial repay correctly', async () => {
+      const collTokenAddress = '0x06325440D014e39736583c165C2963BA99fAf14E' // LP steth
+      const crvGaugeAddress = '0x182B723a58739a9c974cFDB385ceaDb237453c28'
+      const lidoTokenAddress = '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32'
+      const rewardsDistributionAddress = '0x753D5167C31fBEB5b49624314d74A957Eb271709'
+
+      await stakeInLiquidityGauge({
+        collTokenAddress,
+        collTokenSlot: 2,
+        crvGaugeAddress,
+        crvGaugeIndex: 27,
+        rewardTokenAddress: lidoTokenAddress,
+        rewardsDistributionAddress,
+        isPartialRepay: true
       })
     })
 
@@ -830,7 +744,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       await stakeInLiquidityGauge({
         collTokenAddress,
-        collTokeSlot: 5,
+        collTokenSlot: 5,
         crvGaugeAddress,
         crvGaugeIndex: 84
       })
@@ -842,7 +756,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       await stakeInLiquidityGauge({
         collTokenAddress,
-        collTokeSlot: 6,
+        collTokenSlot: 6,
         crvGaugeAddress,
         crvGaugeIndex: 192,
         isPartialRepay: true
