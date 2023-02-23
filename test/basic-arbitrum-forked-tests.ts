@@ -114,7 +114,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     await glpStakingCompartmentImplementation.deployed()
 
     // increase borrower GLP balance
-    const collTokenAddress = '0x1aDDD80E6039594eE970E5872D247bf0414C8903' // GLP
+    const collTokenAddress = '0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf' // GLP
     const rewardRouterAddress = '0xB95DB5B167D75e6d04227CfFFA61069348d271F5' // GMX: Reward Router V2
     const glpManagerAddress = '0x3963FfC9dff443c2A94f21b129D429891E32ec18' // GLP Manager
     const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
@@ -128,7 +128,7 @@ describe('Basic Forked Arbitrum Tests', function () {
       .mintAndStakeGlp(weth.address, ONE_WETH, BigNumber.from(0), BigNumber.from(0))
 
     // lender deposits usdc
-    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(10000000))
 
     // get pre balances
     const borrowerCollBalPre = await collInstance.balanceOf(borrower.address)
@@ -136,7 +136,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
     expect(borrowerCollBalPre).to.be.above(BigNumber.from(0))
-    expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
+    expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
 
     // whitelist token pair
     await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
@@ -154,7 +154,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     })
 
     // borrow with on chain quote
-    const collSendAmount = ethers.BigNumber.from(10).pow(18)
+    const collSendAmount = borrowerCollBalPre.div(2)
     const isAutoQuote = false
     const callbackAddr = '0x0000000000000000000000000000000000000000'
     const callbackData = '0x'
@@ -184,6 +184,9 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     // borrower approves borrower gateway
     await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+    // mine 50000 blocks with an interval of 60 seconds, ~1 month
+    await hre.network.provider.send('hardhat_mine', [BigNumber.from(50000).toHexString(), BigNumber.from(60).toHexString()])
 
     // repay
     await expect(
