@@ -39,7 +39,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         uint256 collSendAmount,
         uint256 expectedTransferFee,
         DataTypes.OffChainQuote calldata offChainQuote,
-        uint256 quoteTupleIdx,
+        DataTypes.QuoteTuple calldata quoteTuple,
+        bytes32[] memory proof,
         address callbackAddr,
         bytes calldata callbackData
     ) external nonReentrant {
@@ -51,7 +52,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             !IQuoteHandler(quoteHandler).doesAcceptOffChainQuote(
                 msg.sender,
                 lenderVault,
-                offChainQuote
+                offChainQuote,
+                quoteTuple,
+                proof
             )
         ) {
             revert();
@@ -62,12 +65,12 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 msg.sender,
                 collSendAmount,
                 expectedTransferFee,
-                offChainQuote.quote,
-                quoteTupleIdx
+                offChainQuote.generalQuoteInfo,
+                quoteTuple
             );
         uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
         address collReceiver = getCollReceiver(
-            offChainQuote.quote.borrowerCompartmentImplementation,
+            offChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
             lenderVault,
             loan.borrower,
             loan.collToken,
@@ -105,7 +108,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         address lenderVault,
         uint256 collSendAmount,
         uint256 expectedTransferFee,
-        DataTypes.Quote calldata quote,
+        DataTypes.OnChainQuote calldata onChainQuote,
         uint256 quoteTupleIdx,
         address callbackAddr,
         bytes calldata callbackData
@@ -127,27 +130,30 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             !IQuoteHandler(quoteHandler).doesAcceptOnChainQuote(
                 msg.sender,
                 lenderVault,
-                quote
+                onChainQuote
             )
         ) {
             revert();
         }
+        DataTypes.QuoteTuple memory quoteTuple = onChainQuote.quoteTuples[
+            quoteTupleIdx
+        ];
         (DataTypes.Loan memory loan, uint256 upfrontFee) = IQuoteHandler(
             quoteHandler
         ).fromQuoteToLoanInfo(
                 msg.sender,
                 collSendAmount,
                 expectedTransferFee,
-                quote,
-                quoteTupleIdx
+                onChainQuote.generalQuoteInfo,
+                quoteTuple
             );
         uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
 
         address collReceiver = getCollReceiver(
-            quote.borrowerCompartmentImplementation,
+            onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
             lenderVault,
             loan.borrower,
-            quote.collToken,
+            onChainQuote.generalQuoteInfo.collToken,
             loanId
         );
 

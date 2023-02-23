@@ -16,31 +16,36 @@ library DataTypes {
         address collTokenCompartmentAddr;
     }
 
-    struct QuoteTuples {
-        uint256[] loanPerCollUnitOrLtv;
-        uint256[] interestRatePctInBase;
-        uint256[] upfrontFeePctInBase;
-        uint256[] tenor;
-        uint256 earliestRepayTenor;
-        bool isNegativeInterestRate;
+    struct QuoteTuple {
+        uint256 loanPerCollUnitOrLtv;
+        int256 interestRatePctInBase;
+        uint256 upfrontFeePctInBase;
+        uint256 tenor;
     }
 
-    struct Quote {
+    struct GeneralQuoteInfo {
         address borrower;
         address collToken;
         address loanToken;
-        QuoteTuples quoteTuples;
         address oracleAddr;
         uint256 minLoan;
         uint256 maxLoan;
         uint256 validUntil;
+        uint256 earliestRepayTenor;
         address borrowerCompartmentImplementation;
         bool isSingleUse;
+    }
+
+    struct OnChainQuote {
+        GeneralQuoteInfo generalQuoteInfo;
+        QuoteTuple[] quoteTuples;
         bytes32 salt;
     }
 
     struct OffChainQuote {
-        Quote quote;
+        GeneralQuoteInfo generalQuoteInfo;
+        bytes32 quoteTuplesRoot;
+        bytes32 salt;
         uint256 nonce;
         uint8 v;
         bytes32 r;

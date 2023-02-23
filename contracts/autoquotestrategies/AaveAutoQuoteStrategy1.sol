@@ -52,7 +52,11 @@ contract AaveAutoQuoteStrategy1 is IAutoQuoteStrategy {
     address constant COLL_TOKEN = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address constant LOAN_TOKEN = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
-    function getQuote() external view returns (DataTypes.Quote memory quote) {
+    function getQuote()
+        external
+        view
+        returns (DataTypes.OnChainQuote memory onChainQuote)
+    {
         /*
         quote.collToken = COLL_TOKEN;
         quote.loanToken = LOAN_TOKEN;

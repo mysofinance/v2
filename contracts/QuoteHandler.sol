@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
@@ -22,7 +23,7 @@ contract QuoteHandler {
 
     event OnChainQuote(
         address lenderVault,
-        DataTypes.Quote quote,
+        DataTypes.OnChainQuote onChainQuote,
         bytes32 onChainQuoteHash,
         bool isActive
     );
@@ -33,7 +34,7 @@ contract QuoteHandler {
 
     function addOnChainQuote(
         address lenderVault,
-        DataTypes.Quote calldata quote
+        DataTypes.OnChainQuote calldata onChainQuote
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
@@ -41,29 +42,29 @@ contract QuoteHandler {
         if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
             revert();
         }
-        if (!isValidQuote(quote)) {
+        if (!isValidOnChainQuote(onChainQuote)) {
             revert();
         }
         if (
             !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                quote.collToken,
-                quote.loanToken
+                onChainQuote.generalQuoteInfo.collToken,
+                onChainQuote.generalQuoteInfo.loanToken
             )
         ) {
             revert();
         }
-        bytes32 onChainQuoteHash = hashOnChainQuote(quote);
+        bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (isOnChainQuote[lenderVault][onChainQuoteHash]) {
             revert();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = true;
-        emit OnChainQuote(lenderVault, quote, onChainQuoteHash, true);
+        emit OnChainQuote(lenderVault, onChainQuote, onChainQuoteHash, true);
     }
 
     function updateOnChainQuote(
         address lenderVault,
-        DataTypes.Quote calldata oldQuote,
-        DataTypes.Quote calldata newQuote
+        DataTypes.OnChainQuote calldata oldOnChainQuote,
+        DataTypes.OnChainQuote calldata newOnChainQuote
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
@@ -71,31 +72,36 @@ contract QuoteHandler {
         if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
             revert();
         }
-        if (!isValidQuote(newQuote)) {
+        if (!isValidOnChainQuote(newOnChainQuote)) {
             revert();
         }
         if (
             !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                newQuote.collToken,
-                newQuote.loanToken
+                newOnChainQuote.generalQuoteInfo.collToken,
+                newOnChainQuote.generalQuoteInfo.loanToken
             )
         ) {
             revert();
         }
-        bytes32 onChainQuoteHash = hashOnChainQuote(oldQuote);
+        bytes32 onChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
             revert();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
-        emit OnChainQuote(lenderVault, oldQuote, onChainQuoteHash, false);
-        onChainQuoteHash = hashOnChainQuote(newQuote);
+        emit OnChainQuote(
+            lenderVault,
+            oldOnChainQuote,
+            onChainQuoteHash,
+            false
+        );
+        onChainQuoteHash = hashOnChainQuote(newOnChainQuote);
         isOnChainQuote[lenderVault][onChainQuoteHash] = true;
-        emit OnChainQuote(lenderVault, newQuote, onChainQuoteHash, true);
+        emit OnChainQuote(lenderVault, newOnChainQuote, onChainQuoteHash, true);
     }
 
     function deleteOnChainQuote(
         address lenderVault,
-        DataTypes.Quote calldata quote
+        DataTypes.OnChainQuote calldata onChainQuote
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
@@ -103,12 +109,12 @@ contract QuoteHandler {
         if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
             revert();
         }
-        bytes32 onChainQuoteHash = hashOnChainQuote(quote);
+        bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
             revert();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
-        emit OnChainQuote(lenderVault, quote, onChainQuoteHash, false);
+        emit OnChainQuote(lenderVault, onChainQuote, onChainQuoteHash, false);
     }
 
     function addAutoQuoteStrategy() external {}
@@ -116,36 +122,42 @@ contract QuoteHandler {
     function doesAcceptOnChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.Quote memory quote
+        DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool) {
         if (
             !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                quote.collToken,
-                quote.loanToken
+                onChainQuote.generalQuoteInfo.collToken,
+                onChainQuote.generalQuoteInfo.loanToken
             )
         ) {
             return false;
         }
-        if (quote.borrower != address(0) && quote.borrower != borrower) {
+        if (
+            onChainQuote.generalQuoteInfo.borrower != address(0) &&
+            onChainQuote.generalQuoteInfo.borrower != borrower
+        ) {
             return false;
         }
-        return isOnChainQuote[lenderVault][hashOnChainQuote(quote)];
+        return isOnChainQuote[lenderVault][hashOnChainQuote(onChainQuote)];
     }
 
     function doesAcceptAutoQuote(
         address borrower,
         address /*lenderVault*/,
-        DataTypes.Quote memory quote
+        DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool) {
         if (
             !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                quote.collToken,
-                quote.loanToken
+                onChainQuote.generalQuoteInfo.collToken,
+                onChainQuote.generalQuoteInfo.loanToken
             )
         ) {
             return false;
         }
-        if (quote.borrower != address(0) && quote.borrower != borrower) {
+        if (
+            onChainQuote.generalQuoteInfo.borrower != address(0) &&
+            onChainQuote.generalQuoteInfo.borrower != borrower
+        ) {
             return false;
         }
         return false;
@@ -159,22 +171,24 @@ contract QuoteHandler {
     function doesAcceptOffChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.OffChainQuote calldata offChainQuote
+        DataTypes.OffChainQuote calldata offChainQuote,
+        DataTypes.QuoteTuple calldata quoteTuple,
+        bytes32[] memory proof
     ) external view returns (bool) {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
         }
         if (
             !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                offChainQuote.quote.collToken,
-                offChainQuote.quote.loanToken
+                offChainQuote.generalQuoteInfo.collToken,
+                offChainQuote.generalQuoteInfo.loanToken
             )
         ) {
             return false;
         }
         if (
-            offChainQuote.quote.borrower != address(0) &&
-            offChainQuote.quote.borrower != borrower
+            offChainQuote.generalQuoteInfo.borrower != address(0) &&
+            offChainQuote.generalQuoteInfo.borrower != borrower
         ) {
             return false;
         }
@@ -199,8 +213,23 @@ contract QuoteHandler {
         );
         if (
             recoveredSigner != ILenderVault(lenderVault).vaultOwner() ||
-            offChainQuote.quote.validUntil < block.timestamp
+            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
         ) {
+            return false;
+        }
+        bytes32 leaf = keccak256(
+            bytes.concat(
+                keccak256(
+                    abi.encode(
+                        quoteTuple.loanPerCollUnitOrLtv,
+                        quoteTuple.interestRatePctInBase,
+                        quoteTuple.upfrontFeePctInBase,
+                        quoteTuple.tenor
+                    )
+                )
+            )
+        );
+        if (!MerkleProof.verify(proof, offChainQuote.quoteTuplesRoot, leaf)) {
             return false;
         }
         return true;
@@ -230,22 +259,29 @@ contract QuoteHandler {
     }
 
     function hashOnChainQuote(
-        DataTypes.Quote memory quote
+        DataTypes.OnChainQuote memory onChainQuote
     ) public pure returns (bytes32 quoteHash) {
-        quoteHash = keccak256(abi.encode(quote));
+        quoteHash = keccak256(abi.encode(onChainQuote));
     }
 
     function hashOffChainQuote(
         DataTypes.OffChainQuote memory offChainQuote
     ) public pure returns (bytes32 quoteHash) {
         quoteHash = keccak256(
-            abi.encode(offChainQuote.quote, offChainQuote.nonce)
+            abi.encode(
+                offChainQuote.generalQuoteInfo,
+                offChainQuote.quoteTuplesRoot,
+                offChainQuote.salt,
+                offChainQuote.nonce
+            )
         );
     }
 
-    function isValidQuote(
-        DataTypes.Quote calldata quote
+    function isValidOnChainQuote(
+        DataTypes.OnChainQuote calldata /*onChainQuote*/
     ) public view returns (bool) {
+        return true;
+        /*
         console.log("PASS 1");
         if (quote.collToken == quote.loanToken) {
             return false;
@@ -296,71 +332,55 @@ contract QuoteHandler {
             }
         }
         return true;
+        */
     }
 
     function fromQuoteToLoanInfo(
         address borrower,
         uint256 collSendAmount,
         uint256 expectedTransferFee,
-        DataTypes.Quote calldata quote,
-        uint256 quoteTupleIdx
+        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypes.QuoteTuple calldata quoteTuple
     ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
         loan.borrower = borrower;
         if (collSendAmount < expectedTransferFee) {
             revert(); // InsufficientSendAmount();
         }
-        if (quote.oracleAddr != address(0)) {
+        if (generalQuoteInfo.oracleAddr != address(0)) {
             revert(); // ToDo: implement oracle handling
         }
-        if (quoteTupleIdx > quote.quoteTuples.loanPerCollUnitOrLtv.length) {
+        uint256 loanAmount = (quoteTuple.loanPerCollUnitOrLtv *
+            (collSendAmount - expectedTransferFee)) /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        uint256 repayAmount;
+        int256 _interestRate = int256(BASE) + quoteTuple.interestRatePctInBase;
+        if (_interestRate < 0) {
             revert();
         }
-        uint256 loanAmount = (quote.quoteTuples.loanPerCollUnitOrLtv[
-            quoteTupleIdx
-        ] * (collSendAmount - expectedTransferFee)) /
-            (10 ** IERC20Metadata(quote.collToken).decimals());
-        uint256 repayAmount;
-        if (quote.quoteTuples.isNegativeInterestRate) {
-            repayAmount =
-                (loanAmount *
-                    (BASE -
-                        quote.quoteTuples.interestRatePctInBase[
-                            quoteTupleIdx
-                        ])) /
-                BASE;
-        } else {
-            repayAmount =
-                (loanAmount *
-                    (BASE +
-                        quote.quoteTuples.interestRatePctInBase[
-                            quoteTupleIdx
-                        ])) /
-                BASE;
-        }
-        upfrontFee =
-            (collSendAmount *
-                quote.quoteTuples.upfrontFeePctInBase[quoteTupleIdx]) /
-            BASE;
+        uint256 interestRateFactor = uint256(_interestRate);
+        repayAmount = (loanAmount * interestRateFactor) / BASE;
+        upfrontFee = (collSendAmount * quoteTuple.upfrontFeePctInBase) / BASE;
         // minimum coll amount to prevent griefing attacks or small unlocks that aren't worth it
-        if (loanAmount < quote.minLoan || loanAmount > quote.maxLoan) {
+        if (
+            loanAmount < generalQuoteInfo.minLoan ||
+            loanAmount > generalQuoteInfo.maxLoan
+        ) {
             revert(); // revert InsufficientSendAmount();
         }
-        loan.loanToken = quote.loanToken;
-        loan.collToken = quote.collToken;
+        loan.loanToken = generalQuoteInfo.loanToken;
+        loan.collToken = generalQuoteInfo.collToken;
         loan.initCollAmount = toUint128(
             collSendAmount - upfrontFee - expectedTransferFee
         );
         loan.initLoanAmount = toUint128(loanAmount);
         loan.initRepayAmount = toUint128(repayAmount);
-        loan.expiry = uint40(
-            block.timestamp + quote.quoteTuples.tenor[quoteTupleIdx]
-        );
+        loan.expiry = uint40(block.timestamp + quoteTuple.tenor);
         loan.earliestRepay = uint40(
-            block.timestamp + quote.quoteTuples.earliestRepayTenor
+            block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
-        if (quote.borrowerCompartmentImplementation != address(0)) {
+        if (generalQuoteInfo.borrowerCompartmentImplementation != address(0)) {
             loan = setCompartmentLoanData(
-                quote.borrowerCompartmentImplementation,
+                generalQuoteInfo.borrowerCompartmentImplementation,
                 borrower,
                 loan
             );

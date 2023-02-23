@@ -8,20 +8,22 @@ interface IQuoteHandler {
     function doesAcceptOffChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.OffChainQuote calldata offChainQuote
+        DataTypes.OffChainQuote calldata offChainQuote,
+        DataTypes.QuoteTuple calldata quoteTuple,
+        bytes32[] memory proof
     ) external view returns (bool);
 
     function doesAcceptOnChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.Quote memory quote
+        DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool);
 
     function fromQuoteToLoanInfo(
         address borrower,
         uint256 collSendAmount,
         uint256 expectedTransferFee,
-        DataTypes.Quote calldata quote,
-        uint256 quoteTupleIdx
+        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypes.QuoteTuple calldata quoteTuple
     ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee);
 }
