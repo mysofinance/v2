@@ -14,24 +14,54 @@ contract BorrowerCompartmentFactory is IBorrowerCompartmentFactory {
         address collToken,
         uint256 loanId
     ) external returns (address newBorrowerCompartment) {
-        bytes32 salt = keccak256(
-            abi.encodePacked(
+        newBorrowerCompartment = Clones.cloneDeterministic(
+            borrowerCompartmentImplementation,
+            getSalt(
                 borrowerCompartmentImplementation,
                 lenderVault,
                 borrower,
                 loanId
             )
         );
-        newBorrowerCompartment = Clones.cloneDeterministic(
-            borrowerCompartmentImplementation,
-            salt
-        );
-
         IBorrowerCompartment(newBorrowerCompartment).initialize(
             lenderVault,
             borrower,
             collToken,
             loanId
+        );
+    }
+
+    function predictCompartmentAddress(
+        address borrowerCompartmentImplementation,
+        address lenderVault,
+        address borrower,
+        uint256 loanId
+    ) external view returns (address compartmentAddress) {
+        compartmentAddress = Clones.predictDeterministicAddress(
+            borrowerCompartmentImplementation,
+            getSalt(
+                borrowerCompartmentImplementation,
+                lenderVault,
+                borrower,
+                loanId
+            ),
+            address(this)
+        );
+    }
+
+    function getSalt(
+        address borrowerCompartmentImplementation,
+        address lenderVault,
+        address borrower,
+        uint256 loanId
+    ) internal pure returns (bytes32 salt) {
+        salt = keccak256(
+            abi.encodePacked(
+                borrowerCompartmentImplementation,
+                lenderVault,
+                borrower,
+                loanId
+            )
         );
     }
 }

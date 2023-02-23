@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
+import {IBorrowerCompartmentFactory} from "./interfaces/IBorrowerCompartmentFactory.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
@@ -133,12 +134,68 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         }
     }
 
+    function prepareLoanAndUpfrontFee(
+        address borrower,
+        uint256 collSendAmount,
+        uint256 expectedTransferFee,
+        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypes.QuoteTuple calldata quoteTuple
+    ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee) {
+        loan.borrower = borrower;
+        if (collSendAmount < expectedTransferFee) {
+            revert(); // InsufficientSendAmount();
+        }
+        if (generalQuoteInfo.oracleAddr != address(0)) {
+            revert(); // ToDo: implement oracle handling
+        }
+        uint256 loanAmount = (quoteTuple.loanPerCollUnitOrLtv *
+            (collSendAmount - expectedTransferFee)) /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        uint256 repayAmount;
+        int256 _interestRate = int256(BASE) + quoteTuple.interestRatePctInBase;
+        if (_interestRate < 0) {
+            revert();
+        }
+        uint256 interestRateFactor = uint256(_interestRate);
+        repayAmount = (loanAmount * interestRateFactor) / BASE;
+        upfrontFee = (collSendAmount * quoteTuple.upfrontFeePctInBase) / BASE;
+        // minimum coll amount to prevent griefing attacks or small unlocks that aren't worth it
+        if (
+            loanAmount < generalQuoteInfo.minLoan ||
+            loanAmount > generalQuoteInfo.maxLoan
+        ) {
+            revert(); // revert InsufficientSendAmount();
+        }
+        loan.loanToken = generalQuoteInfo.loanToken;
+        loan.collToken = generalQuoteInfo.collToken;
+        loan.initCollAmount = toUint128(
+            collSendAmount - upfrontFee - expectedTransferFee
+        );
+        loan.initLoanAmount = toUint128(loanAmount);
+        loan.initRepayAmount = toUint128(repayAmount);
+        loan.expiry = uint40(block.timestamp + quoteTuple.tenor);
+        loan.earliestRepay = uint40(
+            block.timestamp + generalQuoteInfo.earliestRepayTenor
+        );
+        if (generalQuoteInfo.borrowerCompartmentImplementation != address(0)) {
+            address compartmentFactory = IAddressRegistry(addressRegistry)
+                .borrowerCompartmentFactory();
+            IBorrowerCompartmentFactory(compartmentFactory)
+                .predictCompartmentAddress(
+                    generalQuoteInfo.borrowerCompartmentImplementation,
+                    address(this),
+                    borrower,
+                    _loans.length
+                );
+        }
+    }
+
     function addLoan(
         DataTypes.Loan calldata loan
     ) external returns (uint256 loanId) {
         senderCheckGateway();
-        loanId = _loans.length;
         _loans.push(loan);
+        loanId = _loans.length - 1;
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -203,6 +260,13 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
 
     function senderCheckGateway() internal view {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
+            revert();
+        }
+    }
+
+    function toUint128(uint256 x) internal pure returns (uint128 y) {
+        y = uint128(x);
+        if (y != x) {
             revert();
         }
     }

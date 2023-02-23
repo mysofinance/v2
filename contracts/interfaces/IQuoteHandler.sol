@@ -18,12 +18,4 @@ interface IQuoteHandler {
         address lenderVault,
         DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool);
-
-    function fromQuoteToLoanInfo(
-        address borrower,
-        uint256 collSendAmount,
-        uint256 expectedTransferFee,
-        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
-        DataTypes.QuoteTuple calldata quoteTuple
-    ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee);
 }

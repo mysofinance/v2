@@ -45,4 +45,12 @@ interface ILenderVault {
         uint256 collAmount,
         bool isRepay
     ) external;
+
+    function prepareLoanAndUpfrontFee(
+        address borrower,
+        uint256 collSendAmount,
+        uint256 expectedTransferFee,
+        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypes.QuoteTuple calldata quoteTuple
+    ) external view returns (DataTypes.Loan memory loan, uint256 upfrontFee);
 }

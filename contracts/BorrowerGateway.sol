@@ -59,9 +59,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         ) {
             revert();
         }
-        (DataTypes.Loan memory loan, uint256 upfrontFee) = IQuoteHandler(
-            quoteHandler
-        ).fromQuoteToLoanInfo(
+        (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
+            lenderVault
+        ).prepareLoanAndUpfrontFee(
                 msg.sender,
                 collSendAmount,
                 expectedTransferFee,
@@ -138,9 +138,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypes.QuoteTuple memory quoteTuple = onChainQuote.quoteTuples[
             quoteTupleIdx
         ];
-        (DataTypes.Loan memory loan, uint256 upfrontFee) = IQuoteHandler(
-            quoteHandler
-        ).fromQuoteToLoanInfo(
+        (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
+            lenderVault
+        ).prepareLoanAndUpfrontFee(
                 msg.sender,
                 collSendAmount,
                 expectedTransferFee,
