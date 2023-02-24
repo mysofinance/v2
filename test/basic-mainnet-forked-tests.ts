@@ -115,10 +115,8 @@ describe('Basic Forked Mainnet Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
-    // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
-    await addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
-    await addressRegistry.setBorrowerGateway(borrowerGateway.address)
-    await addressRegistry.setQuoteHandler(quoteHandler.address)
+    // initialize address registry
+    await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
