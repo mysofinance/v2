@@ -6,17 +6,13 @@ import { createOnChainRequest } from './helpers'
 
 const hre = require('hardhat')
 
-const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
-const ONE_USDC = ethers.BigNumber.from(10).pow(6)
-const ONE_WETH = ethers.BigNumber.from(10).pow(18)
-const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
-
 describe('Basic Forked Arbitrum Tests', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
+    // deploy address registry
     // deploy address registry
     const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
     const addressRegistry = await AddressRegistry.connect(team).deploy()
@@ -26,6 +22,11 @@ describe('Basic Forked Arbitrum Tests', function () {
     const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
     const borrowerGateway = await BorrowerGateway.connect(team).deploy(addressRegistry.address)
     await borrowerGateway.deployed()
+
+    // deploy quote handler
+    const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
+    const quoteHandler = await QuoteHandler.connect(team).deploy(addressRegistry.address)
+    await quoteHandler.deployed()
 
     // deploy lender vault implementation
     const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
@@ -40,16 +41,8 @@ describe('Basic Forked Arbitrum Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
-    // deploy borrower compartment factory
-    const BorrowerCompartmentFactory = await ethers.getContractFactory('BorrowerCompartmentFactory')
-    await BorrowerCompartmentFactory.connect(team)
-    const borrowerCompartmentFactory = await BorrowerCompartmentFactory.deploy()
-    await borrowerCompartmentFactory.deployed()
-
-    // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
-    addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
-    addressRegistry.setBorrowerGateway(borrowerGateway.address)
-    addressRegistry.setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
+    // initialize address registry
+    await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
@@ -91,7 +84,6 @@ describe('Basic Forked Arbitrum Tests', function () {
     return {
       addressRegistry,
       borrowerGateway,
-      borrowerCompartmentFactory,
       lenderVaultImplementation,
       lender,
       borrower,
@@ -100,12 +92,14 @@ describe('Basic Forked Arbitrum Tests', function () {
       weth,
       lenderVault,
       lenderVaultFactory,
+      quoteHandler,
       balancerV2Looping
     }
   }
 
   it('Should process GLP borrow/repay correctly with rewards', async function () {
-    const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
+    const { borrowerGateway, lender, borrower, quoteHandler, team, usdc, weth, lenderVault, addressRegistry } =
+      await setupTest()
 
     // create curve staking implementation
     const GlpStakingCompartmentImplementation = await ethers.getContractFactory('GLPStakingCompartment')
@@ -151,14 +145,16 @@ describe('Basic Forked Arbitrum Tests', function () {
       loanToken: usdc.address,
       borrowerCompartmentImplementation: glpStakingCompartmentImplementation.address,
       lenderVault,
+      quoteHandler,
       loanPerCollUnit: ONE_USDC.mul(1000)
     })
 
     // borrow with on chain quote
     const collSendAmount = borrowerCollBalPre
-    const isAutoQuote = false
-    const callbackAddr = '0x0000000000000000000000000000000000000000'
-    const callbackData = '0x'
+    const expectedTransferFee = 0
+    const quoteTupleIdx = 0
+    const callbackAddr = ZERO_ADDR
+    const callbackData = ZERO_BYTES32
 
     // Since there is a 15 min cooldown duration after minting GLP, needs to pass for the user before transfer
     // mine 200 blocks with an interval of 60 seconds, ~3 hours
@@ -166,7 +162,15 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     const borrowWithOnChainQuoteTransaction = await borrowerGateway
       .connect(borrower)
-      .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+      .borrowWithOnChainQuote(
+        lenderVault.address,
+        collSendAmount,
+        expectedTransferFee,
+        onChainQuote,
+        quoteTupleIdx,
+        callbackAddr,
+        callbackData
+      )
 
     const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 

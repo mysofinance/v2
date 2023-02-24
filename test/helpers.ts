@@ -10,7 +10,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 
-const createOnChainRequest = async ({
+export const createOnChainRequest = async ({
   lender,
   collToken,
   loanToken,

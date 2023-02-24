@@ -1,9 +1,8 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { LenderVault, QuoteHandler } from '../typechain-types'
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi } from './abi'
+import { createOnChainRequest } from './helpers'
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
