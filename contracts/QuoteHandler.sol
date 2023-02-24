@@ -20,12 +20,13 @@ contract QuoteHandler {
     mapping(address => mapping(address => bool))
         public isActiveAutoQuoteStrategy;
 
-    event OnChainQuote(
+    event OnChainQuoteAdded(
         address lenderVault,
         DataTypes.OnChainQuote onChainQuote,
-        bytes32 onChainQuoteHash,
-        bool isActive
+        bytes32 onChainQuoteHash
     );
+
+    event OnChainQuoteDeleted(address lenderVault, bytes32 onChainQuoteHash);
 
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
@@ -57,7 +58,7 @@ contract QuoteHandler {
             revert();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = true;
-        emit OnChainQuote(lenderVault, onChainQuote, onChainQuoteHash, true);
+        emit OnChainQuoteAdded(lenderVault, onChainQuote, onChainQuoteHash);
     }
 
     function updateOnChainQuote(
@@ -87,15 +88,10 @@ contract QuoteHandler {
             revert();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
-        emit OnChainQuote(
-            lenderVault,
-            oldOnChainQuote,
-            onChainQuoteHash,
-            false
-        );
+        emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
         onChainQuoteHash = hashOnChainQuote(newOnChainQuote);
         isOnChainQuote[lenderVault][onChainQuoteHash] = true;
-        emit OnChainQuote(lenderVault, newOnChainQuote, onChainQuoteHash, true);
+        emit OnChainQuoteAdded(lenderVault, newOnChainQuote, onChainQuoteHash);
     }
 
     function deleteOnChainQuote(
@@ -113,7 +109,7 @@ contract QuoteHandler {
             revert();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
-        emit OnChainQuote(lenderVault, onChainQuote, onChainQuoteHash, false);
+        emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
     }
 
     function addAutoQuoteStrategy() external {}

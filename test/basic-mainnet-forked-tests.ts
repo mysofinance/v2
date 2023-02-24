@@ -80,7 +80,7 @@ const createOnChainRequest = async ({
     salt: ZERO_BYTES32
   }
   await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-  .to.emit(quoteHandler, 'OnChainQuote')
+  .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
   return onChainQuote
 }
@@ -250,7 +250,7 @@ describe('Basic Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuote')
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
       // Balancer V2 integration: calculate which send amount would be needed to max. lever up in 1-click
       const poolAddr = '0x96646936b91d6B9D7D0c47C496AfBF3D6ec7B6f8'
@@ -1033,7 +1033,7 @@ describe('Basic Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuote')
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
       // check balance pre borrow
       const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
@@ -1110,7 +1110,7 @@ describe('Basic Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuote')
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
       
       const collSendAmount = ONE_PAXG
       const protocolFeeAmount = ONE_PAXG.mul(protocolFee).mul(ONE_DAY.mul(90)).div(BASE).div(YEAR_IN_SECONDS)

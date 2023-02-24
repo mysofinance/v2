@@ -150,7 +150,8 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         )
     {
         senderCheckGateway();
-        if (collSendAmount < expectedTransferFee) {
+        upfrontFee = (collSendAmount * quoteTuple.upfrontFeePctInBase) / BASE;
+        if (collSendAmount < upfrontFee + expectedTransferFee) {
             revert(); // InsufficientSendAmount();
         }
         if (generalQuoteInfo.oracleAddr != address(0)) {
@@ -159,20 +160,20 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         uint256 loanAmount = (quoteTuple.loanPerCollUnitOrLtv *
             (collSendAmount - expectedTransferFee)) /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
-        // minimum coll amount to prevent griefing attacks or small unlocks that aren't worth it
+        // checks to prevent griefing attacks (e.g. small unlocks that aren't worth it)
         if (
             loanAmount < generalQuoteInfo.minLoan ||
             loanAmount > generalQuoteInfo.maxLoan
         ) {
             revert(); // revert InsufficientSendAmount();
         }
-        int256 _interestRate = int256(BASE) + quoteTuple.interestRatePctInBase;
-        if (_interestRate < 0) {
+        int256 _interestRateFactor = int256(BASE) +
+            quoteTuple.interestRatePctInBase;
+        if (_interestRateFactor < 0) {
             revert();
         }
-        uint256 interestRateFactor = uint256(_interestRate);
+        uint256 interestRateFactor = uint256(_interestRateFactor);
         uint256 repayAmount = (loanAmount * interestRateFactor) / BASE;
-        upfrontFee = (collSendAmount * quoteTuple.upfrontFeePctInBase) / BASE;
 
         loan.borrower = borrower;
         loan.loanToken = generalQuoteInfo.loanToken;
@@ -186,6 +187,9 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         loan.earliestRepay = uint40(
             block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
+        if (loan.expiry <= loan.earliestRepay) {
+            revert();
+        }
 
         if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {
             collReceiver = address(this);

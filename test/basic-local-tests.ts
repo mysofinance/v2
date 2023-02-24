@@ -367,7 +367,7 @@ describe('Basic Local Tests', function () {
         salt: ZERO_BYTES32
       }
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuote')
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -445,14 +445,14 @@ describe('Basic Local Tests', function () {
       }
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuote')
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
       quoteTuples[0].loanPerCollUnitOrLtv = ONE_USDC.mul(900)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuote')
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
       await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuote')
+        .to.emit(quoteHandler, 'OnChainQuoteDeleted')
     })
   })
 })
