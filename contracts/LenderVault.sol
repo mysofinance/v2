@@ -150,7 +150,6 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         )
     {
         senderCheckGateway();
-        loan.borrower = borrower;
         if (collSendAmount < expectedTransferFee) {
             revert(); // InsufficientSendAmount();
         }
@@ -160,14 +159,6 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         uint256 loanAmount = (quoteTuple.loanPerCollUnitOrLtv *
             (collSendAmount - expectedTransferFee)) /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
-        uint256 repayAmount;
-        int256 _interestRate = int256(BASE) + quoteTuple.interestRatePctInBase;
-        if (_interestRate < 0) {
-            revert();
-        }
-        uint256 interestRateFactor = uint256(_interestRate);
-        repayAmount = (loanAmount * interestRateFactor) / BASE;
-        upfrontFee = (collSendAmount * quoteTuple.upfrontFeePctInBase) / BASE;
         // minimum coll amount to prevent griefing attacks or small unlocks that aren't worth it
         if (
             loanAmount < generalQuoteInfo.minLoan ||
@@ -175,6 +166,15 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         ) {
             revert(); // revert InsufficientSendAmount();
         }
+        int256 _interestRate = int256(BASE) + quoteTuple.interestRatePctInBase;
+        if (_interestRate < 0) {
+            revert();
+        }
+        uint256 interestRateFactor = uint256(_interestRate);
+        uint256 repayAmount = (loanAmount * interestRateFactor) / BASE;
+        upfrontFee = (collSendAmount * quoteTuple.upfrontFeePctInBase) / BASE;
+
+        loan.borrower = borrower;
         loan.loanToken = generalQuoteInfo.loanToken;
         loan.collToken = generalQuoteInfo.collToken;
         loan.initCollAmount = toUint128(
