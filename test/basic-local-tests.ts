@@ -142,9 +142,9 @@ describe('Basic Local Tests', function () {
         quoteTuplesRoot: quoteTuplesRoot,
         salt: ZERO_BYTES32,
         nonce: 0,
-        v: 0,
-        r: ZERO_BYTES32,
-        s: ZERO_BYTES32
+        v: [0],
+        r: [ZERO_BYTES32],
+        s: [ZERO_BYTES32]
       }
       const payload = ethers.utils.defaultAbiCoder.encode(
         [
@@ -229,10 +229,13 @@ describe('Basic Local Tests', function () {
       const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
       expect(recoveredAddr).to.equal(lender.address)
 
+      // add signer
+      lenderVault.connect(lender).addSigners([lender.address])
+
       // lender add sig to quote and pass to borrower
-      offChainQuote.v = sig.v
-      offChainQuote.r = sig.r
-      offChainQuote.s = sig.s
+      offChainQuote.v = [sig.v]
+      offChainQuote.r = [sig.r]
+      offChainQuote.s = [sig.s]
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)

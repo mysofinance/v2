@@ -47,9 +47,9 @@ library DataTypes {
         bytes32 quoteTuplesRoot;
         bytes32 salt;
         uint256 nonce;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
+        uint8[] v;
+        bytes32[] r;
+        bytes32[] s;
     }
 
     struct LoanRepayInfo {

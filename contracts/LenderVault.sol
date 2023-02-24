@@ -22,6 +22,9 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     address public vaultOwner;
     address public newVaultOwner;
     address public addressRegistry;
+    address[] public signers;
+    uint256 public minNumOfSigners;
+    mapping(address => bool) public isSigner;
 
     mapping(address => uint256) public lockedAmounts;
     DataTypes.Loan[] _loans; // stores loans
@@ -35,6 +38,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
     ) external initializer {
         vaultOwner = _vaultOwner;
         addressRegistry = _addressRegistry;
+        minNumOfSigners = 1;
     }
 
     function proposeNewVaultOwner(address _newOwner) external {
@@ -47,6 +51,43 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
             revert Invalid();
         }
         vaultOwner = newVaultOwner;
+    }
+
+    function addSigners(address[] calldata _signers) external {
+        senderCheckOwner();
+        for (uint256 i = 0; i < _signers.length; ) {
+            if (isSigner[_signers[i]]) {
+                revert();
+            }
+            isSigner[_signers[i]] = true;
+            signers.push(_signers[i]);
+            unchecked {
+                i++;
+            }
+        }
+    }
+
+    function removeSigner(address signer, uint256 signerIdx) external {
+        senderCheckOwner();
+        uint256 signersLen = signers.length;
+        if (signerIdx > signersLen - 1) {
+            revert();
+        }
+
+        if (!isSigner[signer] || signer != signers[signerIdx]) {
+            revert();
+        }
+        signers[signerIdx] = signers[signersLen - 1];
+        signers.pop();
+        isSigner[signer] = false;
+    }
+
+    function setMinNumOfSigners(uint256 _minNumOfSigners) external {
+        senderCheckOwner();
+        if (_minNumOfSigners == 0) {
+            revert();
+        }
+        minNumOfSigners = _minNumOfSigners;
     }
 
     function loans(

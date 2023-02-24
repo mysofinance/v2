@@ -190,28 +190,28 @@ contract QuoteHandler {
         if (offChainQuote.nonce > offChainQuoteNonce[lenderVault]) {
             return false;
         }
+        if (offChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
+            return false;
+        }
+        uint256 minNumOfSigners = ILenderVault(lenderVault).minNumOfSigners();
+        if (
+            offChainQuote.v.length != offChainQuote.r.length &&
+            offChainQuote.v.length != offChainQuote.s.length &&
+            offChainQuote.v.length < minNumOfSigners
+        ) {
+            revert();
+        }
+
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
             return false;
         }
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(
-                "\x19Ethereum Signed Message:\n32",
-                offChainQuoteHash
-            )
-        );
-        address recoveredSigner = ecrecover(
-            messageHash,
-            offChainQuote.v,
-            offChainQuote.r,
-            offChainQuote.s
-        );
         if (
-            recoveredSigner != ILenderVault(lenderVault).vaultOwner() ||
-            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
+            !hasValidSignatures(lenderVault, offChainQuoteHash, offChainQuote)
         ) {
-            return false;
+            revert();
         }
+
         bytes32 leaf = keccak256(
             bytes.concat(
                 keccak256(
@@ -226,6 +226,42 @@ contract QuoteHandler {
         );
         if (!MerkleProof.verify(proof, offChainQuote.quoteTuplesRoot, leaf)) {
             return false;
+        }
+        return true;
+    }
+
+    function hasValidSignatures(
+        address lenderVault,
+        bytes32 offChainQuoteHash,
+        DataTypes.OffChainQuote calldata offChainQuote
+    ) internal view returns (bool) {
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                offChainQuoteHash
+            )
+        );
+        uint256 tmp;
+        address recoveredSigner;
+        for (uint256 i = 0; i < offChainQuote.v.length; ) {
+            recoveredSigner = ecrecover(
+                messageHash,
+                offChainQuote.v[i],
+                offChainQuote.r[i],
+                offChainQuote.s[i]
+            );
+
+            if (tmp == tmp | uint256(uint160(recoveredSigner))) {
+                return false;
+            }
+
+            if (!ILenderVault(lenderVault).isSigner(recoveredSigner)) {
+                return false;
+            }
+            tmp |= uint256(uint160(recoveredSigner));
+            unchecked {
+                i++;
+            }
         }
         return true;
     }

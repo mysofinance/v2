@@ -56,4 +56,8 @@ interface ILenderVault {
             uint256 upfrontFee,
             address collReceiver
         );
+
+    function minNumOfSigners() external view returns (uint256);
+
+    function isSigner(address signer) external view returns (bool);
 }
