@@ -6,6 +6,13 @@ import { createOnChainRequest } from './helpers'
 
 const hre = require('hardhat')
 
+const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
+const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
+const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
+const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
+const ONE_USDC = ethers.BigNumber.from(10).pow(6)
+const ONE_WETH = ethers.BigNumber.from(10).pow(18)
+
 describe('Basic Forked Arbitrum Tests', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
