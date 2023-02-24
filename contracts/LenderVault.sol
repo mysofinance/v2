@@ -196,28 +196,12 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         if (collSendAmount < upfrontFee + expectedTransferFee) {
             revert(); // InsufficientSendAmount();
         }
-        uint256 loanPerCollUnit;
-        if (generalQuoteInfo.oracleAddr == address(0)) {
-            loanPerCollUnit = quoteTuple.loanPerCollUnitOrLtv;
-        } else {
-            if (
-                !IAddressRegistry(addressRegistry).isWhitelistedOracle(
-                    generalQuoteInfo.oracleAddr
-                )
-            ) {
-                revert();
-            }
-            loanPerCollUnit =
-                (quoteTuple.loanPerCollUnitOrLtv *
-                    IOracle(generalQuoteInfo.oracleAddr).getPrice(
-                        generalQuoteInfo.collToken,
-                        generalQuoteInfo.loanToken
-                    )) /
-                BASE;
-        }
-        uint256 loanAmount = (loanPerCollUnit *
-            (collSendAmount - expectedTransferFee)) /
-            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        (uint256 loanAmount, uint256 repayAmount) = getLoanAndRepayAmount(
+            collSendAmount,
+            expectedTransferFee,
+            generalQuoteInfo,
+            quoteTuple
+        );
         // checks to prevent griefing attacks (e.g. small unlocks that aren't worth it)
         if (
             loanAmount < generalQuoteInfo.minLoan ||
@@ -225,13 +209,6 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         ) {
             revert(); // revert InsufficientSendAmount();
         }
-        int256 _interestRateFactor = int256(BASE) +
-            quoteTuple.interestRatePctInBase;
-        if (_interestRateFactor < 0) {
-            revert();
-        }
-        uint256 interestRateFactor = uint256(_interestRateFactor);
-        uint256 repayAmount = (loanAmount * interestRateFactor) / BASE;
 
         loan.borrower = borrower;
         loan.loanToken = generalQuoteInfo.loanToken;
@@ -251,6 +228,7 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
 
         if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {
             collReceiver = address(this);
+            lockedAmounts[loan.collToken] += loan.initCollAmount;
         } else {
             collReceiver = createCollCompartment(
                 generalQuoteInfo.borrowerCompartmentImplementation,
@@ -262,8 +240,6 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         }
         loanId = _loans.length;
         _loans.push(loan);
-
-        lockedAmounts[loan.collToken] += loan.initCollAmount;
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -363,6 +339,43 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert();
         }
+    }
+
+    function getLoanAndRepayAmount(
+        uint256 collSendAmount,
+        uint256 expectedTransferFee,
+        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypes.QuoteTuple calldata quoteTuple
+    ) internal view returns (uint256 loanAmount, uint256 repayAmount) {
+        uint256 loanPerCollUnit;
+        if (generalQuoteInfo.oracleAddr == address(0)) {
+            loanPerCollUnit = quoteTuple.loanPerCollUnitOrLtv;
+        } else {
+            if (
+                !IAddressRegistry(addressRegistry).isWhitelistedOracle(
+                    generalQuoteInfo.oracleAddr
+                )
+            ) {
+                revert();
+            }
+            loanPerCollUnit =
+                (quoteTuple.loanPerCollUnitOrLtv *
+                    IOracle(generalQuoteInfo.oracleAddr).getPrice(
+                        generalQuoteInfo.collToken,
+                        generalQuoteInfo.loanToken
+                    )) /
+                BASE;
+        }
+        loanAmount =
+            (loanPerCollUnit * (collSendAmount - expectedTransferFee)) /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        int256 _interestRateFactor = int256(BASE) +
+            quoteTuple.interestRatePctInBase;
+        if (_interestRateFactor < 0) {
+            revert();
+        }
+        uint256 interestRateFactor = uint256(_interestRateFactor);
+        repayAmount = (loanAmount * interestRateFactor) / BASE;
     }
 
     function toUint128(uint256 x) internal pure returns (uint128 y) {
