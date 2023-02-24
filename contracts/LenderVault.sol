@@ -200,6 +200,8 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         }
         loanId = _loans.length;
         _loans.push(loan);
+
+        lockedAmounts[loan.collToken] += loan.initCollAmount;
     }
 
     function withdraw(address token, uint256 amount) external {
