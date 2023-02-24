@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
+import "hardhat/console.sol";
 
 contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
@@ -51,10 +52,13 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
             IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
         }
 
+        console.log(1);
         IStakingHelper(GMX_REWARD_ROUTER).claimFees();
-
+        console.log(2);
         // check weth token balance
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
+
+        console.log(currentWethBal);
         // transfer proportion of weth token balance
         uint256 wethTokenAmount = (repayAmount * currentWethBal) /
             repayAmountLeft;

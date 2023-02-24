@@ -173,6 +173,7 @@ describe('Basic Forked Arbitrum Tests', function () {
       return x.event === 'Borrow'
     })
 
+    const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
     const loanId = borrowEvent?.args?.['loanId']
     const repayAmount = borrowEvent?.args?.['initRepayAmount']
 
@@ -187,6 +188,12 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     // mine 50000 blocks with an interval of 60 seconds, ~1 month
     await hre.network.provider.send('hardhat_mine', [BigNumber.from(50000).toHexString(), BigNumber.from(60).toHexString()])
+
+    // check compartment rewards before repay
+    const feeGLP = '0x4e971a87900b931fF39d1Aad67697F49835400b6'
+    const feeGLPInstance = new ethers.Contract(feeGLP, collTokenAbi, borrower.provider)
+    const claimableCompartmentRewards = await feeGLPInstance.connect(borrower).claimableReward(collTokenCompartmentAddr)
+    expect(claimableCompartmentRewards).to.be.above(BigNumber.from(0))
 
     // repay
     await expect(

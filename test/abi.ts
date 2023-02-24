@@ -29,6 +29,13 @@ const balancerV2PoolAbi = [
 
 const collTokenAbi = [
   {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'claimableReward',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     name: 'balanceOf',
     outputs: [{ type: 'uint256', name: '' }],
     inputs: [{ type: 'address', name: 'arg0' }],
