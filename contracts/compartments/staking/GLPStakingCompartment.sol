@@ -17,8 +17,7 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
 
     // arbitrum WETH address
     address constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address constant GMX_REWARD_ROUTER =
-        0xB95DB5B167D75e6d04227CfFFA61069348d271F5;
+    address constant FEE_GLP = 0x4e971a87900b931fF39d1Aad67697F49835400b6;
 
     function initialize(
         address _vaultAddr,
@@ -43,22 +42,26 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
+
+        console.log(currentCompartmentBal);
+
         // transfer proportion of compartment coll token balance
         uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
+
+        console.log(repayAmount);
+        console.log(lpTokenAmount);
         if (callbackAddr == address(0)) {
             IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
         } else {
             IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
         }
 
-        console.log(1);
-        IStakingHelper(GMX_REWARD_ROUTER).claimFees();
-        console.log(2);
+        IStakingHelper(FEE_GLP).claim(address(this));
+
         // check weth token balance
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
 
-        console.log(currentWethBal);
         // transfer proportion of weth token balance
         uint256 wethTokenAmount = (repayAmount * currentWethBal) /
             repayAmountLeft;

@@ -131,6 +131,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(10000000))
 
     // get pre balances
+    const borrowerWethBalPre = await weth.balanceOf(borrower.address)
     const borrowerCollBalPre = await collInstance.balanceOf(borrower.address)
     const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
     const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
@@ -154,7 +155,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     })
 
     // borrow with on chain quote
-    const collSendAmount = borrowerCollBalPre.div(2)
+    const collSendAmount = borrowerCollBalPre
     const isAutoQuote = false
     const callbackAddr = '0x0000000000000000000000000000000000000000'
     const callbackData = '0x'
@@ -189,11 +190,8 @@ describe('Basic Forked Arbitrum Tests', function () {
     // mine 50000 blocks with an interval of 60 seconds, ~1 month
     await hre.network.provider.send('hardhat_mine', [BigNumber.from(50000).toHexString(), BigNumber.from(60).toHexString()])
 
-    // check compartment rewards before repay
-    const feeGLP = '0x4e971a87900b931fF39d1Aad67697F49835400b6'
-    const feeGLPInstance = new ethers.Contract(feeGLP, collTokenAbi, borrower.provider)
-    const claimableCompartmentRewards = await feeGLPInstance.connect(borrower).claimableReward(collTokenCompartmentAddr)
-    expect(claimableCompartmentRewards).to.be.above(BigNumber.from(0))
+    // increase borrower usdc balance to repay
+    await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(10000000))
 
     // repay
     await expect(
@@ -211,9 +209,9 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     // check balance post repay
     const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
+    const borrowerWethRepayBalPost = await weth.balanceOf(borrower.address)
 
-    expect(borrowerCollRepayBalPost).to.be.above(borrowerCollBalPre)
-
-    // TODO: check rewards
+    expect(borrowerCollRepayBalPost).to.be.equal(borrowerCollBalPre)
+    expect(borrowerWethRepayBalPost).to.be.above(borrowerWethBalPre)
   })
 })

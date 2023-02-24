@@ -22,9 +22,9 @@ interface IStakingHelper {
     function claim_rewards() external;
 
     /**
-     * @notice Claim all available reward tokens
+     * @notice Claim fee reward tokens
      */
-    function claimFees() external;
+    function claim(address _receiver) external returns (uint256);
 
     /**
      * @notice Mint allocated tokens for the caller based on a single gauge.
