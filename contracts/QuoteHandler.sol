@@ -193,21 +193,18 @@ contract QuoteHandler {
         if (offChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
             return false;
         }
-        uint256 minNumOfSigners = ILenderVault(lenderVault).minNumOfSigners();
-        if (
-            offChainQuote.v.length != offChainQuote.r.length &&
-            offChainQuote.v.length != offChainQuote.s.length &&
-            offChainQuote.v.length < minNumOfSigners
-        ) {
-            return false;
-        }
-
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
             return false;
         }
         if (
-            !hasValidSignatures(lenderVault, offChainQuoteHash, offChainQuote)
+            !areValidSignatures(
+                lenderVault,
+                offChainQuoteHash,
+                offChainQuote.v,
+                offChainQuote.r,
+                offChainQuote.s
+            )
         ) {
             return false;
         }
@@ -230,11 +227,20 @@ contract QuoteHandler {
         return true;
     }
 
-    function hasValidSignatures(
+    function areValidSignatures(
         address lenderVault,
         bytes32 offChainQuoteHash,
-        DataTypes.OffChainQuote calldata offChainQuote
+        uint8[] calldata v,
+        bytes32[] calldata r,
+        bytes32[] calldata s
     ) internal view returns (bool) {
+        if (
+            v.length != r.length &&
+            v.length != s.length &&
+            v.length != ILenderVault(lenderVault).minNumOfSigners()
+        ) {
+            return false;
+        }
         bytes32 messageHash = keccak256(
             abi.encodePacked(
                 "\x19Ethereum Signed Message:\n32",
@@ -243,13 +249,8 @@ contract QuoteHandler {
         );
         uint256 tmp;
         address recoveredSigner;
-        for (uint256 i = 0; i < offChainQuote.v.length; ) {
-            recoveredSigner = ecrecover(
-                messageHash,
-                offChainQuote.v[i],
-                offChainQuote.r[i],
-                offChainQuote.s[i]
-            );
+        for (uint256 i = 0; i < v.length; ) {
+            recoveredSigner = ecrecover(messageHash, v[i], r[i], s[i]);
 
             if (tmp == tmp | uint256(uint160(recoveredSigner))) {
                 return false;
