@@ -199,7 +199,7 @@ contract QuoteHandler {
             offChainQuote.v.length != offChainQuote.s.length &&
             offChainQuote.v.length < minNumOfSigners
         ) {
-            revert();
+            return false;
         }
 
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
@@ -209,7 +209,7 @@ contract QuoteHandler {
         if (
             !hasValidSignatures(lenderVault, offChainQuoteHash, offChainQuote)
         ) {
-            revert();
+            return false;
         }
 
         bytes32 leaf = keccak256(
