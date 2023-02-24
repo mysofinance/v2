@@ -20,34 +20,38 @@ contract AddressRegistry is IAddressRegistry {
         owner = msg.sender;
     }
 
-    function setLenderVaultFactory(address addr) external {
+    function initialize(
+        address _lenderVaultFactory,
+        address _borrowerGateway,
+        address _quoteHandler
+    ) external {
         if (msg.sender != owner) {
             revert();
         }
-        if (lenderVaultFactory != address(0)) {
+        if (
+            lenderVaultFactory != address(0) ||
+            borrowerGateway != address(0) ||
+            quoteHandler != address(0)
+        ) {
             revert();
         }
-        lenderVaultFactory = addr;
-    }
-
-    function setBorrowerGateway(address addr) external {
-        if (msg.sender != owner) {
+        if (
+            _lenderVaultFactory == address(0) ||
+            _borrowerGateway == address(0) ||
+            _quoteHandler == address(0)
+        ) {
             revert();
         }
-        if (borrowerGateway != address(0)) {
+        if (
+            _lenderVaultFactory == _borrowerGateway ||
+            _lenderVaultFactory == _quoteHandler ||
+            _borrowerGateway == _quoteHandler
+        ) {
             revert();
         }
-        borrowerGateway = addr;
-    }
-
-    function setQuoteHandler(address addr) external {
-        if (msg.sender != owner) {
-            revert();
-        }
-        if (quoteHandler != address(0)) {
-            revert();
-        }
-        quoteHandler = addr;
+        lenderVaultFactory = _lenderVaultFactory;
+        borrowerGateway = _borrowerGateway;
+        quoteHandler = _quoteHandler;
     }
 
     function toggleTokens(address[] memory tokens) external {

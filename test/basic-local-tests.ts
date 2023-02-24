@@ -46,16 +46,17 @@ describe('Basic Local Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
-    // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
-    await expect(addressRegistry.connect(lender).setLenderVaultFactory(lenderVaultFactory.address)).to.be.reverted
-    await addressRegistry.connect(team).setLenderVaultFactory(lenderVaultFactory.address)
-    await expect(addressRegistry.connect(team).setLenderVaultFactory('0x0000000000000000000000000000000000000001')).to.be
-      .reverted
-    await expect(addressRegistry.connect(lender).setBorrowerGateway(borrowerGateway.address)).to.be.reverted
-    await addressRegistry.connect(team).setBorrowerGateway(borrowerGateway.address)
-    await addressRegistry.connect(team).setQuoteHandler(quoteHandler.address)
-    await expect(addressRegistry.connect(team).setBorrowerGateway('0x0000000000000000000000000000000000000001')).to.be
-      .reverted
+    // initialize address registry
+    await expect(addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(ZERO_ADDRESS, borrowerGateway.address, quoteHandler.address)).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, ZERO_ADDRESS, quoteHandler.address)).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, ZERO_ADDRESS)).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, lenderVaultFactory.address, quoteHandler.address)).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, lenderVaultFactory.address)).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, quoteHandler.address, quoteHandler.address)).to.be.reverted
+    await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
+    await expect(addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)).to.be.reverted
+    await expect(addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)).to.be.reverted
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */

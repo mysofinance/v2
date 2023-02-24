@@ -28,11 +28,11 @@ interface IAddressRegistry {
 
     function owner() external view returns (address);
 
-    function setLenderVaultFactory(address addr) external;
-
-    function setBorrowerGateway(address addr) external;
-
-    function setQuoteHandler(address addr) external;
+    function initialize(
+        address _lenderVaultFactory,
+        address _borrowerGateway,
+        address _quoteHandler
+    ) external;
 
     function addLenderVault(address addr) external;
 
