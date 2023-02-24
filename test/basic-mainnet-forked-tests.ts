@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { LenderVault } from '../typechain-types'
+import { LenderVault, QuoteHandler } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import {
   balancerV2VaultAbi,
@@ -21,6 +21,7 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const YEAR_IN_SECONDS = 31_536_000
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
+const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 
 function getLoopingSendAmount(
   collTokenFromBorrower: number,
@@ -41,6 +42,7 @@ const createOnChainRequest = async ({
   loanToken,
   borrowerCompartmentImplementation,
   lenderVault,
+  quoteHandler,
   loanPerCollUnit
 }: {
   lender: SignerWithAddress
@@ -48,45 +50,37 @@ const createOnChainRequest = async ({
   loanToken: string
   borrowerCompartmentImplementation: string
   lenderVault: LenderVault
+  quoteHandler: QuoteHandler
   loanPerCollUnit: BigNumber
 }) => {
-  //
+  const blocknum = await ethers.provider.getBlockNumber()
+  const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+  let quoteTuples = [
+    {
+      loanPerCollUnitOrLtv: loanPerCollUnit,
+      interestRatePctInBase: BASE.mul(10).div(100),
+      upfrontFeePctInBase: BASE.mul(1).div(100),
+      tenor: ONE_DAY.mul(90)
+    }
+  ]
   let onChainQuote = {
-    loanPerCollUnit,
-    interestRatePctInBase: BASE.mul(10).div(100),
-    upfrontFeePctInBase: BASE.mul(1).div(100),
-    expectedTransferFee: 0,
-    minCollAmount: 0,
-    collToken,
-    loanToken: loanToken,
-    tenor: ONE_DAY.mul(90),
-    timeUntilEarliestRepay: 0,
-    isNegativeInterestRate: false,
-    borrowerCompartmentImplementation: borrowerCompartmentImplementation
+    generalQuoteInfo: {
+      borrower: ZERO_ADDR,
+      collToken: collToken,
+      loanToken: loanToken,
+      oracleAddr: ZERO_ADDR,
+      minLoan: 0,
+      maxLoan: MAX_UINT256,
+      validUntil: timestamp + 60,
+      earliestRepayTenor: 0,
+      borrowerCompartmentImplementation: borrowerCompartmentImplementation,
+      isSingleUse: false,
+    },
+    quoteTuples: quoteTuples,
+    salt: ZERO_BYTES32
   }
-
-  const payload = ethers.utils.defaultAbiCoder.encode(
-    ['uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'address', 'address', 'uint256', 'uint256', 'bool', 'address'],
-    [
-      onChainQuote.loanPerCollUnit,
-      onChainQuote.interestRatePctInBase,
-      onChainQuote.upfrontFeePctInBase,
-      onChainQuote.expectedTransferFee,
-      onChainQuote.minCollAmount,
-      onChainQuote.collToken,
-      onChainQuote.loanToken,
-      onChainQuote.tenor,
-      onChainQuote.timeUntilEarliestRepay,
-      onChainQuote.isNegativeInterestRate,
-      onChainQuote.borrowerCompartmentImplementation
-    ]
-  )
-
-  const onChainQuoteHash = ethers.utils.keccak256(payload)
-
-  await expect(lenderVault.connect(lender).addOnChainQuote(onChainQuote))
-    .to.emit(lenderVault, 'OnChainQuote')
-    .withArgs(Object.values(onChainQuote), onChainQuoteHash, true)
+  await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
+  .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
   return onChainQuote
 }
@@ -107,6 +101,11 @@ describe('Basic Forked Mainnet Tests', function () {
     const borrowerGateway = await BorrowerGateway.connect(team).deploy(addressRegistry.address)
     await borrowerGateway.deployed()
 
+    // deploy quote handler
+    const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
+    const quoteHandler = await QuoteHandler.connect(team).deploy(addressRegistry.address)
+    await quoteHandler.deployed()
+    
     // deploy lender vault implementation
     const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
     const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
@@ -120,16 +119,10 @@ describe('Basic Forked Mainnet Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
-    // deploy borrower compartment factory
-    const BorrowerCompartmentFactory = await ethers.getContractFactory('BorrowerCompartmentFactory')
-    await BorrowerCompartmentFactory.connect(team)
-    const borrowerCompartmentFactory = await BorrowerCompartmentFactory.deploy()
-    await borrowerCompartmentFactory.deployed()
-
     // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
-    addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
-    addressRegistry.setBorrowerGateway(borrowerGateway.address)
-    addressRegistry.setBorrowerCompartmentFactory(borrowerCompartmentFactory.address)
+    await addressRegistry.setLenderVaultFactory(lenderVaultFactory.address)
+    await addressRegistry.setBorrowerGateway(borrowerGateway.address)
+    await addressRegistry.setQuoteHandler(quoteHandler.address)
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
@@ -201,7 +194,7 @@ describe('Basic Forked Mainnet Tests', function () {
     return {
       addressRegistry,
       borrowerGateway,
-      borrowerCompartmentFactory,
+      quoteHandler,
       lenderVaultImplementation,
       lender,
       borrower,
@@ -218,7 +211,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should process atomic balancer swap correctly', async function () {
-      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -226,20 +219,38 @@ describe('Basic Forked Mainnet Tests', function () {
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
       let onChainQuote = {
-        loanPerCollUnit: ONE_USDC.mul(1000),
-        interestRatePctInBase: BASE.mul(10).div(100),
-        upfrontFeePctInBase: BASE.mul(1).div(100),
-        expectedTransferFee: 0,
-        minCollAmount: 0,
-        collToken: weth.address,
-        loanToken: usdc.address,
-        tenor: ONE_DAY.mul(365),
-        timeUntilEarliestRepay: 0,
-        isNegativeInterestRate: false,
-        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false,
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
       }
-      await lenderVault.connect(lender).addOnChainQuote(onChainQuote)
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
       // Balancer V2 integration: calculate which send amount would be needed to max. lever up in 1-click
       const poolAddr = '0x96646936b91d6B9D7D0c47C496AfBF3D6ec7B6f8'
@@ -250,7 +261,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const collBuffer = BASE.mul(990).div(1000)
       const initCollFromBorrower = ONE_WETH.mul(collBuffer).div(BASE)
       const initCollFromBorrowerNumber = Number(initCollFromBorrower.mul(PRECISION).div(ONE_WETH).toString()) / PRECISION
-      const loanPerColl = Number(onChainQuote.loanPerCollUnit.mul(PRECISION).div(ONE_USDC).toString()) / PRECISION
+      const loanPerColl = Number(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(PRECISION).div(ONE_USDC).toString()) / PRECISION
       const swapFee = Number((await balancerV2Pool.getSwapFeePercentage()).mul(PRECISION).div(BASE).toString()) / PRECISION
       const balancerV2Vault = await new ethers.Contract(
         '0xBA12222222228d8Ba445958a75a0704d566BF2C8',
@@ -299,7 +310,8 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const isAutoQuote = false
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
       const slippageTolerance = BASE.mul(30).div(10000)
       const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
       console.log('minSwapReceive: ', minSwapReceive)
@@ -311,7 +323,15 @@ describe('Basic Forked Mainnet Tests', function () {
       )
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -334,10 +354,11 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(borrowerWethBalDiffComparison).to.be.lessThan(0.01)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(0) // borrower: no usdc change as all swapped for weth
       expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(collSendAmount)
-      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(onChainQuote.loanPerCollUnit.mul(collSendAmount).div(ONE_WETH))
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_WETH))
     })
   })
 
+  /*
   it('Should handle auto-quotes correctly', async function () {
     const { addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } =
       await setupTest()
@@ -366,8 +387,8 @@ describe('Basic Forked Mainnet Tests', function () {
     // borrower uses quote to borrow
     const collSendAmount = ONE_WETH
     const isAutoQuote = true
-    const callbackAddr = '0x0000000000000000000000000000000000000000'
-    const callbackData = '0x'
+    const callbackAddr = ZERO_ADDR
+    const callbackData = ZERO_BYTES32
     await borrowerGateway
       .connect(borrower)
       .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
@@ -378,8 +399,9 @@ describe('Basic Forked Mainnet Tests', function () {
     expect(loan.initCollAmount).to.equal(collSendAmount)
     expect(loan.initLoanAmount).to.equal(expectedLoanAmount)
     expect(loan.initRepayAmount).to.equal(expectedRepayAmount)
-  })
+  })*/
 
+  /*
   it('Should handle unlockCollateral without compartment correctly', async () => {
     const { addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
     // deploy an autoquote strategy
@@ -405,8 +427,8 @@ describe('Basic Forked Mainnet Tests', function () {
     // borrower uses quote to borrow
     const collSendAmount = ONE_WETH
     const isAutoQuote = true
-    const callbackAddr = '0x0000000000000000000000000000000000000000'
-    const callbackData = '0x'
+    const callbackAddr = ZERO_ADDR
+    const callbackData = ZERO_BYTES32
     await borrowerGateway
       .connect(borrower)
       .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
@@ -424,7 +446,7 @@ describe('Basic Forked Mainnet Tests', function () {
     const lenderWethBalPost = await weth.balanceOf(lender.address)
 
     expect(lenderWethBalPost).to.equal(collSendAmount)
-  })
+  })*/
 
   describe('Compartment Testing', function () {
     const stakeInLiquidityGauge = async ({
@@ -444,7 +466,7 @@ describe('Basic Forked Mainnet Tests', function () {
       isPartialRepay?: boolean
       rewardsDistributionAddress?: string
     }) => {
-      const { borrowerGateway, lender, borrower, team, usdc, ldo, lenderVault, addressRegistry } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, ldo, lenderVault, addressRegistry } = await setupTest()
 
       // create curve staking implementation
       const CurveLPStakingCompartmentImplementation = await ethers.getContractFactory('CurveLPStakingCompartment')
@@ -508,19 +530,29 @@ describe('Basic Forked Mainnet Tests', function () {
         loanToken: usdc.address,
         borrowerCompartmentImplementation: curveLPStakingCompartmentImplementation.address,
         lenderVault,
+        quoteHandler,
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
       // borrow with on chain quote
       const collSendAmount = ONE_CRV
-      const isAutoQuote = false
-      const callbackAddr = '0x0000000000000000000000000000000000000000'
-      const callbackData = '0x'
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
       const compartmentData = crvGaugeIndex
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
@@ -568,8 +600,15 @@ describe('Basic Forked Mainnet Tests', function () {
       }
 
       // check balance pre repay
+      const borrowerUsdcBalancePre = await usdc.balanceOf(borrower.address)
+      console.log('check if borrower has enough balance to repay...')
+      console.log('borrowerUsdcBalancePre: ', borrowerUsdcBalancePre)
+      console.log('repayAmount: ', repayAmount)
+      if (repayAmount.gt(borrowerUsdcBalancePre)) {
+        console.log('transfer some funds to borrower...')
+        await usdc.connect(lender).transfer(borrower.address, repayAmount.sub(borrowerUsdcBalancePre))
+      }
       const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
-    
 
       expect(totalGaugeRewardCRV).to.not.equal(BigNumber.from(0))
       expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
@@ -764,7 +803,7 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process aToken borrow/repay correctly with rewards', async () => {
-      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
 
       // create curve staking implementation
       const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
@@ -807,19 +846,20 @@ describe('Basic Forked Mainnet Tests', function () {
         loanToken: usdc.address,
         borrowerCompartmentImplementation: aaveStakingCompartmentImplementation.address,
         lenderVault,
+        quoteHandler,
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
       // borrow with on chain quote
       const collSendAmount = BigNumber.from(10).pow(18)
-      const isAutoQuote = false
-      const callbackAddr = '0x0000000000000000000000000000000000000000'
-      const callbackData = '0x'
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
-
+        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, expectedTransferFee, onChainQuote, quoteTupleIdx, callbackAddr, callbackData)
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
@@ -859,7 +899,7 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should delegate voting correctly', async () => {
-      const { borrowerGateway, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
 
       // create uni staking implementation
       const VotingCompartmentImplementation = await ethers.getContractFactory('VoteCompartment')
@@ -907,18 +947,28 @@ describe('Basic Forked Mainnet Tests', function () {
         loanToken: usdc.address,
         borrowerCompartmentImplementation: votingCompartmentImplementation.address,
         lenderVault,
+        quoteHandler,
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
       // borrow with on chain quote
       const collSendAmount = ONE_UNI
-      const isAutoQuote = false
-      const callbackAddr = '0x0000000000000000000000000000000000000000'
-      const callbackData = '0x'
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
@@ -950,7 +1000,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('Testing with token transfer fees', function () {
     it('Should process onChain quote with fees', async function () {
-      const { borrowerGateway, lender, borrower, usdc, paxg, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -958,20 +1008,32 @@ describe('Basic Forked Mainnet Tests', function () {
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        },
+      ]
       let onChainQuote = {
-        loanPerCollUnit: ONE_USDC.mul(1000),
-        interestRatePctInBase: BASE.mul(10).div(100),
-        upfrontFeePctInBase: BASE.mul(1).div(100),
-        expectedTransferFee: ONE_PAXG.mul(2).div(9998),
-        minCollAmount: 0,
-        collToken: paxg.address,
-        loanToken: usdc.address,
-        tenor: ONE_DAY.mul(365),
-        timeUntilEarliestRepay: 0,
-        isNegativeInterestRate: false,
-        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: paxg.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false,
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
       }
-      await lenderVault.connect(lender).addOnChainQuote(onChainQuote)
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
 
       // check balance pre borrow
       const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
@@ -981,13 +1043,22 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const isAutoQuote = false
+      const expectedTransferFee = ONE_PAXG.mul(2).div(9998)
+      const quoteTupleIdx = 0
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
-      const callbackData = '0x'
+      const callbackData = ZERO_BYTES32
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
 
       // check balance post borrow
       const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
@@ -997,23 +1068,12 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(borrowerPaxgBalPre.sub(borrowerPaxgBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(ONE_USDC.mul(1000))
-      expect(
-        Math.abs(Number(vaultPaxgBalPost.sub(vaultPaxgBalPre).sub(collSendAmount.mul(9998).div(10000).toString())))
-      ).to.lessThanOrEqual(1)
-      expect(
-        Math.abs(
-          Number(
-            vaultUsdcBalPre
-              .sub(vaultUsdcBalPost)
-              .sub(onChainQuote.loanPerCollUnit.mul(collSendAmount.mul(9998)).div(10000).div(ONE_PAXG))
-              .toString()
-          )
-        )
-      ).to.lessThanOrEqual(1)
+      expect(Math.abs(Number(vaultPaxgBalPost.sub(vaultPaxgBalPre).sub(collSendAmount.mul(9998).div(10000).toString())))).to.lessThanOrEqual(1)
+      expect(Math.abs(Number(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount.mul(9998)).div(10000).div(ONE_PAXG)).toString()))).to.lessThanOrEqual(1)
     })
 
     it('Should process onChain quote with fees including protocol fee', async function () {
-      const { borrowerGateway, lender, borrower, team, usdc, paxg, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, paxg, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1025,26 +1085,38 @@ describe('Basic Forked Mainnet Tests', function () {
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(90)
+        },
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: paxg.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: 0,
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false,
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
+        .to.emit(quoteHandler, 'OnChainQuoteAdded')
+      
       const collSendAmount = ONE_PAXG
       const protocolFeeAmount = ONE_PAXG.mul(protocolFee).mul(ONE_DAY.mul(90)).div(BASE).div(YEAR_IN_SECONDS)
       const sendAmountPostProtocolFee = collSendAmount.sub(protocolFeeAmount)
       const tokenTransferFee = sendAmountPostProtocolFee.mul(2).div(10000)
       const totalExpectedFees = protocolFeeAmount.add(tokenTransferFee)
-
-      let onChainQuote = {
-        loanPerCollUnit: ONE_USDC.mul(1000),
-        interestRatePctInBase: BASE.mul(10).div(100),
-        upfrontFeePctInBase: BASE.mul(1).div(100),
-        expectedTransferFee: totalExpectedFees,
-        minCollAmount: 0,
-        collToken: paxg.address,
-        loanToken: usdc.address,
-        tenor: ONE_DAY.mul(90),
-        timeUntilEarliestRepay: 0,
-        isNegativeInterestRate: false,
-        borrowerCompartmentImplementation: '0x0000000000000000000000000000000000000000'
-      }
-      await lenderVault.connect(lender).addOnChainQuote(onChainQuote)
 
       // check balance pre borrow
       const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
@@ -1054,13 +1126,21 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const isAutoQuote = false
+      const quoteTupleIdx = 0
       //const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
-      const callbackData = '0x'
+      const callbackData = ZERO_BYTES32
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          totalExpectedFees,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
 
       // check balance post borrow
       const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)

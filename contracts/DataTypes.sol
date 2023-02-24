@@ -16,32 +16,36 @@ library DataTypes {
         address collTokenCompartmentAddr;
     }
 
-    struct OnChainQuote {
-        uint256 loanPerCollUnit;
-        uint256 interestRatePctInBase;
+    struct QuoteTuple {
+        uint256 loanPerCollUnitOrLtv;
+        int256 interestRatePctInBase;
         uint256 upfrontFeePctInBase;
-        uint256 expectedTransferFee;
-        uint256 minCollAmount;
-        address collToken;
-        address loanToken;
-        uint40 tenor;
-        uint40 timeUntilEarliestRepay;
-        bool isNegativeInterestRate;
-        address borrowerCompartmentImplementation;
+        uint256 tenor;
     }
 
-    struct OffChainQuote {
+    struct GeneralQuoteInfo {
         address borrower;
         address collToken;
         address loanToken;
-        uint256 collAmount;
-        uint256 loanAmount;
-        uint256 expiry;
-        uint256 earliestRepay;
-        uint256 repayAmount;
+        address oracleAddr;
+        uint256 minLoan;
+        uint256 maxLoan;
         uint256 validUntil;
-        uint256 upfrontFee;
+        uint256 earliestRepayTenor;
         address borrowerCompartmentImplementation;
+        bool isSingleUse;
+    }
+
+    struct OnChainQuote {
+        GeneralQuoteInfo generalQuoteInfo;
+        QuoteTuple[] quoteTuples;
+        bytes32 salt;
+    }
+
+    struct OffChainQuote {
+        GeneralQuoteInfo generalQuoteInfo;
+        bytes32 quoteTuplesRoot;
+        bytes32 salt;
         uint256 nonce;
         uint8 v;
         bytes32 r;
@@ -52,7 +56,7 @@ library DataTypes {
         address collToken;
         address loanToken;
         uint256 loanId;
-        uint256 repayAmount;
+        uint128 repayAmount;
         uint256 repaySendAmount;
     }
 

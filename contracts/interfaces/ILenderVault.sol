@@ -13,36 +13,6 @@ interface ILenderVault {
         uint256 index
     ) external view returns (DataTypes.Loan memory loan);
 
-    function doesAcceptOnChainQuote(
-        DataTypes.OnChainQuote calldata onChainQuote
-    ) external view returns (bool doesAccept);
-
-    function doesAcceptAutoQuote(
-        DataTypes.OnChainQuote calldata onChainQuote
-    ) external view returns (bool doesAccept);
-
-    function doesAcceptOffChainQuote(
-        address borrower,
-        DataTypes.OffChainQuote calldata offChainQuote
-    ) external view returns (bool doesAccept, bytes32 offChainQuoteHash);
-
-    function getLoanInfoForOnChainQuote(
-        address borrower,
-        uint256 collSendAmount,
-        DataTypes.OnChainQuote calldata onChainQuote
-    ) external returns (DataTypes.Loan memory loan, uint256 upfrontFee);
-
-    function getLoanInfoForOffChainQuote(
-        address borrower,
-        DataTypes.OffChainQuote calldata offChainQuote
-    ) external returns (DataTypes.Loan memory loan, uint256 upfrontFee);
-
-    function addLoan(
-        DataTypes.Loan memory loan
-    ) external returns (uint256 loanId);
-
-    function invalidateOffChainQuote(bytes32 offChainQuoteHash) external;
-
     function transferTo(
         address token,
         address recipient,
@@ -66,9 +36,24 @@ interface ILenderVault {
 
     function updateLoanInfo(
         DataTypes.Loan memory loan,
-        uint256 repayAmount,
+        uint128 repayAmount,
         uint256 loanId,
         uint256 collAmount,
         bool isRepay
     ) external;
+
+    function processQuote(
+        address borrower,
+        uint256 collSendAmount,
+        uint256 expectedTransferFee,
+        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypes.QuoteTuple calldata quoteTuple
+    )
+        external
+        returns (
+            DataTypes.Loan memory loan,
+            uint256 loanId,
+            uint256 upfrontFee,
+            address collReceiver
+        );
 }

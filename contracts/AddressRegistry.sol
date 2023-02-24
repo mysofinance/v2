@@ -2,11 +2,13 @@
 
 pragma solidity 0.8.17;
 
-contract AddressRegistry {
+import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+
+contract AddressRegistry is IAddressRegistry {
     address public owner;
     address public lenderVaultFactory;
     address public borrowerGateway;
-    address public borrowerCompartmentFactory;
+    address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => bool) public isWhitelistedToken;
     mapping(address => bool) public isWhitelistedCallbackAddr;
@@ -38,14 +40,14 @@ contract AddressRegistry {
         borrowerGateway = addr;
     }
 
-    function setBorrowerCompartmentFactory(address addr) external {
+    function setQuoteHandler(address addr) external {
         if (msg.sender != owner) {
             revert();
         }
-        if (borrowerCompartmentFactory != address(0)) {
+        if (quoteHandler != address(0)) {
             revert();
         }
-        borrowerCompartmentFactory = addr;
+        quoteHandler = addr;
     }
 
     function toggleTokens(address[] memory tokens) external {
