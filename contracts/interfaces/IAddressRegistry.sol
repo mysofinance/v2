@@ -20,6 +20,10 @@ interface IAddressRegistry {
         address loanToken
     ) external view returns (bool);
 
+    function isWhitelistedOracle(
+        address oracleAddr
+    ) external view returns (bool);
+
     function isRegisteredVault(address addr) external view returns (bool);
 
     function borrowerGateway() external view returns (address);
@@ -41,4 +45,6 @@ interface IAddressRegistry {
     function toggleCallbackAddr(address addr) external;
 
     function toggleAutoQuoteStrategy(address addr) external;
+
+    function toggleOracle(address addr) external;
 }
