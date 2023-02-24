@@ -190,28 +190,25 @@ contract QuoteHandler {
         if (offChainQuote.nonce > offChainQuoteNonce[lenderVault]) {
             return false;
         }
+        if (offChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
+            return false;
+        }
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
             return false;
         }
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(
-                "\x19Ethereum Signed Message:\n32",
-                offChainQuoteHash
-            )
-        );
-        address recoveredSigner = ecrecover(
-            messageHash,
-            offChainQuote.v,
-            offChainQuote.r,
-            offChainQuote.s
-        );
         if (
-            recoveredSigner != ILenderVault(lenderVault).vaultOwner() ||
-            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
+            !areValidSignatures(
+                lenderVault,
+                offChainQuoteHash,
+                offChainQuote.v,
+                offChainQuote.r,
+                offChainQuote.s
+            )
         ) {
             return false;
         }
+
         bytes32 leaf = keccak256(
             bytes.concat(
                 keccak256(
@@ -226,6 +223,46 @@ contract QuoteHandler {
         );
         if (!MerkleProof.verify(proof, offChainQuote.quoteTuplesRoot, leaf)) {
             return false;
+        }
+        return true;
+    }
+
+    function areValidSignatures(
+        address lenderVault,
+        bytes32 offChainQuoteHash,
+        uint8[] calldata v,
+        bytes32[] calldata r,
+        bytes32[] calldata s
+    ) internal view returns (bool) {
+        if (
+            v.length != r.length &&
+            v.length != s.length &&
+            v.length != ILenderVault(lenderVault).minNumOfSigners()
+        ) {
+            return false;
+        }
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                offChainQuoteHash
+            )
+        );
+        uint256 tmp;
+        address recoveredSigner;
+        for (uint256 i = 0; i < v.length; ) {
+            recoveredSigner = ecrecover(messageHash, v[i], r[i], s[i]);
+
+            if (tmp == tmp | uint256(uint160(recoveredSigner))) {
+                return false;
+            }
+
+            if (!ILenderVault(lenderVault).isSigner(recoveredSigner)) {
+                return false;
+            }
+            tmp |= uint256(uint160(recoveredSigner));
+            unchecked {
+                i++;
+            }
         }
         return true;
     }
