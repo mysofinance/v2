@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
-import "hardhat/console.sol";
 
 contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
     using SafeERC20 for IERC20;
@@ -43,14 +42,10 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
             address(this)
         );
 
-        console.log(currentCompartmentBal);
-
         // transfer proportion of compartment coll token balance
         uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
 
-        console.log(repayAmount);
-        console.log(lpTokenAmount);
         if (callbackAddr == address(0)) {
             IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
         } else {
