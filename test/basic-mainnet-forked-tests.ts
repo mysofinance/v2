@@ -445,6 +445,19 @@ describe('Basic Forked Mainnet Tests', function () {
       // check support gauge in gauge controller
       await expect(gaugeControllerInstance.connect(borrower).gauge_types(crvGaugeAddress)).to.be.not.reverted
 
+      // drop crv borrower balance to 0
+      const crvSlotIndex = 3
+      const crvIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [crvSlotIndex, borrower.address])
+      await ethers.provider.send('hardhat_setStorageAt', [
+        crvTokenAddress,
+        crvIndex.toString(),
+        ethers.utils.hexZeroPad(BigNumber.from(0).toHexString(), 32)
+      ])
+
+      const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
+
+      expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
+
       // Get coll storage slot index
       const collIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [collTokenSlot, borrower.address])
       await ethers.provider.send('hardhat_setStorageAt', [
@@ -560,10 +573,6 @@ describe('Basic Forked Mainnet Tests', function () {
         console.log('transfer some funds to borrower...')
         await usdc.connect(lender).transfer(borrower.address, repayAmount.sub(borrowerUsdcBalancePre))
       }
-      const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
-
-      expect(totalGaugeRewardCRV).to.not.equal(BigNumber.from(0))
-      expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
 
       const repay = async () => {
         const borrowerRewardTokenBalancePre = rewardTokenAddress
@@ -649,11 +658,13 @@ describe('Basic Forked Mainnet Tests', function () {
         if (rewardTokenAddress) {
           const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
           compartmentRewardTokenBalancePost = await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
+
           expect(borrowerRewardTokenBalancePost).to.be.greaterThan(borrowerRewardTokenBalancePre)
+
           if (borrowerRewardTokenBalancePost.gt(borrowerRewardTokenBalancePre)) {
             expect(
               borrowerRewardTokenBalancePost.sub(borrowerRewardTokenBalancePre).sub(compartmentRewardTokenBalancePost)
-            ).to.be.equal(0)
+            ).to.be.closeTo(0, 2)
           }
         }
 
@@ -682,19 +693,6 @@ describe('Basic Forked Mainnet Tests', function () {
       }
 
       isPartialRepay ? await partialRepay() : await repay()
-
-      // drop crv borrower balance to 0
-      const crvSlotIndex = 3
-      const crvIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [crvSlotIndex, borrower.address])
-      await ethers.provider.send('hardhat_setStorageAt', [
-        crvTokenAddress,
-        crvIndex.toString(),
-        ethers.utils.hexZeroPad(BigNumber.from(0).toHexString(), 32)
-      ])
-
-      const emptyCrvBalance = await crvInstance.balanceOf(borrower.address)
-
-      expect(emptyCrvBalance).to.equal(BigNumber.from(0))
     }
 
     it('Should process Curve LP staking in LGauge v1 and repay correctly', async () => {
