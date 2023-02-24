@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { StandardMerkleTree } from "@openzeppelin/merkle-tree";
+import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
@@ -32,7 +32,7 @@ describe('Basic Local Tests', function () {
     const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
     const quoteHandler = await QuoteHandler.connect(team).deploy(addressRegistry.address)
     await quoteHandler.deployed()
-    
+
     // deploy lender vault implementation
     const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
     const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
@@ -49,11 +49,13 @@ describe('Basic Local Tests', function () {
     // set lender vault factory, borrower gateway and borrower compartment on address registry (immutable)
     await expect(addressRegistry.connect(lender).setLenderVaultFactory(lenderVaultFactory.address)).to.be.reverted
     await addressRegistry.connect(team).setLenderVaultFactory(lenderVaultFactory.address)
-    await expect(addressRegistry.connect(team).setLenderVaultFactory('0x0000000000000000000000000000000000000001')).to.be.reverted
+    await expect(addressRegistry.connect(team).setLenderVaultFactory('0x0000000000000000000000000000000000000001')).to.be
+      .reverted
     await expect(addressRegistry.connect(lender).setBorrowerGateway(borrowerGateway.address)).to.be.reverted
     await addressRegistry.connect(team).setBorrowerGateway(borrowerGateway.address)
     await addressRegistry.connect(team).setQuoteHandler(quoteHandler.address)
-    await expect(addressRegistry.connect(team).setBorrowerGateway('0x0000000000000000000000000000000000000001')).to.be.reverted
+    await expect(addressRegistry.connect(team).setBorrowerGateway('0x0000000000000000000000000000000000000001')).to.be
+      .reverted
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
@@ -87,14 +89,13 @@ describe('Basic Local Tests', function () {
 
     //test lenderVault check works
     await expect(addressRegistry.connect(team).addLenderVault(lenderVaultAddr)).to.be.reverted
-    
+
     return { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault }
   }
 
   describe('Off-Chain Quote Testing', function () {
     it('Should process off-chain quote correctly', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
-        await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -117,7 +118,10 @@ describe('Basic Local Tests', function () {
           tenor: ONE_DAY.mul(180)
         }
       ]
-      const quoteTuplesTree = StandardMerkleTree.of(quoteTuples.map(quoteTuple => Object.values(quoteTuple)), ['uint256', 'uint256', 'uint256', 'uint256'])
+      const quoteTuplesTree = StandardMerkleTree.of(
+        quoteTuples.map(quoteTuple => Object.values(quoteTuple)),
+        ['uint256', 'uint256', 'uint256', 'uint256']
+      )
       const quoteTuplesRoot = quoteTuplesTree.root
       console.log('quoteTuplesTree:', quoteTuplesTree)
       console.log('quoteTuplesRoot:', quoteTuplesRoot)
@@ -132,7 +136,7 @@ describe('Basic Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false,
+          isSingleUse: false
         },
         quoteTuplesRoot: quoteTuplesRoot,
         salt: ZERO_BYTES32,
@@ -144,84 +148,79 @@ describe('Basic Local Tests', function () {
       const payload = ethers.utils.defaultAbiCoder.encode(
         [
           {
-            "components": [
+            components: [
               {
-                "internalType": "address",
-                "name": "borrower",
-                "type": "address"
+                internalType: 'address',
+                name: 'borrower',
+                type: 'address'
               },
               {
-                "internalType": "address",
-                "name": "collToken",
-                "type": "address"
+                internalType: 'address',
+                name: 'collToken',
+                type: 'address'
               },
               {
-                "internalType": "address",
-                "name": "loanToken",
-                "type": "address"
+                internalType: 'address',
+                name: 'loanToken',
+                type: 'address'
               },
               {
-                "internalType": "address",
-                "name": "oracleAddr",
-                "type": "address"
+                internalType: 'address',
+                name: 'oracleAddr',
+                type: 'address'
               },
               {
-                "internalType": "uint256",
-                "name": "minLoan",
-                "type": "uint256"
+                internalType: 'uint256',
+                name: 'minLoan',
+                type: 'uint256'
               },
               {
-                "internalType": "uint256",
-                "name": "maxLoan",
-                "type": "uint256"
+                internalType: 'uint256',
+                name: 'maxLoan',
+                type: 'uint256'
               },
               {
-                "internalType": "uint256",
-                "name": "validUntil",
-                "type": "uint256"
+                internalType: 'uint256',
+                name: 'validUntil',
+                type: 'uint256'
               },
               {
-                "internalType": "uint256",
-                "name": "earliestRepayTenor",
-                "type": "uint256"
+                internalType: 'uint256',
+                name: 'earliestRepayTenor',
+                type: 'uint256'
               },
               {
-                "internalType": "address",
-                "name": "borrowerCompartmentImplementation",
-                "type": "address"
+                internalType: 'address',
+                name: 'borrowerCompartmentImplementation',
+                type: 'address'
               },
               {
-                "internalType": "bool",
-                "name": "isSingleUse",
-                "type": "bool"
+                internalType: 'bool',
+                name: 'isSingleUse',
+                type: 'bool'
               }
             ],
-            "internalType": "struct DataTypes.GeneralQuoteInfo",
-            "name": "generalQuoteInfo",
-            "type": "tuple"
+            internalType: 'struct DataTypes.GeneralQuoteInfo',
+            name: 'generalQuoteInfo',
+            type: 'tuple'
           },
           {
-            "internalType": "bytes32",
-            "name": "quoteTuplesRoot",
-            "type": "bytes32"
+            internalType: 'bytes32',
+            name: 'quoteTuplesRoot',
+            type: 'bytes32'
           },
           {
-            "internalType": "bytes32",
-            "name": "salt",
-            "type": "bytes32"
+            internalType: 'bytes32',
+            name: 'salt',
+            type: 'bytes32'
           },
           {
-            "internalType": "uint256",
-            "name": "nonce",
-            "type": "uint256"
+            internalType: 'uint256',
+            name: 'nonce',
+            type: 'uint256'
           }
         ],
-        [
-          offChainQuote.generalQuoteInfo,
-          offChainQuote.quoteTuplesRoot,
-          offChainQuote.salt,
-          offChainQuote.nonce
-        ]
+        [offChainQuote.generalQuoteInfo, offChainQuote.quoteTuplesRoot, offChainQuote.salt, offChainQuote.nonce]
       )
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
@@ -246,7 +245,7 @@ describe('Basic Local Tests', function () {
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
       console.log('Value:', selectedQuoteTuple)
       console.log('Proof:', proof)
-      
+
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
@@ -254,32 +253,36 @@ describe('Basic Local Tests', function () {
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       // unregistered vault address reverts
-      await expect(borrowerGateway
-        .connect(borrower)
-        .borrowWithOffChainQuote(
-          lender.address,
-          collSendAmount,
-          expectedTransferFee,
-          offChainQuote,
-          selectedQuoteTuple,
-          proof,
-          callbackAddr,
-          callbackData
-        )).to.be.revertedWithCustomError(borrowerGateway, 'UnregisteredVault')
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(
+            lender.address,
+            collSendAmount,
+            expectedTransferFee,
+            offChainQuote,
+            selectedQuoteTuple,
+            proof,
+            callbackAddr,
+            callbackData
+          )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'UnregisteredVault')
 
       // if borrower is not msg.sender, reverts
-      await expect(borrowerGateway
-        .connect(team)
-        .borrowWithOffChainQuote(
-          lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          offChainQuote,
-          selectedQuoteTuple,
-          proof,
-          callbackAddr,
-          callbackData
-        )).to.be.reverted
+      await expect(
+        borrowerGateway
+          .connect(team)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            collSendAmount,
+            expectedTransferFee,
+            offChainQuote,
+            selectedQuoteTuple,
+            proof,
+            callbackAddr,
+            callbackData
+          )
+      ).to.be.reverted
 
       // if quote tuple that's not part of tree, reverts
       const unregisteredQuoteTuple = {
@@ -288,18 +291,20 @@ describe('Basic Local Tests', function () {
         upfrontFeePctInBase: 0,
         tenor: ONE_DAY.mul(360)
       }
-      await expect(borrowerGateway
-        .connect(team)
-        .borrowWithOffChainQuote(
-          lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          offChainQuote,
-          unregisteredQuoteTuple,
-          proof,
-          callbackAddr,
-          callbackData
-          )).to.be.reverted
+      await expect(
+        borrowerGateway
+          .connect(team)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            collSendAmount,
+            expectedTransferFee,
+            offChainQuote,
+            unregisteredQuoteTuple,
+            proof,
+            callbackAddr,
+            callbackData
+          )
+      ).to.be.reverted
 
       await borrowerGateway
         .connect(borrower)
@@ -327,8 +332,7 @@ describe('Basic Local Tests', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should process on-chain quote correctly', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
-        await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -361,13 +365,15 @@ describe('Basic Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false,
+          isSingleUse: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuoteAdded')
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -404,9 +410,8 @@ describe('Basic Local Tests', function () {
     })
 
     it('Should update and delete on-chain quota successfully', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
-        await setupTest()
-      
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
@@ -438,21 +443,27 @@ describe('Basic Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false,
+          isSingleUse: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuoteAdded')
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
 
       quoteTuples[0].loanPerCollUnitOrLtv = ONE_USDC.mul(900)
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuoteAdded')
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
 
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote))
-        .to.emit(quoteHandler, 'OnChainQuoteDeleted')
+      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteDeleted'
+      )
     })
   })
 })
