@@ -12,6 +12,7 @@ import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
+import {IOracle} from "./interfaces/IOracle.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
@@ -154,10 +155,26 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         if (collSendAmount < upfrontFee + expectedTransferFee) {
             revert(); // InsufficientSendAmount();
         }
-        if (generalQuoteInfo.oracleAddr != address(0)) {
-            revert(); // ToDo: implement oracle handling
+        uint256 loanPerCollUnit;
+        if (generalQuoteInfo.oracleAddr == address(0)) {
+            loanPerCollUnit = quoteTuple.loanPerCollUnitOrLtv;
+        } else {
+            if (
+                !IAddressRegistry(addressRegistry).isWhitelistedOracle(
+                    generalQuoteInfo.oracleAddr
+                )
+            ) {
+                revert();
+            }
+            loanPerCollUnit =
+                (quoteTuple.loanPerCollUnitOrLtv *
+                    IOracle(generalQuoteInfo.oracleAddr).getPrice(
+                        generalQuoteInfo.collToken,
+                        generalQuoteInfo.loanToken
+                    )) /
+                BASE;
         }
-        uint256 loanAmount = (quoteTuple.loanPerCollUnitOrLtv *
+        uint256 loanAmount = (loanPerCollUnit *
             (collSendAmount - expectedTransferFee)) /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
         // checks to prevent griefing attacks (e.g. small unlocks that aren't worth it)

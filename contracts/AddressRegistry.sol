@@ -14,6 +14,7 @@ contract AddressRegistry is IAddressRegistry {
     mapping(address => bool) public isWhitelistedCallbackAddr;
     mapping(address => bool) public isWhitelistedCollTokenHandler;
     mapping(address => bool) public isWhitelistedAutoQuoteStrategy;
+    mapping(address => bool) public isWhitelistedOracle;
     address[] public registeredVaults;
 
     constructor() {
@@ -87,6 +88,13 @@ contract AddressRegistry is IAddressRegistry {
         isWhitelistedAutoQuoteStrategy[addr] = !isWhitelistedAutoQuoteStrategy[
             addr
         ];
+    }
+
+    function toggleOracle(address addr) external {
+        if (msg.sender != owner) {
+            revert();
+        }
+        isWhitelistedOracle[addr] = !isWhitelistedOracle[addr];
     }
 
     function addLenderVault(address addr) external {
