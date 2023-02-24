@@ -2,11 +2,13 @@
 
 pragma solidity 0.8.17;
 
-contract AddressRegistry {
+import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+
+contract AddressRegistry is IAddressRegistry {
     address public owner;
     address public lenderVaultFactory;
     address public borrowerGateway;
-    address public borrowerCompartmentFactory;
+    address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => bool) public isWhitelistedToken;
     mapping(address => bool) public isWhitelistedCallbackAddr;
@@ -18,34 +20,38 @@ contract AddressRegistry {
         owner = msg.sender;
     }
 
-    function setLenderVaultFactory(address addr) external {
+    function initialize(
+        address _lenderVaultFactory,
+        address _borrowerGateway,
+        address _quoteHandler
+    ) external {
         if (msg.sender != owner) {
             revert();
         }
-        if (lenderVaultFactory != address(0)) {
+        if (
+            lenderVaultFactory != address(0) ||
+            borrowerGateway != address(0) ||
+            quoteHandler != address(0)
+        ) {
             revert();
         }
-        lenderVaultFactory = addr;
-    }
-
-    function setBorrowerGateway(address addr) external {
-        if (msg.sender != owner) {
+        if (
+            _lenderVaultFactory == address(0) ||
+            _borrowerGateway == address(0) ||
+            _quoteHandler == address(0)
+        ) {
             revert();
         }
-        if (borrowerGateway != address(0)) {
+        if (
+            _lenderVaultFactory == _borrowerGateway ||
+            _lenderVaultFactory == _quoteHandler ||
+            _borrowerGateway == _quoteHandler
+        ) {
             revert();
         }
-        borrowerGateway = addr;
-    }
-
-    function setBorrowerCompartmentFactory(address addr) external {
-        if (msg.sender != owner) {
-            revert();
-        }
-        if (borrowerCompartmentFactory != address(0)) {
-            revert();
-        }
-        borrowerCompartmentFactory = addr;
+        lenderVaultFactory = _lenderVaultFactory;
+        borrowerGateway = _borrowerGateway;
+        quoteHandler = _quoteHandler;
     }
 
     function toggleTokens(address[] memory tokens) external {

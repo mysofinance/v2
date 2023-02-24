@@ -52,43 +52,44 @@ contract AaveAutoQuoteStrategy1 is IAutoQuoteStrategy {
     address constant COLL_TOKEN = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address constant LOAN_TOKEN = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
-    function getOnChainQuote()
+    function getQuote()
         external
         view
         returns (DataTypes.OnChainQuote memory onChainQuote)
     {
-        onChainQuote.collToken = COLL_TOKEN;
-        onChainQuote.loanToken = LOAN_TOKEN;
+        /*
+        quote.collToken = COLL_TOKEN;
+        quote.loanToken = LOAN_TOKEN;
 
         // rates in RAY: https://docs.aave.com/developers/v/1.0/developing-on-aave/important-considerations#ray-math
         uint256 aaveFixedRate = ILendingPool(AAVE_V2_LENDING_POOL_ADDR)
-            .getReserveData(onChainQuote.loanToken)
+            .getReserveData(quote.loanToken)
             .currentStableBorrowRate;
         address oracle = ILendingPoolAddressesProvider(
             AAVE_V2_LENDING_POOL_ADDRS_PROVIDER
         ).getPriceOracle();
         uint256 loanTokenPrice = IPriceOracleGetter(oracle).getAssetPrice(
-            onChainQuote.loanToken
+            quote.loanToken
         );
         uint256 collTokenPrice = IPriceOracleGetter(oracle).getAssetPrice(
-            onChainQuote.collToken
+            quote.collToken
         );
 
         uint256 collPriceDenomInLoanCcy = (collTokenPrice *
-            10 ** IERC20Metadata(onChainQuote.loanToken).decimals()) /
+            10 ** IERC20Metadata(quote.loanToken).decimals()) /
             loanTokenPrice;
-
-        onChainQuote.loanPerCollUnit =
+        quote.quoteTuples.loanPerCollUnitOrLtv[0] =
             (collPriceDenomInLoanCcy * TARGET_LTV) /
             BASE;
-        onChainQuote.upfrontFeePctInBase = 0;
-        onChainQuote.tenor = 60 * 60 * 24 * 30;
-        onChainQuote.interestRatePctInBase =
-            (aaveFixedRate * BASE * onChainQuote.tenor) /
+        quote.quoteTuples.upfrontFeePctInBase[0] = 0;
+        quote.quoteTuples.tenor[0] = 60 * 60 * 24 * 30;
+        quote.quoteTuples.interestRatePctInBase[0] =
+            (aaveFixedRate * BASE * quote.quoteTuples.tenor[0]) /
             (24 * 60 * 60 * 365) /
             RAY;
-        onChainQuote.timeUntilEarliestRepay = 0;
-        onChainQuote.isNegativeInterestRate = false;
-        onChainQuote.borrowerCompartmentImplementation = address(0);
+        quote.quoteTuples.earliestRepayTenor = 0;
+        quote.quoteTuples.isNegativeInterestRate = false;
+        quote.borrowerCompartmentImplementation = address(0);
+        */
     }
 }

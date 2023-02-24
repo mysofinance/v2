@@ -6,13 +6,11 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
-import {IBorrowerCompartmentFactory} from "./interfaces/IBorrowerCompartmentFactory.sol";
-import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
-import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
+import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
 contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     // putting fee info in borrow gateway since borrower always pays this upfront
@@ -38,37 +36,41 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     function borrowWithOffChainQuote(
         address lenderVault,
         uint256 collSendAmount,
+        uint256 expectedTransferFee,
         DataTypes.OffChainQuote calldata offChainQuote,
+        DataTypes.QuoteTuple calldata quoteTuple,
+        bytes32[] memory proof,
         address callbackAddr,
         bytes calldata callbackData
     ) external nonReentrant {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
         }
-
-        {
-            (bool doesAccept, bytes32 offChainQuoteHash) = ILenderVault(
-                lenderVault
-            ).doesAcceptOffChainQuote(msg.sender, offChainQuote);
-            if (!doesAccept) {
-                revert();
-            }
-            ILenderVault(lenderVault).invalidateOffChainQuote(
-                offChainQuoteHash
-            );
+        address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
+        if (
+            !IQuoteHandler(quoteHandler).doesVaultAcceptOffChainQuote(
+                msg.sender,
+                lenderVault,
+                offChainQuote,
+                quoteTuple,
+                proof
+            )
+        ) {
+            revert();
         }
 
-        (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
-            lenderVault
-        ).getLoanInfoForOffChainQuote(msg.sender, offChainQuote);
-        uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
-        address collReceiver = getCollReceiver(
-            offChainQuote.borrowerCompartmentImplementation,
-            lenderVault,
-            loan.borrower,
-            loan.collToken,
-            loanId
-        );
+        (
+            DataTypes.Loan memory loan,
+            uint256 loanId,
+            uint256 upfrontFee,
+            address collReceiver
+        ) = ILenderVault(lenderVault).processQuote(
+                msg.sender,
+                collSendAmount,
+                expectedTransferFee,
+                offChainQuote.generalQuoteInfo,
+                quoteTuple
+            );
 
         processTransfers(
             lenderVault,
@@ -100,8 +102,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     function borrowWithOnChainQuote(
         address lenderVault,
         uint256 collSendAmount,
+        uint256 expectedTransferFee,
         DataTypes.OnChainQuote calldata onChainQuote,
-        bool isAutoQuote,
+        uint256 quoteTupleIdx,
         address callbackAddr,
         bytes calldata callbackData
     ) external nonReentrant {
@@ -117,30 +120,31 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
         }
+        address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
         if (
-            !isAutoQuote &&
-            !ILenderVault(lenderVault).doesAcceptOnChainQuote(onChainQuote)
+            !IQuoteHandler(quoteHandler).doesVaultAcceptOnChainQuote(
+                msg.sender,
+                lenderVault,
+                onChainQuote
+            )
         ) {
             revert();
         }
-        if (
-            isAutoQuote &&
-            !ILenderVault(lenderVault).doesAcceptAutoQuote(onChainQuote)
-        ) {
-            revert();
-        }
-        (DataTypes.Loan memory loan, uint256 upfrontFee) = ILenderVault(
-            lenderVault
-        ).getLoanInfoForOnChainQuote(msg.sender, collSendAmount, onChainQuote);
-        uint256 loanId = ILenderVault(lenderVault).addLoan(loan);
-
-        address collReceiver = getCollReceiver(
-            onChainQuote.borrowerCompartmentImplementation,
-            lenderVault,
-            loan.borrower,
-            onChainQuote.collToken,
-            loanId
-        );
+        DataTypes.QuoteTuple memory quoteTuple = onChainQuote.quoteTuples[
+            quoteTupleIdx
+        ];
+        (
+            DataTypes.Loan memory loan,
+            uint256 loanId,
+            uint256 upfrontFee,
+            address collReceiver
+        ) = ILenderVault(lenderVault).processQuote(
+                msg.sender,
+                collSendAmount,
+                expectedTransferFee,
+                onChainQuote.generalQuoteInfo,
+                quoteTuple
+            );
 
         processTransfers(
             lenderVault,
@@ -150,14 +154,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             upfrontFee,
             callbackAddr,
             callbackData
-        );
-
-        ILenderVault(lenderVault).updateLoanInfo(
-            loan,
-            0,
-            loanId,
-            loan.initCollAmount,
-            false
         );
 
         emit Borrow(
@@ -175,37 +171,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.collTokenCompartmentAddr,
             loanId
         );
-    }
-
-    function getCollReceiver(
-        address borrowerCompartmentImplementation,
-        address lenderVault,
-        address borrower,
-        address collToken,
-        uint256 loanId
-    ) internal returns (address collReceiver) {
-        if (borrowerCompartmentImplementation != address(0)) {
-            address _addressRegistry = addressRegistry;
-            if (
-                IAddressRegistry(_addressRegistry)
-                    .isWhitelistedCollTokenHandler(
-                        borrowerCompartmentImplementation
-                    )
-            ) {
-                revert();
-            }
-            collReceiver = IBorrowerCompartmentFactory(
-                IAddressRegistry(_addressRegistry).borrowerCompartmentFactory()
-            ).createCompartment(
-                    borrowerCompartmentImplementation,
-                    lenderVault,
-                    borrower,
-                    collToken,
-                    loanId
-                );
-        } else {
-            collReceiver = lenderVault;
-        }
     }
 
     function processTransfers(

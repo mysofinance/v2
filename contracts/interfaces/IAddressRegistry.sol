@@ -24,23 +24,21 @@ interface IAddressRegistry {
 
     function borrowerGateway() external view returns (address);
 
-    function borrowerCompartmentFactory() external view returns (address);
+    function quoteHandler() external view returns (address);
 
     function owner() external view returns (address);
 
-    function setLenderVaultFactory(address addr) external;
-
-    function setBorrowerGateway(address addr) external;
-
-    function setBorrowerCompartmentFactory(address addr) external;
+    function initialize(
+        address _lenderVaultFactory,
+        address _borrowerGateway,
+        address _quoteHandler
+    ) external;
 
     function addLenderVault(address addr) external;
 
     function toggleTokens(address[] memory addrs) external;
 
     function toggleCallbackAddr(address addr) external;
-
-    function toggleCollTokenCompartment(address addr) external;
 
     function toggleAutoQuoteStrategy(address addr) external;
 }
