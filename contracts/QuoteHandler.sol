@@ -27,6 +27,14 @@ contract QuoteHandler {
     );
 
     event OnChainQuoteDeleted(address lenderVault, bytes32 onChainQuoteHash);
+    event OnChainQuoteInvalidated(
+        address lenderVault,
+        bytes32 onChainQuoteHash
+    );
+    event OffChainQuoteInvalidated(
+        address lenderVault,
+        bytes32 offChainQuoteHash
+    );
 
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
@@ -112,33 +120,34 @@ contract QuoteHandler {
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
     }
 
+    /*
     function addAutoQuoteStrategy() external {}
+    */
 
-    function doesVaultAcceptOnChainQuote(
+    function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.OnChainQuote memory onChainQuote
-    ) external view returns (bool) {
-        if (
-            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                onChainQuote.generalQuoteInfo.collToken,
-                onChainQuote.generalQuoteInfo.loanToken
-            )
-        ) {
-            return false;
+        DataTypes.OnChainQuote calldata onChainQuote
+    ) external {
+        checkSenderAndGeneralQuoteInfo(
+            borrower,
+            lenderVault,
+            onChainQuote.generalQuoteInfo
+        );
+        bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
+        if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
+            revert();
         }
-        if (
-            onChainQuote.generalQuoteInfo.borrower != address(0) &&
-            onChainQuote.generalQuoteInfo.borrower != borrower
-        ) {
-            return false;
+        if (onChainQuote.generalQuoteInfo.isSingleUse) {
+            isOnChainQuote[lenderVault][onChainQuoteHash] = false;
+            emit OnChainQuoteInvalidated(lenderVault, onChainQuoteHash);
         }
-        return isOnChainQuote[lenderVault][hashOnChainQuote(onChainQuote)];
     }
 
+    /*
     function doesVaultAcceptAutoQuote(
         address borrower,
-        address /*lenderVault*/,
+        address lenderVault,
         DataTypes.OnChainQuote memory onChainQuote
     ) external view returns (bool) {
         if (
@@ -156,46 +165,29 @@ contract QuoteHandler {
             return false;
         }
         return false;
-        /*
-        return
-            autoQuoteStrategy[onChainQuote.quote.collToken][onChainQuote.quote.loanToken] !=
-            address(0);
-        */
-    }
+    }*/
 
-    function doesVaultAcceptOffChainQuote(
+    function checkAndRegisterOffChainQuote(
         address borrower,
         address lenderVault,
         DataTypes.OffChainQuote calldata offChainQuote,
         DataTypes.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof
-    ) external view returns (bool) {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+    ) external {
+        checkSenderAndGeneralQuoteInfo(
+            borrower,
+            lenderVault,
+            offChainQuote.generalQuoteInfo
+        );
+        if (offChainQuote.nonce > offChainQuoteNonce[lenderVault]) {
             revert();
         }
-        if (
-            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                offChainQuote.generalQuoteInfo.collToken,
-                offChainQuote.generalQuoteInfo.loanToken
-            )
-        ) {
-            return false;
-        }
-        if (
-            offChainQuote.generalQuoteInfo.borrower != address(0) &&
-            offChainQuote.generalQuoteInfo.borrower != borrower
-        ) {
-            return false;
-        }
-        if (offChainQuote.nonce > offChainQuoteNonce[lenderVault]) {
-            return false;
-        }
         if (offChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
-            return false;
+            revert();
         }
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
-            return false;
+            revert();
         }
         if (
             !areValidSignatures(
@@ -206,7 +198,7 @@ contract QuoteHandler {
                 offChainQuote.s
             )
         ) {
-            return false;
+            revert();
         }
 
         bytes32 leaf = keccak256(
@@ -222,9 +214,12 @@ contract QuoteHandler {
             )
         );
         if (!MerkleProof.verify(proof, offChainQuote.quoteTuplesRoot, leaf)) {
-            return false;
+            revert();
         }
-        return true;
+        if (offChainQuote.generalQuoteInfo.isSingleUse) {
+            offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
+            emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
+        }
     }
 
     function areValidSignatures(
@@ -288,17 +283,18 @@ contract QuoteHandler {
             revert();
         }
         offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
+        emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
     }
 
     function hashOnChainQuote(
         DataTypes.OnChainQuote memory onChainQuote
-    ) public pure returns (bytes32 quoteHash) {
+    ) internal pure returns (bytes32 quoteHash) {
         quoteHash = keccak256(abi.encode(onChainQuote));
     }
 
     function hashOffChainQuote(
         DataTypes.OffChainQuote memory offChainQuote
-    ) public pure returns (bytes32 quoteHash) {
+    ) internal pure returns (bytes32 quoteHash) {
         quoteHash = keccak256(
             abi.encode(
                 offChainQuote.generalQuoteInfo,
@@ -309,9 +305,41 @@ contract QuoteHandler {
         );
     }
 
+    function checkSenderAndGeneralQuoteInfo(
+        address borrower,
+        address lenderVault,
+        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo
+    ) internal {
+        address _addressRegistry = addressRegistry;
+        if (
+            msg.sender != IAddressRegistry(_addressRegistry).borrowerGateway()
+        ) {
+            revert();
+        }
+        if (
+            !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
+        ) {
+            revert();
+        }
+        if (
+            !IAddressRegistry(_addressRegistry).isWhitelistedTokenPair(
+                generalQuoteInfo.collToken,
+                generalQuoteInfo.loanToken
+            )
+        ) {
+            revert();
+        }
+        if (
+            generalQuoteInfo.borrower != address(0) &&
+            generalQuoteInfo.borrower != borrower
+        ) {
+            revert();
+        }
+    }
+
     function isValidOnChainQuote(
         DataTypes.OnChainQuote calldata /*onChainQuote*/
-    ) public view returns (bool) {
+    ) internal view returns (bool) {
         return true;
         /*
         console.log("PASS 1");
