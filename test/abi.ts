@@ -29,6 +29,38 @@ const balancerV2PoolAbi = [
 
 const collTokenAbi = [
   {
+    inputs: [],
+    name: 'cumulativeRewardPerToken',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { internalType: 'address', name: '_account', type: 'address' },
+      { internalType: 'address', name: '_receiver', type: 'address' }
+    ],
+    name: 'claimForAccount',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  { inputs: [], name: 'updateRewards', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+  {
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'claimableReward',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     name: 'balanceOf',
     outputs: [{ type: 'uint256', name: '' }],
     inputs: [{ type: 'address', name: 'arg0' }],
@@ -188,4 +220,29 @@ const crvRewardsDistributorAbi = [
   }
 ]
 
-export { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi }
+const gmxRewarRouterAbi = [
+  {
+    inputs: [
+      { internalType: 'address', name: '_token', type: 'address' },
+      { internalType: 'uint256', name: '_amount', type: 'uint256' },
+      { internalType: 'uint256', name: '_minUsdg', type: 'uint256' },
+      { internalType: 'uint256', name: '_minGlp', type: 'uint256' }
+    ],
+    name: 'mintAndStakeGlp',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { internalType: 'uint256', name: '_minUsdg', type: 'uint256' },
+      { internalType: 'uint256', name: '_minGlp', type: 'uint256' }
+    ],
+    name: 'mintAndStakeGlpETH',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'payable',
+    type: 'function'
+  }
+]
+
+export { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi, gmxRewarRouterAbi }

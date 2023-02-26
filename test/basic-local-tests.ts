@@ -47,13 +47,26 @@ describe('Basic Local Tests', function () {
     await lenderVaultFactory.deployed()
 
     // initialize address registry
-    await expect(addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)).to.be.reverted
-    await expect(addressRegistry.connect(team).initialize(ZERO_ADDRESS, borrowerGateway.address, quoteHandler.address)).to.be.reverted
-    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, ZERO_ADDRESS, quoteHandler.address)).to.be.reverted
-    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, ZERO_ADDRESS)).to.be.reverted
-    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, lenderVaultFactory.address, quoteHandler.address)).to.be.reverted
-    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, lenderVaultFactory.address)).to.be.reverted
-    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, quoteHandler.address, quoteHandler.address)).to.be.reverted
+    await expect(
+      addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
+    ).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(ZERO_ADDRESS, borrowerGateway.address, quoteHandler.address)).to.be
+      .reverted
+    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, ZERO_ADDRESS, quoteHandler.address)).to
+      .be.reverted
+    await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, ZERO_ADDRESS))
+      .to.be.reverted
+    await expect(
+      addressRegistry.connect(team).initialize(lenderVaultFactory.address, lenderVaultFactory.address, quoteHandler.address)
+    ).to.be.reverted
+    await expect(
+      addressRegistry
+        .connect(team)
+        .initialize(lenderVaultFactory.address, borrowerGateway.address, lenderVaultFactory.address)
+    ).to.be.reverted
+    await expect(
+      addressRegistry.connect(team).initialize(lenderVaultFactory.address, quoteHandler.address, quoteHandler.address)
+    ).to.be.reverted
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
     await expect(addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)).to.be.reverted
     await expect(addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)).to.be.reverted

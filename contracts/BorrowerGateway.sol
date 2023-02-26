@@ -218,11 +218,13 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             revert InsufficientSendAmount();
         }
 
-        IERC20Metadata(loan.collToken).safeTransferFrom(
-            loan.borrower,
-            IAddressRegistry(addressRegistry).owner(),
-            protocolFeeAmount
-        );
+        if (protocolFeeAmount != 0) {
+            IERC20Metadata(loan.collToken).safeTransferFrom(
+                loan.borrower,
+                IAddressRegistry(addressRegistry).owner(),
+                protocolFeeAmount
+            );
+        }
 
         IERC20Metadata(loan.collToken).safeTransferFrom(
             loan.borrower,

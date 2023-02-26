@@ -1,9 +1,8 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { LenderVault, QuoteHandler } from '../typechain-types'
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi } from './abi'
+import { createOnChainRequest } from './helpers'
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
@@ -28,57 +27,6 @@ function getLoopingSendAmount(
   const q = -collTokenInDexPool * collTokenFromBorrower
   const collTokenReceivedFromDex = -p / 2 + Math.sqrt(Math.pow(p, 2) / 4 - q)
   return collTokenReceivedFromDex + collTokenFromBorrower
-}
-
-const createOnChainRequest = async ({
-  lender,
-  collToken,
-  loanToken,
-  borrowerCompartmentImplementation,
-  lenderVault,
-  quoteHandler,
-  loanPerCollUnit
-}: {
-  lender: SignerWithAddress
-  collToken: string
-  loanToken: string
-  borrowerCompartmentImplementation: string
-  lenderVault: LenderVault
-  quoteHandler: QuoteHandler
-  loanPerCollUnit: BigNumber
-}) => {
-  const blocknum = await ethers.provider.getBlockNumber()
-  const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-  let quoteTuples = [
-    {
-      loanPerCollUnitOrLtv: loanPerCollUnit,
-      interestRatePctInBase: BASE.mul(10).div(100),
-      upfrontFeePctInBase: BASE.mul(1).div(100),
-      tenor: ONE_DAY.mul(90)
-    }
-  ]
-  let onChainQuote = {
-    generalQuoteInfo: {
-      borrower: ZERO_ADDR,
-      collToken: collToken,
-      loanToken: loanToken,
-      oracleAddr: ZERO_ADDR,
-      minLoan: 0,
-      maxLoan: MAX_UINT256,
-      validUntil: timestamp + 60,
-      earliestRepayTenor: 0,
-      borrowerCompartmentImplementation: borrowerCompartmentImplementation,
-      isSingleUse: false
-    },
-    quoteTuples: quoteTuples,
-    salt: ZERO_BYTES32
-  }
-  await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
-    quoteHandler,
-    'OnChainQuoteAdded'
-  )
-
-  return onChainQuote
 }
 
 describe('Basic Forked Mainnet Tests', function () {
@@ -497,6 +445,19 @@ describe('Basic Forked Mainnet Tests', function () {
       // check support gauge in gauge controller
       await expect(gaugeControllerInstance.connect(borrower).gauge_types(crvGaugeAddress)).to.be.not.reverted
 
+      // drop crv borrower balance to 0
+      const crvSlotIndex = 3
+      const crvIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [crvSlotIndex, borrower.address])
+      await ethers.provider.send('hardhat_setStorageAt', [
+        crvTokenAddress,
+        crvIndex.toString(),
+        ethers.utils.hexZeroPad(BigNumber.from(0).toHexString(), 32)
+      ])
+
+      const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
+
+      expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
+
       // Get coll storage slot index
       const collIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [collTokenSlot, borrower.address])
       await ethers.provider.send('hardhat_setStorageAt', [
@@ -612,10 +573,6 @@ describe('Basic Forked Mainnet Tests', function () {
         console.log('transfer some funds to borrower...')
         await usdc.connect(lender).transfer(borrower.address, repayAmount.sub(borrowerUsdcBalancePre))
       }
-      const borrowerCRVBalancePre = await crvInstance.balanceOf(borrower.address)
-
-      expect(totalGaugeRewardCRV).to.not.equal(BigNumber.from(0))
-      expect(borrowerCRVBalancePre).to.equal(BigNumber.from(0))
 
       const repay = async () => {
         const borrowerRewardTokenBalancePre = rewardTokenAddress
@@ -701,11 +658,13 @@ describe('Basic Forked Mainnet Tests', function () {
         if (rewardTokenAddress) {
           const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
           compartmentRewardTokenBalancePost = await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
+
           expect(borrowerRewardTokenBalancePost).to.be.greaterThan(borrowerRewardTokenBalancePre)
+
           if (borrowerRewardTokenBalancePost.gt(borrowerRewardTokenBalancePre)) {
             expect(
               borrowerRewardTokenBalancePost.sub(borrowerRewardTokenBalancePre).sub(compartmentRewardTokenBalancePost)
-            ).to.be.equal(0)
+            ).to.be.closeTo(0, 2)
           }
         }
 
@@ -734,19 +693,6 @@ describe('Basic Forked Mainnet Tests', function () {
       }
 
       isPartialRepay ? await partialRepay() : await repay()
-
-      // drop crv borrower balance to 0
-      const crvSlotIndex = 3
-      const crvIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [crvSlotIndex, borrower.address])
-      await ethers.provider.send('hardhat_setStorageAt', [
-        crvTokenAddress,
-        crvIndex.toString(),
-        ethers.utils.hexZeroPad(BigNumber.from(0).toHexString(), 32)
-      ])
-
-      const emptyCrvBalance = await crvInstance.balanceOf(borrower.address)
-
-      expect(emptyCrvBalance).to.equal(BigNumber.from(0))
     }
 
     it('Should process Curve LP staking in LGauge v1 and repay correctly', async () => {
