@@ -10,22 +10,43 @@ import {IOracle} from "../interfaces/IOracle.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 contract ChainlinkBasic is IOracle {
-    address internal immutable addressRegistry;
+    address public owner;
     // tokenAddr => chainlink oracle addr in eth
     mapping(address => address) public ethOracleAddrs;
     // tokenAddr => chainlink oracle addr in usd($)
     mapping(address => address) public usdOracleAddrs;
 
     error InvalidOraclePair();
-    error InvalidRegistry();
     error InvalidSender();
     error InvalidAddress();
+    error InvalidArrayLength();
+    error OracleAlreadySet();
 
-    constructor(address _addressRegistry) {
-        if (_addressRegistry == address(0)) {
-            revert InvalidRegistry();
+    constructor(
+        address[] memory _tokenAddrs,
+        address[] memory _oracleAddrs,
+        bool[] memory _isEth
+    ) {
+        owner = msg.sender;
+        if (
+            _tokenAddrs.length != _oracleAddrs.length ||
+            _tokenAddrs.length != _isEth.length
+        ) {
+            revert InvalidArrayLength();
         }
-        addressRegistry = _addressRegistry;
+        for (uint i = 0; i < _oracleAddrs.length; ) {
+            if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
+                revert InvalidAddress();
+            }
+            if (_isEth[i]) {
+                ethOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
+            } else {
+                usdOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
+            }
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function setOracleAddrs(
@@ -33,16 +54,29 @@ contract ChainlinkBasic is IOracle {
         address[] memory oracleAddrs,
         bool[] memory isEth
     ) external {
-        if (msg.sender != addressRegistry) {
+        if (msg.sender != owner) {
             revert InvalidSender();
+        }
+        if (
+            tokenAddrs.length == 0 ||
+            tokenAddrs.length != oracleAddrs.length ||
+            tokenAddrs.length != isEth.length
+        ) {
+            revert InvalidArrayLength();
         }
         for (uint i = 0; i < oracleAddrs.length; ) {
             if (tokenAddrs[i] == address(0) || oracleAddrs[i] == address(0)) {
                 revert InvalidAddress();
             }
             if (isEth[i]) {
+                if (ethOracleAddrs[tokenAddrs[i]] != address(0)) {
+                    revert OracleAlreadySet();
+                }
                 ethOracleAddrs[tokenAddrs[i]] = oracleAddrs[i];
             } else {
+                if (usdOracleAddrs[tokenAddrs[i]] != address(0)) {
+                    revert OracleAlreadySet();
+                }
                 usdOracleAddrs[tokenAddrs[i]] = oracleAddrs[i];
             }
             unchecked {
