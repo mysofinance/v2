@@ -312,7 +312,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         loanTokenReceived =
             IERC20Metadata(loan.loanToken).balanceOf(lenderVault) -
             loanTokenReceived;
-
         if (loanTokenReceived != loanRepayInfo.repayAmount) {
             revert(); // InvalidSendAmount();
         }

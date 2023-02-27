@@ -1203,7 +1203,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount =ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
-      await borrowerGateway
+      const borrowTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
@@ -1214,6 +1214,14 @@ describe('Basic Forked Mainnet Tests', function () {
           callbackAddr,
           callbackData
         )
+
+      const borrowTransactionReceipt = await borrowTransaction.wait()
+
+      const borrowEvent = borrowTransactionReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })
+
+      const loanId = borrowEvent?.args?.['loanId']
           
       // check balance post borrow
       const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
@@ -1232,7 +1240,24 @@ describe('Basic Forked Mainnet Tests', function () {
               .sub(vaultPaxgBalPost)
               .sub(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_USDC))
       ).to.equal(0)
-      // todo: add repay with paxg repay fee
+
+      await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            collToken: usdc.address,
+            loanToken: paxg.address,
+            loanId,
+            repayAmount: ONE_PAXG.mul(10).mul(9998).div(10000),
+            repaySendAmount: ONE_PAXG.mul(10)
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      )
+        .to.emit(borrowerGateway, 'Repay')
+        .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(9998).div(10000))
     })
   })
 })
