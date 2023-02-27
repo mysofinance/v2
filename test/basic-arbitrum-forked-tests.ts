@@ -185,9 +185,12 @@ describe('Basic Forked Arbitrum Tests', function () {
       return x.event === 'Borrow'
     })
 
-    const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
     const loanId = borrowEvent?.args?.['loanId']
     const repayAmount = borrowEvent?.args?.['initRepayAmount']
+    const loanExpiry = borrowEvent?.args?.['expiry']
+
+    const coeffRepay = 2
+    const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
 
     // check balance post borrow
     const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -204,25 +207,45 @@ describe('Basic Forked Arbitrum Tests', function () {
     // increase borrower usdc balance to repay
     await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(10000000))
 
-    // repay
+    // partial repay
     await expect(
-      borrowerGateway
-        .connect(borrower)
-        .repay(
-          { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, repaySendAmount: repayAmount },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
-        )
+      borrowerGateway.connect(borrower).repay(
+        {
+          collToken: collTokenAddress,
+          loanToken: usdc.address,
+          loanId,
+          repayAmount: partialRepayAmount,
+          repaySendAmount: partialRepayAmount
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
+      )
     )
       .to.emit(borrowerGateway, 'Repay')
-      .withArgs(lenderVault.address, loanId, repayAmount)
+      .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
     // check balance post repay
     const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
     const borrowerWethRepayBalPost = await weth.balanceOf(borrower.address)
 
-    expect(borrowerCollRepayBalPost).to.be.equal(borrowerCollBalPre)
+    expect(borrowerCollRepayBalPost).to.be.equal(borrowerCollBalPre.div(coeffRepay))
     expect(borrowerWethRepayBalPost).to.be.above(borrowerWethBalPre)
+
+    await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+    // unlock collateral
+    const lenderVaultWethBalPre = await weth.balanceOf(lenderVault.address)
+    const lenderCollBalPre = await collInstance.balanceOf(lender.address)
+
+    expect(lenderCollBalPre).to.equal(BigNumber.from(0))
+
+    await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+
+    const lenderVaultWethBalPost = await weth.balanceOf(lenderVault.address)
+    const lenderCollBalPost = await collInstance.balanceOf(lender.address)
+
+    expect(lenderVaultWethBalPost).to.be.above(lenderVaultWethBalPre)
+    expect(lenderCollBalPost).to.equal(borrowerCollBalPre.div(coeffRepay))
   })
 })
