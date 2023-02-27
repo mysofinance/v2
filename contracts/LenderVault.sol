@@ -358,6 +358,9 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
             ) {
                 revert();
             }
+            if (quoteTuple.loanPerCollUnitOrLtv > BASE) {
+                revert(); // arbitrage protection?
+            }
             loanPerCollUnit =
                 (quoteTuple.loanPerCollUnitOrLtv *
                     IOracle(generalQuoteInfo.oracleAddr).getPrice(

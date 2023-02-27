@@ -10,7 +10,7 @@ import {IOracle} from "../interfaces/IOracle.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 contract ChainlinkBasic is IOracle {
-    address immutable addressRegistry;
+    address internal immutable addressRegistry;
     // tokenAddr => chainlink oracle addr in eth
     mapping(address => address) public ethOracleAddrs;
     // tokenAddr => chainlink oracle addr in usd($)
@@ -123,6 +123,7 @@ contract ChainlinkBasic is IOracle {
         // todo: decide on logic check for updatedAt versus current timestamp?
         uint256 collTokenPriceRaw = uint256(answer);
 
+        // typically loanTokenOracleDecimals should equal collTokenOracleDecimals
         collTokenPriceInLoanToken =
             (loanTokenPriceRaw *
                 (10 ** loanTokenDecimals) *
