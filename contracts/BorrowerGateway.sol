@@ -47,17 +47,13 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             revert UnregisteredVault();
         }
         address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
-        if (
-            !IQuoteHandler(quoteHandler).doesVaultAcceptOffChainQuote(
-                msg.sender,
-                lenderVault,
-                offChainQuote,
-                quoteTuple,
-                proof
-            )
-        ) {
-            revert();
-        }
+        IQuoteHandler(quoteHandler).checkAndRegisterOffChainQuote(
+            msg.sender,
+            lenderVault,
+            offChainQuote,
+            quoteTuple,
+            proof
+        );
 
         (
             DataTypes.Loan memory loan,
@@ -121,15 +117,11 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             revert UnregisteredVault();
         }
         address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
-        if (
-            !IQuoteHandler(quoteHandler).doesVaultAcceptOnChainQuote(
-                msg.sender,
-                lenderVault,
-                onChainQuote
-            )
-        ) {
-            revert();
-        }
+        IQuoteHandler(quoteHandler).checkAndRegisterOnChainQuote(
+            msg.sender,
+            lenderVault,
+            onChainQuote
+        );
         DataTypes.QuoteTuple memory quoteTuple = onChainQuote.quoteTuples[
             quoteTupleIdx
         ];
