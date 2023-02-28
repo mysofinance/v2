@@ -1358,19 +1358,14 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(borrowerPaxgBalPre.sub(borrowerPaxgBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
-      /*expect(
+      expect(
         Math.abs(Number(vaultPaxgBalPost.sub(vaultPaxgBalPre).sub(collSendAmount.mul(9998).div(10000).toString())))
       ).to.lessThanOrEqual(1)
       expect(
-        Math.abs(
-          Number(
             vaultUsdcBalPre
               .sub(vaultUsdcBalPost)
-              .sub(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount.mul(9998)).div(10000).div(ONE_PAXG))
-              .toString()
-          )
-        )
-      ).to.lessThanOrEqual(1)*/
+              .sub(maxLoanPerColl)
+      ).to.equal(0)
     })
   })
 })
