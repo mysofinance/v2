@@ -1260,4 +1260,106 @@ describe('Basic Forked Mainnet Tests', function () {
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(9998).div(10000))
     })
   })
+
+  describe('Testing chainlink oracles', function () {
+    it('Should process onChain quote with oracle address', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, team, lenderVault, addressRegistry } = await setupTest()
+
+      // deploy chainlinkOracleContract
+      //0x986b5e1e1755e3c2440e960477f25201b0a8bbd4 USDC/ETH chainlink addr
+      //0x9b97304ea12efed0fad976fbecaad46016bf269e PAXG/ETH chainlink addr
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+      const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+        ['0x986b5e1e1755e3c2440e960477f25201b0a8bbd4', '0x9b97304ea12efed0fad976fbecaad46016bf269e'],
+        [true, true]
+      )
+      await chainlinkBasicImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address)
+
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: BASE.mul(75).div(100),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: paxg.address,
+          loanToken: usdc.address,
+          oracleAddr: chainlinkBasicImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPre = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const expectedTransferFee = ONE_PAXG.mul(2).div(9998)
+      const quoteTupleIdx = 0
+      const collSendAmount = ONE_PAXG.mul(10000).div(9998)
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
+
+      // check balance post borrow
+      const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPost = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      /*expect(borrowerPaxgBalPre.sub(borrowerPaxgBalPost)).to.equal(collSendAmount)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(ONE_USDC.mul(1000))
+      expect(
+        Math.abs(Number(vaultPaxgBalPost.sub(vaultPaxgBalPre).sub(collSendAmount.mul(9998).div(10000).toString())))
+      ).to.lessThanOrEqual(1)
+      expect(
+        Math.abs(
+          Number(
+            vaultUsdcBalPre
+              .sub(vaultUsdcBalPost)
+              .sub(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount.mul(9998)).div(10000).div(ONE_PAXG))
+              .toString()
+          )
+        )
+      ).to.lessThanOrEqual(1)*/
+    })
+  })
 })

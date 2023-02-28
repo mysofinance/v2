@@ -12,9 +12,14 @@ import {IOracle} from "../interfaces/IOracle.sol";
 contract ChainlinkBasic is IOracle {
     address public owner;
     // tokenAddr => chainlink oracle addr in eth
-    mapping(address => address) public ethOracleAddrs;
+    mapping(address => OracleData) public ethOracleAddrs;
     // tokenAddr => chainlink oracle addr in usd($)
-    mapping(address => address) public usdOracleAddrs;
+    mapping(address => OracleData) public usdOracleAddrs;
+
+    struct OracleData {
+        address oracleAddr;
+        uint40 timestampValid;
+    }
 
     error InvalidOraclePair();
     error InvalidSender();
@@ -39,9 +44,15 @@ contract ChainlinkBasic is IOracle {
                 revert InvalidAddress();
             }
             if (_isEth[i]) {
-                ethOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
+                ethOracleAddrs[_tokenAddrs[i]] = OracleData({
+                    oracleAddr: _oracleAddrs[i],
+                    timestampValid: uint40(block.timestamp)
+                });
             } else {
-                usdOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
+                usdOracleAddrs[_tokenAddrs[i]] = OracleData({
+                    oracleAddr: _oracleAddrs[i],
+                    timestampValid: uint40(block.timestamp)
+                });
             }
             unchecked {
                 ++i;
@@ -69,15 +80,21 @@ contract ChainlinkBasic is IOracle {
                 revert InvalidAddress();
             }
             if (isEth[i]) {
-                if (ethOracleAddrs[tokenAddrs[i]] != address(0)) {
+                if (ethOracleAddrs[tokenAddrs[i]].oracleAddr != address(0)) {
                     revert OracleAlreadySet();
                 }
-                ethOracleAddrs[tokenAddrs[i]] = oracleAddrs[i];
+                ethOracleAddrs[tokenAddrs[i]] = OracleData({
+                    oracleAddr: oracleAddrs[i],
+                    timestampValid: uint40(block.timestamp + 86400)
+                });
             } else {
-                if (usdOracleAddrs[tokenAddrs[i]] != address(0)) {
+                if (usdOracleAddrs[tokenAddrs[i]].oracleAddr != address(0)) {
                     revert OracleAlreadySet();
                 }
-                usdOracleAddrs[tokenAddrs[i]] = oracleAddrs[i];
+                usdOracleAddrs[tokenAddrs[i]] = OracleData({
+                    oracleAddr: oracleAddrs[i],
+                    timestampValid: uint40(block.timestamp + 86400)
+                });
             }
             unchecked {
                 ++i;
@@ -116,21 +133,30 @@ contract ChainlinkBasic is IOracle {
             address collTokenOracleAddr
         )
     {
+        uint256 currTimestamp = block.timestamp;
         // try to see if both have non-zero ethOracleAddrs
-        loanTokenOracleAddr = ethOracleAddrs[loanToken];
-        collTokenOracleAddr = ethOracleAddrs[collToken];
+        OracleData memory loanTokenOracleData = ethOracleAddrs[loanToken];
+        OracleData memory collTokenOracleData = ethOracleAddrs[collToken];
+        loanTokenOracleAddr = loanTokenOracleData.oracleAddr;
+        collTokenOracleAddr = collTokenOracleData.oracleAddr;
         isValid =
             loanTokenOracleAddr != address(0) &&
-            collTokenOracleAddr != address(0);
+            collTokenOracleAddr != address(0) &&
+            currTimestamp > loanTokenOracleData.timestampValid &&
+            currTimestamp > collTokenOracleData.timestampValid;
         if (isValid) {
             return (isValid, loanTokenOracleAddr, collTokenOracleAddr);
         }
         // now try usd oracle addresses
-        loanTokenOracleAddr = usdOracleAddrs[loanToken];
-        collTokenOracleAddr = usdOracleAddrs[collToken];
+        loanTokenOracleData = usdOracleAddrs[loanToken];
+        collTokenOracleData = usdOracleAddrs[collToken];
+        loanTokenOracleAddr = loanTokenOracleData.oracleAddr;
+        collTokenOracleAddr = collTokenOracleData.oracleAddr;
         isValid =
             loanTokenOracleAddr != address(0) &&
-            collTokenOracleAddr != address(0);
+            collTokenOracleAddr != address(0) &&
+            currTimestamp > loanTokenOracleData.timestampValid &&
+            currTimestamp > collTokenOracleData.timestampValid;
     }
 
     function calculatePrice(
@@ -159,9 +185,9 @@ contract ChainlinkBasic is IOracle {
 
         // typically loanTokenOracleDecimals should equal collTokenOracleDecimals
         collTokenPriceInLoanToken =
-            (loanTokenPriceRaw *
+            (collTokenPriceRaw *
                 (10 ** loanTokenDecimals) *
-                (10 ** collTokenOracleDecimals)) /
-            (collTokenPriceRaw * (10 ** loanTokenOracleDecimals));
+                (10 ** loanTokenOracleDecimals)) /
+            (loanTokenPriceRaw * (10 ** collTokenOracleDecimals));
     }
 }
