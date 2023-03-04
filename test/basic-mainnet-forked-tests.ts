@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi } from './abi'
-import { createOnChainRequest } from './helpers'
+import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta } from './helpers'
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
@@ -583,7 +583,7 @@ describe('Basic Forked Mainnet Tests', function () {
           borrowerGateway
             .connect(borrower)
             .repay(
-              { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, repaySendAmount: repayAmount },
+              { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, expectedTransferFee: 0 },
               lenderVault.address,
               callbackAddr,
               callbackData
@@ -623,7 +623,7 @@ describe('Basic Forked Mainnet Tests', function () {
               loanToken: usdc.address,
               loanId,
               repayAmount: partialRepayAmount,
-              repaySendAmount: partialRepayAmount
+              expectedTransferFee: 0
             },
             lenderVault.address,
             callbackAddr,
@@ -855,7 +855,7 @@ describe('Basic Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .repay(
-            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, repaySendAmount: repayAmount },
+            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, expectedTransferFee: 0 },
             lenderVault.address,
             callbackAddr,
             callbackData
@@ -1229,27 +1229,30 @@ describe('Basic Forked Mainnet Tests', function () {
       const vaultPaxgBalPost = await paxg.balanceOf(lenderVault.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
-      expect(borrowerPaxgBalPost.sub(borrowerPaxgBalPre)).to.equal(ONE_PAXG.mul(10).mul(9998).div(10000))
-      expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPost)).to.equal(ONE_USDC.mul(10000))
+      const maxLoanPerCollOrLtv = quoteTuples[0].loanPerCollUnitOrLtv
+
+      expect(borrowerPaxgBalPost.sub(borrowerPaxgBalPre)).to.equal(calcLoanBalanceDelta(maxLoanPerCollOrLtv,2,collSendAmount,6))
+      expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPost)).to.equal(collSendAmount)
       expect(
-        vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(ONE_USDC.mul(10000))
+        vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount)
       ).to.equal(0)
       
       expect(
             vaultPaxgBalPre
               .sub(vaultPaxgBalPost)
-              .sub(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_USDC))
+              .sub(calcLoanBalanceDelta(maxLoanPerCollOrLtv,0,collSendAmount,6))
       ).to.equal(0)
 
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
+      
       await expect(
         borrowerGateway.connect(borrower).repay(
           {
             collToken: usdc.address,
             loanToken: paxg.address,
             loanId,
-            repayAmount: ONE_PAXG.mul(10).mul(9998).div(10000),
-            repaySendAmount: ONE_PAXG.mul(10)
+            repayAmount: ONE_PAXG.mul(10),
+            expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10),2)
           },
           lenderVault.address,
           callbackAddr,
@@ -1257,7 +1260,7 @@ describe('Basic Forked Mainnet Tests', function () {
         )
       )
         .to.emit(borrowerGateway, 'Repay')
-        .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(9998).div(10000))
+        .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10))
     })
   })
 })

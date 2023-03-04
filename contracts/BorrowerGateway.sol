@@ -306,7 +306,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         IERC20Metadata(loan.loanToken).safeTransferFrom(
             loan.borrower,
             lenderVault,
-            loanRepayInfo.repaySendAmount
+            uint256(loanRepayInfo.repayAmount) +
+                loanRepayInfo.expectedTransferFee
         );
 
         loanTokenReceived =
@@ -337,7 +338,11 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
             revert UnregisteredVault();
         }
-        if (loanRepayInfo.repaySendAmount < loanRepayInfo.repayAmount) {
+        if (
+            uint256(loanRepayInfo.repayAmount) +
+                loanRepayInfo.expectedTransferFee <
+            loanRepayInfo.repayAmount
+        ) {
             revert(); // InsufficientSendAmount()
         }
         DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(

@@ -60,3 +60,25 @@ export const createOnChainRequest = async ({
 
   return onChainQuote
 }
+
+export const transferFeeHelper = (amountReceived : BigNumber, feeInBasisPoints : number) : BigNumber => {
+  const initSendAmount = amountReceived.mul(10000).div(10000 - feeInBasisPoints)
+  const initFeeAmount = initSendAmount.mul(feeInBasisPoints).div(10000)
+  if(initSendAmount.sub(initFeeAmount).eq(amountReceived)){
+    return initFeeAmount
+  }
+  else{
+    let sendAmount = initSendAmount.add(1)
+    let feeAmount = sendAmount.mul(feeInBasisPoints).div(10000)
+    while(sendAmount.sub(feeAmount).lt(amountReceived)){
+      sendAmount = sendAmount.add(1)
+      feeAmount = sendAmount.mul(feeInBasisPoints).div(10000)
+    }
+    return feeAmount
+  }
+  
+}
+
+export const calcLoanBalanceDelta = (maxLoanPerColl : BigNumber, feeInBasisPoints : number, collSendAmount : BigNumber, loanDecimals : number) : BigNumber => {
+  return maxLoanPerColl.mul(collSendAmount).mul(10000 - feeInBasisPoints).div(10000).div(10**loanDecimals)
+}

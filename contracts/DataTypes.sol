@@ -57,7 +57,7 @@ library DataTypes {
         address loanToken;
         uint256 loanId;
         uint128 repayAmount;
-        uint256 repaySendAmount;
+        uint256 expectedTransferFee;
     }
 
     struct LoanRequest {
