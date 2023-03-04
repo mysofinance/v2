@@ -1251,8 +1251,8 @@ describe('Basic Forked Mainnet Tests', function () {
             collToken: usdc.address,
             loanToken: paxg.address,
             loanId,
-            repayAmount: ONE_PAXG.mul(10),
-            expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10),2)
+            repayAmount: ONE_PAXG.mul(10).mul(110).div(100),
+            expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100),2)
           },
           lenderVault.address,
           callbackAddr,
@@ -1260,7 +1260,10 @@ describe('Basic Forked Mainnet Tests', function () {
         )
       )
         .to.emit(borrowerGateway, 'Repay')
-        .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10))
+        .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
+        const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
+        // full repay of USDC less upfront fee
+        expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPostRepay)).to.be.equal(collSendAmount.mul(1).div(100))
     })
   })
 })
