@@ -209,7 +209,7 @@ describe('Basic Forked Arbitrum Tests', function () {
       borrowerGateway
         .connect(borrower)
         .repay(
-          { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, repaySendAmount: repayAmount },
+          { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, expectedTransferFee: 0 },
           lenderVault.address,
           callbackAddr,
           callbackData

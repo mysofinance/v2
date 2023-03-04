@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -229,7 +229,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             collTokenReceived;
 
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
-            revert(); // InsufficientSendAmount();
+            revert(); // InvalidSendAmount();
         }
     }
 
@@ -306,15 +306,15 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         IERC20Metadata(loan.loanToken).safeTransferFrom(
             loan.borrower,
             lenderVault,
-            loanRepayInfo.repaySendAmount
+            uint256(loanRepayInfo.repayAmount) +
+                loanRepayInfo.expectedTransferFee
         );
 
         loanTokenReceived =
             IERC20Metadata(loan.loanToken).balanceOf(lenderVault) -
             loanTokenReceived;
-
         if (loanTokenReceived != loanRepayInfo.repayAmount) {
-            revert(); // InsufficientSendAmount();
+            revert(); // InvalidSendAmount();
         }
     }
 
@@ -338,7 +338,13 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
             revert UnregisteredVault();
         }
-
+        if (
+            uint256(loanRepayInfo.repayAmount) +
+                loanRepayInfo.expectedTransferFee <
+            loanRepayInfo.repayAmount
+        ) {
+            revert(); // InsufficientSendAmount()
+        }
         DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(
             loanRepayInfo.loanId
         );
