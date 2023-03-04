@@ -209,18 +209,15 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     // partial repay
     await expect(
-      borrowerGateway.connect(borrower).repay(
-        {
-          collToken: collTokenAddress,
-          loanToken: usdc.address,
-          loanId,
-          repayAmount: partialRepayAmount,
-          repaySendAmount: partialRepayAmount
-        },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
-      )
+      borrowerGateway
+        .connect(borrower)
+        .repay(
+          { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, expectedTransferFee: 0 },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+
     )
       .to.emit(borrowerGateway, 'Repay')
       .withArgs(lenderVault.address, loanId, partialRepayAmount)

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 library DataTypes {
     struct Loan {
@@ -57,7 +57,7 @@ library DataTypes {
         address loanToken;
         uint256 loanId;
         uint128 repayAmount;
-        uint256 repaySendAmount;
+        uint256 expectedTransferFee;
     }
 
     struct LoanRequest {
