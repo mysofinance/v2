@@ -7,7 +7,7 @@
     "prettier:write": "prettier --config .prettierrc --write \"{contracts,test}/**/*.{js,json,sol,ts}\"",
     "test": "npm run test:mainnet && npm run test:arbitrum && npm run test:local",
     "test:arbitrum": "HARDHAT_CHAIN_ID=31336 npx hardhat test ./test/*-arbitrum-*.ts",
-    "test:mainnet": "HARDHAT_CHAIN_ID=31337 npx hardhat test ./test/*-mainnet-*.ts",
+    "test:mainnet": "HARDHAT_CHAIN_ID=1 npx hardhat test ./test/*-mainnet-*.ts",
     "test:local": "npx hardhat test ./test/*-local-*.ts",
     "lint": "solhint \"contracts/**/*.sol\"",
     "slither": "slither . --checklist",

@@ -13,7 +13,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY ?? '00000000000000000000000000000000
 console.log(`Using hardhat config with GOERLI_URL=${ALCHEMY_API_KEY} and PRIVATE_KEY=${PRIVATE_KEY}`)
 
 const forkMainnet = {
-  chainId: 31337,
+  chainId: 1,
   forking: {
     url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
     blockNumber: 16640270 // 2023-02-16

@@ -139,6 +139,8 @@ describe('Basic Local Tests', function () {
       const quoteTuplesRoot = quoteTuplesTree.root
       console.log('quoteTuplesTree:', quoteTuplesTree)
       console.log('quoteTuplesRoot:', quoteTuplesRoot)
+      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
+      console.log('chainId:', chainId)
       let offChainQuote = {
         generalQuoteInfo: {
           borrower: borrower.address,
@@ -155,6 +157,7 @@ describe('Basic Local Tests', function () {
         quoteTuplesRoot: quoteTuplesRoot,
         salt: ZERO_BYTES32,
         nonce: 0,
+        chainId: chainId,
         v: [0],
         r: [ZERO_BYTES32],
         s: [ZERO_BYTES32]
@@ -232,9 +235,14 @@ describe('Basic Local Tests', function () {
             internalType: 'uint256',
             name: 'nonce',
             type: 'uint256'
-          }
+          },
+          {
+            internalType: 'uint256',
+            name: 'chainId',
+            type: 'uint256'
+          },
         ],
-        [offChainQuote.generalQuoteInfo, offChainQuote.quoteTuplesRoot, offChainQuote.salt, offChainQuote.nonce]
+        [offChainQuote.generalQuoteInfo, offChainQuote.quoteTuplesRoot, offChainQuote.salt, offChainQuote.nonce, offChainQuote.chainId]
       )
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
