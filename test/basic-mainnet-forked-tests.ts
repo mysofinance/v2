@@ -1009,7 +1009,7 @@ describe('Basic Forked Mainnet Tests', function () {
             loanToken: usdc.address,
             loanId,
             repayAmount: partialRepayAmount,
-            repaySendAmount: partialRepayAmount
+            expectedTransferFee: 0
           },
           lenderVault.address,
           callbackAddr,
