@@ -863,7 +863,7 @@ describe('Basic Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .repay(
-            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, expectedTransferFee: 0 },
+            { collToken: collTokenAddress, loanToken: usdc.address, loanId, partialRepayAmount, expectedTransferFee: 0 },
             lenderVault.address,
             callbackAddr,
             callbackData
