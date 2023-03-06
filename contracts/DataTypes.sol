@@ -47,6 +47,7 @@ library DataTypes {
         bytes32 quoteTuplesRoot;
         bytes32 salt;
         uint256 nonce;
+        uint256 chainId;
         uint8[] v;
         bytes32[] r;
         bytes32[] s;
@@ -57,7 +58,7 @@ library DataTypes {
         address loanToken;
         uint256 loanId;
         uint128 repayAmount;
-        uint256 repaySendAmount;
+        uint256 expectedTransferFee;
     }
 
     struct LoanRequest {

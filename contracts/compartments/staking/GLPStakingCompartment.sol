@@ -72,6 +72,9 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
         );
         // transfer all to vault
         IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
+
+        IStakingHelper(FEE_GLP).claim(address(this));
+
         // get weth token balance
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
         // transfer all weth to vault

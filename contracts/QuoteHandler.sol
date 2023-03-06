@@ -294,13 +294,14 @@ contract QuoteHandler {
 
     function hashOffChainQuote(
         DataTypes.OffChainQuote memory offChainQuote
-    ) internal pure returns (bytes32 quoteHash) {
+    ) internal view returns (bytes32 quoteHash) {
         quoteHash = keccak256(
             abi.encode(
                 offChainQuote.generalQuoteInfo,
                 offChainQuote.quoteTuplesRoot,
                 offChainQuote.salt,
-                offChainQuote.nonce
+                offChainQuote.nonce,
+                block.chainid
             )
         );
     }
