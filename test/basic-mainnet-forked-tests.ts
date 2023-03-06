@@ -1399,9 +1399,9 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = ONE_PAXG.mul(2).div(9998)
       const quoteTupleIdx = 0
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
+      const expectedTransferFee = transferFeeHelper(collSendAmount,2)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       await borrowerGateway
