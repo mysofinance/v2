@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi } from './abi'
+import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi, chainlinkAggregatorAbi } from './abi'
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta } from './helpers'
 
 const hre = require('hardhat')
