@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -72,6 +72,9 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
         );
         // transfer all to vault
         IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
+
+        IStakingHelper(FEE_GLP).claim(address(this));
+
         // get weth token balance
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
         // transfer all weth to vault

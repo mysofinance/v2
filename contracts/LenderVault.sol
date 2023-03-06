@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -369,6 +369,12 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
         loanAmount =
             (loanPerCollUnit * (collSendAmount - expectedTransferFee)) /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        uint256 vaultLoanTokenBal = IERC20(generalQuoteInfo.loanToken)
+            .balanceOf(address(this));
+        // check if loan is too big for vault
+        if (loanAmount > vaultLoanTokenBal) {
+            revert(); // InsufficientVaultFunds();
+        }
         int256 _interestRateFactor = int256(BASE) +
             quoteTuple.interestRatePctInBase;
         if (_interestRateFactor < 0) {
