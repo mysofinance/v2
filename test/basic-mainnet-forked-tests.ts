@@ -532,7 +532,11 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
+      await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.reverted
+      await expect(crvCompInstance.connect(borrower).stake(1000)).to.be.reverted
+      await expect(crvCompInstance.connect(borrower).stake(10)).to.be.reverted
       await crvCompInstance.connect(borrower).stake(compartmentData)
+      await expect(crvCompInstance.connect(borrower).stake(compartmentData)).to.be.reverted
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -765,7 +769,7 @@ describe('Basic Forked Mainnet Tests', function () {
       })
     })
 
-    it('Should process aToken borrow/repay correctly with rewards', async () => {
+    it('Should process aToken borrow and partial repayment correctly with rewards', async () => {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } =
         await setupTest()
 
@@ -838,8 +842,12 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })
 
-      const loanId = borrowEvent?.args?.['loanId']
       const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const loanId = borrowEvent?.args?.['loanId']
+      const loanExpiry = borrowEvent?.args?.['expiry']
+
+      const coeffRepay = 2
+      const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -855,22 +863,35 @@ describe('Basic Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .repay(
-            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, expectedTransferFee: 0 },
+            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount: partialRepayAmount, expectedTransferFee: 0 },
             lenderVault.address,
             callbackAddr,
             callbackData
           )
       )
         .to.emit(borrowerGateway, 'Repay')
-        .withArgs(lenderVault.address, loanId, repayAmount)
+        .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
       // check balance post repay
       const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
 
-      expect(borrowerCollRepayBalPost).to.be.above(borrowerCollBalPre)
+      expect(borrowerCollRepayBalPost).to.be.above(borrowerCollBalPre.div(coeffRepay))
+
+      await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // unlock collateral
+      const lenderCollBalPre = await collInstance.balanceOf(lender.address)
+
+      expect(lenderCollBalPre).to.equal(BigNumber.from(0))
+
+      await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+
+      const lenderCollBalPost = await collInstance.balanceOf(lender.address)
+
+      expect(lenderCollBalPost).to.be.above(borrowerCollBalPre.div(coeffRepay))
     })
 
-    it('Should delegate voting correctly', async () => {
+    it('Should delegate voting correctly with borrow and partial repayment', async () => {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, lenderVault, addressRegistry } = await setupTest()
 
       // create uni staking implementation
@@ -944,14 +965,23 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
-      const collTokenCompartmentAddr = borrowWithOnChainQuoteReceipt.events?.find(x => {
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
         return x.event === 'Borrow'
-      })?.args?.['collTokenCompartmentAddr']
+      })
+
+      const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
+      const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const loanId = borrowEvent?.args?.['loanId']
+      const loanExpiry = borrowEvent?.args?.['expiry']
+
+      const coeffRepay = 2
+      const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
 
       const uniCompInstance = await votingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
       const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
 
+      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.reverted
       await uniCompInstance.connect(borrower).delegate(borrower.address)
 
       // check balance post borrow
@@ -967,6 +997,44 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
       expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre))
+
+      // borrower approves borrower gateway
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // partial repay
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            collToken: collTokenAddress,
+            loanToken: usdc.address,
+            loanId,
+            repayAmount: partialRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      )
+        .to.emit(borrowerGateway, 'Repay')
+        .withArgs(lenderVault.address, loanId, partialRepayAmount)
+
+      // check balance post repay
+      const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
+      expect(borrowerCollRepayBalPost).to.be.equal(borrowerUNIBalPre.div(coeffRepay))
+
+      await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // unlock collateral
+      const lenderCollBalPre = await collInstance.balanceOf(lender.address)
+
+      expect(lenderCollBalPre).to.equal(BigNumber.from(0))
+
+      await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+
+      const lenderCollBalPost = await collInstance.balanceOf(lender.address)
+
+      expect(lenderCollBalPost).to.equal(borrowerUNIBalPre.div(coeffRepay))
     })
   })
 
