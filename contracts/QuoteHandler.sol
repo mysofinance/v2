@@ -244,17 +244,18 @@ contract QuoteHandler {
         );
         uint256 tmp;
         address recoveredSigner;
+        uint256 newHash;
         for (uint256 i = 0; i < v.length; ) {
             recoveredSigner = ecrecover(messageHash, v[i], r[i], s[i]);
-
-            if (tmp == tmp | uint256(uint160(recoveredSigner))) {
+            newHash = uint256(keccak256(abi.encode(recoveredSigner)));
+            if (tmp == tmp | newHash) {
                 return false;
             }
 
             if (!ILenderVault(lenderVault).isSigner(recoveredSigner)) {
                 return false;
             }
-            tmp |= uint256(uint160(recoveredSigner));
+            tmp |= newHash;
             unchecked {
                 i++;
             }

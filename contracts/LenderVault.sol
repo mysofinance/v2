@@ -358,6 +358,11 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
             ) {
                 revert();
             }
+            // arbitrage protection...any reason with a callback and
+            // purpose-bound loan might want greater than 100%?
+            if (quoteTuple.loanPerCollUnitOrLtv > BASE) {
+                revert();
+            }
             loanPerCollUnit =
                 (quoteTuple.loanPerCollUnitOrLtv *
                     IOracle(generalQuoteInfo.oracleAddr).getPrice(

@@ -245,4 +245,28 @@ const gmxRewarRouterAbi = [
   }
 ]
 
-export { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi, gmxRewarRouterAbi }
+const chainlinkAggregatorAbi = [
+  {
+    inputs: [],
+    name: 'latestRoundData',
+    outputs: [
+      { internalType: 'uint80', name: 'roundId', type: 'uint80' },
+      { internalType: 'int256', name: 'answer', type: 'int256' },
+      { internalType: 'uint256', name: 'startedAt', type: 'uint256' },
+      { internalType: 'uint256', name: 'updatedAt', type: 'uint256' },
+      { internalType: 'uint80', name: 'answeredInRound', type: 'uint80' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
+
+export {
+  balancerV2VaultAbi,
+  balancerV2PoolAbi,
+  collTokenAbi,
+  aavePoolAbi,
+  crvRewardsDistributorAbi,
+  gmxRewarRouterAbi,
+  chainlinkAggregatorAbi
+}
