@@ -1332,6 +1332,12 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(borrowerGateway.connect(borrower).repay(repayBody, team.address, callbackAddr, callbackData)).to.be
         .reverted
 
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .repay({ ...repayBody, expectedTransferFee: BASE }, lenderVault.address, callbackAddr, callbackData)
+      ).to.be.reverted
+
       await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
         .to.emit(borrowerGateway, 'Repay')
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
