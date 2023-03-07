@@ -1,7 +1,14 @@
 import { expect } from 'chai'
-import { BigNumber } from 'ethers'
+import { BigNumber, constants } from 'ethers'
 import { ethers } from 'hardhat'
-import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi, chainlinkAggregatorAbi } from './abi'
+import {
+  balancerV2VaultAbi,
+  balancerV2PoolAbi,
+  collTokenAbi,
+  aavePoolAbi,
+  crvRewardsDistributorAbi,
+  chainlinkAggregatorAbi
+} from './abi'
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta } from './helpers'
 
 const hre = require('hardhat')
@@ -860,14 +867,18 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // repay
       await expect(
-        borrowerGateway
-          .connect(borrower)
-          .repay(
-            { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount: partialRepayAmount, expectedTransferFee: 0 },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
-          )
+        borrowerGateway.connect(borrower).repay(
+          {
+            collToken: collTokenAddress,
+            loanToken: usdc.address,
+            loanId,
+            repayAmount: partialRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
       )
         .to.emit(borrowerGateway, 'Repay')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
@@ -1214,17 +1225,16 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote and repay with loan token transfer fees', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, team, borrower, usdc, paxg, lenderVault } = await setupTest()
 
       // borrower transfers paxg to lender
       await paxg.connect(borrower).transfer(lender.address, ONE_PAXG.mul(20).mul(10000).div(9998))
       // lender transfers usdc to borroower
       await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(100000))
       // owner approves lender vault
-      await paxg.connect(lender).approve(lenderVault.address, MAX_UINT256) 
+      await paxg.connect(lender).approve(lenderVault.address, MAX_UINT256)
       // lenderVault owner deposits paxg
       await paxg.connect(lender).transfer(lenderVault.address, ONE_PAXG.mul(20))
-      
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -1268,7 +1278,7 @@ describe('Basic Forked Mainnet Tests', function () {
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
       const quoteTupleIdx = 0
-      const collSendAmount =ONE_USDC.mul(10000)
+      const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowTransaction = await borrowerGateway
@@ -1290,7 +1300,7 @@ describe('Basic Forked Mainnet Tests', function () {
       })
 
       const loanId = borrowEvent?.args?.['loanId']
-          
+
       // check balance post borrow
       const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -1299,45 +1309,42 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const maxLoanPerCollOrLtv = quoteTuples[0].loanPerCollUnitOrLtv
 
-      expect(borrowerPaxgBalPost.sub(borrowerPaxgBalPre)).to.equal(calcLoanBalanceDelta(maxLoanPerCollOrLtv,2,collSendAmount,6))
+      expect(borrowerPaxgBalPost.sub(borrowerPaxgBalPre)).to.equal(
+        calcLoanBalanceDelta(maxLoanPerCollOrLtv, 2, collSendAmount, 6)
+      )
       expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPost)).to.equal(collSendAmount)
+      expect(vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount)).to.equal(0)
+
       expect(
-        vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount)
-      ).to.equal(0)
-      
-      expect(
-            vaultPaxgBalPre
-              .sub(vaultPaxgBalPost)
-              .sub(calcLoanBalanceDelta(maxLoanPerCollOrLtv,0,collSendAmount,6))
+        vaultPaxgBalPre.sub(vaultPaxgBalPost).sub(calcLoanBalanceDelta(maxLoanPerCollOrLtv, 0, collSendAmount, 6))
       ).to.equal(0)
 
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
-      
-      await expect(
-        borrowerGateway.connect(borrower).repay(
-          {
-            collToken: usdc.address,
-            loanToken: paxg.address,
-            loanId,
-            repayAmount: ONE_PAXG.mul(10).mul(110).div(100),
-            expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100),2)
-          },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
-        )
-      )
+
+      const repayBody = {
+        collToken: usdc.address,
+        loanToken: paxg.address,
+        loanId,
+        repayAmount: ONE_PAXG.mul(10).mul(110).div(100),
+        expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100), 2)
+      }
+
+      await expect(borrowerGateway.connect(borrower).repay(repayBody, team.address, callbackAddr, callbackData)).to.be
+        .reverted
+
+      await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
         .to.emit(borrowerGateway, 'Repay')
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
-        const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
-        // full repay of USDC less upfront fee
-        expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPostRepay)).to.be.equal(collSendAmount.mul(1).div(100))
+      const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
+      // full repay of USDC less upfront fee
+      expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPostRepay)).to.be.equal(collSendAmount.mul(1).div(100))
     })
   })
 
   describe('Testing chainlink oracles', function () {
     it('Should process onChain quote with oracle address', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, team, lenderVault, addressRegistry } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -1354,7 +1361,6 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const paxgOracleInstance = new ethers.Contract(paxgEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
-
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1435,11 +1441,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(
         Math.abs(Number(vaultPaxgBalPost.sub(vaultPaxgBalPre).sub(collSendAmount.mul(9998).div(10000).toString())))
       ).to.lessThanOrEqual(1)
-      expect(
-            vaultUsdcBalPre
-              .sub(vaultUsdcBalPost)
-              .sub(maxLoanPerColl)
-      ).to.equal(0)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
   })
 })

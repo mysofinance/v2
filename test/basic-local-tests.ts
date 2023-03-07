@@ -107,6 +107,82 @@ describe('Basic Local Tests', function () {
     return { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault }
   }
 
+  describe('Lender Vault', function () {
+    it('Should not proccess with insufficient vault funds', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            collSendAmount,
+            expectedTransferFee,
+            onChainQuote,
+            quoteTupleIdx,
+            callbackAddr,
+            callbackData
+          )
+      ).to.be.reverted
+    })
+  })
+
+  describe('Borrow Gateway', function () {
+    it('Should not proccess with bigger fee than max fee', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      await expect(borrowerGateway.connect(lender).setNewProtocolFee(0)).to.be.reverted
+      await expect(borrowerGateway.connect(team).setNewProtocolFee(BASE)).to.be.reverted
+    })
+  })
+
   describe('Off-Chain Quote Testing', function () {
     it('Should process off-chain quote correctly', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
@@ -240,9 +316,15 @@ describe('Basic Local Tests', function () {
             internalType: 'uint256',
             name: 'chainId',
             type: 'uint256'
-          },
+          }
         ],
-        [offChainQuote.generalQuoteInfo, offChainQuote.quoteTuplesRoot, offChainQuote.salt, offChainQuote.nonce, offChainQuote.chainId]
+        [
+          offChainQuote.generalQuoteInfo,
+          offChainQuote.quoteTuplesRoot,
+          offChainQuote.salt,
+          offChainQuote.nonce,
+          offChainQuote.chainId
+        ]
       )
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
