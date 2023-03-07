@@ -135,7 +135,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
     const gohmHolder = await ethers.getSigner(GOHM_HOLDER)
 
-    await gohm.connect(gohmHolder).transfer(team.address, '1000000000000000000000')
+    await gohm.connect(gohmHolder).transfer(team.address, '100000000000000000000')
 
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
@@ -289,6 +289,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -529,6 +530,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -847,6 +849,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -973,6 +976,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1112,6 +1116,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1207,6 +1212,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           totalExpectedFees,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1293,6 +1299,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1427,6 +1434,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1532,6 +1540,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1638,6 +1647,7 @@ describe('Basic Forked Mainnet Tests', function () {
           lenderVault.address,
           collSendAmount,
           expectedTransferFee,
+          MAX_UINT256,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
