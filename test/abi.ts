@@ -261,6 +261,16 @@ const chainlinkAggregatorAbi = [
   }
 ]
 
+const gohmAbi = [
+  {
+    inputs: [],
+    name: 'index',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]
+
 export {
   balancerV2VaultAbi,
   balancerV2PoolAbi,
@@ -268,5 +278,6 @@ export {
   aavePoolAbi,
   crvRewardsDistributorAbi,
   gmxRewarRouterAbi,
-  chainlinkAggregatorAbi
+  chainlinkAggregatorAbi,
+  gohmAbi
 }

@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi, chainlinkAggregatorAbi } from './abi'
+import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi, chainlinkAggregatorAbi, gohmAbi } from './abi'
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta } from './helpers'
 
 const hre = require('hardhat')
@@ -9,6 +9,7 @@ const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const ONE_PAXG = ethers.BigNumber.from(10).pow(18)
+const ONE_GOHM = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
@@ -122,6 +123,20 @@ describe('Basic Forked Mainnet Tests', function () {
 
     await ldo.connect(ldoHolder).transfer(team.address, '10000000000000000000000')
 
+    // prepare GOHM balances
+    const GOHM_ADDRESS = '0x0ab87046fBb341D058F17CBC4c1133F25a20a52f'
+    const GOHM_HOLDER = '0x168fa4917e7cD18f4eD3dc313c4975851cA9E5E7'
+    const gohm = await ethers.getContractAt('IWETH', GOHM_ADDRESS)
+    await ethers.provider.send('hardhat_setBalance', [GOHM_HOLDER, '0x56BC75E2D63100000'])
+    await hre.network.provider.request({
+      method: 'hardhat_impersonateAccount',
+      params: [GOHM_HOLDER]
+    })
+
+    const gohmHolder = await ethers.getSigner(GOHM_HOLDER)
+
+    await gohm.connect(gohmHolder).transfer(team.address, '1000000000000000000000')
+
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
     await BalancerV2Looping.connect(lender)
@@ -145,6 +160,7 @@ describe('Basic Forked Mainnet Tests', function () {
       weth,
       paxg,
       ldo,
+      gohm,
       lenderVault,
       lenderVaultFactory,
       balancerV2Looping
@@ -1336,8 +1352,8 @@ describe('Basic Forked Mainnet Tests', function () {
   })
 
   describe('Testing chainlink oracles', function () {
-    it('Should process onChain quote with oracle address', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, team, lenderVault, addressRegistry } = await setupTest()
+    it('Should process onChain quote with oracle address (non-weth)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, team, lenderVault, addressRegistry } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -1346,7 +1362,8 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        [true, true]
+        [true, true],
+        weth.address
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1435,6 +1452,220 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(
         Math.abs(Number(vaultPaxgBalPost.sub(vaultPaxgBalPre).sub(collSendAmount.mul(9998).div(10000).toString())))
       ).to.lessThanOrEqual(1)
+      expect(
+            vaultUsdcBalPre
+              .sub(vaultUsdcBalPost)
+              .sub(maxLoanPerColl)
+      ).to.equal(0)
+    })
+
+    it('Should process onChain quote with oracle address (weth)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } = await setupTest()
+
+      // deploy chainlinkOracleContract
+      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
+      
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+      const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+        [usdcEthChainlinkAddr],
+        [true],
+        weth.address
+      )
+      await chainlinkBasicImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address)
+
+      const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: BASE.mul(75).div(100),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: chainlinkBasicImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const collSendAmount = ONE_WETH
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
+
+      // check balance post borrow
+      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
+      const loanTokenPriceRaw = loanTokenRoundData.answer
+
+      const collTokenPriceInLoanToken = ONE_WETH.mul(ONE_USDC).div(loanTokenPriceRaw)
+      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+
+      expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(collSendAmount)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
+      expect(
+        Math.abs(Number(vaultWethBalPost.sub(vaultWethBalPre).sub(collSendAmount).toString()))
+      ).to.equal(0)
+      expect(
+            vaultUsdcBalPre
+              .sub(vaultUsdcBalPost)
+              .sub(maxLoanPerColl)
+      ).to.equal(0)
+    })
+
+    it('Should process onChain quote with olympus gohm oracle (non-weth)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry } = await setupTest()
+
+      // deploy chainlinkOracleContract
+      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
+      const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
+      const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
+      const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+        [usdcEthChainlinkAddr],
+        weth.address
+      )
+      await olympusOracleImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address)
+
+      const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+      const ohmOracleInstance = new ethers.Contract(ohmEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+      const gohmInstance = new ethers.Contract(gohm.address,gohmAbi, borrower.provider)
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      await gohm.connect(team).transfer(borrower.address, ONE_GOHM.mul(10))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: BASE.mul(75).div(100),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: gohm.address,
+          loanToken: usdc.address,
+          oracleAddr: olympusOracleImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerGohmBalPre = await gohm.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultGohmBalPre = await gohm.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await gohm.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const collSendAmount = ONE_GOHM
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
+
+      // check balance post borrow
+      const borrowerGohmBalPost = await gohm.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultGohmBalPost = await gohm.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
+      const collTokenRoundDataPreIndex = await ohmOracleInstance.latestRoundData()
+      const loanTokenPriceRaw = loanTokenRoundData.answer
+      const collTokenPriceRawPreIndex = collTokenRoundDataPreIndex.answer
+      const index = await gohmInstance.index()
+
+      const collTokenPriceInLoanToken = collTokenPriceRawPreIndex.mul(ONE_USDC).mul(index).div(loanTokenPriceRaw).div(10**9)
+      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+
+      console.log(collTokenPriceInLoanToken.toString())
+
+      expect(borrowerGohmBalPre.sub(borrowerGohmBalPost)).to.equal(collSendAmount)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
+      expect(
+        Math.abs(Number(vaultGohmBalPost.sub(vaultGohmBalPre).sub(collSendAmount).toString()))
+      ).to.equal(0)
       expect(
             vaultUsdcBalPre
               .sub(vaultUsdcBalPost)
