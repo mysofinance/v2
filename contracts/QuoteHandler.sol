@@ -247,6 +247,7 @@ contract QuoteHandler {
         uint256 newHash;
         for (uint256 i = 0; i < v.length; ) {
             recoveredSigner = ecrecover(messageHash, v[i], r[i], s[i]);
+            // use hash instead of address to spread out over 256 bits and reduce false positives
             newHash = uint256(keccak256(abi.encode(recoveredSigner)));
             if (tmp == tmp | newHash) {
                 return false;
