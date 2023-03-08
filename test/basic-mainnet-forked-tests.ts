@@ -1363,6 +1363,8 @@ describe('Basic Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
+      await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address)).to.be.reverted
+
       await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
