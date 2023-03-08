@@ -10,7 +10,6 @@ import {IOracle} from "../../interfaces/IOracle.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 contract ChainlinkBasic is IOracle {
-    address public owner;
     // tokenAddr => chainlink oracle addr in eth
     mapping(address => address) public ethOracleAddrs;
     // tokenAddr => chainlink oracle addr in usd($)
@@ -27,7 +26,6 @@ contract ChainlinkBasic is IOracle {
         bool[] memory _isEth,
         address _wethAddr
     ) {
-        owner = msg.sender;
         if (_wethAddr == address(0)) {
             revert InvalidAddress();
         }

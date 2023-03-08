@@ -11,7 +11,6 @@ import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
  */
 contract OlympusOracle is IOracle {
-    address public owner;
     address internal constant SOHM_ADDR =
         0x04906695D6D12CF5459975d7C3C03356E4Ccd460;
     address internal constant GOHM_ADDR =
@@ -33,7 +32,6 @@ contract OlympusOracle is IOracle {
         address[] memory _oracleAddrs,
         address _wethAddr
     ) {
-        owner = msg.sender;
         if (_wethAddr == address(0)) {
             revert InvalidAddress();
         }
@@ -113,21 +111,15 @@ contract OlympusOracle is IOracle {
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
         int256 answer;
         uint256 updatedAt;
-        uint256 loanTokenOracleDecimals;
-        uint256 collTokenOracleDecimals;
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         address wethAddress = weth;
         if (loanTokenOracleAddr == wethAddress) {
             answer = 10 ** 18;
             updatedAt = block.timestamp;
-            loanTokenOracleDecimals = 18;
         } else {
             (, answer, , updatedAt, ) = AggregatorV3Interface(
                 loanTokenOracleAddr
             ).latestRoundData();
-            loanTokenOracleDecimals = AggregatorV3Interface(loanTokenOracleAddr)
-                .decimals();
-            // todo: decide on logic check for updatedAt versus current timestamp?
         }
 
         uint256 loanTokenPriceRaw = uint256(answer);
@@ -137,13 +129,10 @@ contract OlympusOracle is IOracle {
         if (collTokenOracleAddr == wethAddress) {
             answer = 10 ** 18;
             updatedAt = block.timestamp;
-            collTokenOracleDecimals = 18;
         } else {
             (, answer, , updatedAt, ) = AggregatorV3Interface(
                 collTokenOracleAddr
             ).latestRoundData();
-            collTokenOracleDecimals = AggregatorV3Interface(collTokenOracleAddr)
-                .decimals();
         }
         // todo: decide on logic check for updatedAt versus current timestamp?
         uint256 collTokenPriceRaw = uint256(answer);
@@ -152,17 +141,11 @@ contract OlympusOracle is IOracle {
         }
         uint256 index = IOlympus(GOHM_ADDR).index();
 
-        // typically loanTokenOracleDecimals should equal collTokenOracleDecimals
         collTokenPriceInLoanToken = isColl
-            ? ((collTokenPriceRaw *
+            ? (collTokenPriceRaw * (10 ** loanTokenDecimals) * index) /
+                (loanTokenPriceRaw * (10 ** SOHM_DECIMALS))
+            : (collTokenPriceRaw *
                 (10 ** loanTokenDecimals) *
-                (10 ** loanTokenOracleDecimals)) * index) /
-                (loanTokenPriceRaw *
-                    (10 ** collTokenOracleDecimals) *
-                    (10 ** SOHM_DECIMALS))
-            : ((collTokenPriceRaw *
-                (10 ** loanTokenDecimals) *
-                (10 ** loanTokenOracleDecimals)) * (10 ** SOHM_DECIMALS)) /
-                (loanTokenPriceRaw * (10 ** collTokenOracleDecimals) * index);
+                (10 ** SOHM_DECIMALS)) / (loanTokenPriceRaw * index);
     }
 }
