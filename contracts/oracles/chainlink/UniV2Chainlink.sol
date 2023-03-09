@@ -259,9 +259,9 @@ contract UniV2Chainlink is IOracle {
         }
 
         uint256 totalEthValueToken0 = (uint256(reserve0) * token0PriceRaw) /
-            decimalsToken0;
+            (10 ** decimalsToken0);
         uint256 totalEthValueToken1 = (uint256(reserve1) * token1PriceRaw) /
-            decimalsToken1;
+            (10 ** decimalsToken1);
 
         ethValueLowerBound = totalEthValueToken0 > totalEthValueToken1
             ? totalEthValueToken1 * 2
