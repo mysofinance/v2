@@ -104,8 +104,108 @@ describe('Basic Local Tests', function () {
     //test lenderVault check works
     await expect(addressRegistry.connect(team).addLenderVault(lenderVaultAddr)).to.be.reverted
 
-    return { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault }
+    return { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault }
   }
+
+  describe('Lender Vault', function () {
+    it('Should not proccess with insufficient vault funds', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            collSendAmount,
+            expectedTransferFee,
+            MAX_UINT256,
+            onChainQuote,
+            quoteTupleIdx,
+            callbackAddr,
+            callbackData
+          )
+      ).to.be.reverted
+    })
+  })
+
+  describe('Borrow Gateway', function () {
+    it('Should not proccess with bigger fee than max fee', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      await expect(borrowerGateway.connect(lender).setNewProtocolFee(0)).to.be.reverted
+      await expect(borrowerGateway.connect(team).setNewProtocolFee(BASE)).to.be.reverted
+    })
+  })
+
+  describe('Address Registry', function () {
+    it('Should toggle auto quote strategy', async function () {
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+        await setupTest()
+
+      // deploy an autoquote strategy
+      const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
+      const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
+      await aaveAutoQuoteStrategy1.deployed()
+
+      await expect(addressRegistry.connect(borrower).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.reverted
+
+      // whitelist autoquote strategy
+      await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
+
+      expect(await addressRegistry.connect(team).isWhitelistedAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.true
+
+      await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
+
+      expect(await addressRegistry.connect(team).isWhitelistedAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.false
+    })
+  })
 
   describe('Off-Chain Quote Testing', function () {
     it('Should process off-chain quote correctly', async function () {
@@ -240,9 +340,15 @@ describe('Basic Local Tests', function () {
             internalType: 'uint256',
             name: 'chainId',
             type: 'uint256'
-          },
+          }
         ],
-        [offChainQuote.generalQuoteInfo, offChainQuote.quoteTuplesRoot, offChainQuote.salt, offChainQuote.nonce, offChainQuote.chainId]
+        [
+          offChainQuote.generalQuoteInfo,
+          offChainQuote.quoteTuplesRoot,
+          offChainQuote.salt,
+          offChainQuote.nonce,
+          offChainQuote.chainId
+        ]
       )
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
