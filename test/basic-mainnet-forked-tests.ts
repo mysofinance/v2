@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { BigNumber, constants } from 'ethers'
+import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import {
   balancerV2VaultAbi,
@@ -269,6 +269,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
       console.log('minSwapReceive: ', minSwapReceive)
       const deadline = MAX_UINT128
+
       const callbackAddr = balancerV2Looping.address
       const callbackData = ethers.utils.defaultAbiCoder.encode(
         ['bytes32', 'uint256', 'uint256'],
@@ -1046,6 +1047,180 @@ describe('Basic Forked Mainnet Tests', function () {
       const lenderCollBalPost = await collInstance.balanceOf(lender.address)
 
       expect(lenderCollBalPost).to.equal(borrowerUNIBalPre.div(coeffRepay))
+    })
+
+    it('Should delegate voting correctly with borrow and partial repayment with callback', async () => {
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        weth,
+        lenderVault,
+        addressRegistry,
+        balancerV2Looping
+      } = await setupTest()
+
+      // create uni staking implementation
+      const VotingCompartmentImplementation = await ethers.getContractFactory('VoteCompartment')
+      await VotingCompartmentImplementation.connect(team)
+      const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
+      await votingCompartmentImplementation.deployed()
+
+      // increase borrower UNI balance
+      const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
+      const collTokenAddress = '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984' // UNI
+      const UNI_SLOT = 4
+      const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
+
+      // Get storage slot index
+      const index = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [borrower.address, UNI_SLOT])
+      await ethers.provider.send('hardhat_setStorageAt', [
+        collTokenAddress,
+        index.toString(),
+        ethers.utils.hexZeroPad(locallyUNIBalance.toHexString(), 32)
+      ])
+
+      // lender deposits weth
+      await weth.connect(lender).deposit({ value: ONE_WETH.mul(1000) })
+      await weth.connect(lender).transfer(lenderVault.address, ONE_WETH.mul(1000))
+
+      // get pre balances
+      const borrowerCollBalPre = await collInstance.balanceOf(borrower.address)
+      const borrowerLoanBalPre = await weth.balanceOf(borrower.address)
+      const vaultLoanBalPre = await weth.balanceOf(lenderVault.address)
+
+      expect(borrowerCollBalPre).to.equal(locallyUNIBalance)
+      expect(vaultLoanBalPre).to.equal(ONE_WETH.mul(1000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).toggleTokens([collTokenAddress, weth.address])
+
+      expect(await addressRegistry.connect(team).isWhitelistedToken(collTokenAddress)).to.be.true
+      expect(await addressRegistry.connect(team).isWhitelistedToken(weth.address)).to.be.true
+
+      // borrower approves borrower gateway
+      await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const ONE_UNI = BigNumber.from(10).pow(18)
+
+      const onChainQuote = await createOnChainRequest({
+        lender: lender,
+        collToken: collTokenAddress,
+        loanToken: weth.address,
+        borrowerCompartmentImplementation: votingCompartmentImplementation.address,
+        lenderVault,
+        quoteHandler,
+        loanPerCollUnit: ONE_WETH.div(10)
+      })
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_UNI
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+
+      const PRECISION = 10000
+      const collBuffer = BASE.mul(990).div(1000)
+      const initCollFromBorrower = ONE_UNI.mul(collBuffer).div(BASE)
+      const slippageTolerance = BASE.mul(30).div(10000)
+      const poolId = '0x5aa90c7362ea46b3cbfbd7f01ea5ca69c98fef1c000200000000000000000020' // look up via getPoolId() on bal pool
+      const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
+      const deadline = MAX_UINT128
+
+      const callbackAddr = balancerV2Looping.address
+      const callbackData = ethers.utils.defaultAbiCoder.encode(
+        ['bytes32', 'uint256', 'uint256'],
+        [poolId, minSwapReceive, deadline]
+      )
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })
+
+      const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
+      const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const loanId = borrowEvent?.args?.['loanId']
+
+      const coeffRepay = 2
+      const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
+
+      const uniCompInstance = await votingCompartmentImplementation.attach(collTokenCompartmentAddr)
+
+      const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
+
+      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.reverted
+      await uniCompInstance.connect(borrower).delegate(borrower.address)
+
+      // check balance post borrow
+      const borrowerLoanBalPost = await weth.balanceOf(borrower.address)
+      const borrowerCollBalPost = await collInstance.balanceOf(borrower.address)
+      const compartmentCollBalPost = await collInstance.balanceOf(collTokenCompartmentAddr)
+
+      const borrowerCollBalDiffActual = borrowerCollBalPre.add(borrowerCollBalPost)
+      const borrowerCollBalDiffExpected = borrowerCollBalPre.sub(collSendAmount)
+      const borrowerCollBalDiffComparison = Math.abs(
+        Number(
+          borrowerCollBalDiffActual
+            .sub(borrowerCollBalDiffExpected)
+            .mul(PRECISION)
+            .div(borrowerCollBalDiffActual)
+            .div(ONE_UNI)
+            .toString()
+        ) / PRECISION
+      )
+      expect(borrowerCollBalDiffComparison).to.be.lessThan(0.01)
+      expect(borrowerLoanBalPost.sub(borrowerLoanBalPre)).to.equal(0) // borrower: no weth change as all swapped for uni
+      expect(compartmentCollBalPost).to.equal(collSendAmount)
+      expect(borrowerVotesPreDelegation).to.equal(0)
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const minSwapReceiveRepay = partialRepayAmount.mul(BASE.sub(slippageTolerance)).div(BASE).div(1000)
+
+      const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
+        ['bytes32', 'uint256', 'uint256'],
+        [poolId, minSwapReceiveRepay, deadline]
+      )
+
+      // partial repay
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            collToken: collTokenAddress,
+            loanToken: weth.address,
+            loanId,
+            repayAmount: partialRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      )
+        .to.emit(borrowerGateway, 'Repay')
+        .withArgs(lenderVault.address, loanId, partialRepayAmount)
+
+      // check balance post repay
+      const borrowerCollBalPostRepay = await collInstance.balanceOf(borrower.address)
+      const compartmentCollBalPostRepay = await collInstance.balanceOf(collTokenCompartmentAddr)
+
+      expect(borrowerCollBalPostRepay).to.not.equal(borrowerCollBalPost)
+      expect(compartmentCollBalPostRepay).to.equal(compartmentCollBalPost.div(coeffRepay))
     })
   })
 
