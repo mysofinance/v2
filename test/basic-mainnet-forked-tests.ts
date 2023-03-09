@@ -149,7 +149,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
     const univ2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
 
-    await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '10000000000000000')
+    await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
