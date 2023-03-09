@@ -3,6 +3,7 @@ import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import { LenderVault, QuoteHandler } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { chainlinkAggregatorAbi, collTokenAbi, uniV2Abi } from './abi'
 
 const BASE = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
@@ -81,4 +82,38 @@ export const transferFeeHelper = (amountReceived : BigNumber, feeInBasisPoints :
 
 export const calcLoanBalanceDelta = (maxLoanPerColl : BigNumber, feeInBasisPoints : number, collSendAmount : BigNumber, loanDecimals : number) : BigNumber => {
   return maxLoanPerColl.mul(collSendAmount).mul(10000 - feeInBasisPoints).div(10000).div(10**loanDecimals)
+}
+
+export const getTotalEthValue = async (lpTokenAddr : string, provider : SignerWithAddress, token0OracleAddr : string, token1OracleAddr : string, wethAddr : string) : Promise<BigNumber> => {
+  const uniV2Instance = new ethers.Contract(lpTokenAddr, uniV2Abi, provider)
+  const token0 = await uniV2Instance.token0()
+  const token1 = await uniV2Instance.token1()
+  const token0Instance = new ethers.Contract(token0, collTokenAbi, provider.provider)
+  const token1Instance = new ethers.Contract(token1, collTokenAbi, provider.provider)
+  const token0OracleInstance = new ethers.Contract(token0OracleAddr, chainlinkAggregatorAbi, provider.provider)
+  const token1OracleInstance = new ethers.Contract(token1OracleAddr, chainlinkAggregatorAbi, provider.provider)
+  let answer : BigNumber
+  const reserveData = await uniV2Instance.getReserves()
+  const reserve0 = reserveData._reserve0
+  const reserve1 = reserveData._reserve1
+  const decimals0 = await token0Instance.decimals()
+  const decimals1 = await token1Instance.decimals()
+  if (token0 == wethAddr){
+    answer = BASE
+  }
+  else{
+    const token0OracleData = await token0OracleInstance.latestRoundData()
+    answer = token0OracleData.answer
+  }
+  const token0EthValue = answer.mul(reserve0).div(BigNumber.from(10).pow(decimals0))
+  if (token1 == wethAddr){
+    answer = BASE
+  }
+  else{
+    const token1OracleData = await token1OracleInstance.latestRoundData()
+    answer = token1OracleData.answer
+  }
+  const token1EthValue = answer.mul(reserve1).div(BigNumber.from(10).pow(decimals1))
+
+  return token0EthValue.gt(token1EthValue) ? token1EthValue.mul(2) : token0EthValue.mul(2)
 }
