@@ -165,6 +165,7 @@ describe('Basic Local Tests', function () {
             lenderVault.address,
             collSendAmount,
             expectedTransferFee,
+            MAX_UINT256,
             onChainQuote,
             quoteTupleIdx,
             callbackAddr,
