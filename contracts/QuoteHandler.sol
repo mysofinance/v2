@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {DataTypes} from "./DataTypes.sol";
@@ -10,8 +8,6 @@ import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 
 contract QuoteHandler {
-    using SafeERC20 for IERC20Metadata;
-
     uint256 constant BASE = 1e18;
     address addressRegistry;
     mapping(address => uint256) offChainQuoteNonce;
