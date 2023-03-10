@@ -59,7 +59,7 @@ contract AddressRegistry is IAddressRegistry {
         if (msg.sender != owner) {
             revert();
         }
-        for (uint i = 0; i < tokens.length; i++) {
+        for (uint i = 0; i < tokens.length; ) {
             if (tokens[i] != address(0)) {
                 isWhitelistedToken[tokens[i]] = !isWhitelistedToken[tokens[i]];
             }
@@ -116,7 +116,6 @@ contract AddressRegistry is IAddressRegistry {
         address collToken,
         address loanToken
     ) external view returns (bool) {
-        return
-            !(isWhitelistedToken[collToken] && isWhitelistedToken[loanToken]);
+        return (isWhitelistedToken[collToken] && isWhitelistedToken[loanToken]);
     }
 }
