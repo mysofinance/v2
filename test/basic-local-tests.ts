@@ -184,29 +184,6 @@ describe('Basic Local Tests', function () {
     })
   })
 
-  describe('Address Registry', function () {
-    it('Should toggle auto quote strategy', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
-        await setupTest()
-
-      // deploy an autoquote strategy
-      const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
-      const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
-      await aaveAutoQuoteStrategy1.deployed()
-
-      await expect(addressRegistry.connect(borrower).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.reverted
-
-      // whitelist autoquote strategy
-      await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-
-      expect(await addressRegistry.connect(team).isWhitelistedAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.true
-
-      await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-
-      expect(await addressRegistry.connect(team).isWhitelistedAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.false
-    })
-  })
-
   describe('Off-Chain Quote Testing', function () {
     it('Should process off-chain quote correctly', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()

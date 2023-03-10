@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
-import {IAutoQuoteStrategy} from "./interfaces/IAutoQuoteStrategy.sol";
 import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
