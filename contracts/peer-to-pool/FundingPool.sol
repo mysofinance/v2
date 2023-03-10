@@ -80,9 +80,6 @@ contract FundingPool {
         if (!LoanProposalImpl(loanProposal).inUnsubscriptionPhase()) {
             revert();
         }
-        if (amount > balanceOf[msg.sender]) {
-            revert();
-        }
         if (amount > subscribedBalanceOf[loanProposal][msg.sender]) {
             revert();
         }
@@ -127,5 +124,20 @@ contract FundingPool {
             LoanProposalImpl(loanProposal).arranger(),
             LoanProposalImpl(loanProposal).arrangerFee()
         );
+    }
+
+    function updateLenderDataOnConversion(
+        address lender,
+        uint256 collConversionAmount,
+        uint256 finalCollAmount
+    ) external {
+        uint256 currSubscribedBal = subscribedBalanceOf[msg.sender][lender];
+        uint256 subscribedReduction = (currSubscribedBal *
+            collConversionAmount) / finalCollAmount;
+        if (subscribedReduction > currSubscribeBal) {
+            revert();
+        }
+        totalSubscribed[msg.sender] -= subscribedReduction;
+        subscribedBalanceOf[msg.sender][lender] -= subscribedReduction;
     }
 }

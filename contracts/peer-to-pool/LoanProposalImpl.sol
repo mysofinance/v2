@@ -189,6 +189,13 @@ contract LoanProposalImpl is Initializable {
             .collTokenDueIfConverted * lenderContribution) /
             FundingPool(fundingPool).totalSubscribed(address(this));
         collTokenRepaid[repaymentIdx] += conversionAmount;
+        lenderExercisedConversion[msg.sender][repaymentIdx] = true;
+        // still need to thinkabout this update
+        FundingPool(fundingPool).updateLenderDataOnConversion(
+            msg.sender,
+            conversionAmount,
+            finalCollAmount
+        );
         IERC20Metadata(collToken).safeTransfer(msg.sender, conversionAmount);
     }
 
@@ -210,10 +217,13 @@ contract LoanProposalImpl is Initializable {
         ) {
             revert();
         }
+        uint256 collTokenDue = _loanTerms
+            .repaymentSchedule[repaymentIdx]
+            .collTokenDueIfConverted;
         uint256 remainingLoanTokenDue = (_loanTerms
             .repaymentSchedule[repaymentIdx]
-            .loanTokenDue * collTokenRepaid[repaymentIdx]) /
-            _loanTerms.repaymentSchedule[repaymentIdx].collTokenDueIfConverted;
+            .loanTokenDue * (collTokenDue - collTokenRepaid[repaymentIdx])) /
+            collTokenDue;
         loanTokenRepaid[repaymentIdx] += remainingLoanTokenDue;
         _loanTerms.repaymentSchedule[repaymentIdx].repaid = true;
         IERC20Metadata(loanToken).safeTransferFrom(
@@ -299,7 +309,8 @@ contract LoanProposalImpl is Initializable {
         }
         uint256 recoveryVal = (IERC20Metadata(collToken).balanceOf(
             address(this)
-        ) * lenderContribution) / (10 ** IERC20Metadata(loanToken).decimals());
+        ) * lenderContribution) /
+            FundingPool(fundingPool).totalSubscribed(address(this));
         lenderClaimedCollateral[msg.sender] = true;
         IERC20Metadata(collToken).safeTransfer(msg.sender, recoveryVal);
     }
