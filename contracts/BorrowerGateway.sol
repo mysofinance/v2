@@ -37,23 +37,30 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         address lenderVault,
         uint256 collSendAmount,
         uint256 expectedTransferFee,
+        uint256 deadline,
         DataTypes.OffChainQuote calldata offChainQuote,
         DataTypes.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof,
         address callbackAddr,
         bytes calldata callbackData
     ) external nonReentrant {
+        if (block.timestamp > deadline) {
+            revert();
+        }
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
         }
-        address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
-        IQuoteHandler(quoteHandler).checkAndRegisterOffChainQuote(
-            msg.sender,
-            lenderVault,
-            offChainQuote,
-            quoteTuple,
-            proof
-        );
+        {
+            address quoteHandler = IAddressRegistry(addressRegistry)
+                .quoteHandler();
+            IQuoteHandler(quoteHandler).checkAndRegisterOffChainQuote(
+                msg.sender,
+                lenderVault,
+                offChainQuote,
+                quoteTuple,
+                proof
+            );
+        }
 
         (
             DataTypes.Loan memory loan,
@@ -99,6 +106,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         address lenderVault,
         uint256 collSendAmount,
         uint256 expectedTransferFee,
+        uint256 deadline,
         DataTypes.OnChainQuote calldata onChainQuote,
         uint256 quoteTupleIdx,
         address callbackAddr,
@@ -113,15 +121,21 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // 2. BorrowGateway then pulls collToken from borrower to lender vault
         // 3. Finally, BorrowGateway updates lender vault storage state
 
+        if (block.timestamp > deadline) {
+            revert();
+        }
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert UnregisteredVault();
         }
-        address quoteHandler = IAddressRegistry(addressRegistry).quoteHandler();
-        IQuoteHandler(quoteHandler).checkAndRegisterOnChainQuote(
-            msg.sender,
-            lenderVault,
-            onChainQuote
-        );
+        {
+            address quoteHandler = IAddressRegistry(addressRegistry)
+                .quoteHandler();
+            IQuoteHandler(quoteHandler).checkAndRegisterOnChainQuote(
+                msg.sender,
+                lenderVault,
+                onChainQuote
+            );
+        }
         DataTypes.QuoteTuple memory quoteTuple = onChainQuote.quoteTuples[
             quoteTupleIdx
         ];
