@@ -20,7 +20,7 @@ contract LoanProposalImpl is Initializable {
     uint256 public finalLoanAmount;
     uint256 public finalCollAmount;
     uint256 public currentRepaymentIdx;
-    uint256 public totalStakeCounterOnDefaultedClaims;
+    uint256 public subscriptionsThatAlreadyClaimedRecoveryValue;
     DataTypes.LoanStatus public status;
     mapping(address => uint256) public balanceOf;
     DataTypes.LoanTerms _loanTerms;
@@ -293,6 +293,7 @@ contract LoanProposalImpl is Initializable {
             revert();
         }
         uint256 repaymentIdx = currentRepaymentIdx;
+        // this will check if loan has been fully repaid yet in this instance
         checkRepaymentIdx(repaymentIdx);
         if (
             block.timestamp >
@@ -332,6 +333,14 @@ contract LoanProposalImpl is Initializable {
         );
         uint256 lastPeriodNonConvertedCollToken = lastPeriodCollTokenDue -
             collTokenRepaid[lastPeriodIdx];
+        uint256 recoveryCollAmount = collTokenBal -
+            lastPeriodNonConvertedCollToken;
+        uint256 subscriptionsLeftForLastIdx = FundingPool(fundingPool)
+            .totalSubscribed(address(this)) -
+            totalConvertedContributionsPerIdx[lastPeriodIdx];
+        uint256 subscriptionsLeftForRecoveryClaim = FundingPool(fundingPool)
+            .totalSubscribed(address(this)) -
+            subscriptionsThatAlreadyClaimedRecoveryValue;
         // recoveryVal split into two parts
         // 1) unconverted portion of last index is split over lenders who didn't convert OR claim yet
         // 2) rest of coll split over everyone who has not claimed
@@ -339,21 +348,18 @@ contract LoanProposalImpl is Initializable {
             lastPeriodIdx
         ]
             ? (lastPeriodNonConvertedCollToken * lenderContribution) /
-                (FundingPool(fundingPool).totalSubscribed(address(this)) -
-                    totalConvertedContributionsPerIdx[lastPeriodIdx])
+                subscriptionsLeftForLastIdx
             : 0;
         // accounts for collateral and contribution towards last index
         collTokenRepaid[lastPeriodIdx] += recoveryVal;
         // update counter for those who have claimed/converted on the coll set aside for last round
         totalConvertedContributionsPerIdx[lastPeriodIdx] += lenderContribution;
         recoveryVal +=
-            ((collTokenBal - lastPeriodNonConvertedCollToken) *
-                lenderContribution) /
-            (FundingPool(fundingPool).totalSubscribed(address(this)) -
-                totalStakeCounterOnDefaultedClaims);
+            (recoveryCollAmount * lenderContribution) /
+            subscriptionsLeftForRecoveryClaim;
         lenderClaimedCollateral[msg.sender] = true;
         // update counter for those who have claimed
-        totalStakeCounterOnDefaultedClaims += lenderContribution;
+        subscriptionsThatAlreadyClaimedRecoveryValue += lenderContribution;
         IERC20Metadata(collToken).safeTransfer(msg.sender, recoveryVal);
     }
 
