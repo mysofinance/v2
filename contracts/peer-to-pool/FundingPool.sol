@@ -80,9 +80,6 @@ contract FundingPool {
         if (!LoanProposalImpl(loanProposal).inUnsubscriptionPhase()) {
             revert();
         }
-        if (amount > balanceOf[msg.sender]) {
-            revert();
-        }
         if (amount > subscribedBalanceOf[loanProposal][msg.sender]) {
             revert();
         }
