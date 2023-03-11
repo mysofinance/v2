@@ -20,12 +20,13 @@ contract LoanProposalImpl is Initializable {
     uint256 public finalLoanAmount;
     uint256 public finalCollAmount;
     uint256 public currentRepaymentIdx;
+    uint256 public totalStakeCounterOnDefaultedClaims;
     DataTypes.LoanStatus public status;
     mapping(address => uint256) public balanceOf;
     DataTypes.LoanTerms _loanTerms;
     mapping(uint256 => uint256) public loanTokenRepaid;
     mapping(uint256 => uint256) public collTokenRepaid;
-    mapping(uint256 => uint256) public totalStakedConversionsPerIdx;
+    mapping(uint256 => uint256) public totalConvertedContributionsPerIdx; // denominated in loan Token
     mapping(address => mapping(uint256 => bool))
         public lenderExercisedConversion;
     mapping(address => mapping(uint256 => bool)) public lenderClaimedRepayment;
@@ -197,7 +198,7 @@ contract LoanProposalImpl is Initializable {
             .collTokenDueIfConverted * lenderContribution) /
             FundingPool(fundingPool).totalSubscribed(address(this));
         collTokenRepaid[repaymentIdx] += conversionAmount;
-        totalStakedConversionsPerIdx[repaymentIdx] += lenderContribution;
+        totalConvertedContributionsPerIdx[repaymentIdx] += lenderContribution;
         lenderExercisedConversion[msg.sender][repaymentIdx] = true;
         IERC20Metadata(collToken).safeTransfer(msg.sender, conversionAmount);
     }
@@ -213,28 +214,19 @@ contract LoanProposalImpl is Initializable {
         checkRepaymentIdx(repaymentIdx);
         // must be after when the period of this loan when lenders can convert,
         // but before default period for this period
+        uint256 conversionTimeEnd = _loanTerms
+            .repaymentSchedule[repaymentIdx]
+            .dueTimestamp +
+            _loanTerms.repaymentSchedule[repaymentIdx].conversionGracePeriod;
         if (
-            (block.timestamp <
-                _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-                    _loanTerms
-                        .repaymentSchedule[repaymentIdx]
-                        .conversionGracePeriod) ||
+            (block.timestamp < conversionTimeEnd) ||
             (block.timestamp >
-                _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-                    _loanTerms
-                        .repaymentSchedule[repaymentIdx]
-                        .conversionGracePeriod +
+                conversionTimeEnd +
                     _loanTerms
                         .repaymentSchedule[repaymentIdx]
                         .repaymentGracePeriod)
         ) {
             revert();
-        }
-        if (
-            repaymentIdx > 0 &&
-            !_loanTerms.repaymentSchedule[repaymentIdx - 1].repaid
-        ) {
-            revert(); // previous loan defaulted
         }
         uint256 collTokenDue = _loanTerms
             .repaymentSchedule[repaymentIdx]
@@ -259,6 +251,9 @@ contract LoanProposalImpl is Initializable {
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
+        if (repaymentIdx >= currentRepaymentIdx) {
+            revert();
+        }
         checkRepaymentIdx(repaymentIdx);
         if (!_loanTerms.repaymentSchedule[repaymentIdx].repaid) {
             revert();
@@ -289,7 +284,7 @@ contract LoanProposalImpl is Initializable {
         uint256 claimAmount = (loanTokenRepaid[repaymentIdx] *
             lenderContribution) /
             (FundingPool(fundingPool).totalSubscribed(address(this)) -
-                totalStakedConversionsPerIdx[repaymentIdx]);
+                totalConvertedContributionsPerIdx[repaymentIdx]);
         lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
         IERC20Metadata(loanToken).safeTransfer(msg.sender, claimAmount);
     }
@@ -338,31 +333,34 @@ contract LoanProposalImpl is Initializable {
         );
         uint256 lastPeriodNonConvertedCollToken = lastPeriodCollTokenDue -
             collTokenRepaid[lastPeriodIdx];
-        // recoverVal split into two parts
-        // 1) unconverted portion of last index is split over lenders who didn't convert
-        // 2) rest of coll split over everyone
+        // recoveryVal split into two parts
+        // 1) unconverted portion of last index is split over lenders who didn't convert OR claim yet
+        // 2) rest of coll split over everyone who has not claimed
         uint256 recoveryVal = !lenderExercisedConversion[msg.sender][
             lastPeriodIdx
         ]
             ? (lastPeriodNonConvertedCollToken * lenderContribution) /
                 (FundingPool(fundingPool).totalSubscribed(address(this)) -
-                    totalStakedConversionsPerIdx[lastPeriodIdx])
+                    totalConvertedContributionsPerIdx[lastPeriodIdx])
             : 0;
+        // accounts for collateral and contribution towards last index
+        collTokenRepaid[lastPeriodIdx] += recoveryVal;
+        // update counter for those who have claimed/converted on the coll set aside for last round
+        totalConvertedContributionsPerIdx[lastPeriodIdx] += lenderContribution;
         recoveryVal +=
             ((collTokenBal - lastPeriodNonConvertedCollToken) *
                 lenderContribution) /
-            FundingPool(fundingPool).totalSubscribed(address(this));
+            (FundingPool(fundingPool).totalSubscribed(address(this)) -
+                totalStakeCounterOnDefaultedClaims);
         lenderClaimedCollateral[msg.sender] = true;
+        // update counter for those who have claimed
+        totalStakeCounterOnDefaultedClaims += lenderContribution;
         IERC20Metadata(collToken).safeTransfer(msg.sender, recoveryVal);
     }
 
     function checkRepaymentIdx(uint256 repaymentIdx) internal view {
         // currentRepaymentIdx == _loanTerms.repaymentSchedule.length on full repay,
-        // so second equality check needed
-        if (
-            repaymentIdx > currentRepaymentIdx ||
-            repaymentIdx == _loanTerms.repaymentSchedule.length
-        ) {
+        if (repaymentIdx == _loanTerms.repaymentSchedule.length) {
             revert();
         }
     }
