@@ -254,7 +254,6 @@ contract LoanProposalImpl is Initializable {
         if (repaymentIdx >= currentRepaymentIdx) {
             revert();
         }
-        checkRepaymentIdx(repaymentIdx);
         if (!_loanTerms.repaymentSchedule[repaymentIdx].repaid) {
             revert();
         }
