@@ -125,19 +125,4 @@ contract FundingPool {
             LoanProposalImpl(loanProposal).arrangerFee()
         );
     }
-
-    function updateLenderDataOnConversion(
-        address lender,
-        uint256 collConversionAmount,
-        uint256 finalCollAmount
-    ) external {
-        uint256 currSubscribedBal = subscribedBalanceOf[msg.sender][lender];
-        uint256 subscribedReduction = (currSubscribedBal *
-            collConversionAmount) / finalCollAmount;
-        if (subscribedReduction > currSubscribeBal) {
-            revert();
-        }
-        totalSubscribed[msg.sender] -= subscribedReduction;
-        subscribedBalanceOf[msg.sender][lender] -= subscribedReduction;
-    }
 }
