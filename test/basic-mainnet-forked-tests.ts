@@ -346,24 +346,18 @@ describe('Basic Forked Mainnet Tests', function () {
     const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
     const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
     await aaveAutoQuoteStrategy1.deployed()
-
     // whitelist autoquote strategy
     await expect(addressRegistry.connect(lender).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.reverted
     await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-
     // lender subscribes to strategy
     await lenderVault.connect(lender).setAutoQuoteStrategy(weth.address, usdc.address, aaveAutoQuoteStrategy1.address)
-
     // lender deposits usdc
     await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
     // borrower approves borrower gateway
     await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-
     // test retrieiving autoquote
     const onChainQuote = await aaveAutoQuoteStrategy1.getOnChainQuote()
     console.log('onChainQuote from Aave strategy:', onChainQuote)
-
     // borrower uses quote to borrow
     const collSendAmount = ONE_WETH
     const isAutoQuote = true
@@ -375,7 +369,6 @@ describe('Basic Forked Mainnet Tests', function () {
     const loan = await lenderVault.loans(0)
     const expectedLoanAmount = collSendAmount.mul(onChainQuote.loanPerCollUnit).div(ONE_WETH)
     const expectedRepayAmount = expectedLoanAmount.mul(BASE.add(onChainQuote.interestRatePctInBase)).div(BASE)
-
     expect(loan.initCollAmount).to.equal(collSendAmount)
     expect(loan.initLoanAmount).to.equal(expectedLoanAmount)
     expect(loan.initRepayAmount).to.equal(expectedRepayAmount)
@@ -388,22 +381,16 @@ describe('Basic Forked Mainnet Tests', function () {
     const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
     const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
     await aaveAutoQuoteStrategy1.deployed()
-
     // whitelist autoquote strategy
     await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-
     // lender subscribes to strategy
     await lenderVault.connect(lender).setAutoQuoteStrategy(weth.address, usdc.address, aaveAutoQuoteStrategy1.address)
-
     // lender deposits usdc
     await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
     // borrower approves borrower gateway
     await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-
     // test retrieiving autoquote
     const onChainQuote = await aaveAutoQuoteStrategy1.getOnChainQuote()
-
     // borrower uses quote to borrow
     const collSendAmount = ONE_WETH
     const isAutoQuote = true
@@ -412,19 +399,12 @@ describe('Basic Forked Mainnet Tests', function () {
     await borrowerGateway
       .connect(borrower)
       .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
-
     const loan = await lenderVault.loans(0)
-
     await ethers.provider.send('evm_mine', [loan.expiry + 12])
-
     const lenderWethBalPre = await weth.balanceOf(lender.address)
-
     expect(lenderWethBalPre).to.equal(BigNumber.from(0))
-
     await lenderVault.connect(lender).unlockCollateral(weth.address, [0], true)
-
     const lenderWethBalPost = await weth.balanceOf(lender.address)
-
     expect(lenderWethBalPost).to.equal(collSendAmount)
   })*/
 

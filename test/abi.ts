@@ -11,6 +11,7 @@ const balancerV2VaultAbi = [
     type: 'function'
   }
 ]
+
 const balancerV2PoolAbi = [
   {
     inputs: [],
