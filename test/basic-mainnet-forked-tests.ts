@@ -1,7 +1,16 @@
 import { expect } from 'chai'
-import { BigNumber, constants } from 'ethers'
+import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { balancerV2VaultAbi, balancerV2PoolAbi, collTokenAbi, aavePoolAbi, crvRewardsDistributorAbi, chainlinkAggregatorAbi, gohmAbi, uniV2Abi } from './abi'
+import {
+  balancerV2VaultAbi,
+  balancerV2PoolAbi,
+  collTokenAbi,
+  aavePoolAbi,
+  crvRewardsDistributorAbi,
+  chainlinkAggregatorAbi,
+  gohmAbi,
+  uniV2Abi
+} from './abi'
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers'
 
 const hre = require('hardhat')
@@ -158,7 +167,7 @@ describe('Basic Forked Mainnet Tests', function () {
     await balancerV2Looping.deployed()
 
     // whitelist addrs
-    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address])
+    //await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address, gohm.address, uniV2WethUsdc])
     await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address)).to.be.reverted
     await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
 
@@ -184,8 +193,18 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should process atomic balancer swap correctly', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } =
-        await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        usdc,
+        weth,
+        lenderVault,
+        balancerV2Looping
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -223,6 +242,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -293,6 +313,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
       console.log('minSwapReceive: ', minSwapReceive)
       const deadline = MAX_UINT128
+
       const callbackAddr = balancerV2Looping.address
       const callbackData = ethers.utils.defaultAbiCoder.encode(
         ['bytes32', 'uint256', 'uint256'],
@@ -337,76 +358,6 @@ describe('Basic Forked Mainnet Tests', function () {
       )
     })
   })
-
-  /*
-  it('Should handle auto-quotes correctly', async function () {
-    const { addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, balancerV2Looping } =
-      await setupTest()
-    // deploy an autoquote strategy
-    const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
-    const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
-    await aaveAutoQuoteStrategy1.deployed()
-    // whitelist autoquote strategy
-    await expect(addressRegistry.connect(lender).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.reverted
-    await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-    // lender subscribes to strategy
-    await lenderVault.connect(lender).setAutoQuoteStrategy(weth.address, usdc.address, aaveAutoQuoteStrategy1.address)
-    // lender deposits usdc
-    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-    // borrower approves borrower gateway
-    await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-    // test retrieiving autoquote
-    const onChainQuote = await aaveAutoQuoteStrategy1.getOnChainQuote()
-    console.log('onChainQuote from Aave strategy:', onChainQuote)
-    // borrower uses quote to borrow
-    const collSendAmount = ONE_WETH
-    const isAutoQuote = true
-    const callbackAddr = ZERO_ADDR
-    const callbackData = ZERO_BYTES32
-    await borrowerGateway
-      .connect(borrower)
-      .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
-    const loan = await lenderVault.loans(0)
-    const expectedLoanAmount = collSendAmount.mul(onChainQuote.loanPerCollUnit).div(ONE_WETH)
-    const expectedRepayAmount = expectedLoanAmount.mul(BASE.add(onChainQuote.interestRatePctInBase)).div(BASE)
-    expect(loan.initCollAmount).to.equal(collSendAmount)
-    expect(loan.initLoanAmount).to.equal(expectedLoanAmount)
-    expect(loan.initRepayAmount).to.equal(expectedRepayAmount)
-  })*/
-
-  /*
-  it('Should handle unlockCollateral without compartment correctly', async () => {
-    const { addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
-    // deploy an autoquote strategy
-    const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
-    const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
-    await aaveAutoQuoteStrategy1.deployed()
-    // whitelist autoquote strategy
-    await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-    // lender subscribes to strategy
-    await lenderVault.connect(lender).setAutoQuoteStrategy(weth.address, usdc.address, aaveAutoQuoteStrategy1.address)
-    // lender deposits usdc
-    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-    // borrower approves borrower gateway
-    await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-    // test retrieiving autoquote
-    const onChainQuote = await aaveAutoQuoteStrategy1.getOnChainQuote()
-    // borrower uses quote to borrow
-    const collSendAmount = ONE_WETH
-    const isAutoQuote = true
-    const callbackAddr = ZERO_ADDR
-    const callbackData = ZERO_BYTES32
-    await borrowerGateway
-      .connect(borrower)
-      .borrowWithOnChainQuote(lenderVault.address, collSendAmount, onChainQuote, isAutoQuote, callbackAddr, callbackData)
-    const loan = await lenderVault.loans(0)
-    await ethers.provider.send('evm_mine', [loan.expiry + 12])
-    const lenderWethBalPre = await weth.balanceOf(lender.address)
-    expect(lenderWethBalPre).to.equal(BigNumber.from(0))
-    await lenderVault.connect(lender).unlockCollateral(weth.address, [0], true)
-    const lenderWethBalPost = await weth.balanceOf(lender.address)
-    expect(lenderWethBalPost).to.equal(collSendAmount)
-  })*/
 
   describe('Compartment Testing', function () {
     const stakeInLiquidityGauge = async ({
@@ -1055,11 +1006,190 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(lenderCollBalPost).to.equal(borrowerUNIBalPre.div(coeffRepay))
     })
+
+    it('Should delegate voting correctly with borrow and partial repayment with callback', async () => {
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        weth,
+        lenderVault,
+        addressRegistry,
+        balancerV2Looping
+      } = await setupTest()
+
+      // create uni staking implementation
+      const VotingCompartmentImplementation = await ethers.getContractFactory('VoteCompartment')
+      await VotingCompartmentImplementation.connect(team)
+      const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
+      await votingCompartmentImplementation.deployed()
+
+      // increase borrower UNI balance
+      const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
+      const collTokenAddress = '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984' // UNI
+      const UNI_SLOT = 4
+      const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
+
+      // Get storage slot index
+      const index = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [borrower.address, UNI_SLOT])
+      await ethers.provider.send('hardhat_setStorageAt', [
+        collTokenAddress,
+        index.toString(),
+        ethers.utils.hexZeroPad(locallyUNIBalance.toHexString(), 32)
+      ])
+
+      // lender deposits weth
+      await weth.connect(lender).deposit({ value: ONE_WETH.mul(1000) })
+      await weth.connect(lender).transfer(lenderVault.address, ONE_WETH.mul(1000))
+
+      // get pre balances
+      const borrowerCollBalPre = await collInstance.balanceOf(borrower.address)
+      const borrowerLoanBalPre = await weth.balanceOf(borrower.address)
+      const vaultLoanBalPre = await weth.balanceOf(lenderVault.address)
+
+      expect(borrowerCollBalPre).to.equal(locallyUNIBalance)
+      expect(vaultLoanBalPre).to.equal(ONE_WETH.mul(1000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).toggleTokens([collTokenAddress, weth.address])
+
+      expect(await addressRegistry.connect(team).isWhitelistedToken(collTokenAddress)).to.be.true
+      expect(await addressRegistry.connect(team).isWhitelistedToken(weth.address)).to.be.true
+
+      // borrower approves borrower gateway
+      await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const ONE_UNI = BigNumber.from(10).pow(18)
+
+      const onChainQuote = await createOnChainRequest({
+        lender: lender,
+        collToken: collTokenAddress,
+        loanToken: weth.address,
+        borrowerCompartmentImplementation: votingCompartmentImplementation.address,
+        lenderVault,
+        quoteHandler,
+        loanPerCollUnit: ONE_WETH.div(400)
+      })
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_UNI
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+
+      const PRECISION = 10000
+      const collBuffer = BASE.mul(990).div(1000)
+      const initCollFromBorrower = ONE_UNI.mul(collBuffer).div(BASE)
+      const slippageTolerance = BASE.mul(30).div(10000)
+      const poolId = '0x5aa90c7362ea46b3cbfbd7f01ea5ca69c98fef1c000200000000000000000020' // look up via getPoolId() on bal pool
+      const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
+      const deadline = MAX_UINT128
+
+      const callbackAddr = balancerV2Looping.address
+      const callbackData = ethers.utils.defaultAbiCoder.encode(
+        ['bytes32', 'uint256', 'uint256'],
+        [poolId, minSwapReceive, deadline]
+      )
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          MAX_UINT256,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })
+
+      const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
+      const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const loanId = borrowEvent?.args?.['loanId']
+
+      const coeffRepay = 2
+      const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
+
+      const uniCompInstance = await votingCompartmentImplementation.attach(collTokenCompartmentAddr)
+
+      const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
+
+      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.reverted
+      await uniCompInstance.connect(borrower).delegate(borrower.address)
+
+      // check balance post borrow
+      const borrowerLoanBalPost = await weth.balanceOf(borrower.address)
+      const borrowerCollBalPost = await collInstance.balanceOf(borrower.address)
+      const compartmentCollBalPost = await collInstance.balanceOf(collTokenCompartmentAddr)
+
+      // const borrowerCollBalDiffActual = borrowerCollBalPre.sub(borrowerCollBalPost)
+      // const borrowerCollBalDiffExpected = borrowerCollBalPre.sub(collSendAmount)
+      // const borrowerCollBalDiffComparison = Math.abs(
+      //   Number(
+      //     borrowerCollBalDiffActual
+      //       .sub(borrowerCollBalDiffExpected)
+      //       .mul(PRECISION)
+      //       .div(borrowerCollBalDiffActual)
+      //       .div(ONE_UNI)
+      //       .toString()
+      //   )
+      // )
+      // expect(borrowerCollBalDiffComparison).to.be.lessThan(0.01)
+      // the swap leverage means this test is not meaningful... need to compare to balancer swap amount expected for loan amount
+      expect(borrowerLoanBalPost.sub(borrowerLoanBalPre)).to.equal(0) // borrower: no weth change as all swapped for uni
+      expect(compartmentCollBalPost).to.equal(collSendAmount)
+      expect(borrowerVotesPreDelegation).to.equal(0)
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const minSwapReceiveRepay = partialRepayAmount.mul(BASE.sub(slippageTolerance)).div(BASE).div(1000)
+
+      const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
+        ['bytes32', 'uint256', 'uint256'],
+        [poolId, minSwapReceiveRepay, deadline]
+      )
+
+      // partial repay
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            collToken: collTokenAddress,
+            loanToken: weth.address,
+            loanId,
+            repayAmount: partialRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      )
+        .to.emit(borrowerGateway, 'Repay')
+        .withArgs(lenderVault.address, loanId, partialRepayAmount)
+
+      // check balance post repay
+      const borrowerCollBalPostRepay = await collInstance.balanceOf(borrower.address)
+      const compartmentCollBalPostRepay = await collInstance.balanceOf(collTokenCompartmentAddr)
+      const borrowerLoanBalPostRepay = await weth.balanceOf(borrower.address)
+
+      expect(borrowerCollBalPostRepay).to.equal(borrowerCollBalPost) // coll swapped out for loan, no change in coll
+      expect(borrowerLoanBalPostRepay).to.be.greaterThan(partialRepayAmount)
+      expect(compartmentCollBalPostRepay).to.equal(compartmentCollBalPost.div(coeffRepay))
+    })
   })
 
   describe('Testing with token transfer fees', function () {
     it('Should process onChain quote with fees', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, lenderVault } = await setupTest()
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, paxg, lenderVault } =
+        await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1091,6 +1221,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1146,7 +1277,8 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with fees including protocol fee', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, paxg, lenderVault } = await setupTest()
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, paxg, lenderVault } =
+        await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1182,6 +1314,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1235,7 +1368,8 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote and repay with loan token transfer fees', async function () {
-      const { borrowerGateway, quoteHandler, lender, team, borrower, usdc, paxg, lenderVault } = await setupTest()
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, team, borrower, usdc, paxg, lenderVault } =
+        await setupTest()
 
       // borrower transfers paxg to lender
       await paxg.connect(borrower).transfer(lender.address, ONE_PAXG.mul(20).mul(10000).div(9998))
@@ -1273,6 +1407,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1360,7 +1495,8 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('Testing chainlink oracles', function () {
     it('Should process onChain quote with oracle address (non-weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, team, lenderVault, addressRegistry } = await setupTest()
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, team, lenderVault } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -1411,6 +1547,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1464,12 +1601,13 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
 
-    it('Should process onChain quote with oracle address (weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } = await setupTest()
+    it('Should process onChain quote with oracle address (coll weth)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-      
+
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
@@ -1513,6 +1651,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1558,18 +1697,113 @@ describe('Basic Forked Mainnet Tests', function () {
 
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
-      expect(
-        Math.abs(Number(vaultWethBalPost.sub(vaultWethBalPre).sub(collSendAmount).toString()))
-      ).to.equal(0)
-      expect(
-            vaultUsdcBalPre
-              .sub(vaultUsdcBalPost)
-              .sub(maxLoanPerColl)
-      ).to.equal(0)
+      expect(Math.abs(Number(vaultWethBalPost.sub(vaultWethBalPre).sub(collSendAmount).toString()))).to.equal(0)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
+    })
+
+    it('Should process onChain quote with oracle address (loan weth)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
+
+      // deploy chainlinkOracleContract
+      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
+
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+      const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+        [usdcEthChainlinkAddr],
+        [true],
+        weth.address
+      )
+      await chainlinkBasicImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address)
+
+      const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+
+      // lenderVault owner deposits weth
+      await weth.connect(lender).deposit({ value: ONE_WETH.mul(1000) })
+      await weth.connect(lender).transfer(lenderVault.address, ONE_WETH.mul(1000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_WETH.div(10),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: usdc.address,
+          loanToken: weth.address,
+          oracleAddr: chainlinkBasicImplementation.address,
+          minLoan: ONE_WETH.div(100),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const collSendAmount = ONE_USDC.mul(10000)
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(
+          lenderVault.address,
+          collSendAmount,
+          expectedTransferFee,
+          MAX_UINT256,
+          onChainQuote,
+          quoteTupleIdx,
+          callbackAddr,
+          callbackData
+        )
+
+      // check balance post borrow
+      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      const collTokenRoundData = await usdcOracleInstance.latestRoundData()
+      const collTokenPriceRaw = collTokenRoundData.answer
+
+      const maxLoanPerColl = collTokenPriceRaw.div(10).mul(10000)
+
+      expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPost)).to.equal(collSendAmount)
+      expect(borrowerWethBalPost.sub(borrowerWethBalPre)).to.equal(maxLoanPerColl)
+      expect(Math.abs(Number(vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount).toString()))).to.equal(0)
+      expect(vaultWethBalPre.sub(vaultWethBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -1586,7 +1820,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const ohmOracleInstance = new ethers.Contract(ohmEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
-      const gohmInstance = new ethers.Contract(gohm.address,gohmAbi, borrower.provider)
+      const gohmInstance = new ethers.Contract(gohm.address, gohmAbi, borrower.provider)
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1620,6 +1854,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([gohm.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1663,25 +1898,34 @@ describe('Basic Forked Mainnet Tests', function () {
       const collTokenPriceRawPreIndex = collTokenRoundDataPreIndex.answer
       const index = await gohmInstance.index()
 
-      const collTokenPriceInLoanToken = collTokenPriceRawPreIndex.mul(ONE_USDC).mul(index).div(loanTokenPriceRaw).div(10**9)
+      const collTokenPriceInLoanToken = collTokenPriceRawPreIndex
+        .mul(ONE_USDC)
+        .mul(index)
+        .div(loanTokenPriceRaw)
+        .div(10 ** 9)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
       console.log(collTokenPriceInLoanToken.toString())
 
       expect(borrowerGohmBalPre.sub(borrowerGohmBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
-      expect(
-        Math.abs(Number(vaultGohmBalPost.sub(vaultGohmBalPre).sub(collSendAmount).toString()))
-      ).to.equal(0)
-      expect(
-            vaultUsdcBalPre
-              .sub(vaultUsdcBalPost)
-              .sub(maxLoanPerColl)
-      ).to.equal(0)
+      expect(Math.abs(Number(vaultGohmBalPost.sub(vaultGohmBalPre).sub(collSendAmount).toString()))).to.equal(0)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
 
     it('Should process onChain quote with uni v2 oracle (usdc-weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, uniV2WethUsdc, team, lenderVault, addressRegistry } = await setupTest()
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        usdc,
+        weth,
+        uniV2WethUsdc,
+        team,
+        lenderVault,
+        addressRegistry
+      } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -1730,6 +1974,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+      await addressRegistry.connect(team).toggleTokens([uniV2WethUsdc.address, usdc.address])
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1768,7 +2013,13 @@ describe('Basic Forked Mainnet Tests', function () {
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
       const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
-      const totalEthValueOfLpPool = await getTotalEthValue(uniV2WethUsdc.address, borrower, usdcEthChainlinkAddr, weth.address, weth.address ) 
+      const totalEthValueOfLpPool = await getTotalEthValue(
+        uniV2WethUsdc.address,
+        borrower,
+        usdcEthChainlinkAddr,
+        weth.address,
+        weth.address
+      )
       const totalSupply = await uniV2WethUsdc.totalSupply()
       const loanTokenPriceRaw = loanTokenRoundData.answer
       const collTokenPriceRaw = totalEthValueOfLpPool.mul(BigNumber.from(10).pow(18)).div(totalSupply)
@@ -1783,11 +2034,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(
         Math.abs(Number(vaultUniV2WethUsdcBalPost.sub(vaultUniV2WethUsdcBalPre).sub(collSendAmount).toString()))
       ).to.equal(0)
-      expect(
-            vaultUsdcBalPre
-              .sub(vaultUsdcBalPost)
-              .sub(maxLoanPerColl.div(1000))
-      ).to.equal(0)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl.div(1000))).to.equal(0)
     })
   })
 })
