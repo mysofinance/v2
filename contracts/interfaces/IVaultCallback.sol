@@ -11,7 +11,6 @@ interface IVaultCallback {
 
     function repayCallback(
         DataTypes.Loan calldata loan,
-        uint256 collTokenBalBefore,
         bytes calldata data
     ) external;
 }

@@ -98,8 +98,29 @@ contract UniV3Looping is IVaultCallback {
     }
 
     function repayCallback(
-        DataTypes.Loan calldata loanQuote,
-        uint256 collTokenBalBefore,
+        DataTypes.Loan calldata loan,
         bytes calldata data
-    ) external {}
+    ) external {
+        (uint256 minSwapReceive, uint256 deadline, uint24 poolFee) = abi.decode(
+            data,
+            (uint256, uint256, uint24)
+        );
+        // swap whole coll token balance received from borrower gateway
+        uint256 collBalance = IERC20(loan.collToken).balanceOf(address(this));
+        IERC20Metadata(loan.loanToken).approve(UNI_V3_SWAP_ROUTER, collBalance);
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+            .ExactInputSingleParams({
+                tokenIn: loan.collToken,
+                tokenOut: loan.loanToken,
+                fee: poolFee,
+                recipient: loan.borrower,
+                deadline: deadline,
+                amountIn: collBalance,
+                amountOutMinimum: minSwapReceive,
+                sqrtPriceLimitX96: 0
+            });
+
+        ISwapRouter(UNI_V3_SWAP_ROUTER).exactInputSingle(params);
+        IERC20Metadata(loan.loanToken).approve(UNI_V3_SWAP_ROUTER, 0);
+    }
 }

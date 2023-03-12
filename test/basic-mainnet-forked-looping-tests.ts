@@ -343,6 +343,24 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(
         onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmountBn).div(ONE_WETH)
       )
+
+      // check repay
+      const loan = await lenderVault.loans(0)
+      const minSwapReceiveLoanToken = 0
+      const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'uint256', 'uint24'],
+        [minSwapReceiveLoanToken, deadline, poolFee]
+      )
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .repay(
+            { collToken: loan.collToken, loanToken: loan.loanToken, loanId: 0, repayAmount: loan.initRepayAmount, expectedTransferFee: 0 },
+            lenderVault.address,
+            callbackAddr,
+            callbackDataRepay
+          )
+      )
     })
 
   })
