@@ -76,6 +76,10 @@ contract LoanProposalImpl is Initializable {
         if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
             revert();
         }
+        repaymentScheduleCheck(
+            newLoanTerms.repaymentSchedule,
+            uint256(newLoanTerms.collPerLoanToken)
+        );
         _loanTerms = newLoanTerms;
     }
 
@@ -115,14 +119,15 @@ contract LoanProposalImpl is Initializable {
         ) {
             revert();
         }
+        if (_loanTerms.repaymentSchedule[0].dueTimestamp <= block.timestamp) {
+            revert(); // loan already due
+        }
         status = DataTypes.LoanStatus.READY_TO_EXECUTE;
         arrangerFee = (arrangerFee * totalSubscribed) / 1e18;
         finalLoanAmount = totalSubscribed - arrangerFee;
         finalCollAmount =
             (finalLoanAmount * _loanTerms.collPerLoanToken) /
             (10 ** IERC20Metadata(loanToken).decimals());
-        // todo: sanity check on successive repayment periods not overlapping and
-        // collToken conversion amounts sum less than finalCollAmount
         for (uint256 i = 0; i < _loanTerms.repaymentSchedule.length; ) {
             _loanTerms.repaymentSchedule[i].loanTokenDue = toUint128(
                 (finalLoanAmount *
@@ -379,6 +384,46 @@ contract LoanProposalImpl is Initializable {
     function toUint128(uint256 x) internal pure returns (uint128 y) {
         y = uint128(x);
         if (y != x) {
+            revert();
+        }
+    }
+
+    function repaymentScheduleCheck(
+        DataTypes.Repayment[] memory repaymentSchedule,
+        uint256 collPerLoanToken
+    ) internal pure {
+        if (repaymentSchedule.length == 0) {
+            revert(); // must have at least one entry
+        }
+        uint256 collAmountsDueTotal;
+        uint256 prevPeriodEnd;
+        uint256 currPeriodStart;
+        for (uint i = 0; i < repaymentSchedule.length; ) {
+            currPeriodStart = repaymentSchedule[i].dueTimestamp;
+            if (currPeriodStart <= prevPeriodEnd) {
+                revert(); // overlapping intervals
+            }
+            if (
+                repaymentSchedule[i].conversionGracePeriod *
+                    repaymentSchedule[i].repaymentGracePeriod ==
+                0
+            ) {
+                revert();
+            }
+            prevPeriodEnd =
+                currPeriodStart +
+                repaymentSchedule[i].conversionGracePeriod +
+                repaymentSchedule[i].repaymentGracePeriod;
+            // this is order that will be used to compute locked final amounts in repayment schedule
+            // the multiplication will occur after the division
+            collAmountsDueTotal +=
+                ((repaymentSchedule[i].loanTokenDue) / 1e18) *
+                repaymentSchedule[i].collTokenDueIfConverted;
+            unchecked {
+                i++;
+            }
+        }
+        if (collAmountsDueTotal > collPerLoanToken) {
             revert();
         }
     }
