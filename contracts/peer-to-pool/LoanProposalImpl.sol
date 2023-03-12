@@ -231,10 +231,11 @@ contract LoanProposalImpl is Initializable {
         uint256 collTokenDue = _loanTerms
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted;
+        uint256 remainingCollTokenDue = collTokenDue -
+            collTokenRepaid[repaymentIdx];
         uint256 remainingLoanTokenDue = (_loanTerms
             .repaymentSchedule[repaymentIdx]
-            .loanTokenDue * (collTokenDue - collTokenRepaid[repaymentIdx])) /
-            collTokenDue;
+            .loanTokenDue * remainingCollTokenDue) / collTokenDue;
         loanTokenRepaid[repaymentIdx] = remainingLoanTokenDue;
         _loanTerms.repaymentSchedule[repaymentIdx].repaid = true;
         IERC20Metadata(loanToken).safeTransferFrom(
@@ -247,6 +248,11 @@ contract LoanProposalImpl is Initializable {
                 address(this)
             );
             IERC20Metadata(collToken).safeTransfer(msg.sender, collBal);
+        } else {
+            IERC20Metadata(collToken).safeTransfer(
+                msg.sender,
+                remainingCollTokenDue
+            );
         }
     }
 
