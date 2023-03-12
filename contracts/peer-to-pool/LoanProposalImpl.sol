@@ -76,10 +76,7 @@ contract LoanProposalImpl is Initializable {
         if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
             revert();
         }
-        repaymentScheduleCheck(
-            newLoanTerms.repaymentSchedule,
-            uint256(newLoanTerms.collPerLoanToken)
-        );
+        repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
         _loanTerms = newLoanTerms;
     }
 
@@ -128,6 +125,7 @@ contract LoanProposalImpl is Initializable {
         finalCollAmount =
             (finalLoanAmount * _loanTerms.collPerLoanToken) /
             (10 ** IERC20Metadata(loanToken).decimals());
+        uint256 totalCollTokenDueIfConverted;
         for (uint256 i = 0; i < _loanTerms.repaymentSchedule.length; ) {
             _loanTerms.repaymentSchedule[i].loanTokenDue = toUint128(
                 (finalLoanAmount *
@@ -138,9 +136,15 @@ contract LoanProposalImpl is Initializable {
                     _loanTerms.repaymentSchedule[i].collTokenDueIfConverted) /
                     (10 ** IERC20Metadata(loanToken).decimals())
             );
+            totalCollTokenDueIfConverted += _loanTerms
+                .repaymentSchedule[i]
+                .collTokenDueIfConverted;
             unchecked {
                 i++;
             }
+        }
+        if (finalCollAmount < totalCollTokenDueIfConverted) {
+            revert(); // possible collToken shortfall
         }
     }
 
@@ -389,13 +393,11 @@ contract LoanProposalImpl is Initializable {
     }
 
     function repaymentScheduleCheck(
-        DataTypes.Repayment[] memory repaymentSchedule,
-        uint256 collPerLoanToken
+        DataTypes.Repayment[] memory repaymentSchedule
     ) internal pure {
         if (repaymentSchedule.length == 0) {
             revert(); // must have at least one entry
         }
-        uint256 collAmountsDueTotal;
         uint256 prevPeriodEnd;
         uint256 currPeriodStart;
         for (uint i = 0; i < repaymentSchedule.length; ) {
@@ -414,17 +416,9 @@ contract LoanProposalImpl is Initializable {
                 currPeriodStart +
                 repaymentSchedule[i].conversionGracePeriod +
                 repaymentSchedule[i].repaymentGracePeriod;
-            // this is order that will be used to compute locked final amounts in repayment schedule
-            // the multiplication will occur after the division
-            collAmountsDueTotal +=
-                ((repaymentSchedule[i].loanTokenDue) / 1e18) *
-                repaymentSchedule[i].collTokenDueIfConverted;
             unchecked {
                 i++;
             }
-        }
-        if (collAmountsDueTotal > collPerLoanToken) {
-            revert();
         }
     }
 }
