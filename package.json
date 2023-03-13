@@ -9,13 +9,15 @@
     "test:arbitrum": "HARDHAT_CHAIN_ID=31336 npx hardhat test ./test/*-arbitrum-*.ts",
     "test:mainnet": "HARDHAT_CHAIN_ID=1 npx hardhat test ./test/*-mainnet-*.ts",
     "test:local": "npx hardhat test ./test/*-local-*.ts",
+    "coverage:mainnet": "HARDHAT_CHAIN_ID=1 npx hardhat coverage  --testfiles \"test/*-mainnet-*.ts|test/*-local-*.ts\"",
+    "coverage:arbitrum": "HARDHAT_CHAIN_ID=31336 npx hardhat coverage  --testfiles \"test/*-arbitrum-*.ts\"",
     "lint": "solhint \"contracts/**/*.sol\"",
     "slither": "slither . --checklist",
     "prepare": "husky install"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^1.0.2",
-    "hardhat": "^2.12.4",
+    "hardhat": "^2.13.0",
+    "hardhat-contract-sizer": "^2.8.0",
     "husky": "^8.0.3",
     "lint-staged": "^13.1.0",
     "prettier": "^2.8.3",
@@ -24,13 +26,14 @@
     "solhint-plugin-prettier": "^0.0.5"
   },
   "dependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.2",
     "@openzeppelin/contracts": "^4.8.0",
     "@openzeppelin/merkle-tree": "^1.0.2",
     "@uniswap/sdk-core": "^3.2.1",
     "@uniswap/v3-sdk": "^3.9.0",
     "dotenv": "^16.0.3",
     "hardhat-abi-exporter": "^2.10.1",
-    "hardhat-contract-sizer": "^2.7.0",
-    "prettier-plugin-solidity": "^1.1.1"
+    "prettier-plugin-solidity": "^1.1.1",
+    "solidity-coverage": "^0.8.2"
   }
 }

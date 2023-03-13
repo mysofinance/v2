@@ -165,8 +165,8 @@ describe('Basic Forked Arbitrum Tests', function () {
     const borrowInstructions = {
       collSendAmount,
       expectedTransferFee,
-      deadline : MAX_UINT256,
-      minLoanAmount : 0,
+      deadline: MAX_UINT256,
+      minLoanAmount: 0,
       callbackAddr,
       callbackData
     }
@@ -177,12 +177,7 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     const borrowWithOnChainQuoteTransaction = await borrowerGateway
       .connect(borrower)
-      .borrowWithOnChainQuote(
-        lenderVault.address,
-        borrowInstructions,
-        onChainQuote,
-        quoteTupleIdx
-      )
+      .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
     const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
@@ -214,15 +209,18 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     // partial repay
     await expect(
-      borrowerGateway
-        .connect(borrower)
-        .repay(
-          { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount: partialRepayAmount, expectedTransferFee: 0 },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
-        )
-
+      borrowerGateway.connect(borrower).repay(
+        {
+          collToken: collTokenAddress,
+          loanToken: usdc.address,
+          loanId,
+          repayAmount: partialRepayAmount,
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
+      )
     )
       .to.emit(borrowerGateway, 'Repay')
       .withArgs(lenderVault.address, loanId, partialRepayAmount)
