@@ -69,36 +69,6 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         IStakingHelper(_liqGaugeAddr).deposit(amount, address(this));
     }
 
-    function withdrawCollFromGauge(
-        uint256 repayAmount,
-        uint256 repayAmountLeft
-    ) internal returns (address _rewardTokenAddr) {
-        address _liqGaugeAddr = liqGaugeAddr;
-
-        uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
-            address(this)
-        );
-
-        // withdraw proportion of gauge amount
-        uint256 withdrawAmount = (repayAmount * currentStakedBal) /
-            repayAmountLeft;
-
-        IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
-
-        try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
-            address rewardTokenAddr
-        ) {
-            if (rewardTokenAddr != address(0)) {
-                _rewardTokenAddr = rewardTokenAddr;
-                IStakingHelper(_liqGaugeAddr).claim_rewards();
-            }
-
-            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
-        } catch {
-            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
-        }
-    }
-
     // transfer coll on repays
     function transferCollFromCompartment(
         uint256 repayAmount,
@@ -194,6 +164,36 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
                 vaultAddr,
                 currentRewardTokenBal
             );
+        }
+    }
+
+    function withdrawCollFromGauge(
+        uint256 repayAmount,
+        uint256 repayAmountLeft
+    ) internal returns (address _rewardTokenAddr) {
+        address _liqGaugeAddr = liqGaugeAddr;
+
+        uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
+            address(this)
+        );
+
+        // withdraw proportion of gauge amount
+        uint256 withdrawAmount = (repayAmount * currentStakedBal) /
+            repayAmountLeft;
+
+        IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
+
+        try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
+            address rewardTokenAddr
+        ) {
+            if (rewardTokenAddr != address(0)) {
+                _rewardTokenAddr = rewardTokenAddr;
+                IStakingHelper(_liqGaugeAddr).claim_rewards();
+            }
+
+            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+        } catch {
+            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         }
     }
 }
