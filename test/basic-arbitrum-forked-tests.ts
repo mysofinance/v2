@@ -162,11 +162,13 @@ describe('Basic Forked Arbitrum Tests', function () {
     const quoteTupleIdx = 0
     const callbackAddr = ZERO_ADDR
     const callbackData = ZERO_BYTES32
-    const borrowInputInfo = {
+    const borrowInstructions = {
       collSendAmount,
       expectedTransferFee,
       deadline : MAX_UINT256,
-      minLoanAmount : 0
+      minLoanAmount : 0,
+      callbackAddr,
+      callbackData
     }
 
     // Since there is a 15 min cooldown duration after minting GLP, needs to pass for the user before transfer
@@ -177,11 +179,9 @@ describe('Basic Forked Arbitrum Tests', function () {
       .connect(borrower)
       .borrowWithOnChainQuote(
         lenderVault.address,
-        borrowInputInfo,
+        borrowInstructions,
         onChainQuote,
-        quoteTupleIdx,
-        callbackAddr,
-        callbackData
+        quoteTupleIdx
       )
 
     const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()

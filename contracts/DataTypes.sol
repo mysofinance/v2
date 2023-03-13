@@ -75,11 +75,13 @@ library DataTypes {
         bool useCollCompartment;
     }
 
-    struct BorrowInputInfo {
+    struct BorrowTransferInstructions {
         uint256 collSendAmount;
         uint256 expectedTransferFee;
         uint256 deadline;
         uint256 minLoanAmount;
+        address callbackAddr;
+        bytes callbackData;
     }
 
     enum WhiteListType {

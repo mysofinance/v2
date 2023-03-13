@@ -157,11 +157,13 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
-      const borrowInputInfo = {
+      const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
         deadline : MAX_UINT256,
-        minLoanAmount : 0
+        minLoanAmount : 0,
+        callbackAddr,
+        callbackData
       }
 
       await expect(
@@ -169,11 +171,9 @@ describe('Basic Local Tests', function () {
           .connect(borrower)
           .borrowWithOnChainQuote(
             lenderVault.address,
-            borrowInputInfo,
+            borrowInstructions,
             onChainQuote,
-            quoteTupleIdx,
-            callbackAddr,
-            callbackData
+            quoteTupleIdx
           )
       ).to.be.reverted
     })
@@ -364,11 +364,13 @@ describe('Basic Local Tests', function () {
       const expectedTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
-      const borrowInputInfo = {
+      const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
         deadline : MAX_UINT256,
-        minLoanAmount : 0
+        minLoanAmount : 0,
+        callbackAddr,
+        callbackData
       }
 
       // unregistered vault address reverts
@@ -377,12 +379,10 @@ describe('Basic Local Tests', function () {
           .connect(borrower)
           .borrowWithOffChainQuote(
             lender.address,
-            borrowInputInfo,
+            borrowInstructions,
             offChainQuote,
             selectedQuoteTuple,
-            proof,
-            callbackAddr,
-            callbackData
+            proof
           )
       ).to.be.revertedWithCustomError(borrowerGateway, 'UnregisteredVault')
 
@@ -392,12 +392,10 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(
             lenderVault.address,
-            borrowInputInfo,
+            borrowInstructions,
             offChainQuote,
             selectedQuoteTuple,
-            proof,
-            callbackAddr,
-            callbackData
+            proof
           )
       ).to.be.reverted
 
@@ -413,12 +411,10 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(
             lenderVault.address,
-            borrowInputInfo,
+            borrowInstructions,
             offChainQuote,
             unregisteredQuoteTuple,
-            proof,
-            callbackAddr,
-            callbackData
+            proof
           )
       ).to.be.reverted
 
@@ -426,12 +422,10 @@ describe('Basic Local Tests', function () {
         .connect(borrower)
         .borrowWithOffChainQuote(
           lenderVault.address,
-          borrowInputInfo,
+          borrowInstructions,
           offChainQuote,
           selectedQuoteTuple,
-          proof,
-          callbackAddr,
-          callbackData
+          proof
         )
 
       // check balance post borrow
@@ -503,21 +497,21 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
-      const borrowInputInfo = {
+      const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
         deadline : MAX_UINT256,
-        minLoanAmount : 0
+        minLoanAmount : 0,
+        callbackAddr,
+        callbackData
       }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          borrowInputInfo,
+          borrowInstructions,
           onChainQuote,
-          quoteTupleIdx,
-          callbackAddr,
-          callbackData
+          quoteTupleIdx
         )
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
