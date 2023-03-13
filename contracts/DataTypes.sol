@@ -69,5 +69,4 @@ library DataTypes {
         address callbackAddr;
         bytes callbackData;
     }
-
 }
