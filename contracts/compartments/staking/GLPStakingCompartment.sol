@@ -2,18 +2,13 @@
 
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
 
-contract GLPStakingCompartment is
-    Initializable,
-    BaseCompartment,
-    IBorrowerCompartment
-{
+contract GLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
     using SafeERC20 for IERC20;
 
     // arbitrum WETH address
