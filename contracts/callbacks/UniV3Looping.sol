@@ -94,10 +94,7 @@ contract UniV3Looping is IVaultCallback {
                 sqrtPriceLimitX96: 0
             });
         ISwapRouter(UNI_V3_SWAP_ROUTER).exactInputSingle(params);
-        IERC20Metadata(loan.loanToken).approve(
-            UNI_V3_SWAP_ROUTER,
-            loan.initLoanAmount
-        );
+        IERC20Metadata(loan.loanToken).approve(UNI_V3_SWAP_ROUTER, 0);
     }
 
     function repayCallback(
@@ -125,9 +122,6 @@ contract UniV3Looping is IVaultCallback {
             });
 
         ISwapRouter(UNI_V3_SWAP_ROUTER).exactInputSingle(params);
-        IERC20Metadata(loan.collToken).approve(
-            UNI_V3_SWAP_ROUTER,
-            loan.initLoanAmount
-        );
+        IERC20Metadata(loan.collToken).approve(UNI_V3_SWAP_ROUTER, 0);
     }
 }
