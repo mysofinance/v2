@@ -13,7 +13,6 @@ contract AddressRegistry is IAddressRegistry {
     mapping(address => bool) public isWhitelistedToken;
     mapping(address => bool) public isWhitelistedCallbackAddr;
     mapping(address => bool) public isWhitelistedCollTokenHandler;
-    mapping(address => bool) public isWhitelistedAutoQuoteStrategy;
     mapping(address => bool) public isWhitelistedOracle;
     address[] public registeredVaults;
 
@@ -81,15 +80,6 @@ contract AddressRegistry is IAddressRegistry {
             revert();
         }
         isWhitelistedCollTokenHandler[addr] = !isWhitelistedCollTokenHandler[
-            addr
-        ];
-    }
-
-    function toggleAutoQuoteStrategy(address addr) external {
-        if (msg.sender != owner) {
-            revert();
-        }
-        isWhitelistedAutoQuoteStrategy[addr] = !isWhitelistedAutoQuoteStrategy[
             addr
         ];
     }

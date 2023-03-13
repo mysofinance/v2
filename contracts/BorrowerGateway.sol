@@ -5,18 +5,16 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Constants} from "./Constants.sol";
+import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
-import {DataTypes} from "./DataTypes.sol";
 import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
 contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     // putting fee info in borrow gateway since borrower always pays this upfront
-    uint256 constant BASE = 1e18;
-    uint256 constant YEAR_IN_SECONDS = 31_536_000; // 365*24*3600
-    uint256 constant MAX_FEE = 5e16; // 5% max in base
     address immutable addressRegistry;
     uint256 public protocolFee; // in BASE
 
@@ -201,7 +199,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // this will make calculation of upfrontFee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
         uint256 protocolFeeAmount = ((borrowInstructions.collSendAmount) *
             protocolFee *
-            (loan.expiry - block.timestamp)) / (BASE * YEAR_IN_SECONDS);
+            (loan.expiry - block.timestamp)) /
+            (Constants.BASE * Constants.YEAR_IN_SECONDS);
 
         if (borrowInstructions.collSendAmount < protocolFeeAmount) {
             revert InsufficientSendAmount();
@@ -308,7 +307,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
             revert InvalidSender();
         }
-        if (_newFee > MAX_FEE) {
+        if (_newFee > Constants.MAX_FEE) {
             revert InvalidFee();
         }
         protocolFee = _newFee;
