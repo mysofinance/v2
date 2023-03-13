@@ -11,16 +11,9 @@ interface IBorrowerCompartment {
      * @notice function to initialize collateral compartment
      * @dev factory creates clone and then initializes implementation contract
      * @param vaultAddr address of vault
-     * @param borrowerAddr address of borrower
-     * @param collTokenAddr address of collToken
      * @param loanId index of the loan
      */
-    function initialize(
-        address vaultAddr,
-        address borrowerAddr,
-        address collTokenAddr,
-        uint256 loanId
-    ) external;
+    function initialize(address vaultAddr, uint256 loanId) external;
 
     /**
      * @notice function to unlock all collateral left in compartment

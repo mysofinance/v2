@@ -31,10 +31,12 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
     address internal constant CRV_MINTER_ADDR =
         0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _vaultAddr,
-        address,
-        address,
         uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;

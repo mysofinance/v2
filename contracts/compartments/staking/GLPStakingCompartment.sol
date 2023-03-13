@@ -18,10 +18,12 @@ contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
     address constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address constant FEE_GLP = 0x4e971a87900b931fF39d1Aad67697F49835400b6;
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _vaultAddr,
-        address,
-        address,
         uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;

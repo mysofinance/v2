@@ -17,10 +17,12 @@ contract VoteCompartment is Initializable, IBorrowerCompartment {
     address public vaultAddr;
     uint256 public loanIdx;
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _vaultAddr,
-        address,
-        address,
         uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;
