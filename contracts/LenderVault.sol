@@ -4,7 +4,6 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
@@ -15,7 +14,7 @@ import {IOracle} from "./interfaces/IOracle.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
+contract LenderVault is ILenderVault, Initializable {
     using SafeERC20 for IERC20Metadata;
 
     uint256 constant BASE = 1e18;
@@ -31,6 +30,10 @@ contract LenderVault is ReentrancyGuard, Initializable, ILenderVault {
 
     error Invalid();
     error InvalidLoanIndex();
+
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _vaultOwner,
