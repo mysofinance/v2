@@ -11,10 +11,6 @@ interface IAddressRegistry {
         address
     ) external view returns (bool);
 
-    function isWhitelistedAutoQuoteStrategy(
-        address
-    ) external view returns (bool);
-
     function isWhitelistedTokenPair(
         address collToken,
         address loanToken
@@ -43,8 +39,6 @@ interface IAddressRegistry {
     function toggleTokens(address[] memory addrs) external;
 
     function toggleCallbackAddr(address addr) external;
-
-    function toggleAutoQuoteStrategy(address addr) external;
 
     function toggleOracle(address addr) external;
 }
