@@ -76,6 +76,7 @@ contract BalancerV2Looping is IVaultCallback {
                 loan.initLoanAmount,
                 "0x"
             );
+        IERC20Metadata(loan.loanToken).approve(address(BalancerV2), 0);
         IERC20Metadata(loan.loanToken).approve(
             address(BalancerV2),
             loan.initLoanAmount
@@ -86,6 +87,7 @@ contract BalancerV2Looping is IVaultCallback {
             minSwapReceive,
             deadline
         );
+        IERC20Metadata(loan.loanToken).approve(address(BalancerV2), 0);
     }
 
     function repayCallback(
@@ -114,6 +116,7 @@ contract BalancerV2Looping is IVaultCallback {
                 collBalance,
                 "0x"
             );
+        IERC20Metadata(loan.collToken).approve(address(BalancerV2), 0);
         IERC20Metadata(loan.collToken).approve(
             address(BalancerV2),
             collBalance
@@ -124,5 +127,6 @@ contract BalancerV2Looping is IVaultCallback {
             minSwapReceive,
             deadline
         );
+        IERC20Metadata(loan.collToken).safeApprove(address(BalancerV2), 0);
     }
 }
