@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {Constants} from "./Constants.sol";
+import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";

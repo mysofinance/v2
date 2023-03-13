@@ -5,7 +5,7 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Constants} from "./Constants.sol";
+import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
