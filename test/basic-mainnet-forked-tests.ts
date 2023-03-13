@@ -322,19 +322,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -476,20 +471,15 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
@@ -799,20 +789,15 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
@@ -934,20 +919,15 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
@@ -1110,20 +1090,15 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
@@ -1263,19 +1238,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
@@ -1364,20 +1334,15 @@ describe('Basic Forked Mainnet Tests', function () {
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee : totalExpectedFees,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        expectedTransferFee: totalExpectedFees,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
@@ -1457,19 +1422,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       const borrowTransaction = await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       const borrowTransactionReceipt = await borrowTransaction.wait()
 
@@ -1601,19 +1561,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
@@ -1709,19 +1664,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -1814,19 +1764,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -1920,19 +1865,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerGohmBalPost = await gohm.balanceOf(borrower.address)
@@ -2044,19 +1984,14 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerUniV2WethUsdcBalPost = await uniV2WethUsdc.balanceOf(borrower.address)
