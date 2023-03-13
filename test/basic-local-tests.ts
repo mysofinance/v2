@@ -157,15 +157,19 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
 
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(
             lenderVault.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInputInfo,
             onChainQuote,
             quoteTupleIdx,
             callbackAddr,
@@ -360,15 +364,20 @@ describe('Basic Local Tests', function () {
       const expectedTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
+
       // unregistered vault address reverts
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(
             lender.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInputInfo,
             offChainQuote,
             selectedQuoteTuple,
             proof,
@@ -383,9 +392,7 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(
             lenderVault.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInputInfo,
             offChainQuote,
             selectedQuoteTuple,
             proof,
@@ -406,9 +413,7 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(
             lenderVault.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInputInfo,
             offChainQuote,
             unregisteredQuoteTuple,
             proof,
@@ -421,9 +426,7 @@ describe('Basic Local Tests', function () {
         .connect(borrower)
         .borrowWithOffChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           offChainQuote,
           selectedQuoteTuple,
           proof,
@@ -500,13 +503,17 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,

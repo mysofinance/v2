@@ -75,6 +75,13 @@ library DataTypes {
         bool useCollCompartment;
     }
 
+    struct BorrowInputInfo {
+        uint256 collSendAmount;
+        uint256 expectedTransferFee;
+        uint256 deadline;
+        uint256 minLoanAmount;
+    }
+
     enum WhiteListType {
         TOKEN,
         STRATEGY,

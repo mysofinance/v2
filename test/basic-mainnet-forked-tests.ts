@@ -319,13 +319,17 @@ describe('Basic Forked Mainnet Tests', function () {
         ['bytes32', 'uint256', 'uint256'],
         [poolId, minSwapReceive, deadline]
       )
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -469,14 +473,18 @@ describe('Basic Forked Mainnet Tests', function () {
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const compartmentData = crvGaugeIndex
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -788,14 +796,18 @@ describe('Basic Forked Mainnet Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -919,14 +931,18 @@ describe('Basic Forked Mainnet Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1091,14 +1107,18 @@ describe('Basic Forked Mainnet Tests', function () {
         ['bytes32', 'uint256', 'uint256'],
         [poolId, minSwapReceive, deadline]
       )
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1240,13 +1260,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1338,13 +1362,17 @@ describe('Basic Forked Mainnet Tests', function () {
       //const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee : totalExpectedFees,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          totalExpectedFees,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1426,13 +1454,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       const borrowTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1566,13 +1598,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1670,13 +1706,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_WETH
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1771,13 +1811,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1873,13 +1917,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_GOHM
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,
@@ -1993,13 +2041,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ONE_WETH.div(1000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
+      const borrowInputInfo = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInputInfo,
           onChainQuote,
           quoteTupleIdx,
           callbackAddr,

@@ -35,16 +35,14 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     function borrowWithOffChainQuote(
         address lenderVault,
-        uint256 collSendAmount,
-        uint256 expectedTransferFee,
-        uint256 deadline,
+        DataTypes.BorrowInputInfo calldata borrowInputs,
         DataTypes.OffChainQuote calldata offChainQuote,
         DataTypes.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof,
         address callbackAddr,
         bytes calldata callbackData
     ) external nonReentrant {
-        if (block.timestamp > deadline) {
+        if (block.timestamp > borrowInputs.deadline) {
             revert();
         }
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
@@ -69,16 +67,20 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             address collReceiver
         ) = ILenderVault(lenderVault).processQuote(
                 msg.sender,
-                collSendAmount,
-                expectedTransferFee,
+                borrowInputs.collSendAmount,
+                borrowInputs.expectedTransferFee,
                 offChainQuote.generalQuoteInfo,
                 quoteTuple
             );
-
+        {
+            if (loan.initLoanAmount < borrowInputs.minLoanAmount) {
+                revert(); // InsufficientLoanAmount();
+            }
+        }
         processTransfers(
             lenderVault,
             collReceiver,
-            collSendAmount,
+            borrowInputs.collSendAmount,
             loan,
             upfrontFee,
             callbackAddr,
@@ -104,9 +106,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     function borrowWithOnChainQuote(
         address lenderVault,
-        uint256 collSendAmount,
-        uint256 expectedTransferFee,
-        uint256 deadline,
+        DataTypes.BorrowInputInfo calldata borrowInputs,
         DataTypes.OnChainQuote calldata onChainQuote,
         uint256 quoteTupleIdx,
         address callbackAddr,
@@ -121,7 +121,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // 2. BorrowGateway then pulls collToken from borrower to lender vault
         // 3. Finally, BorrowGateway updates lender vault storage state
 
-        if (block.timestamp > deadline) {
+        if (block.timestamp > borrowInputs.deadline) {
             revert();
         }
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
@@ -146,16 +146,21 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             address collReceiver
         ) = ILenderVault(lenderVault).processQuote(
                 msg.sender,
-                collSendAmount,
-                expectedTransferFee,
+                borrowInputs.collSendAmount,
+                borrowInputs.expectedTransferFee,
                 onChainQuote.generalQuoteInfo,
                 quoteTuple
             );
+        {
+            if (loan.initLoanAmount < borrowInputs.minLoanAmount) {
+                revert(); // InsufficientLoanAmount();
+            }
+        }
 
         processTransfers(
             lenderVault,
             collReceiver,
-            collSendAmount,
+            borrowInputs.collSendAmount,
             loan,
             upfrontFee,
             callbackAddr,
