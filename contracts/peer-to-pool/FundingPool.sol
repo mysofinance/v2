@@ -110,7 +110,7 @@ contract FundingPool {
             .finalCollAmount();
         totalSubscribedIsDeployed[loanProposal] = true;
         LoanProposalImpl(loanProposal).updateStatusToDeployed();
-        IERC20Metadata(LoanProposalImpl(loanProposal).loanToken()).safeTransfer(
+        IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
             finalLoanAmount
         );
@@ -120,7 +120,7 @@ contract FundingPool {
                 loanProposal,
                 finalCollAmount
             );
-        IERC20Metadata(LoanProposalImpl(loanProposal).loanToken()).safeTransfer(
+        IERC20Metadata(depositToken).safeTransfer(
             LoanProposalImpl(loanProposal).arranger(),
             LoanProposalImpl(loanProposal).arrangerFee()
         );

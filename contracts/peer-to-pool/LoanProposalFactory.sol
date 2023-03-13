@@ -16,7 +16,6 @@ contract LoanProposalFactory {
 
     function createLoanProposal(
         address _fundingPool,
-        address _loanToken,
         address _collToken,
         uint256 _arrangerFee,
         uint256 _lenderGracePeriod
@@ -33,7 +32,6 @@ contract LoanProposalFactory {
         LoanProposalImpl(newLoanProposal).initialize(
             msg.sender,
             _fundingPool,
-            _loanToken,
             _collToken,
             _arrangerFee,
             _lenderGracePeriod

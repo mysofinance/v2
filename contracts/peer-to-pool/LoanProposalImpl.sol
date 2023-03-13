@@ -11,7 +11,6 @@ contract LoanProposalImpl is Initializable {
     using SafeERC20 for IERC20Metadata;
 
     address public fundingPool;
-    address public loanToken;
     address public collToken;
     address public arranger;
     uint256 public arrangerFee;
@@ -35,13 +34,11 @@ contract LoanProposalImpl is Initializable {
     function initialize(
         address _arranger,
         address _fundingPool,
-        address _loanToken,
         address _collToken,
         uint256 _arrangerFee,
         uint256 _lenderGracePeriod
     ) external initializer {
         fundingPool = _fundingPool;
-        loanToken = _loanToken;
         collToken = _collToken;
         arranger = _arranger;
         arrangerFee = _arrangerFee;
@@ -122,6 +119,7 @@ contract LoanProposalImpl is Initializable {
         status = DataTypes.LoanStatus.READY_TO_EXECUTE;
         arrangerFee = (arrangerFee * totalSubscribed) / 1e18;
         finalLoanAmount = totalSubscribed - arrangerFee;
+        address loanToken = FundingPool(fundingPool).depositToken();
         finalCollAmount =
             (finalLoanAmount * _loanTerms.collPerLoanToken) /
             (10 ** IERC20Metadata(loanToken).decimals());
@@ -237,6 +235,7 @@ contract LoanProposalImpl is Initializable {
         ) {
             revert();
         }
+        address loanToken = FundingPool(fundingPool).depositToken();
         uint256 collTokenDue = _loanTerms
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted;
@@ -294,6 +293,7 @@ contract LoanProposalImpl is Initializable {
         if (lenderContribution == 0) {
             revert();
         }
+        address loanToken = FundingPool(fundingPool).depositToken();
         // repaid amount for that period split over those who didn't convert in that period
         uint256 claimAmount = (loanTokenRepaid[repaymentIdx] *
             lenderContribution) /

@@ -65,7 +65,7 @@ describe('Basic Local Tests', function () {
       const arrangerFee = BASE.mul(50).div(10000)
       const lenderGracePeriod = ONE_DAY
       const firstDueDate = ethers.BigNumber.from(1703416332)
-      await loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, usdc.address, daoToken.address, arrangerFee, lenderGracePeriod)
+      await loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, arrangerFee, lenderGracePeriod)
       const loanProposalAddr = await loanProposalFactory.loanProposals(0)
       const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
       const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
