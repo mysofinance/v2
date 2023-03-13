@@ -17,8 +17,6 @@ contract QuoteHandler {
     mapping(address => uint256) offChainQuoteNonce;
     mapping(address => mapping(bytes32 => bool)) offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
-    mapping(address => mapping(address => bool))
-        public isActiveAutoQuoteStrategy;
 
     event OnChainQuoteAdded(
         address lenderVault,
@@ -120,10 +118,6 @@ contract QuoteHandler {
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
     }
 
-    /*
-    function addAutoQuoteStrategy() external {}
-    */
-
     function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
@@ -143,29 +137,6 @@ contract QuoteHandler {
             emit OnChainQuoteInvalidated(lenderVault, onChainQuoteHash);
         }
     }
-
-    /*
-    function doesVaultAcceptAutoQuote(
-        address borrower,
-        address lenderVault,
-        DataTypes.OnChainQuote memory onChainQuote
-    ) external view returns (bool) {
-        if (
-            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                onChainQuote.generalQuoteInfo.collToken,
-                onChainQuote.generalQuoteInfo.loanToken
-            )
-        ) {
-            return false;
-        }
-        if (
-            onChainQuote.generalQuoteInfo.borrower != address(0) &&
-            onChainQuote.generalQuoteInfo.borrower != borrower
-        ) {
-            return false;
-        }
-        return false;
-    }*/
 
     function checkAndRegisterOffChainQuote(
         address borrower,
