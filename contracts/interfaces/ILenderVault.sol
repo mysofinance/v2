@@ -44,8 +44,7 @@ interface ILenderVault {
 
     function processQuote(
         address borrower,
-        uint256 collSendAmount,
-        uint256 expectedTransferFee,
+        DataTypes.BorrowTransferInstructions calldata borrowInstructions,
         DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypes.QuoteTuple calldata quoteTuple
     )

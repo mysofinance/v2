@@ -178,8 +178,7 @@ contract LenderVault is ILenderVault, Initializable {
 
     function processQuote(
         address borrower,
-        uint256 collSendAmount,
-        uint256 expectedTransferFee,
+        DataTypes.BorrowTransferInstructions calldata borrowInstructions,
         DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypes.QuoteTuple calldata quoteTuple
     )
@@ -193,14 +192,18 @@ contract LenderVault is ILenderVault, Initializable {
     {
         senderCheckGateway();
         upfrontFee =
-            (collSendAmount * quoteTuple.upfrontFeePctInBase) /
+            (borrowInstructions.collSendAmount *
+                quoteTuple.upfrontFeePctInBase) /
             Constants.BASE;
-        if (collSendAmount < upfrontFee + expectedTransferFee) {
+        if (
+            borrowInstructions.collSendAmount <
+            upfrontFee + borrowInstructions.expectedTransferFee
+        ) {
             revert(); // InsufficientSendAmount();
         }
         (uint256 loanAmount, uint256 repayAmount) = getLoanAndRepayAmount(
-            collSendAmount,
-            expectedTransferFee,
+            borrowInstructions.collSendAmount,
+            borrowInstructions.expectedTransferFee,
             generalQuoteInfo,
             quoteTuple
         );
@@ -209,14 +212,19 @@ contract LenderVault is ILenderVault, Initializable {
             loanAmount < generalQuoteInfo.minLoan ||
             loanAmount > generalQuoteInfo.maxLoan
         ) {
-            revert(); // revert InsufficientSendAmount();
+            revert(); // revert InvalidSendAmount();
+        }
+        if (loanAmount < borrowInstructions.minLoanAmount) {
+            revert(); // revert TooSmallLoanAmount();
         }
 
         loan.borrower = borrower;
         loan.loanToken = generalQuoteInfo.loanToken;
         loan.collToken = generalQuoteInfo.collToken;
         loan.initCollAmount = toUint128(
-            collSendAmount - upfrontFee - expectedTransferFee
+            borrowInstructions.collSendAmount -
+                upfrontFee -
+                borrowInstructions.expectedTransferFee
         );
         loan.initLoanAmount = toUint128(loanAmount);
         loan.initRepayAmount = toUint128(repayAmount);
