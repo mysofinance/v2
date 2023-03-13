@@ -312,7 +312,7 @@ contract QuoteHandler {
         address borrower,
         address lenderVault,
         DataTypes.GeneralQuoteInfo calldata generalQuoteInfo
-    ) internal {
+    ) internal view {
         address _addressRegistry = addressRegistry;
         if (
             msg.sender != IAddressRegistry(_addressRegistry).borrowerGateway()
@@ -330,6 +330,9 @@ contract QuoteHandler {
                 generalQuoteInfo.loanToken
             )
         ) {
+            revert();
+        }
+        if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
             revert();
         }
         if (
