@@ -46,7 +46,8 @@ interface IBalancerVault {
 contract BalancerV2Looping is IVaultCallback {
     using SafeERC20 for IERC20Metadata;
 
-    address immutable BalancerV2 = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+    address constant BALANCER_V2_VAULT =
+        0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
     event Received(address, uint);
 
@@ -76,18 +77,18 @@ contract BalancerV2Looping is IVaultCallback {
                 loan.initLoanAmount,
                 "0x"
             );
-        IERC20Metadata(loan.loanToken).approve(address(BalancerV2), 0);
+        IERC20Metadata(loan.loanToken).approve(BALANCER_V2_VAULT, 0);
         IERC20Metadata(loan.loanToken).approve(
-            address(BalancerV2),
+            BALANCER_V2_VAULT,
             loan.initLoanAmount
         );
-        IBalancerVault(BalancerV2).swap(
+        IBalancerVault(BALANCER_V2_VAULT).swap(
             singleSwap,
             fundManagement,
             minSwapReceive,
             deadline
         );
-        IERC20Metadata(loan.loanToken).approve(address(BalancerV2), 0);
+        IERC20Metadata(loan.loanToken).approve(BALANCER_V2_VAULT, 0);
     }
 
     function repayCallback(
@@ -116,17 +117,14 @@ contract BalancerV2Looping is IVaultCallback {
                 collBalance,
                 "0x"
             );
-        IERC20Metadata(loan.collToken).approve(address(BalancerV2), 0);
-        IERC20Metadata(loan.collToken).approve(
-            address(BalancerV2),
-            collBalance
-        );
-        IBalancerVault(BalancerV2).swap(
+        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, 0);
+        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, collBalance);
+        IBalancerVault(BALANCER_V2_VAULT).swap(
             singleSwap,
             fundManagement,
             minSwapReceive,
             deadline
         );
-        IERC20Metadata(loan.collToken).safeApprove(address(BalancerV2), 0);
+        IERC20Metadata(loan.collToken).safeApprove(BALANCER_V2_VAULT, 0);
     }
 }
