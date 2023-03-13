@@ -42,112 +42,48 @@ contract LenderVault is ILenderVault, Initializable {
         minNumOfSigners = 1;
     }
 
-    function proposeNewVaultOwner(address _newOwner) external {
-        senderCheckOwner();
-        newVaultOwner = _newOwner;
-    }
+    function unlockCollateral(
+        address collToken,
+        uint256[] calldata _loanIds,
+        bool autoWithdraw
+    ) external {
+        uint256 totalUnlockableColl;
 
-    function claimVaultOwnership() external {
-        if (msg.sender != newVaultOwner) {
-            revert Invalid();
-        }
-        vaultOwner = newVaultOwner;
-    }
+        for (uint256 i = 0; i < _loanIds.length; ) {
+            uint256 tmp = 0;
+            DataTypes.Loan storage loan = _loans[_loanIds[i]];
 
-    function addSigners(address[] calldata _signers) external {
-        senderCheckOwner();
-        for (uint256 i = 0; i < _signers.length; ) {
-            if (isSigner[_signers[i]]) {
+            if (loan.collToken != collToken) {
                 revert();
             }
-            isSigner[_signers[i]] = true;
-            signers.push(_signers[i]);
+            if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
+                if (loan.collTokenCompartmentAddr != address(0)) {
+                    IBorrowerCompartment(loan.collTokenCompartmentAddr)
+                        .unlockCollToVault(loan.collToken);
+                } else {
+                    tmp =
+                        loan.initCollAmount -
+                        (loan.initCollAmount * loan.amountRepaidSoFar) /
+                        loan.initRepayAmount;
+                    totalUnlockableColl += tmp;
+                }
+            }
+            loan.collUnlocked = true;
             unchecked {
                 i++;
             }
         }
-    }
 
-    function removeSigner(address signer, uint256 signerIdx) external {
-        senderCheckOwner();
-        uint256 signersLen = signers.length;
-        if (signerIdx > signersLen - 1) {
-            revert();
-        }
+        lockedAmounts[collToken] -= totalUnlockableColl;
+        // if collToken is not used by vault as loan token too
+        if (autoWithdraw) {
+            uint256 currentCollTokenBalance = IERC20Metadata(collToken)
+                .balanceOf(address(this));
 
-        if (!isSigner[signer] || signer != signers[signerIdx]) {
-            revert();
-        }
-        signers[signerIdx] = signers[signersLen - 1];
-        signers.pop();
-        isSigner[signer] = false;
-    }
-
-    function setMinNumOfSigners(uint256 _minNumOfSigners) external {
-        senderCheckOwner();
-        if (_minNumOfSigners == 0) {
-            revert();
-        }
-        minNumOfSigners = _minNumOfSigners;
-    }
-
-    function loans(
-        uint256 loanId
-    ) external view returns (DataTypes.Loan memory loan) {
-        uint256 loanLen = _loans.length;
-        if (loanLen == 0 || loanId > loanLen - 1) {
-            revert InvalidLoanIndex();
-        }
-        loan = _loans[loanId];
-    }
-
-    function transferTo(
-        address token,
-        address recipient,
-        uint256 amount
-    ) external {
-        senderCheckGateway();
-        IERC20Metadata(token).safeTransfer(recipient, amount);
-    }
-
-    function transferFromCompartment(
-        uint256 repayAmount,
-        uint256 repayAmountLeft,
-        address borrowerAddr,
-        address collTokenAddr,
-        address callbackAddr,
-        address collTokenCompartmentAddr
-    ) external {
-        senderCheckGateway();
-        IBorrowerCompartment(collTokenCompartmentAddr)
-            .transferCollFromCompartment(
-                repayAmount,
-                repayAmountLeft,
-                borrowerAddr,
-                collTokenAddr,
-                callbackAddr
+            IERC20Metadata(collToken).safeTransfer(
+                vaultOwner,
+                currentCollTokenBalance - lockedAmounts[collToken]
             );
-    }
-
-    function validateRepayInfo(
-        address borrower,
-        DataTypes.Loan memory loan,
-        DataTypes.LoanRepayInfo memory loanRepayInfo
-    ) external view {
-        if (borrower != loan.borrower) {
-            revert Invalid();
-        }
-        if (
-            block.timestamp < loan.earliestRepay ||
-            block.timestamp >= loan.expiry
-        ) {
-            revert Invalid();
-        }
-        if (
-            loanRepayInfo.repayAmount >
-            loan.initRepayAmount - loan.amountRepaidSoFar
-        ) {
-            revert Invalid();
         }
     }
 
@@ -261,48 +197,112 @@ contract LenderVault is ILenderVault, Initializable {
         IERC20Metadata(token).safeTransfer(vaultOwner, amount);
     }
 
-    function unlockCollateral(
-        address collToken,
-        uint256[] calldata _loanIds,
-        bool autoWithdraw
+    function transferTo(
+        address token,
+        address recipient,
+        uint256 amount
     ) external {
-        uint256 totalUnlockableColl;
+        senderCheckGateway();
+        IERC20Metadata(token).safeTransfer(recipient, amount);
+    }
 
-        for (uint256 i = 0; i < _loanIds.length; ) {
-            uint256 tmp = 0;
-            DataTypes.Loan storage loan = _loans[_loanIds[i]];
+    function transferFromCompartment(
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
+        address borrowerAddr,
+        address collTokenAddr,
+        address callbackAddr,
+        address collTokenCompartmentAddr
+    ) external {
+        senderCheckGateway();
+        IBorrowerCompartment(collTokenCompartmentAddr)
+            .transferCollFromCompartment(
+                repayAmount,
+                repayAmountLeft,
+                borrowerAddr,
+                collTokenAddr,
+                callbackAddr
+            );
+    }
 
-            if (loan.collToken != collToken) {
+    function setMinNumOfSigners(uint256 _minNumOfSigners) external {
+        senderCheckOwner();
+        if (_minNumOfSigners == 0) {
+            revert();
+        }
+        minNumOfSigners = _minNumOfSigners;
+    }
+
+    function addSigners(address[] calldata _signers) external {
+        senderCheckOwner();
+        for (uint256 i = 0; i < _signers.length; ) {
+            if (isSigner[_signers[i]]) {
                 revert();
             }
-            if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
-                if (loan.collTokenCompartmentAddr != address(0)) {
-                    IBorrowerCompartment(loan.collTokenCompartmentAddr)
-                        .unlockCollToVault(loan.collToken);
-                } else {
-                    tmp =
-                        loan.initCollAmount -
-                        (loan.initCollAmount * loan.amountRepaidSoFar) /
-                        loan.initRepayAmount;
-                    totalUnlockableColl += tmp;
-                }
-            }
-            loan.collUnlocked = true;
+            isSigner[_signers[i]] = true;
+            signers.push(_signers[i]);
             unchecked {
                 i++;
             }
         }
+    }
 
-        lockedAmounts[collToken] -= totalUnlockableColl;
-        // if collToken is not used by vault as loan token too
-        if (autoWithdraw) {
-            uint256 currentCollTokenBalance = IERC20Metadata(collToken)
-                .balanceOf(address(this));
+    function removeSigner(address signer, uint256 signerIdx) external {
+        senderCheckOwner();
+        uint256 signersLen = signers.length;
+        if (signerIdx > signersLen - 1) {
+            revert();
+        }
 
-            IERC20Metadata(collToken).safeTransfer(
-                vaultOwner,
-                currentCollTokenBalance - lockedAmounts[collToken]
-            );
+        if (!isSigner[signer] || signer != signers[signerIdx]) {
+            revert();
+        }
+        signers[signerIdx] = signers[signersLen - 1];
+        signers.pop();
+        isSigner[signer] = false;
+    }
+
+    function proposeNewVaultOwner(address _newOwner) external {
+        senderCheckOwner();
+        newVaultOwner = _newOwner;
+    }
+
+    function claimVaultOwnership() external {
+        if (msg.sender != newVaultOwner) {
+            revert Invalid();
+        }
+        vaultOwner = newVaultOwner;
+    }
+
+    function loans(
+        uint256 loanId
+    ) external view returns (DataTypes.Loan memory loan) {
+        uint256 loanLen = _loans.length;
+        if (loanLen == 0 || loanId > loanLen - 1) {
+            revert InvalidLoanIndex();
+        }
+        loan = _loans[loanId];
+    }
+
+    function validateRepayInfo(
+        address borrower,
+        DataTypes.Loan memory loan,
+        DataTypes.LoanRepayInfo memory loanRepayInfo
+    ) external view {
+        if (borrower != loan.borrower) {
+            revert Invalid();
+        }
+        if (
+            block.timestamp < loan.earliestRepay ||
+            block.timestamp >= loan.expiry
+        ) {
+            revert Invalid();
+        }
+        if (
+            loanRepayInfo.repayAmount >
+            loan.initRepayAmount - loan.amountRepaidSoFar
+        ) {
+            revert Invalid();
         }
     }
 

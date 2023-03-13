@@ -159,6 +159,62 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         );
     }
 
+    function repay(
+        DataTypes.LoanRepayInfo calldata loanRepayInfo,
+        address vaultAddr,
+        address callbackAddr,
+        bytes calldata callbackData
+    ) external nonReentrant {
+        if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
+            revert UnregisteredVault();
+        }
+        if (
+            uint256(loanRepayInfo.repayAmount) +
+                loanRepayInfo.expectedTransferFee <
+            loanRepayInfo.repayAmount
+        ) {
+            revert(); // InsufficientSendAmount()
+        }
+        DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(
+            loanRepayInfo.loanId
+        );
+
+        ILenderVault(vaultAddr).validateRepayInfo(
+            msg.sender,
+            loan,
+            loanRepayInfo
+        );
+
+        uint256 reclaimCollAmount = processRepayTransfers(
+            vaultAddr,
+            loanRepayInfo,
+            loan,
+            callbackAddr,
+            callbackData
+        );
+
+        ILenderVault(vaultAddr).updateLoanInfo(
+            loan,
+            loanRepayInfo.repayAmount,
+            loanRepayInfo.loanId,
+            reclaimCollAmount,
+            true
+        );
+
+        emit Repay(vaultAddr, loanRepayInfo.loanId, loanRepayInfo.repayAmount);
+    }
+
+    function setNewProtocolFee(uint256 _newFee) external {
+        if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
+            revert InvalidSender();
+        }
+        if (_newFee > Constants.MAX_FEE) {
+            revert InvalidFee();
+        }
+        protocolFee = _newFee;
+        emit NewProtocolFee(_newFee);
+    }
+
     function processTransfers(
         address lenderVault,
         address collReceiver,
@@ -301,62 +357,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (loanTokenReceived != loanRepayInfo.repayAmount) {
             revert(); // InvalidSendAmount();
         }
-    }
-
-    function setNewProtocolFee(uint256 _newFee) external {
-        if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
-            revert InvalidSender();
-        }
-        if (_newFee > Constants.MAX_FEE) {
-            revert InvalidFee();
-        }
-        protocolFee = _newFee;
-        emit NewProtocolFee(_newFee);
-    }
-
-    function repay(
-        DataTypes.LoanRepayInfo calldata loanRepayInfo,
-        address vaultAddr,
-        address callbackAddr,
-        bytes calldata callbackData
-    ) external nonReentrant {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
-            revert UnregisteredVault();
-        }
-        if (
-            uint256(loanRepayInfo.repayAmount) +
-                loanRepayInfo.expectedTransferFee <
-            loanRepayInfo.repayAmount
-        ) {
-            revert(); // InsufficientSendAmount()
-        }
-        DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(
-            loanRepayInfo.loanId
-        );
-
-        ILenderVault(vaultAddr).validateRepayInfo(
-            msg.sender,
-            loan,
-            loanRepayInfo
-        );
-
-        uint256 reclaimCollAmount = processRepayTransfers(
-            vaultAddr,
-            loanRepayInfo,
-            loan,
-            callbackAddr,
-            callbackData
-        );
-
-        ILenderVault(vaultAddr).updateLoanInfo(
-            loan,
-            loanRepayInfo.repayAmount,
-            loanRepayInfo.loanId,
-            reclaimCollAmount,
-            true
-        );
-
-        emit Repay(vaultAddr, loanRepayInfo.loanId, loanRepayInfo.repayAmount);
     }
 
     function checkDeadlineAndRegisteredVault(

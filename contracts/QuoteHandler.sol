@@ -117,6 +117,30 @@ contract QuoteHandler {
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
     }
 
+    function incrementOffChainQuoteNonce(address lenderVault) external {
+        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+            revert();
+        }
+        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
+            revert();
+        }
+        offChainQuoteNonce[lenderVault] += 1;
+    }
+
+    function invalidateOffChainQuote(
+        address lenderVault,
+        bytes32 offChainQuoteHash
+    ) external {
+        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+            revert();
+        }
+        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
+            revert();
+        }
+        offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
+        emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
+    }
+
     function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
@@ -234,36 +258,6 @@ contract QuoteHandler {
         return true;
     }
 
-    function incrementOffChainQuoteNonce(address lenderVault) external {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
-        }
-        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
-            revert();
-        }
-        offChainQuoteNonce[lenderVault] += 1;
-    }
-
-    function invalidateOffChainQuote(
-        address lenderVault,
-        bytes32 offChainQuoteHash
-    ) external {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
-        }
-        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
-            revert();
-        }
-        offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
-        emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
-    }
-
-    function hashOnChainQuote(
-        DataTypes.OnChainQuote memory onChainQuote
-    ) internal pure returns (bytes32 quoteHash) {
-        quoteHash = keccak256(abi.encode(onChainQuote));
-    }
-
     function hashOffChainQuote(
         DataTypes.OffChainQuote memory offChainQuote
     ) internal view returns (bytes32 quoteHash) {
@@ -366,5 +360,11 @@ contract QuoteHandler {
             }
         }
         return true;
+    }
+
+    function hashOnChainQuote(
+        DataTypes.OnChainQuote memory onChainQuote
+    ) internal pure returns (bytes32 quoteHash) {
+        quoteHash = keccak256(abi.encode(onChainQuote));
     }
 }
