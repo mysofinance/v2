@@ -344,60 +344,53 @@ contract QuoteHandler {
     }
 
     function isValidOnChainQuote(
-        DataTypes.OnChainQuote calldata /*onChainQuote*/
+        DataTypes.OnChainQuote calldata onChainQuote
     ) internal view returns (bool) {
-        return true;
-        /*
-        console.log("PASS 1");
-        if (quote.collToken == quote.loanToken) {
-            return false;
-        }
-        console.log("PASS 2");
-        console.log("PASS 3");
         if (
-            quote.quoteTuples.loanPerCollUnitOrLtv.length !=
-            quote.quoteTuples.tenor.length ||
-            quote.quoteTuples.loanPerCollUnitOrLtv.length !=
-            quote.quoteTuples.interestRatePctInBase.length ||
-            quote.quoteTuples.loanPerCollUnitOrLtv.length !=
-            quote.quoteTuples.upfrontFeePctInBase.length
+            onChainQuote.generalQuoteInfo.collToken ==
+            onChainQuote.generalQuoteInfo.loanToken
         ) {
             return false;
         }
-        console.log("PASS 4");
-        console.log("PASS 5");
-        if (quote.validUntil < block.timestamp) {
+        if (onChainQuote.quoteTuples.length == 0) {
             return false;
         }
-        console.log("PASS 6");
-        for (
-            uint256 k = 0;
-            k < quote.quoteTuples.loanPerCollUnitOrLtv.length;
-
+        if (onChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
+            return false;
+        }
+        if (
+            onChainQuote.generalQuoteInfo.maxLoan == 0 ||
+            onChainQuote.generalQuoteInfo.minLoan >
+            onChainQuote.generalQuoteInfo.maxLoan
         ) {
-            if (quote.quoteTuples.upfrontFeePctInBase[k] > BASE) {
+            return false;
+        }
+        for (uint256 k = 0; k < onChainQuote.quoteTuples.length; ) {
+            if (onChainQuote.quoteTuples[k].upfrontFeePctInBase > BASE) {
                 return false;
             }
-            console.log("PASS 7");
             if (
-                quote.oracleAddr != address(0) &&
-                quote.quoteTuples.loanPerCollUnitOrLtv[k] >= BASE
+                onChainQuote.generalQuoteInfo.oracleAddr != address(0) &&
+                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >= BASE
             ) {
                 return false;
             }
-            console.log("PASS 8");
             if (
-                quote.quoteTuples.isNegativeInterestRate &&
-                quote.quoteTuples.interestRatePctInBase[k] > BASE
+                onChainQuote.quoteTuples[k].interestRatePctInBase + int(BASE) <=
+                0
             ) {
                 return false;
             }
-            console.log("PASS 9");
+            if (
+                onChainQuote.quoteTuples[k].tenor <=
+                onChainQuote.generalQuoteInfo.earliestRepayTenor
+            ) {
+                return false;
+            }
             unchecked {
                 k++;
             }
         }
         return true;
-        */
     }
 }
