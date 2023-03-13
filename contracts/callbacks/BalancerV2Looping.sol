@@ -46,7 +46,8 @@ interface IBalancerVault {
 contract BalancerV2Looping is IVaultCallback {
     using SafeERC20 for IERC20Metadata;
 
-    address immutable BalancerV2 = 0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+    address constant BALANCER_V2_VAULT =
+        0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
     event Received(address, uint);
 
@@ -76,56 +77,54 @@ contract BalancerV2Looping is IVaultCallback {
                 loan.initLoanAmount,
                 "0x"
             );
+        IERC20Metadata(loan.loanToken).approve(BALANCER_V2_VAULT, 0);
         IERC20Metadata(loan.loanToken).approve(
-            address(BalancerV2),
+            BALANCER_V2_VAULT,
             loan.initLoanAmount
         );
-        IBalancerVault(BalancerV2).swap(
+        IBalancerVault(BALANCER_V2_VAULT).swap(
             singleSwap,
             fundManagement,
             minSwapReceive,
             deadline
         );
+        IERC20Metadata(loan.loanToken).approve(BALANCER_V2_VAULT, 0);
     }
 
     function repayCallback(
-        DataTypes.Loan calldata loanQuote,
-        uint256 collTokenBalBefore,
+        DataTypes.Loan calldata loan,
         bytes calldata data
     ) external {
         BalancerDataTypes.FundManagement
             memory fundManagement = BalancerDataTypes.FundManagement(
                 address(this), // swap payer
                 false, // use payer's internal balance
-                payable(loanQuote.borrower), // swap receiver
+                payable(loan.borrower), // swap receiver
                 false // user receiver's internal balance
             );
         (bytes32 poolId, uint256 minSwapReceive, uint256 deadline) = abi.decode(
             data,
             (bytes32, uint256, uint256)
         );
-        // use collTokenBalBefore, to account for collToken transfer fees
-        uint256 currentCallbackAddrCollBal = IERC20(loanQuote.collToken)
-            .balanceOf(address(this));
-        uint256 collAmount = currentCallbackAddrCollBal - collTokenBalBefore;
+        // swap whole coll token balance received from borrower gateway
+        uint256 collBalance = IERC20(loan.collToken).balanceOf(address(this));
         BalancerDataTypes.SingleSwap memory singleSwap = BalancerDataTypes
             .SingleSwap(
                 poolId,
                 BalancerDataTypes.SwapKind.GIVEN_IN,
-                IBalancerAsset(loanQuote.collToken),
-                IBalancerAsset(loanQuote.loanToken),
-                collAmount,
+                IBalancerAsset(loan.collToken),
+                IBalancerAsset(loan.loanToken),
+                collBalance,
                 "0x"
             );
-        IERC20Metadata(loanQuote.collToken).approve(
-            address(BalancerV2),
-            collAmount
-        );
-        IBalancerVault(BalancerV2).swap(
+        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, 0);
+        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, collBalance);
+        IBalancerVault(BALANCER_V2_VAULT).swap(
             singleSwap,
             fundManagement,
             minSwapReceive,
             deadline
         );
+        IERC20Metadata(loan.collToken).safeApprove(BALANCER_V2_VAULT, 0);
     }
 }

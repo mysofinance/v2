@@ -26,6 +26,8 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.8.0",
     "@openzeppelin/merkle-tree": "^1.0.2",
+    "@uniswap/sdk-core": "^3.2.1",
+    "@uniswap/v3-sdk": "^3.9.0",
     "dotenv": "^16.0.3",
     "hardhat-abi-exporter": "^2.10.1",
     "hardhat-contract-sizer": "^2.7.0",

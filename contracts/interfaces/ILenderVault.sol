@@ -7,12 +7,6 @@ import {DataTypes} from "../DataTypes.sol";
 interface ILenderVault {
     function initialize(address vaultOwner, address addressRegistry) external;
 
-    function vaultOwner() external view returns (address);
-
-    function loans(
-        uint256 index
-    ) external view returns (DataTypes.Loan memory loan);
-
     function transferTo(
         address token,
         address recipient,
@@ -28,12 +22,6 @@ interface ILenderVault {
         address collTokenCompartmentAddr
     ) external;
 
-    function validateRepayInfo(
-        address borrower,
-        DataTypes.Loan memory loan,
-        DataTypes.LoanRepayInfo memory loanRepayInfo
-    ) external view;
-
     function updateLoanInfo(
         DataTypes.Loan memory loan,
         uint128 repayAmount,
@@ -44,8 +32,7 @@ interface ILenderVault {
 
     function processQuote(
         address borrower,
-        uint256 collSendAmount,
-        uint256 expectedTransferFee,
+        DataTypes.BorrowTransferInstructions calldata borrowInstructions,
         DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypes.QuoteTuple calldata quoteTuple
     )
@@ -56,6 +43,18 @@ interface ILenderVault {
             uint256 upfrontFee,
             address collReceiver
         );
+
+    function vaultOwner() external view returns (address);
+
+    function loans(
+        uint256 index
+    ) external view returns (DataTypes.Loan memory loan);
+
+    function validateRepayInfo(
+        address borrower,
+        DataTypes.Loan memory loan,
+        DataTypes.LoanRepayInfo memory loanRepayInfo
+    ) external view;
 
     function minNumOfSigners() external view returns (uint256);
 

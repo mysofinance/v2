@@ -157,19 +157,23 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0,
+        callbackAddr,
+        callbackData
+      }
 
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(
             lenderVault.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInstructions,
             onChainQuote,
-            quoteTupleIdx,
-            callbackAddr,
-            callbackData
+            quoteTupleIdx
           )
       ).to.be.reverted
     })
@@ -181,29 +185,6 @@ describe('Basic Local Tests', function () {
 
       await expect(borrowerGateway.connect(lender).setNewProtocolFee(0)).to.be.reverted
       await expect(borrowerGateway.connect(team).setNewProtocolFee(BASE)).to.be.reverted
-    })
-  })
-
-  describe('Address Registry', function () {
-    it('Should toggle auto quote strategy', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
-        await setupTest()
-
-      // deploy an autoquote strategy
-      const AaveAutoQuoteStrategy1 = await ethers.getContractFactory('AaveAutoQuoteStrategy1')
-      const aaveAutoQuoteStrategy1 = await AaveAutoQuoteStrategy1.connect(team).deploy()
-      await aaveAutoQuoteStrategy1.deployed()
-
-      await expect(addressRegistry.connect(borrower).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.reverted
-
-      // whitelist autoquote strategy
-      await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-
-      expect(await addressRegistry.connect(team).isWhitelistedAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.true
-
-      await addressRegistry.connect(team).toggleAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)
-
-      expect(await addressRegistry.connect(team).isWhitelistedAutoQuoteStrategy(aaveAutoQuoteStrategy1.address)).to.be.false
     })
   })
 
@@ -383,20 +364,25 @@ describe('Basic Local Tests', function () {
       const expectedTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0,
+        callbackAddr,
+        callbackData
+      }
+
       // unregistered vault address reverts
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(
             lender.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInstructions,
             offChainQuote,
             selectedQuoteTuple,
-            proof,
-            callbackAddr,
-            callbackData
+            proof
           )
       ).to.be.revertedWithCustomError(borrowerGateway, 'UnregisteredVault')
 
@@ -406,14 +392,10 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(
             lenderVault.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInstructions,
             offChainQuote,
             selectedQuoteTuple,
-            proof,
-            callbackAddr,
-            callbackData
+            proof
           )
       ).to.be.reverted
 
@@ -429,14 +411,10 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(
             lenderVault.address,
-            collSendAmount,
-            expectedTransferFee,
-            MAX_UINT256,
+            borrowInstructions,
             offChainQuote,
             unregisteredQuoteTuple,
-            proof,
-            callbackAddr,
-            callbackData
+            proof
           )
       ).to.be.reverted
 
@@ -444,14 +422,10 @@ describe('Basic Local Tests', function () {
         .connect(borrower)
         .borrowWithOffChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInstructions,
           offChainQuote,
           selectedQuoteTuple,
-          proof,
-          callbackAddr,
-          callbackData
+          proof
         )
 
       // check balance post borrow
@@ -523,17 +497,21 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline : MAX_UINT256,
+        minLoanAmount : 0,
+        callbackAddr,
+        callbackData
+      }
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(
           lenderVault.address,
-          collSendAmount,
-          expectedTransferFee,
-          MAX_UINT256,
+          borrowInstructions,
           onChainQuote,
-          quoteTupleIdx,
-          callbackAddr,
-          callbackData
+          quoteTupleIdx
         )
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
