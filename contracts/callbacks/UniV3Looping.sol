@@ -77,6 +77,7 @@ contract UniV3Looping is IVaultCallback {
             data,
             (uint256, uint256, uint24)
         );
+        IERC20Metadata(loan.loanToken).approve(UNI_V3_SWAP_ROUTER, 0);
         IERC20Metadata(loan.loanToken).approve(
             UNI_V3_SWAP_ROUTER,
             loan.initLoanAmount
@@ -92,7 +93,6 @@ contract UniV3Looping is IVaultCallback {
                 amountOutMinimum: minSwapReceive,
                 sqrtPriceLimitX96: 0
             });
-
         ISwapRouter(UNI_V3_SWAP_ROUTER).exactInputSingle(params);
         IERC20Metadata(loan.loanToken).approve(UNI_V3_SWAP_ROUTER, 0);
     }
@@ -107,7 +107,8 @@ contract UniV3Looping is IVaultCallback {
         );
         // swap whole coll token balance received from borrower gateway
         uint256 collBalance = IERC20(loan.collToken).balanceOf(address(this));
-        IERC20Metadata(loan.loanToken).approve(UNI_V3_SWAP_ROUTER, collBalance);
+        IERC20Metadata(loan.collToken).approve(UNI_V3_SWAP_ROUTER, 0);
+        IERC20Metadata(loan.collToken).approve(UNI_V3_SWAP_ROUTER, collBalance);
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
                 tokenIn: loan.collToken,
@@ -121,6 +122,6 @@ contract UniV3Looping is IVaultCallback {
             });
 
         ISwapRouter(UNI_V3_SWAP_ROUTER).exactInputSingle(params);
-        IERC20Metadata(loan.loanToken).approve(UNI_V3_SWAP_ROUTER, 0);
+        IERC20Metadata(loan.collToken).approve(UNI_V3_SWAP_ROUTER, 0);
     }
 }
