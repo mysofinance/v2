@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
@@ -10,16 +9,15 @@ import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelp
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
+import {BaseCompartment} from "../BaseCompartment.sol";
 
-contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
+contract CurveLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
     using SafeERC20 for IERC20;
 
     error IncorrectGaugeForLpToken();
     error InvalidGaugeIndex();
     error AlreadyStaked();
 
-    address public vaultAddr;
-    uint256 public loanIdx;
     address public liqGaugeAddr;
 
     // todo: possibly have this be set at initialize instead of
@@ -33,8 +31,6 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
 
     function initialize(
         address _vaultAddr,
-        address,
-        address,
         uint256 _loanIdx
     ) external initializer {
         vaultAddr = _vaultAddr;

@@ -178,8 +178,6 @@ contract LenderVault is ILenderVault, Initializable {
         } else {
             collReceiver = createCollCompartment(
                 generalQuoteInfo.borrowerCompartmentImplementation,
-                borrower,
-                generalQuoteInfo.collToken,
                 _loans.length
             );
             loan.collTokenCompartmentAddr = collReceiver;
@@ -308,8 +306,6 @@ contract LenderVault is ILenderVault, Initializable {
 
     function createCollCompartment(
         address borrowerCompartmentImplementation,
-        address borrower,
-        address collToken,
         uint256 loanId
     ) internal returns (address collCompartment) {
         if (
@@ -323,7 +319,6 @@ contract LenderVault is ILenderVault, Initializable {
             abi.encodePacked(
                 borrowerCompartmentImplementation,
                 address(this),
-                borrower,
                 loanId
             )
         );
@@ -331,12 +326,7 @@ contract LenderVault is ILenderVault, Initializable {
             borrowerCompartmentImplementation,
             salt
         );
-        IBorrowerCompartment(collCompartment).initialize(
-            address(this),
-            borrower,
-            collToken,
-            loanId
-        );
+        IBorrowerCompartment(collCompartment).initialize(address(this), loanId);
     }
 
     function senderCheckOwner() internal view {
