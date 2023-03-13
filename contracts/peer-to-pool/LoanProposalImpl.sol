@@ -76,6 +76,7 @@ contract LoanProposalImpl is Initializable {
         if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
             revert();
         }
+        repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
         _loanTerms = newLoanTerms;
     }
 
@@ -115,14 +116,16 @@ contract LoanProposalImpl is Initializable {
         ) {
             revert();
         }
+        if (_loanTerms.repaymentSchedule[0].dueTimestamp <= block.timestamp) {
+            revert(); // loan already due
+        }
         status = DataTypes.LoanStatus.READY_TO_EXECUTE;
         arrangerFee = (arrangerFee * totalSubscribed) / 1e18;
         finalLoanAmount = totalSubscribed - arrangerFee;
         finalCollAmount =
             (finalLoanAmount * _loanTerms.collPerLoanToken) /
             (10 ** IERC20Metadata(loanToken).decimals());
-        // todo: sanity check on successive repayment periods not overlapping and
-        // collToken conversion amounts sum less than finalCollAmount
+        uint256 totalCollTokenDueIfConverted;
         for (uint256 i = 0; i < _loanTerms.repaymentSchedule.length; ) {
             _loanTerms.repaymentSchedule[i].loanTokenDue = toUint128(
                 (finalLoanAmount *
@@ -133,9 +136,15 @@ contract LoanProposalImpl is Initializable {
                     _loanTerms.repaymentSchedule[i].collTokenDueIfConverted) /
                     (10 ** IERC20Metadata(loanToken).decimals())
             );
+            totalCollTokenDueIfConverted += _loanTerms
+                .repaymentSchedule[i]
+                .collTokenDueIfConverted;
             unchecked {
                 i++;
             }
+        }
+        if (finalCollAmount < totalCollTokenDueIfConverted) {
+            revert(); // possible collToken shortfall
         }
     }
 
@@ -231,10 +240,11 @@ contract LoanProposalImpl is Initializable {
         uint256 collTokenDue = _loanTerms
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted;
+        uint256 remainingCollTokenDue = collTokenDue -
+            collTokenRepaid[repaymentIdx];
         uint256 remainingLoanTokenDue = (_loanTerms
             .repaymentSchedule[repaymentIdx]
-            .loanTokenDue * (collTokenDue - collTokenRepaid[repaymentIdx])) /
-            collTokenDue;
+            .loanTokenDue * remainingCollTokenDue) / collTokenDue;
         loanTokenRepaid[repaymentIdx] = remainingLoanTokenDue;
         _loanTerms.repaymentSchedule[repaymentIdx].repaid = true;
         IERC20Metadata(loanToken).safeTransferFrom(
@@ -247,6 +257,11 @@ contract LoanProposalImpl is Initializable {
                 address(this)
             );
             IERC20Metadata(collToken).safeTransfer(msg.sender, collBal);
+        } else {
+            IERC20Metadata(collToken).safeTransfer(
+                msg.sender,
+                remainingCollTokenDue
+            );
         }
     }
 
@@ -374,6 +389,36 @@ contract LoanProposalImpl is Initializable {
         y = uint128(x);
         if (y != x) {
             revert();
+        }
+    }
+
+    function repaymentScheduleCheck(
+        DataTypes.Repayment[] memory repaymentSchedule
+    ) internal pure {
+        if (repaymentSchedule.length == 0) {
+            revert(); // must have at least one entry
+        }
+        uint256 prevPeriodEnd;
+        uint256 currPeriodStart;
+        for (uint i = 0; i < repaymentSchedule.length; ) {
+            currPeriodStart = repaymentSchedule[i].dueTimestamp;
+            if (currPeriodStart <= prevPeriodEnd) {
+                revert(); // overlapping intervals
+            }
+            if (
+                repaymentSchedule[i].conversionGracePeriod *
+                    repaymentSchedule[i].repaymentGracePeriod ==
+                0
+            ) {
+                revert();
+            }
+            prevPeriodEnd =
+                currPeriodStart +
+                repaymentSchedule[i].conversionGracePeriod +
+                repaymentSchedule[i].repaymentGracePeriod;
+            unchecked {
+                i++;
+            }
         }
     }
 }
