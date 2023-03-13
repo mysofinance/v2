@@ -10,16 +10,19 @@ import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelp
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
+import {BaseCompartment} from "../BaseCompartment.sol";
 
-contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
+contract CurveLPStakingCompartment is
+    Initializable,
+    BaseCompartment,
+    IBorrowerCompartment
+{
     using SafeERC20 for IERC20;
 
     error IncorrectGaugeForLpToken();
     error InvalidGaugeIndex();
     error AlreadyStaked();
 
-    address public vaultAddr;
-    uint256 public loanIdx;
     address public liqGaugeAddr;
 
     // todo: possibly have this be set at initialize instead of
@@ -30,10 +33,6 @@ contract CurveLPStakingCompartment is Initializable, IBorrowerCompartment {
         0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB;
     address internal constant CRV_MINTER_ADDR =
         0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
-
-    constructor() {
-        _disableInitializers();
-    }
 
     function initialize(
         address _vaultAddr,

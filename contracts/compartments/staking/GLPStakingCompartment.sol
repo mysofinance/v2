@@ -7,20 +7,18 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
+import {BaseCompartment} from "../BaseCompartment.sol";
 
-contract GLPStakingCompartment is Initializable, IBorrowerCompartment {
+contract GLPStakingCompartment is
+    Initializable,
+    BaseCompartment,
+    IBorrowerCompartment
+{
     using SafeERC20 for IERC20;
-
-    address public vaultAddr;
-    uint256 public loanIdx;
 
     // arbitrum WETH address
     address constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address constant FEE_GLP = 0x4e971a87900b931fF39d1Aad67697F49835400b6;
-
-    constructor() {
-        _disableInitializers();
-    }
 
     function initialize(
         address _vaultAddr,

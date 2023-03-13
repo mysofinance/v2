@@ -10,16 +10,14 @@ import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
+import {BaseCompartment} from "../BaseCompartment.sol";
 
-contract VoteCompartment is Initializable, IBorrowerCompartment {
+contract VoteCompartment is
+    Initializable,
+    BaseCompartment,
+    IBorrowerCompartment
+{
     using SafeERC20 for IERC20;
-
-    address public vaultAddr;
-    uint256 public loanIdx;
-
-    constructor() {
-        _disableInitializers();
-    }
 
     function initialize(
         address _vaultAddr,
