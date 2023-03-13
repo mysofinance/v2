@@ -6,18 +6,16 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
+import {Constants} from "./Constants.sol";
+import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
-import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
-import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
-import {DataTypes} from "./DataTypes.sol";
 
 contract LenderVault is ILenderVault, Initializable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 constant BASE = 1e18;
     address public vaultOwner;
     address public newVaultOwner;
     address public addressRegistry;
@@ -194,7 +192,9 @@ contract LenderVault is ILenderVault, Initializable {
         )
     {
         senderCheckGateway();
-        upfrontFee = (collSendAmount * quoteTuple.upfrontFeePctInBase) / BASE;
+        upfrontFee =
+            (collSendAmount * quoteTuple.upfrontFeePctInBase) /
+            Constants.BASE;
         if (collSendAmount < upfrontFee + expectedTransferFee) {
             revert(); // InsufficientSendAmount();
         }
@@ -362,7 +362,7 @@ contract LenderVault is ILenderVault, Initializable {
             }
             // arbitrage protection...any reason with a callback and
             // purpose-bound loan might want greater than 100%?
-            if (quoteTuple.loanPerCollUnitOrLtv > BASE) {
+            if (quoteTuple.loanPerCollUnitOrLtv > Constants.BASE) {
                 revert();
             }
             loanPerCollUnit =
@@ -371,7 +371,7 @@ contract LenderVault is ILenderVault, Initializable {
                         generalQuoteInfo.collToken,
                         generalQuoteInfo.loanToken
                     )) /
-                BASE;
+                Constants.BASE;
         }
         loanAmount =
             (loanPerCollUnit * (collSendAmount - expectedTransferFee)) /
@@ -382,13 +382,13 @@ contract LenderVault is ILenderVault, Initializable {
         if (loanAmount > vaultLoanTokenBal) {
             revert(); // InsufficientVaultFunds();
         }
-        int256 _interestRateFactor = int256(BASE) +
+        int256 _interestRateFactor = int256(Constants.BASE) +
             quoteTuple.interestRatePctInBase;
         if (_interestRateFactor < 0) {
             revert();
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
-        repayAmount = (loanAmount * interestRateFactor) / BASE;
+        repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;
     }
 
     function toUint128(uint256 x) internal pure returns (uint128 y) {

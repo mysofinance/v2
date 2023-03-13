@@ -60,27 +60,4 @@ library DataTypes {
         uint128 repayAmount;
         uint256 expectedTransferFee;
     }
-
-    struct LoanRequest {
-        address borrower;
-        address collToken;
-        address loanToken;
-        uint256 sendAmount;
-        uint256 loanAmount;
-        uint256 expiry;
-        uint256 earliestRepay;
-        uint256 repayAmount;
-        uint256 validUntil;
-        uint256 upfrontFee;
-        bool useCollCompartment;
-    }
-
-    enum WhiteListType {
-        TOKEN,
-        STRATEGY,
-        COMPARTMENT,
-        CALLBACK,
-        STAKINGPOOL,
-        FACTORY
-    }
 }

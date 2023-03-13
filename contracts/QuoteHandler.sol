@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {Constants} from "./Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
@@ -12,7 +12,6 @@ import {ILenderVault} from "./interfaces/ILenderVault.sol";
 contract QuoteHandler {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 constant BASE = 1e18;
     address addressRegistry;
     mapping(address => uint256) offChainQuoteNonce;
     mapping(address => mapping(bytes32 => bool)) offChainQuoteIsInvalidated;
@@ -366,17 +365,21 @@ contract QuoteHandler {
             return false;
         }
         for (uint256 k = 0; k < onChainQuote.quoteTuples.length; ) {
-            if (onChainQuote.quoteTuples[k].upfrontFeePctInBase > BASE) {
-                return false;
-            }
             if (
-                onChainQuote.generalQuoteInfo.oracleAddr != address(0) &&
-                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >= BASE
+                onChainQuote.quoteTuples[k].upfrontFeePctInBase > Constants.BASE
             ) {
                 return false;
             }
             if (
-                onChainQuote.quoteTuples[k].interestRatePctInBase + int(BASE) <=
+                onChainQuote.generalQuoteInfo.oracleAddr != address(0) &&
+                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >=
+                Constants.BASE
+            ) {
+                return false;
+            }
+            if (
+                onChainQuote.quoteTuples[k].interestRatePctInBase +
+                    int(Constants.BASE) <=
                 0
             ) {
                 return false;
