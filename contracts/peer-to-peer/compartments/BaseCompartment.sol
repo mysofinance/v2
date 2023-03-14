@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBaseCompartment} from "../interfaces/compartments/IBaseCompartment.sol";
-import {ILenderVault} from "../interfaces/ILenderVault.sol";
+import {ILenderVaultImpl} from "../interfaces/ILenderVaultImpl.sol";
 import {Errors} from "../../Errors.sol";
 
 abstract contract BaseCompartment is Initializable, IBaseCompartment {
@@ -58,7 +58,7 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
     }
 
     function _withdrawCheck() internal view {
-        bool withdrawEntered = ILenderVault(vaultAddr).withdrawEntered();
+        bool withdrawEntered = ILenderVaultImpl(vaultAddr).withdrawEntered();
         if (withdrawEntered) {
             revert Errors.WithdrawEntered();
         }

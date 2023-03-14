@@ -3,10 +3,10 @@
 pragma solidity 0.8.19;
 
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {Ownable} from "../Ownable.sol";
 
-contract AddressRegistry is IAddressRegistry {
+contract AddressRegistry is Ownable, IAddressRegistry {
     bool private isInitialized;
-    address public owner;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
@@ -18,7 +18,7 @@ contract AddressRegistry is IAddressRegistry {
     address[] public registeredVaults;
 
     constructor() {
-        owner = msg.sender;
+        _owner = msg.sender;
     }
 
     function initialize(
@@ -26,9 +26,7 @@ contract AddressRegistry is IAddressRegistry {
         address _borrowerGateway,
         address _quoteHandler
     ) external {
-        if (msg.sender != owner) {
-            revert();
-        }
+        senderCheckOwner();
         if (isInitialized) {
             revert();
         }
@@ -96,8 +94,13 @@ contract AddressRegistry is IAddressRegistry {
         registeredVaults.push(addr);
     }
 
+    function owner() external view returns (address) {
+        return _owner;
+    }
+
     function checkSenderAndIsInitialized() internal view {
-        if (msg.sender != owner || !isInitialized) {
+        senderCheckOwner();
+        if (!isInitialized) {
             revert();
         }
     }

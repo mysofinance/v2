@@ -303,7 +303,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     }
 
     // whitelist token pair
-    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
+    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
 
     await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
       quoteHandler,

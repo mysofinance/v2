@@ -44,8 +44,6 @@ interface ILenderVaultImpl {
             address collReceiver
         );
 
-    function vaultOwner() external view returns (address);
-
     function loans(
         uint256 index
     ) external view returns (DataTypes.Loan memory loan);
@@ -61,4 +59,6 @@ interface ILenderVaultImpl {
     function isSigner(address signer) external view returns (bool);
 
     function withdrawEntered() external view returns (bool);
+
+    function owner() external view returns (address);
 }
