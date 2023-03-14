@@ -198,8 +198,8 @@ describe('Basic Forked Arbitrum Tests', function () {
     })
 
     const loanId = borrowEvent?.args?.['loanId']
-    const repayAmount = borrowEvent?.args?.['initRepayAmount']
-    const loanExpiry = borrowEvent?.args?.['expiry']
+    const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
+    const loanExpiry = borrowEvent?.args?.loan?.['expiry']
 
     const coeffRepay = 2
     const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)

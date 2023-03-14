@@ -487,10 +487,10 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })
 
-      const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
+      const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
       const loanId = borrowEvent?.args?.['loanId']
-      const repayAmount = borrowEvent?.args?.['initRepayAmount']
-      const loanExpiry = borrowEvent?.args?.['expiry']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
 
       const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
@@ -804,9 +804,9 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })
 
-      const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanId = borrowEvent?.args?.['loanId']
-      const loanExpiry = borrowEvent?.args?.['expiry']
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
 
       const coeffRepay = 2
       const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
@@ -935,10 +935,10 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })
 
-      const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
-      const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanId = borrowEvent?.args?.['loanId']
-      const loanExpiry = borrowEvent?.args?.['expiry']
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
 
       const coeffRepay = 2
       const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
@@ -1106,8 +1106,8 @@ describe('Basic Forked Mainnet Tests', function () {
         return x.event === 'Borrow'
       })
 
-      const collTokenCompartmentAddr = borrowEvent?.args?.['collTokenCompartmentAddr']
-      const repayAmount = borrowEvent?.args?.['initRepayAmount']
+      const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanId = borrowEvent?.args?.['loanId']
 
       const coeffRepay = 2

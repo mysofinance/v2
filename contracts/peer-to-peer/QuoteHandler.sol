@@ -6,28 +6,14 @@ import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 
-contract QuoteHandler {
+contract QuoteHandler is IQuoteHandler, IEvents {
     address addressRegistry;
     mapping(address => uint256) offChainQuoteNonce;
     mapping(address => mapping(bytes32 => bool)) offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
-
-    event OnChainQuoteAdded(
-        address lenderVault,
-        DataTypes.OnChainQuote onChainQuote,
-        bytes32 onChainQuoteHash
-    );
-
-    event OnChainQuoteDeleted(address lenderVault, bytes32 onChainQuoteHash);
-    event OnChainQuoteInvalidated(
-        address lenderVault,
-        bytes32 onChainQuoteHash
-    );
-    event OffChainQuoteInvalidated(
-        address lenderVault,
-        bytes32 offChainQuoteHash
-    );
 
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
