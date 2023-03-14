@@ -11,10 +11,10 @@ import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
-import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
-contract LenderVaultImpl is ILenderVault, Initializable {
+contract LenderVaultImpl is Initializable, ILenderVaultImpl {
     using SafeERC20 for IERC20Metadata;
 
     address public vaultOwner;

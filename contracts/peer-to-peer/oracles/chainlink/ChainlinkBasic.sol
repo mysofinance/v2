@@ -11,7 +11,7 @@ import {Errors} from "../../../Errors.sol";
 /**
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
-contract ChainlinkBasic is IOracle, BaseOracle {
+contract ChainlinkBasic is BaseOracle, IOracle {
     // solhint-disable no-empty-blocks
     constructor(
         address[] memory _tokenAddrs,

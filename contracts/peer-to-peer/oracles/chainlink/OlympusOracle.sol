@@ -12,7 +12,7 @@ import {Errors} from "../../../Errors.sol";
 /**
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
  */
-contract OlympusOracle is IOracle, BaseOracle {
+contract OlympusOracle is BaseOracle, IOracle {
     address internal constant SOHM_ADDR =
         0x04906695D6D12CF5459975d7C3C03356E4Ccd460;
     address internal constant GOHM_ADDR =

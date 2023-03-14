@@ -3,10 +3,11 @@
 pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import {LoanProposalImpl} from "./LoanProposalImpl.sol";
+import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
+import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 
 contract LoanProposalFactory {
-    address public loanProposalImpl;
+    address public immutable loanProposalImpl;
     address[] public loanProposals;
     mapping(address => bool) public isLoanProposal;
 
@@ -29,7 +30,7 @@ contract LoanProposalFactory {
         );
         loanProposals.push(newLoanProposal);
         isLoanProposal[newLoanProposal] = true;
-        LoanProposalImpl(newLoanProposal).initialize(
+        ILoanProposalImpl(newLoanProposal).initialize(
             msg.sender,
             _fundingPool,
             _collToken,

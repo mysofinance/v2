@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 
 import {DataTypes} from "../DataTypes.sol";
 
-interface ILenderVault {
+interface ILenderVaultImpl {
     function initialize(address vaultOwner, address addressRegistry) external;
 
     function transferTo(

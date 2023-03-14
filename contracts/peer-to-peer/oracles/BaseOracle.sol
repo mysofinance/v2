@@ -2,12 +2,9 @@
 
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
-import {IOracle} from "../interfaces/IOracle.sol";
 import {Errors} from "../../Errors.sol";
 
-contract BaseOracle {
+abstract contract BaseOracle {
     address internal immutable weth;
     // tokenAddr => chainlink oracle addr in eth
     mapping(address => address) public ethOracleAddrs;
