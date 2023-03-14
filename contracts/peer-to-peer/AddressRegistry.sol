@@ -5,6 +5,7 @@ pragma solidity 0.8.19;
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
 contract AddressRegistry is IAddressRegistry {
+    bool private isInitialized;
     address public owner;
     address public lenderVaultFactory;
     address public borrowerGateway;
@@ -28,11 +29,7 @@ contract AddressRegistry is IAddressRegistry {
         if (msg.sender != owner) {
             revert();
         }
-        if (
-            lenderVaultFactory != address(0) ||
-            borrowerGateway != address(0) ||
-            quoteHandler != address(0)
-        ) {
+        if (isInitialized) {
             revert();
         }
         if (
@@ -52,15 +49,17 @@ contract AddressRegistry is IAddressRegistry {
         lenderVaultFactory = _lenderVaultFactory;
         borrowerGateway = _borrowerGateway;
         quoteHandler = _quoteHandler;
+        isInitialized = true;
     }
 
-    function toggleTokens(address[] memory tokens) external {
-        if (msg.sender != owner) {
-            revert();
-        }
+    function toggleTokens(
+        address[] memory tokens,
+        bool whitelistStatus
+    ) external {
+        checkSenderAndIsInitialized();
         for (uint i = 0; i < tokens.length; ) {
             if (tokens[i] != address(0)) {
-                isWhitelistedToken[tokens[i]] = !isWhitelistedToken[tokens[i]];
+                isWhitelistedToken[tokens[i]] = whitelistStatus;
             }
             unchecked {
                 i++;
@@ -68,31 +67,26 @@ contract AddressRegistry is IAddressRegistry {
         }
     }
 
-    function toggleCallbackAddr(address addr) external {
-        if (msg.sender != owner) {
-            revert();
-        }
-        isWhitelistedCallbackAddr[addr] = !isWhitelistedCallbackAddr[addr];
+    function toggleCallbackAddr(address addr, bool whitelistStatus) external {
+        checkSenderAndIsInitialized();
+        isWhitelistedCallbackAddr[addr] = whitelistStatus;
     }
 
-    function toggleCollTokenHandler(address addr) external {
-        if (msg.sender != owner) {
-            revert();
-        }
-        isWhitelistedCollTokenHandler[addr] = !isWhitelistedCollTokenHandler[
-            addr
-        ];
+    function toggleCollTokenHandler(
+        address addr,
+        bool whitelistStatus
+    ) external {
+        checkSenderAndIsInitialized();
+        isWhitelistedCollTokenHandler[addr] = whitelistStatus;
     }
 
-    function toggleOracle(address addr) external {
-        if (msg.sender != owner) {
-            revert();
-        }
-        isWhitelistedOracle[addr] = !isWhitelistedOracle[addr];
+    function toggleOracle(address addr, bool whitelistStatus) external {
+        checkSenderAndIsInitialized();
+        isWhitelistedOracle[addr] = whitelistStatus;
     }
 
     function addLenderVault(address addr) external {
-        if (msg.sender != lenderVaultFactory) {
+        if (!isInitialized) {
             revert();
         }
         if (isRegisteredVault[addr]) {
@@ -102,10 +96,9 @@ contract AddressRegistry is IAddressRegistry {
         registeredVaults.push(addr);
     }
 
-    function isWhitelistedTokenPair(
-        address collToken,
-        address loanToken
-    ) external view returns (bool) {
-        return (isWhitelistedToken[collToken] && isWhitelistedToken[loanToken]);
+    function checkSenderAndIsInitialized() internal view {
+        if (msg.sender != owner || !isInitialized) {
+            revert();
+        }
     }
 }

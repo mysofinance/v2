@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { LenderVault, QuoteHandler } from '../typechain-types'
+import { LenderVaultImpl, QuoteHandler } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { chainlinkAggregatorAbi, collTokenAbi, uniV2Abi } from './abi'
 
@@ -24,7 +24,7 @@ export const createOnChainRequest = async ({
   collToken: string
   loanToken: string
   borrowerCompartmentImplementation: string
-  lenderVault: LenderVault
+  lenderVault: LenderVaultImpl
   quoteHandler: QuoteHandler
   loanPerCollUnit: BigNumber
 }) => {

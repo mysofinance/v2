@@ -11,23 +11,23 @@ interface IAddressRegistry {
 
     function addLenderVault(address addr) external;
 
-    function toggleTokens(address[] memory addrs) external;
+    function toggleTokens(
+        address[] memory addrs,
+        bool whitelistStatus
+    ) external;
 
-    function toggleCallbackAddr(address addr) external;
+    function toggleCallbackAddr(address addr, bool whitelistStatus) external;
 
-    function toggleOracle(address addr) external;
+    function toggleOracle(address addr, bool whitelistStatus) external;
 
-    function isWhitelistedCallbackAddr(address) external view returns (bool);
+    function isWhitelistedCallbackAddr(
+        address addr
+    ) external view returns (bool);
 
-    function isWhitelistedToken(address) external view returns (bool);
+    function isWhitelistedToken(address addr) external view returns (bool);
 
     function isWhitelistedCollTokenHandler(
         address
-    ) external view returns (bool);
-
-    function isWhitelistedTokenPair(
-        address collToken,
-        address loanToken
     ) external view returns (bool);
 
     function isWhitelistedOracle(
