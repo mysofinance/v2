@@ -14,7 +14,7 @@ import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
-contract LenderVault is ILenderVault, Initializable {
+contract LenderVaultImpl is ILenderVault, Initializable {
     using SafeERC20 for IERC20Metadata;
 
     address public vaultOwner;

@@ -34,7 +34,7 @@ describe('Basic Local Tests', function () {
     await quoteHandler.deployed()
 
     // deploy lender vault implementation
-    const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
+    const LenderVaultImplementation = await ethers.getContractFactory('LenderVaultImpl')
     const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
     await lenderVaultImplementation.deployed()
 
@@ -96,9 +96,9 @@ describe('Basic Local Tests', function () {
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).toggleTokens([weth.address])).to.be.reverted
-    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
-    await addressRegistry.connect(team).toggleTokens([ZERO_ADDRESS])
+    await expect(addressRegistry.connect(lender).toggleTokens([weth.address], true)).to.be.reverted
+    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+    await addressRegistry.connect(team).toggleTokens([ZERO_ADDRESS], true)
     expect(await addressRegistry.isWhitelistedToken(ZERO_ADDRESS)).to.be.false
 
     //test lenderVault check works
