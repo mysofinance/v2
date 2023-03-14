@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { getOutGivenIn, fromReadableAmount, toReadableAmount } from './helpers/uniV3'
+import { getOutGivenIn, fromReadableAmount, toReadableAmount, getOptimCollSendAndFlashBorrowAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
 const hre = require('hardhat')
@@ -15,44 +15,6 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const YEAR_IN_SECONDS = 31_536_000
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
-
-function getLoanAmount(x: number, f: number, c: number): number {
-  // x: collateral pledge amount
-  // f: expected transfer fee on collateral send amount
-  // c: loan token per collateral unit
-  return x * (1-f) * c
-}
-
-async function getOptimCollSendAndFlashBorrowAmount(initCollUnits: number, transferFee: number, loanPerColl: number, tokenIn: Token, tokenOut: Token, poolFee: number) {
-    const PRECISION = 10000
-    
-    let x = initCollUnits
-    let y = Math.round(getLoanAmount(x, transferFee, loanPerColl) * PRECISION) / PRECISION
-    let totalPledged = x
-    let totalBorrowedAndSwapped = y
-    console.log("i, totalPledged, totalBorrowedAndSwapped")
-    console.log(0, totalPledged, totalBorrowedAndSwapped)
-
-    const epsilon = 1/PRECISION
-    for (var i = 0; i < 100; i++) {
-      x = Number(toReadableAmount(await getOutGivenIn(fromReadableAmount(y, tokenIn.decimals).toString(), tokenIn, tokenOut, poolFee), tokenOut.decimals))
-      y = Math.round(getLoanAmount(x, transferFee, loanPerColl) * PRECISION) / PRECISION
-
-      totalPledged += x
-      totalBorrowedAndSwapped += y
-      console.log(i+1, totalPledged, totalBorrowedAndSwapped)
-
-      if (x < epsilon) {
-        break
-      }
-    }
-
-    const finalFlashBorrowAmount = Math.round(getLoanAmount(totalPledged, transferFee, loanPerColl) * PRECISION) / PRECISION
-    const minSwapReceive = Number(toReadableAmount(await getOutGivenIn(fromReadableAmount(finalFlashBorrowAmount, tokenIn.decimals).toString(), tokenIn, tokenOut, poolFee), tokenOut.decimals))
-    const finalTotalPledgeAmount = initCollUnits + minSwapReceive
-    return { finalTotalPledgeAmount, minSwapReceive, finalFlashBorrowAmount }
-}
-
 
 describe('Basic Forked Mainnet Tests', function () {
   async function setupTest() {
@@ -186,7 +148,7 @@ describe('Basic Forked Mainnet Tests', function () {
     await UniV3Looping.connect(lender)
     const uniV3Looping = await UniV3Looping.deploy()
     await uniV3Looping.deployed()
-    
+
     // whitelist addrs
     await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address])
     await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address)).to.be.reverted
@@ -215,9 +177,8 @@ describe('Basic Forked Mainnet Tests', function () {
   }
 
   describe('On-Chain Quote Testing', function () {
-    it('Uni V3 Looping Test', async function() {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault, uniV3Looping } =
-      await setupTest()
+    it('Uni V3 Looping Test', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault, uniV3Looping } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -261,27 +222,22 @@ describe('Basic Forked Mainnet Tests', function () {
       )
 
       // prepare looping
-      const dexSwapTokenIn = new Token(
-        SupportedChainId.MAINNET,
-        usdc.address,
-        6,
-        'USDC',
-        'USD//C'
-      )
-      const dexSwapTokenOut = new Token(
-        SupportedChainId.MAINNET,
-        weth.address,
-        18,
-        'WETH',
-        'Wrapped Ether'
-      )
+      const dexSwapTokenIn = new Token(SupportedChainId.MAINNET, usdc.address, 6, 'USDC', 'USD//C')
+      const dexSwapTokenOut = new Token(SupportedChainId.MAINNET, weth.address, 18, 'WETH', 'Wrapped Ether')
       const initCollUnits = 10
       const transferFee = 0
       const poolFee = 3000 // assume "medium" uni v3 swap fee
-      const { finalTotalPledgeAmount, minSwapReceive, finalFlashBorrowAmount} = await getOptimCollSendAndFlashBorrowAmount(initCollUnits, transferFee, toReadableAmount(quoteTuples[0].loanPerCollUnitOrLtv, dexSwapTokenIn.decimals), dexSwapTokenIn, dexSwapTokenOut, poolFee)
+      const { finalTotalPledgeAmount, minSwapReceive, finalFlashBorrowAmount } = await getOptimCollSendAndFlashBorrowAmount(
+        initCollUnits,
+        transferFee,
+        toReadableAmount(quoteTuples[0].loanPerCollUnitOrLtv.toString(), dexSwapTokenIn.decimals),
+        dexSwapTokenIn,
+        dexSwapTokenOut,
+        poolFee
+      )
 
-      console.log("uni v3 finalTotalPledgeAmount:", finalTotalPledgeAmount)
-      console.log("uni v3 finalFlashBorrowAmount:", finalFlashBorrowAmount)
+      console.log('uni v3 finalTotalPledgeAmount:', finalTotalPledgeAmount)
+      console.log('uni v3 finalFlashBorrowAmount:', finalFlashBorrowAmount)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -289,14 +245,16 @@ describe('Basic Forked Mainnet Tests', function () {
       const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
-      // borrower approves and executes quote
-      const collSendAmountBn = fromReadableAmount(initCollUnits+minSwapReceive, dexSwapTokenOut.decimals)
-      console.log("collSendAmountBn", collSendAmountBn)
-      const slippage = 0.01
-      const minSwapReceiveBn = fromReadableAmount(minSwapReceive*(1-slippage), dexSwapTokenOut.decimals)
-      console.log("minSwapReceive", minSwapReceive)
-      const quoteTupleIdx = 0
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
+
+      // borrower approves and executes quote
+      const collSendAmountBn = fromReadableAmount(initCollUnits + minSwapReceive, dexSwapTokenOut.decimals)
+      console.log('collSendAmountBn', collSendAmountBn)
+      const slippage = 0.01
+      const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
+      console.log('minSwapReceive', minSwapReceive)
+      const quoteTupleIdx = 0
       const expectedTransferFee = 0
       const deadline = MAX_UINT128
       const callbackAddr = uniV3Looping.address
@@ -306,21 +264,16 @@ describe('Basic Forked Mainnet Tests', function () {
         [minSwapReceiveBn, deadline, poolFee]
       )
       const borrowInstructions = {
-        collSendAmount : collSendAmountBn,
+        collSendAmount: collSendAmountBn,
         expectedTransferFee,
-        deadline : MAX_UINT256,
-        minLoanAmount : 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
       await borrowerGateway
         .connect(borrower)
-        .borrowWithOnChainQuote(
-          lenderVault.address,
-          borrowInstructions,
-          onChainQuote,
-          quoteTupleIdx
-        )
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -356,17 +309,19 @@ describe('Basic Forked Mainnet Tests', function () {
         [minSwapReceiveLoanToken, deadline, poolFee]
       )
       await expect(
-        borrowerGateway
-          .connect(borrower)
-          .repay(
-            { collToken: loan.collToken, loanToken: loan.loanToken, loanId: 0, repayAmount: loan.initRepayAmount, expectedTransferFee: 0 },
-            lenderVault.address,
-            callbackAddr,
-            callbackDataRepay
-          )
+        borrowerGateway.connect(borrower).repay(
+          {
+            collToken: loan.collToken,
+            loanToken: loan.loanToken,
+            loanId: 0,
+            repayAmount: loan.initRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
       )
     })
-
   })
 })
-

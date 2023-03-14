@@ -3,9 +3,13 @@ import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
 import { collTokenAbi, gmxRewarRouterAbi } from './abi'
 import { createOnChainRequest } from './helpers'
+import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
+import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
 const hre = require('hardhat')
 
+const BASE = ethers.BigNumber.from(10).pow(18)
+const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
@@ -51,6 +55,18 @@ describe('Basic Forked Arbitrum Tests', function () {
     // initialize address registry
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
 
+    // deploy balancer v2 callbacks
+    const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
+    await BalancerV2Looping.connect(lender)
+    const balancerV2Looping = await BalancerV2Looping.deploy()
+    await balancerV2Looping.deployed()
+
+    // deploy uni v3 callback
+    const UniV3Looping = await ethers.getContractFactory('UniV3Looping')
+    await UniV3Looping.connect(lender)
+    const uniV3Looping = await UniV3Looping.deploy()
+    await uniV3Looping.deployed()
+
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
     /* ********************************** */
@@ -61,7 +77,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
 
     // prepare USDC balances
-    const USDC_ADDRESS = '0x1eFB3f88Bc88f03FD1804A5C53b7141bbEf5dED8'
+    const USDC_ADDRESS = '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8'
     const USDC_MASTER_MINTER = '0x096760f208390250649e3e8763348e783aef5562'
     const usdc = await ethers.getContractAt('IUSDC', USDC_ADDRESS)
     await ethers.provider.send('hardhat_setBalance', [USDC_MASTER_MINTER, '0x56BC75E2D63100000'])
@@ -76,17 +92,12 @@ describe('Basic Forked Arbitrum Tests', function () {
     const WETH_ADDRESS = '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1'
     const weth = await ethers.getContractAt('IWETH', WETH_ADDRESS)
     await ethers.provider.send('hardhat_setBalance', [borrower.address, '0x204FCE5E3E25026110000000'])
-    await weth.connect(borrower).deposit({ value: ONE_WETH.mul(1) })
-
-    // deploy balancer v2 callbacks
-    const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
-    await BalancerV2Looping.connect(lender)
-    const balancerV2Looping = await BalancerV2Looping.deploy()
-    await balancerV2Looping.deployed()
+    await weth.connect(borrower).deposit({ value: ONE_WETH.mul(100000) })
 
     // whitelist addrs
     await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address)).to.be.reverted
     await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
+    await addressRegistry.connect(team).toggleCallbackAddr(uniV3Looping.address)
 
     return {
       addressRegistry,
@@ -100,7 +111,8 @@ describe('Basic Forked Arbitrum Tests', function () {
       lenderVault,
       lenderVaultFactory,
       quoteHandler,
-      balancerV2Looping
+      balancerV2Looping,
+      uniV3Looping
     }
   }
 
@@ -247,5 +259,258 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     expect(lenderVaultWethBalPost).to.be.above(lenderVaultWethBalPre)
     expect(lenderCollBalPost).to.equal(borrowerCollBalPre.div(coeffRepay))
+  })
+
+  it('Uni V3 Looping Test', async function () {
+    const { quoteHandler, lender, borrower, usdc, weth, lenderVault, addressRegistry, team, uniV3Looping, borrowerGateway } =
+      await setupTest()
+
+    // lenderVault owner deposits usdc
+    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+    // lenderVault owner gives quote
+    const blocknum = await ethers.provider.getBlockNumber()
+    const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    let quoteTuples = [
+      {
+        loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+        interestRatePctInBase: BASE.mul(10).div(100),
+        upfrontFeePctInBase: BASE.mul(1).div(100),
+        tenor: ONE_DAY.mul(365)
+      },
+      {
+        loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+        interestRatePctInBase: BASE.mul(20).div(100),
+        upfrontFeePctInBase: 0,
+        tenor: ONE_DAY.mul(180)
+      }
+    ]
+    let onChainQuote = {
+      generalQuoteInfo: {
+        borrower: borrower.address,
+        collToken: weth.address,
+        loanToken: usdc.address,
+        oracleAddr: ZERO_ADDR,
+        minLoan: ONE_USDC.mul(1000),
+        maxLoan: MAX_UINT256,
+        validUntil: timestamp + 60,
+        earliestRepayTenor: 0,
+        borrowerCompartmentImplementation: ZERO_ADDR,
+        isSingleUse: false
+      },
+      quoteTuples: quoteTuples,
+      salt: ZERO_BYTES32
+    }
+
+    // whitelist token pair
+    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
+
+    await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+      quoteHandler,
+      'OnChainQuoteAdded'
+    )
+
+    // prepare looping
+    const dexSwapTokenIn = new Token(SupportedChainId.ARBITRUM_ONE, usdc.address, 6, 'USDC', 'USD//C')
+    const dexSwapTokenOut = new Token(SupportedChainId.ARBITRUM_ONE, weth.address, 18, 'WETH', 'Wrapped Ether')
+    const initCollUnits = 10
+    const transferFee = 0
+    const poolFee = 3000 // assume "medium" uni v3 swap fee
+    const { finalTotalPledgeAmount, minSwapReceive, finalFlashBorrowAmount } = await getOptimCollSendAndFlashBorrowAmount(
+      initCollUnits,
+      transferFee,
+      toReadableAmount(quoteTuples[0].loanPerCollUnitOrLtv.toString(), dexSwapTokenIn.decimals),
+      dexSwapTokenIn,
+      dexSwapTokenOut,
+      poolFee
+    )
+
+    console.log('uni v3 finalTotalPledgeAmount:', finalTotalPledgeAmount)
+    console.log('uni v3 finalFlashBorrowAmount:', finalFlashBorrowAmount)
+
+    // check balance pre borrow
+    const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+    const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+    const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+    const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+    // borrower approves and executes quote
+    const collSendAmountBn = fromReadableAmount(initCollUnits + minSwapReceive, dexSwapTokenOut.decimals)
+    console.log('collSendAmountBn', collSendAmountBn)
+    const slippage = 0.01
+    const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
+    console.log('minSwapReceive', minSwapReceive)
+    const quoteTupleIdx = 0
+    await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+    const expectedTransferFee = 0
+    const deadline = MAX_UINT128
+    const callbackAddr = uniV3Looping.address
+
+    const callbackData = ethers.utils.defaultAbiCoder.encode(
+      ['uint256', 'uint256', 'uint24'],
+      [minSwapReceiveBn, deadline, poolFee]
+    )
+    const borrowInstructions = {
+      collSendAmount: collSendAmountBn,
+      expectedTransferFee,
+      deadline: MAX_UINT256,
+      minLoanAmount: 0,
+      callbackAddr,
+      callbackData
+    }
+    await borrowerGateway
+      .connect(borrower)
+      .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+    // check balance post borrow
+    const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+    const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+    const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+    const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+    const borrowerWethBalDiffActual = borrowerWethBalPre.add(borrowerWethBalPost)
+    const borrowerWethBalDiffExpected = borrowerWethBalPre.sub(collSendAmountBn)
+    const PRECISION = 10000
+    const borrowerWethBalDiffComparison = Math.abs(
+      Number(
+        borrowerWethBalDiffActual
+          .sub(borrowerWethBalDiffExpected)
+          .mul(PRECISION)
+          .div(borrowerWethBalDiffActual)
+          .div(ONE_WETH)
+          .toString()
+      ) / PRECISION
+    )
+    expect(borrowerWethBalDiffComparison).to.be.lessThan(0.01)
+    expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(0) // borrower: no usdc change as all swapped for weth
+    expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(collSendAmountBn)
+    expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(
+      onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmountBn).div(ONE_WETH)
+    )
+
+    // check repay
+    const loan = await lenderVault.loans(0)
+    const minSwapReceiveLoanToken = 0
+    const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
+      ['uint256', 'uint256', 'uint24'],
+      [minSwapReceiveLoanToken, deadline, poolFee]
+    )
+    await expect(
+      borrowerGateway.connect(borrower).repay(
+        {
+          collToken: loan.collToken,
+          loanToken: loan.loanToken,
+          loanId: 0,
+          repayAmount: loan.initRepayAmount,
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackDataRepay
+      )
+    )
+  })
+
+  it('Should revert GLP borrow with compartment and univ3 looping because of missing pool', async function () {
+    const { borrowerGateway, lender, borrower, quoteHandler, team, usdc, weth, lenderVault, addressRegistry, uniV3Looping } =
+      await setupTest()
+
+    // create curve staking implementation
+    const GlpStakingCompartmentImplementation = await ethers.getContractFactory('GLPStakingCompartment')
+    await GlpStakingCompartmentImplementation.connect(team)
+    const glpStakingCompartmentImplementation = await GlpStakingCompartmentImplementation.deploy()
+    await glpStakingCompartmentImplementation.deployed()
+
+    // increase borrower GLP balance
+    const collTokenAddress = '0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf' // GLP
+    const rewardRouterAddress = '0xB95DB5B167D75e6d04227CfFFA61069348d271F5' // GMX: Reward Router V2
+    const glpManagerAddress = '0x3963FfC9dff443c2A94f21b129D429891E32ec18' // GLP Manager
+    const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
+
+    const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewarRouterAbi, borrower.provider)
+
+    // mint GLP token
+    await weth.connect(borrower).approve(glpManagerAddress, MAX_UINT256)
+    await rewardRouterInstance
+      .connect(borrower)
+      .mintAndStakeGlp(weth.address, ONE_WETH, BigNumber.from(0), BigNumber.from(0))
+
+    // lender deposits usdc
+    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(10000000))
+
+    // get pre balances
+    const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+    const borrowerCollBalPre = await collInstance.balanceOf(borrower.address)
+    const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+    const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+    expect(borrowerCollBalPre).to.be.above(BigNumber.from(0))
+    expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
+
+    // whitelist token pair
+    await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
+
+    // borrower approves borrower gateway
+    await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+    // lenderVault owner gives quote
+    const onChainQuote = await createOnChainRequest({
+      lender,
+      collToken: collTokenAddress,
+      loanToken: usdc.address,
+      borrowerCompartmentImplementation: glpStakingCompartmentImplementation.address,
+      lenderVault,
+      quoteHandler,
+      loanPerCollUnit: ONE_USDC.mul(1000)
+    })
+
+    // prepare looping
+    const dexSwapTokenIn = new Token(SupportedChainId.ARBITRUM_ONE, usdc.address, 6, 'USDC', 'USD//C')
+    const dexSwapTokenOut = new Token(SupportedChainId.ARBITRUM_ONE, weth.address, 18, 'WETH', 'Wrapped Ether')
+    const initCollUnits = 10
+    const transferFee = 0
+    const poolFee = 3000 // assume "medium" uni v3 swap fee
+    const { finalTotalPledgeAmount, minSwapReceive, finalFlashBorrowAmount } = await getOptimCollSendAndFlashBorrowAmount(
+      initCollUnits,
+      transferFee,
+      toReadableAmount(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.toString(), dexSwapTokenIn.decimals),
+      dexSwapTokenIn,
+      dexSwapTokenOut,
+      poolFee
+    )
+
+    console.log('uni v3 finalTotalPledgeAmount:', finalTotalPledgeAmount)
+    console.log('uni v3 finalFlashBorrowAmount:', finalFlashBorrowAmount)
+
+    // borrower approves and executes quote
+    const collSendAmountBn = fromReadableAmount(initCollUnits + minSwapReceive, dexSwapTokenOut.decimals)
+    console.log('collSendAmountBn', collSendAmountBn)
+    const slippage = 0.01
+    const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
+    console.log('minSwapReceive', minSwapReceive)
+    const quoteTupleIdx = 0
+    await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+    const expectedTransferFee = 0
+    const deadline = MAX_UINT128
+    const callbackAddr = uniV3Looping.address
+
+    const callbackData = ethers.utils.defaultAbiCoder.encode(
+      ['uint256', 'uint256', 'uint24'],
+      [minSwapReceiveBn, deadline, poolFee]
+    )
+    const borrowInstructions = {
+      collSendAmount: collSendAmountBn,
+      expectedTransferFee,
+      deadline: MAX_UINT256,
+      minLoanAmount: 0,
+      callbackAddr,
+      callbackData
+    }
+
+    await expect(
+      borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+    ).to.be.reverted
   })
 })
