@@ -6,21 +6,15 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IUniV2} from "../../interfaces/oracles/IUniV2.sol";
+import {BaseOracle} from "../BaseOracle.sol";
+import {Errors} from "../../../Errors.sol";
 
 /**
  * @dev supports oracles which have one token which is a 50/50 LP token
  * compatible with v2v3 or v3 interfaces
  */
-contract UniV2Chainlink is IOracle {
-    // tokenAddr => chainlink oracle addr in eth
-    mapping(address => address) public ethOracleAddrs;
+contract UniV2Chainlink is IOracle, BaseOracle {
     mapping(address => bool) public isLpAddr;
-    address internal immutable weth;
-
-    error InvalidOraclePair();
-    error InvalidAddress();
-    error InvalidArrayLength();
-    error NoLpTokens();
 
     struct OracleData {
         address token0;
@@ -34,29 +28,10 @@ contract UniV2Chainlink is IOracle {
         address[] memory _oracleAddrs,
         address[] memory _lpAddrs,
         address _wethAddr
-    ) {
-        if (_wethAddr == address(0)) {
-            revert InvalidAddress();
-        }
-        weth = _wethAddr;
-        // if you use eth oracles with weth, will just return weth address
-        ethOracleAddrs[_wethAddr] = _wethAddr;
-        if (_tokenAddrs.length != _oracleAddrs.length) {
-            revert InvalidArrayLength();
-        }
-        uint i;
-        for (i = 0; i < _oracleAddrs.length; ) {
-            if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
-                revert InvalidAddress();
-            }
-            ethOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
-            unchecked {
-                ++i;
-            }
-        }
-        for (i = 0; i < _lpAddrs.length; ) {
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, false, new bool[](0)) {
+        for (uint i = 0; i < _lpAddrs.length; ) {
             if (_lpAddrs[i] == address(0)) {
-                revert InvalidAddress();
+                revert Errors.InvalidAddress();
             }
             isLpAddr[_lpAddrs[i]] = true;
             unchecked {
@@ -93,7 +68,7 @@ contract UniV2Chainlink is IOracle {
         )
     {
         if (!isLpAddr[collToken] && !isLpAddr[loanToken]) {
-            revert NoLpTokens();
+            revert Errors.NoLpTokens();
         }
         address _token0;
         address _token1;
@@ -105,7 +80,7 @@ contract UniV2Chainlink is IOracle {
                 ethOracleAddrs[_token0] == address(0) ||
                 ethOracleAddrs[_token1] == address(0)
             ) {
-                revert InvalidOraclePair();
+                revert Errors.InvalidOraclePair();
             }
             loanTokenOracleData = OracleData({
                 token0: _token0,
@@ -115,7 +90,7 @@ contract UniV2Chainlink is IOracle {
             });
         } else {
             if (ethOracleAddrs[loanToken] == address(0)) {
-                revert InvalidOraclePair();
+                revert Errors.InvalidOraclePair();
             }
             loanTokenOracleData = OracleData({
                 token0: loanToken,
@@ -132,7 +107,7 @@ contract UniV2Chainlink is IOracle {
                 ethOracleAddrs[_token0] == address(0) ||
                 ethOracleAddrs[_token1] == address(0)
             ) {
-                revert InvalidOraclePair();
+                revert Errors.InvalidOraclePair();
             }
             collTokenOracleData = OracleData({
                 token0: _token0,
@@ -142,7 +117,7 @@ contract UniV2Chainlink is IOracle {
             });
         } else {
             if (ethOracleAddrs[collToken] == address(0)) {
-                revert InvalidOraclePair();
+                revert Errors.InvalidOraclePair();
             }
             collTokenOracleData = OracleData({
                 token0: collToken,

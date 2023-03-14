@@ -2,11 +2,7 @@
 
 pragma solidity ^0.8.19;
 
-interface IBorrowerCompartment {
-    //shared compartment errors
-    error InvalidSender();
-    error InvalidPool();
-
+interface IBaseCompartment {
     /**
      * @notice function to initialize collateral compartment
      * @dev factory creates clone and then initializes implementation contract
@@ -14,13 +10,6 @@ interface IBorrowerCompartment {
      * @param loanId index of the loan
      */
     function initialize(address vaultAddr, uint256 loanId) external;
-
-    /**
-     * @notice function to unlock all collateral left in compartment
-     * @dev this function can only be called by vault and returns all collateral to vault
-     * @param collTokenAddr pass in collToken addr to avoid callback reads gas cost
-     */
-    function unlockCollToVault(address collTokenAddr) external;
 
     /**
      * @notice function to transfer some amount of collateral to borrower on repay
@@ -40,4 +29,11 @@ interface IBorrowerCompartment {
         address collTokenAddr,
         address callbackAddr
     ) external;
+
+    /**
+     * @notice function to unlock all collateral left in compartment
+     * @dev this function can only be called by vault and returns all collateral to vault
+     * @param collTokenAddr pass in collToken addr to avoid callback reads gas cost
+     */
+    function unlockCollToVault(address collTokenAddr) external;
 }
