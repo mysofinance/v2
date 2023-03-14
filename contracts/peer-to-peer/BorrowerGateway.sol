@@ -11,10 +11,10 @@ import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
-import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
-contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
+contract BorrowerGateway is ReentrancyGuard, IEvents {
     // putting fee info in borrow gateway since borrower always pays this upfront
     address immutable addressRegistry;
     uint256 public protocolFee; // in BASE
@@ -24,8 +24,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     }
 
     using SafeERC20 for IERC20Metadata;
-
-    event NewProtocolFee(uint256 _newFee);
 
     function borrowWithOffChainQuote(
         address lenderVault,
@@ -73,17 +71,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         emit Borrow(
             lenderVault,
             loan.borrower,
-            loan.collToken,
-            loan.loanToken,
-            loan.expiry,
-            loan.earliestRepay,
-            loan.initCollAmount,
-            loan.initLoanAmount,
-            loan.initRepayAmount,
-            loan.amountRepaidSoFar,
-            loan.collUnlocked,
-            loan.collTokenCompartmentAddr,
-            loanId
+            loan,
+            loanId,
+            borrowInstructions.callbackAddr,
+            borrowInstructions.callbackData
         );
     }
 
@@ -141,17 +132,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         emit Borrow(
             lenderVault,
             loan.borrower,
-            loan.collToken,
-            loan.loanToken,
-            loan.expiry,
-            loan.earliestRepay,
-            loan.initCollAmount,
-            loan.initLoanAmount,
-            loan.initRepayAmount,
-            loan.amountRepaidSoFar,
-            loan.collUnlocked,
-            loan.collTokenCompartmentAddr,
-            loanId
+            loan,
+            loanId,
+            borrowInstructions.callbackAddr,
+            borrowInstructions.callbackData
         );
     }
 
