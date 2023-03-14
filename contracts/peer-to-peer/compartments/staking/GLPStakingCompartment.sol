@@ -23,7 +23,7 @@ contract GLPStakingCompartment is BaseCompartment {
         address collTokenAddr,
         address callbackAddr
     ) external {
-        transferCollFromCompartmentHelper(
+        _transferCollFromCompartment(
             repayAmount,
             repayAmountLeft,
             borrowerAddr,
@@ -44,7 +44,7 @@ contract GLPStakingCompartment is BaseCompartment {
 
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
-        unlockCollToVaultHelper(collTokenAddr);
+        _unlockCollToVault(collTokenAddr);
 
         IStakingHelper(FEE_GLP).claim(address(this));
 

@@ -293,7 +293,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.initRepayAmount;
         if (callbackAddr == address(0)) {
             if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVault(lenderVault).transferFromCompartment(
+                ILenderVault(lenderVault).transferCollFromCompartment(
                     loanRepayInfo.repayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,
@@ -317,7 +317,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 revert Errors.NonWhitelistedCallback();
             }
             if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVault(lenderVault).transferFromCompartment(
+                ILenderVault(lenderVault).transferCollFromCompartment(
                     loanRepayInfo.repayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,

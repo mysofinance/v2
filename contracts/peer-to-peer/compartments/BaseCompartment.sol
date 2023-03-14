@@ -27,7 +27,7 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
     }
 
     // transfer coll on repays
-    function transferCollFromCompartmentHelper(
+    function _transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,
@@ -40,14 +40,13 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
         );
         uint256 amount = (repayAmount * currentCompartmentBal) /
             repayAmountLeft;
-        if (callbackAddr == address(0)) {
-            IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
-        } else {
-            IERC20(collTokenAddr).safeTransfer(callbackAddr, amount);
-        }
+        address collReceiver = callbackAddr == address(0)
+            ? borrowerAddr
+            : callbackAddr;
+        IERC20(collTokenAddr).safeTransfer(collReceiver, amount);
     }
 
-    function unlockCollToVaultHelper(address collTokenAddr) internal {
+    function _unlockCollToVault(address collTokenAddr) internal {
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
         uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
             address(this)

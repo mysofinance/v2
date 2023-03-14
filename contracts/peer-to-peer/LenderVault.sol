@@ -202,7 +202,7 @@ contract LenderVault is ILenderVault, Initializable {
         IERC20Metadata(token).safeTransfer(recipient, amount);
     }
 
-    function transferFromCompartment(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,

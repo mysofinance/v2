@@ -18,7 +18,7 @@ contract AaveStakingCompartment is BaseCompartment {
         address collTokenAddr,
         address callbackAddr
     ) external {
-        transferCollFromCompartmentHelper(
+        _transferCollFromCompartment(
             repayAmount,
             repayAmountLeft,
             borrowerAddr,
@@ -29,6 +29,6 @@ contract AaveStakingCompartment is BaseCompartment {
 
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
-        unlockCollToVaultHelper(collTokenAddr);
+        _unlockCollToVault(collTokenAddr);
     }
 }
