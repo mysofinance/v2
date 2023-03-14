@@ -14,14 +14,14 @@ import {Errors} from "../../../Errors.sol";
  * compatible with v2v3 or v3 interfaces
  */
 contract UniV2Chainlink is IOracle, BaseOracle {
-    mapping(address => bool) public isLpAddr;
-
     struct OracleData {
         address token0;
         address token1;
         address oracleAddrToken0;
         address oracleAddrToken1;
     }
+
+    mapping(address => bool) public isLpAddr;
 
     constructor(
         address[] memory _tokenAddrs,

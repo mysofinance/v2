@@ -8,6 +8,19 @@ import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
 import {IEvents} from "../interfaces/IEvents.sol";
 import {DataTypes} from "../DataTypes.sol";
 
+interface IBalancerAsset {
+    // solhint-disable-previous-line no-empty-blocks
+}
+
+interface IBalancerVault {
+    function swap(
+        BalancerDataTypes.SingleSwap memory singleSwap,
+        BalancerDataTypes.FundManagement memory funds,
+        uint256 limit,
+        uint256 deadline
+    ) external payable returns (uint256);
+}
+
 library BalancerDataTypes {
     enum SwapKind {
         GIVEN_IN,
@@ -29,19 +42,6 @@ library BalancerDataTypes {
         uint256 amount;
         bytes userData;
     }
-}
-
-interface IBalancerAsset {
-    // solhint-disable-previous-line no-empty-blocks
-}
-
-interface IBalancerVault {
-    function swap(
-        BalancerDataTypes.SingleSwap memory singleSwap,
-        BalancerDataTypes.FundManagement memory funds,
-        uint256 limit,
-        uint256 deadline
-    ) external payable returns (uint256);
 }
 
 contract BalancerV2Looping is IVaultCallback, IEvents {

@@ -15,6 +15,8 @@ import {IEvents} from "./interfaces/IEvents.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
 contract BorrowerGateway is ReentrancyGuard, IEvents {
+    using SafeERC20 for IERC20Metadata;
+
     // putting fee info in borrow gateway since borrower always pays this upfront
     address immutable addressRegistry;
     uint256 public protocolFee; // in BASE
@@ -22,8 +24,6 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
     }
-
-    using SafeERC20 for IERC20Metadata;
 
     function borrowWithOffChainQuote(
         address lenderVault,

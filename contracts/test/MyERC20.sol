@@ -16,11 +16,11 @@ contract MyERC20 is ERC20, Ownable {
         _decimals = __decimals;
     }
 
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-
     function mint(address account, uint256 amount) external {
         _mint(account, amount);
+    }
+
+    function decimals() public view override returns (uint8) {
+        return _decimals;
     }
 }

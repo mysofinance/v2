@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-import {DataTypes} from "../DataTypes.sol";
-
 pragma solidity 0.8.19;
+
+import {DataTypes} from "../DataTypes.sol";
 
 interface IEvents {
     event Received(address, uint);

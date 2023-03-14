@@ -46,25 +46,6 @@ contract LoanProposalImpl is Initializable {
         lenderGracePeriod = _lenderGracePeriod;
     }
 
-    function loanTerms() external view returns (DataTypes.LoanTerms memory) {
-        return _loanTerms;
-    }
-
-    function inSubscriptionPhase() public view returns (bool) {
-        return
-            status == DataTypes.LoanStatus.IN_NEGOTIATION ||
-            (status == DataTypes.LoanStatus.BORROWER_ACCEPTED &&
-                block.timestamp < loanTermsLockedTime + lenderGracePeriod);
-    }
-
-    function inUnsubscriptionPhase() external view returns (bool) {
-        return inSubscriptionPhase() || status == DataTypes.LoanStatus.ROLLBACK;
-    }
-
-    function isReadyToExecute() external view returns (bool) {
-        return status == DataTypes.LoanStatus.READY_TO_EXECUTE;
-    }
-
     function proposeLoanTerms(
         DataTypes.LoanTerms calldata newLoanTerms
     ) external {
@@ -378,6 +359,25 @@ contract LoanProposalImpl is Initializable {
         // update counter for those who have claimed
         subscriptionsThatAlreadyClaimedRecoveryValue += lenderContribution;
         IERC20Metadata(collToken).safeTransfer(msg.sender, recoveryVal);
+    }
+
+    function loanTerms() external view returns (DataTypes.LoanTerms memory) {
+        return _loanTerms;
+    }
+
+    function inUnsubscriptionPhase() external view returns (bool) {
+        return inSubscriptionPhase() || status == DataTypes.LoanStatus.ROLLBACK;
+    }
+
+    function isReadyToExecute() external view returns (bool) {
+        return status == DataTypes.LoanStatus.READY_TO_EXECUTE;
+    }
+
+    function inSubscriptionPhase() public view returns (bool) {
+        return
+            status == DataTypes.LoanStatus.IN_NEGOTIATION ||
+            (status == DataTypes.LoanStatus.BORROWER_ACCEPTED &&
+                block.timestamp < loanTermsLockedTime + lenderGracePeriod);
     }
 
     function checkRepaymentIdx(uint256 repaymentIdx) internal view {
