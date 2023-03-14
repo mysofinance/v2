@@ -6,11 +6,13 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
+import {BaseOracle} from "../BaseOracle.sol";
+import {Errors} from "../../Errors.sol";
 
 /**
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
  */
-contract OlympusOracle is IOracle {
+contract OlympusOracle is IOracle, BaseOracle {
     address internal constant SOHM_ADDR =
         0x04906695D6D12CF5459975d7C3C03356E4Ccd460;
     address internal constant GOHM_ADDR =
@@ -18,45 +20,20 @@ contract OlympusOracle is IOracle {
     uint256 internal constant SOHM_DECIMALS = 9;
     address internal constant ETH_OHM_ORACLE_ADDR =
         0x9a72298ae3886221820B1c878d12D872087D3a23;
-    // tokenAddr => chainlink oracle addr in eth
-    mapping(address => address) public ethOracleAddrs;
-    address internal immutable weth;
 
-    error InvalidOraclePair();
-    error InvalidAddress();
-    error InvalidArrayLength();
-    error NeitherTokenIsGOHM();
-
+    // solhint-disable no-empty-blocks
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address _wethAddr
-    ) {
-        if (_wethAddr == address(0)) {
-            revert InvalidAddress();
-        }
-        weth = _wethAddr;
-        ethOracleAddrs[_wethAddr] = _wethAddr;
-        if (_tokenAddrs.length != _oracleAddrs.length) {
-            revert InvalidArrayLength();
-        }
-        for (uint i = 0; i < _oracleAddrs.length; ) {
-            if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
-                revert InvalidAddress();
-            }
-            ethOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
-            unchecked {
-                ++i;
-            }
-        }
-    }
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, false, new bool[](0)) {}
 
     function getPrice(
         address collToken,
         address loanToken
     ) external view returns (uint256 collTokenPriceInLoanToken) {
         if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {
-            revert NeitherTokenIsGOHM();
+            revert Errors.NeitherTokenIsGOHM();
         }
         (
             bool isValid,
@@ -65,7 +42,7 @@ contract OlympusOracle is IOracle {
             bool isColl
         ) = checkValidOraclePair(collToken, loanToken);
         if (!isValid) {
-            revert InvalidOraclePair();
+            revert Errors.InvalidOraclePair();
         }
         collTokenPriceInLoanToken = calculatePrice(
             loanTokenOracleAddr,

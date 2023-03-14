@@ -6,17 +6,13 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
-import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
+import {Errors} from "../../Errors.sol";
 
-contract CurveLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
+contract CurveLPStakingCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
-
-    error IncorrectGaugeForLpToken();
-    error InvalidGaugeIndex();
-    error AlreadyStaked();
 
     address public liqGaugeAddr;
 
@@ -29,21 +25,13 @@ contract CurveLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
     address internal constant CRV_MINTER_ADDR =
         0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
 
-    function initialize(
-        address _vaultAddr,
-        uint256 _loanIdx
-    ) external initializer {
-        vaultAddr = _vaultAddr;
-        loanIdx = _loanIdx;
-    }
-
     function stake(uint256 gaugeIndex) external {
         DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(loanIdx);
         if (msg.sender != loan.borrower) {
-            revert InvalidSender();
+            revert Errors.InvalidSender();
         }
         if (liqGaugeAddr != address(0)) {
-            revert AlreadyStaked();
+            revert Errors.AlreadyStaked();
         }
 
         uint256 amount = IERC20(loan.collToken).balanceOf(address(this));
@@ -53,12 +41,12 @@ contract CurveLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
         );
 
         if (_liqGaugeAddr == address(0)) {
-            revert InvalidGaugeIndex();
+            revert Errors.InvalidGaugeIndex();
         }
 
         address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
         if (lpTokenAddrForGauge != loan.collToken) {
-            revert IncorrectGaugeForLpToken();
+            revert Errors.IncorrectGaugeForLpToken();
         }
         liqGaugeAddr = _liqGaugeAddr;
         IERC20(loan.collToken).approve(_liqGaugeAddr, amount);
@@ -73,7 +61,7 @@ contract CurveLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
         address collTokenAddr,
         address callbackAddr
     ) external {
-        if (msg.sender != vaultAddr) revert InvalidSender();
+        if (msg.sender != vaultAddr) revert Errors.InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
         address _rewardTokenAddr = address(0);
         bool isStaked = _liqGaugeAddr != address(0);
@@ -125,7 +113,7 @@ contract CurveLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
 
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
-        if (msg.sender != vaultAddr) revert InvalidSender();
+        if (msg.sender != vaultAddr) revert Errors.InvalidSender();
 
         address _liqGaugeAddr = liqGaugeAddr;
         address _rewardTokenAddr = address(0);
