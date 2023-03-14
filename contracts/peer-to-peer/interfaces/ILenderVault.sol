@@ -13,7 +13,7 @@ interface ILenderVault {
         uint256 amount
     ) external;
 
-    function transferFromCompartment(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,

@@ -6,26 +6,18 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
-import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {ILenderVault} from "../../interfaces/ILenderVault.sol";
 import {DataTypes} from "../../DataTypes.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
+import {Errors} from "../../../Errors.sol";
 
-contract VoteCompartment is BaseCompartment, IBorrowerCompartment {
+contract VoteCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
-
-    function initialize(
-        address _vaultAddr,
-        uint256 _loanIdx
-    ) external initializer {
-        vaultAddr = _vaultAddr;
-        loanIdx = _loanIdx;
-    }
 
     function delegate(address _delegatee) external {
         DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(loanIdx);
         if (msg.sender != loan.borrower) {
-            revert InvalidSender();
+            revert Errors.InvalidSender();
         }
         if (_delegatee != address(0)) {
             IVotes(loan.collToken).delegate(_delegatee);
@@ -40,25 +32,17 @@ contract VoteCompartment is BaseCompartment, IBorrowerCompartment {
         address collTokenAddr,
         address callbackAddr
     ) external {
-        if (msg.sender != vaultAddr) revert InvalidSender();
-        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
-            address(this)
+        _transferCollFromCompartment(
+            repayAmount,
+            repayAmountLeft,
+            borrowerAddr,
+            collTokenAddr,
+            callbackAddr
         );
-        uint256 amount = (repayAmount * currentCompartmentBal) /
-            repayAmountLeft;
-        if (callbackAddr == address(0)) {
-            IERC20(collTokenAddr).safeTransfer(borrowerAddr, amount);
-        } else {
-            IERC20(collTokenAddr).safeTransfer(callbackAddr, amount);
-        }
     }
 
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
-        if (msg.sender != vaultAddr) revert InvalidSender();
-        uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
-            address(this)
-        );
-        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
+        _unlockCollToVault(collTokenAddr);
     }
 }
