@@ -59,4 +59,6 @@ interface ILenderVault {
     function minNumOfSigners() external view returns (uint256);
 
     function isSigner(address signer) external view returns (bool);
+
+    function withdrawEntered() external view returns (bool);
 }
