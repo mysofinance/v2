@@ -52,7 +52,7 @@ contract LenderVault is ILenderVault, Initializable {
             DataTypes.Loan storage loan = _loans[_loanIds[i]];
 
             if (loan.collToken != collToken) {
-                revert Errors.IdenticalTokenAddresses();
+                revert Errors.InconsistentUnlockTokenAddresses();
             }
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
                 if (loan.collTokenCompartmentAddr != address(0)) {

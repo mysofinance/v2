@@ -11,7 +11,6 @@ library Errors {
     error InvalidArrayLength();
     error NeitherTokenIsGOHM();
     error NoLpTokens();
-    error InvalidPool();
     error IncorrectGaugeForLpToken();
     error InvalidGaugeIndex();
     error AlreadyStaked();
@@ -27,7 +26,7 @@ library Errors {
     error InsufficientVaultFunds();
     error NegativeRepaymentAmount();
     error OverflowUint128();
-    error IdenticalTokenAddresses();
+    error InconsistentUnlockTokenAddresses();
     error ExpiresBeforeRepayAllowed();
     error MustHaveAtLeastOneSigner();
     error AlreadySigner();

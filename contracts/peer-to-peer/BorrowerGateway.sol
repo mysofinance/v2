@@ -204,7 +204,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
             revert Errors.InvalidSender();
         }
-        if (_newFee > Constants.MAX_FEE) {
+        if (_newFee > Constants.MAX_FEE_PER_ANNUM) {
             revert Errors.InvalidFee();
         }
         protocolFee = _newFee;
