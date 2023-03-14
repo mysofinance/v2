@@ -23,6 +23,7 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
     address[] public signers;
     uint256 public minNumOfSigners;
     mapping(address => bool) public isSigner;
+    bool public withdrawEntered;
 
     mapping(address => uint256) public lockedAmounts;
     DataTypes.Loan[] _loans; // stores loans
@@ -185,12 +186,17 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
     }
 
     function withdraw(address token, uint256 amount) external {
+        if (withdrawEntered) {
+            revert Errors.WithdrawEntered();
+        }
+        withdrawEntered = true;
         senderCheckOwner();
         uint256 vaultBalance = IERC20Metadata(token).balanceOf(address(this));
         if (amount > vaultBalance - lockedAmounts[token]) {
             revert Errors.InvalidWithdrawAmount();
         }
         IERC20Metadata(token).safeTransfer(vaultOwner, amount);
+        withdrawEntered = false;
     }
 
     function transferTo(

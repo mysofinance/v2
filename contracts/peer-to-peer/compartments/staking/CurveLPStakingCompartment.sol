@@ -16,8 +16,6 @@ contract CurveLPStakingCompartment is BaseCompartment {
 
     address public liqGaugeAddr;
 
-    // todo: possibly have this be set at initialize instead of
-    //separate BAL and AURA instances?
     address internal constant CRV_ADDR =
         0xD533a949740bb3306d119CC777fa900bA034cd52;
     address internal constant GAUGE_CONTROLLER =
@@ -61,94 +59,26 @@ contract CurveLPStakingCompartment is BaseCompartment {
         address collTokenAddr,
         address callbackAddr
     ) external {
-        if (msg.sender != vaultAddr) revert Errors.InvalidSender();
-        address _liqGaugeAddr = liqGaugeAddr;
-        address _rewardTokenAddr = address(0);
-        bool isStaked = _liqGaugeAddr != address(0);
-        // check staked balance in gauge if gaugeAddr has been set
-        // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
-        if (isStaked) {
-            _rewardTokenAddr = withdrawCollFromGauge(
-                repayAmount,
-                repayAmountLeft
-            );
-        }
-
-        // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
-        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
-            address(this)
+        _collAccountingHelper(
+            repayAmount,
+            repayAmountLeft,
+            borrowerAddr,
+            collTokenAddr,
+            callbackAddr,
+            false
         );
-        // transfer proportion of compartment lp token balance if never staked, else all balance if staked
-        uint256 lpTokenAmount = isStaked
-            ? currentCompartmentBal
-            : (repayAmount * currentCompartmentBal) / repayAmountLeft;
-        // if callback send directly there, else to borrower
-        if (callbackAddr == address(0)) {
-            IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
-        } else {
-            IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
-        }
-        //rest of rewards are always sent to borrower, not for callback
-        // check crv token balance
-        uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
-        // transfer proportion of crv token balance
-        uint256 crvTokenAmount = (repayAmount * currentCrvBal) /
-            repayAmountLeft;
-        IERC20(CRV_ADDR).safeTransfer(borrowerAddr, crvTokenAmount);
-
-        if (_rewardTokenAddr != address(0)) {
-            uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr).balanceOf(
-                address(this)
-            );
-
-            uint256 rewardTokenAmount = (repayAmount * currentRewardTokenBal) /
-                repayAmountLeft;
-
-            IERC20(_rewardTokenAddr).safeTransfer(
-                borrowerAddr,
-                rewardTokenAmount
-            );
-        }
     }
 
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
-        if (msg.sender != vaultAddr) revert Errors.InvalidSender();
-
-        address _liqGaugeAddr = liqGaugeAddr;
-        address _rewardTokenAddr = address(0);
-        bool isStaked = _liqGaugeAddr != address(0);
-        // check staked balance in gauge if gaugeAddr has been set
-        // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
-        if (isStaked) {
-            _rewardTokenAddr = withdrawCollFromGauge(uint256(1), uint256(1));
-        }
-
-        // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
-        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
-            address(this)
+        _collAccountingHelper(
+            uint256(1),
+            uint256(1),
+            address(0),
+            collTokenAddr,
+            address(0),
+            true
         );
-
-        // transfer  the compartment lp token balance
-        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCompartmentBal);
-
-        //rest of rewards are always sent to borrower, not for callback
-        // check crv token balance
-        uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
-
-        // transfer crv token balance
-        IERC20(CRV_ADDR).safeTransfer(vaultAddr, currentCrvBal);
-
-        if (_rewardTokenAddr != address(0)) {
-            uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr).balanceOf(
-                address(this)
-            );
-
-            IERC20(_rewardTokenAddr).safeTransfer(
-                vaultAddr,
-                currentRewardTokenBal
-            );
-        }
     }
 
     function withdrawCollFromGauge(
@@ -178,6 +108,73 @@ contract CurveLPStakingCompartment is BaseCompartment {
             IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         } catch {
             IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+        }
+    }
+
+    function _collAccountingHelper(
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
+        address borrowerAddr,
+        address collTokenAddr,
+        address callbackAddr,
+        bool isUnlock
+    ) internal {
+        _withdrawCheck();
+        if (msg.sender != vaultAddr) revert Errors.InvalidSender();
+        address _liqGaugeAddr = liqGaugeAddr;
+        address _rewardTokenAddr = address(0);
+        bool isStaked = _liqGaugeAddr != address(0);
+        // check staked balance in gauge if gaugeAddr has been set
+        // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
+        if (isStaked) {
+            _rewardTokenAddr = withdrawCollFromGauge(
+                repayAmount,
+                repayAmountLeft
+            );
+        }
+
+        // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
+        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
+            address(this)
+        );
+
+        // transfer proportion of compartment lp token balance if never staked or an unlock, else all balance if staked
+        {
+            uint256 lpTokenAmount = isUnlock || isStaked
+                ? currentCompartmentBal
+                : (repayAmount * currentCompartmentBal) / repayAmountLeft;
+
+            // if unlock, send to vault, else if callback send directly there, else to borrower
+            address lpTokenReceiver = isUnlock
+                ? vaultAddr
+                : callbackAddr == address(0)
+                ? borrowerAddr
+                : callbackAddr;
+
+            IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
+        }
+
+        // rest of rewards are always sent to borrower, not for callback
+        // if unlock then sent to vaultAddr
+        address rewardReceiver = isUnlock ? vaultAddr : borrowerAddr;
+        // check crv token balance
+        uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
+        // transfer proportion of crv token balance
+        uint256 tokenAmount = isUnlock
+            ? currentCrvBal
+            : (repayAmount * currentCrvBal) / repayAmountLeft;
+        IERC20(CRV_ADDR).safeTransfer(rewardReceiver, tokenAmount);
+
+        if (_rewardTokenAddr != address(0)) {
+            uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr).balanceOf(
+                address(this)
+            );
+
+            tokenAmount = isUnlock
+                ? currentRewardTokenBal
+                : (repayAmount * currentRewardTokenBal) / repayAmountLeft;
+
+            IERC20(_rewardTokenAddr).safeTransfer(rewardReceiver, tokenAmount);
         }
     }
 }

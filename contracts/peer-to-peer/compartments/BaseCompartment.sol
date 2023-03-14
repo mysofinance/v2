@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBaseCompartment} from "../interfaces/compartments/IBaseCompartment.sol";
+import {ILenderVault} from "../interfaces/ILenderVault.sol";
 import {Errors} from "../../Errors.sol";
 
 abstract contract BaseCompartment is Initializable, IBaseCompartment {
@@ -34,6 +35,7 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
         address collTokenAddr,
         address callbackAddr
     ) internal {
+        _withdrawCheck();
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
@@ -47,10 +49,18 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
     }
 
     function _unlockCollToVault(address collTokenAddr) internal {
+        _withdrawCheck();
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
         uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
         IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
+    }
+
+    function _withdrawCheck() internal view {
+        bool withdrawEntered = ILenderVault(vaultAddr).withdrawEntered();
+        if (withdrawEntered) {
+            revert Errors.WithdrawEntered();
+        }
     }
 }
