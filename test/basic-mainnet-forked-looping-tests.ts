@@ -38,7 +38,7 @@ describe('Basic Forked Mainnet Tests', function () {
     await quoteHandler.deployed()
 
     // deploy lender vault implementation
-    const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
+    const LenderVaultImplementation = await ethers.getContractFactory('LenderVaultImpl')
     const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
     await lenderVaultImplementation.deployed()
 
@@ -150,10 +150,10 @@ describe('Basic Forked Mainnet Tests', function () {
     await uniV3Looping.deployed()
 
     // whitelist addrs
-    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address])
-    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address)).to.be.reverted
-    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
-    await addressRegistry.connect(team).toggleCallbackAddr(uniV3Looping.address)
+    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address], true)
+    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address, true)).to.be.reverted
+    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+    await addressRegistry.connect(team).toggleCallbackAddr(uniV3Looping.address, true)
 
     return {
       addressRegistry,

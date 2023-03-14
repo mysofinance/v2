@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {Constants} from "./Constants.sol";
+import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
@@ -37,7 +37,10 @@ contract QuoteHandler {
         address lenderVault,
         DataTypes.OnChainQuote calldata onChainQuote
     ) external {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+        address _addressRegistry = addressRegistry;
+        if (
+            !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
+        ) {
             revert();
         }
         if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
@@ -47,8 +50,10 @@ contract QuoteHandler {
             revert();
         }
         if (
-            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                onChainQuote.generalQuoteInfo.collToken,
+            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+                onChainQuote.generalQuoteInfo.collToken
+            ) ||
+            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
                 onChainQuote.generalQuoteInfo.loanToken
             )
         ) {
@@ -67,7 +72,10 @@ contract QuoteHandler {
         DataTypes.OnChainQuote calldata oldOnChainQuote,
         DataTypes.OnChainQuote calldata newOnChainQuote
     ) external {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+        address _addressRegistry = addressRegistry;
+        if (
+            !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
+        ) {
             revert();
         }
         if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
@@ -77,8 +85,10 @@ contract QuoteHandler {
             revert();
         }
         if (
-            !IAddressRegistry(addressRegistry).isWhitelistedTokenPair(
-                newOnChainQuote.generalQuoteInfo.collToken,
+            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+                newOnChainQuote.generalQuoteInfo.collToken
+            ) ||
+            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
                 newOnChainQuote.generalQuoteInfo.loanToken
             )
         ) {
@@ -285,8 +295,10 @@ contract QuoteHandler {
             revert();
         }
         if (
-            !IAddressRegistry(_addressRegistry).isWhitelistedTokenPair(
-                generalQuoteInfo.collToken,
+            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+                generalQuoteInfo.collToken
+            ) ||
+            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
                 generalQuoteInfo.loanToken
             )
         ) {

@@ -40,7 +40,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     await quoteHandler.deployed()
 
     // deploy lender vault implementation
-    const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
+    const LenderVaultImplementation = await ethers.getContractFactory('LenderVaultImpl')
     const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
     await lenderVaultImplementation.deployed()
 
@@ -95,9 +95,9 @@ describe('Basic Forked Arbitrum Tests', function () {
     await weth.connect(borrower).deposit({ value: ONE_WETH.mul(100000) })
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address)).to.be.reverted
-    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
-    await addressRegistry.connect(team).toggleCallbackAddr(uniV3Looping.address)
+    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address, true)).to.be.reverted
+    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+    await addressRegistry.connect(team).toggleCallbackAddr(uniV3Looping.address, true)
 
     return {
       addressRegistry,
@@ -153,7 +153,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
 
     // whitelist token pair
-    await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
+    await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)

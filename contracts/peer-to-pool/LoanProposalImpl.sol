@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {FundingPool} from "./FundingPool.sol";
+import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract LoanProposalImpl is Initializable {
@@ -117,7 +118,7 @@ contract LoanProposalImpl is Initializable {
             revert(); // loan already due
         }
         status = DataTypes.LoanStatus.READY_TO_EXECUTE;
-        arrangerFee = (arrangerFee * totalSubscribed) / 1e18;
+        arrangerFee = (arrangerFee * totalSubscribed) / Constants.BASE;
         finalLoanAmount = totalSubscribed - arrangerFee;
         address loanToken = FundingPool(fundingPool).depositToken();
         finalCollAmount =
@@ -127,7 +128,8 @@ contract LoanProposalImpl is Initializable {
         for (uint256 i = 0; i < _loanTerms.repaymentSchedule.length; ) {
             _loanTerms.repaymentSchedule[i].loanTokenDue = toUint128(
                 (finalLoanAmount *
-                    _loanTerms.repaymentSchedule[i].loanTokenDue) / 1e18
+                    _loanTerms.repaymentSchedule[i].loanTokenDue) /
+                    Constants.BASE
             );
             _loanTerms.repaymentSchedule[i].collTokenDueIfConverted = toUint128(
                 (_loanTerms.repaymentSchedule[i].loanTokenDue *

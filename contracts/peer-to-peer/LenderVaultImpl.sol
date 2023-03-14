@@ -6,14 +6,15 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import {Constants} from "./Constants.sol";
+import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
+import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
-import {IBorrowerCompartment} from "./interfaces/IBorrowerCompartment.sol";
+import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
-contract LenderVault is ILenderVault, Initializable {
+contract LenderVaultImpl is ILenderVault, Initializable {
     using SafeERC20 for IERC20Metadata;
 
     address public vaultOwner;
@@ -25,9 +26,6 @@ contract LenderVault is ILenderVault, Initializable {
 
     mapping(address => uint256) public lockedAmounts;
     DataTypes.Loan[] _loans; // stores loans
-
-    error Invalid();
-    error InvalidLoanIndex();
 
     constructor() {
         _disableInitializers();
@@ -54,11 +52,11 @@ contract LenderVault is ILenderVault, Initializable {
             DataTypes.Loan storage loan = _loans[_loanIds[i]];
 
             if (loan.collToken != collToken) {
-                revert();
+                revert Errors.InconsistentUnlockTokenAddresses();
             }
             if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
                 if (loan.collTokenCompartmentAddr != address(0)) {
-                    IBorrowerCompartment(loan.collTokenCompartmentAddr)
+                    IBaseCompartment(loan.collTokenCompartmentAddr)
                         .unlockCollToVault(loan.collToken);
                 } else {
                     tmp =
@@ -135,7 +133,7 @@ contract LenderVault is ILenderVault, Initializable {
             borrowInstructions.collSendAmount <
             upfrontFee + borrowInstructions.expectedTransferFee
         ) {
-            revert(); // InsufficientSendAmount();
+            revert Errors.InsufficientSendAmount();
         }
         (uint256 loanAmount, uint256 repayAmount) = getLoanAndRepayAmount(
             borrowInstructions.collSendAmount,
@@ -148,10 +146,10 @@ contract LenderVault is ILenderVault, Initializable {
             loanAmount < generalQuoteInfo.minLoan ||
             loanAmount > generalQuoteInfo.maxLoan
         ) {
-            revert(); // revert InvalidSendAmount();
+            revert Errors.InvalidSendAmount();
         }
         if (loanAmount < borrowInstructions.minLoanAmount) {
-            revert(); // revert TooSmallLoanAmount();
+            revert Errors.TooSmallLoanAmount();
         }
 
         loan.borrower = borrower;
@@ -169,7 +167,7 @@ contract LenderVault is ILenderVault, Initializable {
             block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
         if (loan.expiry <= loan.earliestRepay) {
-            revert();
+            revert Errors.ExpiresBeforeRepayAllowed();
         }
 
         if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {
@@ -190,7 +188,7 @@ contract LenderVault is ILenderVault, Initializable {
         senderCheckOwner();
         uint256 vaultBalance = IERC20Metadata(token).balanceOf(address(this));
         if (amount > vaultBalance - lockedAmounts[token]) {
-            revert Invalid();
+            revert Errors.InvalidWithdrawAmount();
         }
         IERC20Metadata(token).safeTransfer(vaultOwner, amount);
     }
@@ -204,7 +202,7 @@ contract LenderVault is ILenderVault, Initializable {
         IERC20Metadata(token).safeTransfer(recipient, amount);
     }
 
-    function transferFromCompartment(
+    function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
         address borrowerAddr,
@@ -213,20 +211,19 @@ contract LenderVault is ILenderVault, Initializable {
         address collTokenCompartmentAddr
     ) external {
         senderCheckGateway();
-        IBorrowerCompartment(collTokenCompartmentAddr)
-            .transferCollFromCompartment(
-                repayAmount,
-                repayAmountLeft,
-                borrowerAddr,
-                collTokenAddr,
-                callbackAddr
-            );
+        IBaseCompartment(collTokenCompartmentAddr).transferCollFromCompartment(
+            repayAmount,
+            repayAmountLeft,
+            borrowerAddr,
+            collTokenAddr,
+            callbackAddr
+        );
     }
 
     function setMinNumOfSigners(uint256 _minNumOfSigners) external {
         senderCheckOwner();
         if (_minNumOfSigners == 0) {
-            revert();
+            revert Errors.MustHaveAtLeastOneSigner();
         }
         minNumOfSigners = _minNumOfSigners;
     }
@@ -235,7 +232,7 @@ contract LenderVault is ILenderVault, Initializable {
         senderCheckOwner();
         for (uint256 i = 0; i < _signers.length; ) {
             if (isSigner[_signers[i]]) {
-                revert();
+                revert Errors.AlreadySigner();
             }
             isSigner[_signers[i]] = true;
             signers.push(_signers[i]);
@@ -249,11 +246,11 @@ contract LenderVault is ILenderVault, Initializable {
         senderCheckOwner();
         uint256 signersLen = signers.length;
         if (signerIdx > signersLen - 1) {
-            revert();
+            revert Errors.InvalidArrayIndex();
         }
 
         if (!isSigner[signer] || signer != signers[signerIdx]) {
-            revert();
+            revert Errors.InvalidSignerRemoveInfo();
         }
         signers[signerIdx] = signers[signersLen - 1];
         signers.pop();
@@ -267,7 +264,7 @@ contract LenderVault is ILenderVault, Initializable {
 
     function claimVaultOwnership() external {
         if (msg.sender != newVaultOwner) {
-            revert Invalid();
+            revert Errors.InvalidSender();
         }
         vaultOwner = newVaultOwner;
     }
@@ -277,7 +274,7 @@ contract LenderVault is ILenderVault, Initializable {
     ) external view returns (DataTypes.Loan memory loan) {
         uint256 loanLen = _loans.length;
         if (loanLen == 0 || loanId > loanLen - 1) {
-            revert InvalidLoanIndex();
+            revert Errors.InvalidArrayIndex();
         }
         loan = _loans[loanId];
     }
@@ -288,19 +285,19 @@ contract LenderVault is ILenderVault, Initializable {
         DataTypes.LoanRepayInfo memory loanRepayInfo
     ) external view {
         if (borrower != loan.borrower) {
-            revert Invalid();
+            revert Errors.InvalidBorrower();
         }
         if (
             block.timestamp < loan.earliestRepay ||
             block.timestamp >= loan.expiry
         ) {
-            revert Invalid();
+            revert Errors.OutsideValidRepayWindow();
         }
         if (
             loanRepayInfo.repayAmount >
             loan.initRepayAmount - loan.amountRepaidSoFar
         ) {
-            revert Invalid();
+            revert Errors.InvalidRepayAmount();
         }
     }
 
@@ -313,7 +310,7 @@ contract LenderVault is ILenderVault, Initializable {
                 borrowerCompartmentImplementation
             )
         ) {
-            revert();
+            revert Errors.NonWhitelistedCompartment();
         }
         bytes32 salt = keccak256(
             abi.encodePacked(
@@ -326,18 +323,18 @@ contract LenderVault is ILenderVault, Initializable {
             borrowerCompartmentImplementation,
             salt
         );
-        IBorrowerCompartment(collCompartment).initialize(address(this), loanId);
+        IBaseCompartment(collCompartment).initialize(address(this), loanId);
     }
 
     function senderCheckOwner() internal view {
         if (msg.sender != vaultOwner) {
-            revert Invalid();
+            revert Errors.InvalidSender();
         }
     }
 
     function senderCheckGateway() internal view {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
-            revert();
+            revert Errors.UnregisteredGateway();
         }
     }
 
@@ -356,12 +353,12 @@ contract LenderVault is ILenderVault, Initializable {
                     generalQuoteInfo.oracleAddr
                 )
             ) {
-                revert();
+                revert Errors.NonWhitelistedOracle();
             }
             // arbitrage protection...any reason with a callback and
             // purpose-bound loan might want greater than 100%?
             if (quoteTuple.loanPerCollUnitOrLtv > Constants.BASE) {
-                revert();
+                revert Errors.LTVHigherThanMax();
             }
             loanPerCollUnit =
                 (quoteTuple.loanPerCollUnitOrLtv *
@@ -378,12 +375,12 @@ contract LenderVault is ILenderVault, Initializable {
             .balanceOf(address(this));
         // check if loan is too big for vault
         if (loanAmount > vaultLoanTokenBal) {
-            revert(); // InsufficientVaultFunds();
+            revert Errors.InsufficientVaultFunds();
         }
         int256 _interestRateFactor = int256(Constants.BASE) +
             quoteTuple.interestRatePctInBase;
         if (_interestRateFactor < 0) {
-            revert();
+            revert Errors.NegativeRepaymentAmount();
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
         repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;
@@ -392,7 +389,7 @@ contract LenderVault is ILenderVault, Initializable {
     function toUint128(uint256 x) internal pure returns (uint128 y) {
         y = uint128(x);
         if (y != x) {
-            revert();
+            revert Errors.OverflowUint128();
         }
     }
 }

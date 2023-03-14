@@ -61,7 +61,7 @@ describe('Basic Forked Mainnet Tests', function () {
     await quoteHandler.deployed()
 
     // deploy lender vault implementation
-    const LenderVaultImplementation = await ethers.getContractFactory('LenderVault')
+    const LenderVaultImplementation = await ethers.getContractFactory('LenderVaultImpl')
     const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
     await lenderVaultImplementation.deployed()
 
@@ -168,8 +168,8 @@ describe('Basic Forked Mainnet Tests', function () {
 
     // whitelist addrs
     //await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address, gohm.address, uniV2WethUsdc])
-    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address)).to.be.reverted
-    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address)
+    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address, true)).to.be.reverted
+    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
 
     return {
       addressRegistry,
@@ -242,7 +242,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -439,12 +439,12 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(borrowerCRVLpBalPre).to.equal(locallyCollBalance)
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
-      // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
+      // whitelist tokens
+      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
 
       // whitelist gauge contract
-      await expect(addressRegistry.connect(lender).toggleCollTokenHandler(crvGaugeAddress)).to.be.reverted
-      await addressRegistry.connect(team).toggleCollTokenHandler(crvGaugeAddress)
+      await expect(addressRegistry.connect(lender).toggleCollTokenHandler(crvGaugeAddress, true)).to.be.reverted
+      await addressRegistry.connect(team).toggleCollTokenHandler(crvGaugeAddress, true)
 
       // borrower approves borrower gateway
       await crvLPInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -765,7 +765,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -893,7 +893,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1049,7 +1049,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultLoanBalPre).to.equal(ONE_WETH.mul(1000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, weth.address])
+      await addressRegistry.connect(team).toggleTokens([collTokenAddress, weth.address], true)
 
       expect(await addressRegistry.connect(team).isWhitelistedToken(collTokenAddress)).to.be.true
       expect(await addressRegistry.connect(team).isWhitelistedToken(weth.address)).to.be.true
@@ -1216,7 +1216,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1308,7 +1308,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1400,7 +1400,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1502,9 +1502,9 @@ describe('Basic Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address)).to.be.reverted
+      await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address, true)).to.be.reverted
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address)
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const paxgOracleInstance = new ethers.Contract(paxgEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
@@ -1539,7 +1539,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1608,7 +1608,7 @@ describe('Basic Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address)
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -1642,7 +1642,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1707,7 +1707,7 @@ describe('Basic Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address)
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -1742,7 +1742,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1805,7 +1805,7 @@ describe('Basic Forked Mainnet Tests', function () {
       )
       await olympusOracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address)
+      await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address, true)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const ohmOracleInstance = new ethers.Contract(ohmEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
@@ -1843,7 +1843,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([gohm.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([gohm.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1926,7 +1926,7 @@ describe('Basic Forked Mainnet Tests', function () {
       )
       await uniV2OracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address)
+      await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -1962,7 +1962,7 @@ describe('Basic Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([uniV2WethUsdc.address, usdc.address])
+      await addressRegistry.connect(team).toggleTokens([uniV2WethUsdc.address, usdc.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
