@@ -6,7 +6,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {LoanProposalImpl} from "./LoanProposalImpl.sol";
 
 contract LoanProposalFactory {
-    address public loanProposalImpl;
+    address public immutable loanProposalImpl;
     address[] public loanProposals;
     mapping(address => bool) public isLoanProposal;
 

@@ -9,8 +9,8 @@ import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
 contract LenderVaultFactory is ILenderVaultFactory, ReentrancyGuard {
-    address public addressRegistry;
-    address public lenderVaultImpl;
+    address public immutable addressRegistry;
+    address public immutable lenderVaultImpl;
 
     constructor(address _addressRegistry, address _lenderVaultImpl) {
         addressRegistry = _addressRegistry;

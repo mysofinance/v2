@@ -10,8 +10,8 @@ import {DataTypes} from "./DataTypes.sol";
 contract FundingPool {
     using SafeERC20 for IERC20Metadata;
 
-    address public loanProposalFactory;
-    address public depositToken;
+    address public immutable loanProposalFactory;
+    address public immutable depositToken;
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public totalSubscribed;
     mapping(address => bool) public totalSubscribedIsDeployed;
