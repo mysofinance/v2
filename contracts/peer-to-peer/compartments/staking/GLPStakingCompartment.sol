@@ -4,24 +4,16 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IBorrowerCompartment} from "../../interfaces/IBorrowerCompartment.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
+import {Errors} from "../../../Errors.sol";
 
-contract GLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
+contract GLPStakingCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
 
     // arbitrum WETH address
     address constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address constant FEE_GLP = 0x4e971a87900b931fF39d1Aad67697F49835400b6;
-
-    function initialize(
-        address _vaultAddr,
-        uint256 _loanIdx
-    ) external initializer {
-        vaultAddr = _vaultAddr;
-        loanIdx = _loanIdx;
-    }
 
     // transfer coll on repays
     function transferCollFromCompartment(
@@ -31,21 +23,13 @@ contract GLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
         address collTokenAddr,
         address callbackAddr
     ) external {
-        if (msg.sender != vaultAddr) revert InvalidSender();
-        // check coll token balance of compartment
-        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
-            address(this)
+        transferCollFromCompartmentHelper(
+            repayAmount,
+            repayAmountLeft,
+            borrowerAddr,
+            collTokenAddr,
+            callbackAddr
         );
-
-        // transfer proportion of compartment coll token balance
-        uint256 lpTokenAmount = (repayAmount * currentCompartmentBal) /
-            repayAmountLeft;
-
-        if (callbackAddr == address(0)) {
-            IERC20(collTokenAddr).safeTransfer(borrowerAddr, lpTokenAmount);
-        } else {
-            IERC20(collTokenAddr).safeTransfer(callbackAddr, lpTokenAmount);
-        }
 
         IStakingHelper(FEE_GLP).claim(address(this));
 
@@ -60,13 +44,7 @@ contract GLPStakingCompartment is BaseCompartment, IBorrowerCompartment {
 
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
-        if (msg.sender != vaultAddr) revert InvalidSender();
-        // get coll token balance
-        uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
-            address(this)
-        );
-        // transfer all to vault
-        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
+        unlockCollToVaultHelper(collTokenAddr);
 
         IStakingHelper(FEE_GLP).claim(address(this));
 

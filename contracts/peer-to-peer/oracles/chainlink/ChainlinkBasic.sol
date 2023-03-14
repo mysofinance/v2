@@ -5,53 +5,20 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
+import {BaseOracle} from "../BaseOracle.sol";
+import {Errors} from "../../../Errors.sol";
 
 /**
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
-contract ChainlinkBasic is IOracle {
-    // tokenAddr => chainlink oracle addr in eth
-    mapping(address => address) public ethOracleAddrs;
-    // tokenAddr => chainlink oracle addr in usd($)
-    mapping(address => address) public usdOracleAddrs;
-    address internal immutable weth;
-
-    error InvalidOraclePair();
-    error InvalidAddress();
-    error InvalidArrayLength();
-
+contract ChainlinkBasic is IOracle, BaseOracle {
+    // solhint-disable no-empty-blocks
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         bool[] memory _isEth,
         address _wethAddr
-    ) {
-        if (_wethAddr == address(0)) {
-            revert InvalidAddress();
-        }
-        weth = _wethAddr;
-        // if you use eth oracles with weth, will just return weth address
-        ethOracleAddrs[_wethAddr] = _wethAddr;
-        if (
-            _tokenAddrs.length != _oracleAddrs.length ||
-            _tokenAddrs.length != _isEth.length
-        ) {
-            revert InvalidArrayLength();
-        }
-        for (uint i = 0; i < _oracleAddrs.length; ) {
-            if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
-                revert InvalidAddress();
-            }
-            if (_isEth[i]) {
-                ethOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
-            } else {
-                usdOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
-            }
-            unchecked {
-                ++i;
-            }
-        }
-    }
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, true, _isEth) {}
 
     function getPrice(
         address collToken,
@@ -63,7 +30,7 @@ contract ChainlinkBasic is IOracle {
             address collTokenOracleAddr
         ) = checkValidOraclePair(collToken, loanToken);
         if (!isValid) {
-            revert InvalidOraclePair();
+            revert Errors.InvalidOraclePair();
         }
         collTokenPriceInLoanToken = calculatePrice(
             loanTokenOracleAddr,

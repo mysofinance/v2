@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
+import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVault} from "./interfaces/ILenderVault.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
@@ -23,11 +24,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     }
 
     using SafeERC20 for IERC20Metadata;
-
-    error UnregisteredVault();
-    error InvalidSender();
-    error InvalidFee();
-    error InsufficientSendAmount();
 
     event NewProtocolFee(uint256 _newFee);
 
@@ -166,14 +162,14 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         bytes calldata callbackData
     ) external nonReentrant {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
-            revert UnregisteredVault();
+            revert Errors.UnregisteredVault();
         }
         if (
             uint256(loanRepayInfo.repayAmount) +
                 loanRepayInfo.expectedTransferFee <
             loanRepayInfo.repayAmount
         ) {
-            revert(); // InsufficientSendAmount()
+            revert Errors.InsufficientSendAmount();
         }
         DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(
             loanRepayInfo.loanId
@@ -206,10 +202,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     function setNewProtocolFee(uint256 _newFee) external {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
-            revert InvalidSender();
+            revert Errors.InvalidSender();
         }
         if (_newFee > Constants.MAX_FEE) {
-            revert InvalidFee();
+            revert Errors.InvalidFee();
         }
         protocolFee = _newFee;
         emit NewProtocolFee(_newFee);
@@ -234,7 +230,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                     borrowInstructions.callbackAddr
                 )
             ) {
-                revert();
+                revert Errors.NonWhitelistedCallback();
             }
             ILenderVault(lenderVault).transferTo(
                 loan.loanToken,
@@ -259,7 +255,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             (Constants.BASE * Constants.YEAR_IN_SECONDS);
 
         if (borrowInstructions.collSendAmount < protocolFeeAmount) {
-            revert InsufficientSendAmount();
+            revert Errors.InsufficientSendAmount();
         }
 
         if (protocolFeeAmount != 0) {
@@ -281,7 +277,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             collTokenReceived;
 
         if (collTokenReceived != loan.initCollAmount + upfrontFee) {
-            revert(); // InvalidSendAmount();
+            revert Errors.InvalidSendAmount();
         }
     }
 
@@ -318,7 +314,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                     callbackAddr
                 )
             ) {
-                revert();
+                revert Errors.NonWhitelistedCallback();
             }
             if (loan.collTokenCompartmentAddr != address(0)) {
                 ILenderVault(lenderVault).transferFromCompartment(
@@ -355,7 +351,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             IERC20Metadata(loan.loanToken).balanceOf(lenderVault) -
             loanTokenReceived;
         if (loanTokenReceived != loanRepayInfo.repayAmount) {
-            revert(); // InvalidSendAmount();
+            revert Errors.InvalidSendAmount();
         }
     }
 
@@ -364,10 +360,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         address lenderVault
     ) internal view {
         if (block.timestamp > deadline) {
-            revert();
+            revert Errors.DeadlinePassed();
         }
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert UnregisteredVault();
+            revert Errors.UnregisteredVault();
         }
     }
 }
