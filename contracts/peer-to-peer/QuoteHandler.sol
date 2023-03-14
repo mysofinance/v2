@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
@@ -10,9 +10,10 @@ import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
 
 contract QuoteHandler is IQuoteHandler, IEvents {
-    address addressRegistry;
-    mapping(address => uint256) offChainQuoteNonce;
-    mapping(address => mapping(bytes32 => bool)) offChainQuoteIsInvalidated;
+    address public addressRegistry;
+    mapping(address => uint256) public offChainQuoteNonce;
+    mapping(address => mapping(bytes32 => bool))
+        public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
 
     constructor(address _addressRegistry) {

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/proxy/Clones.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {LoanProposalImpl} from "./LoanProposalImpl.sol";
 
 contract LoanProposalFactory {

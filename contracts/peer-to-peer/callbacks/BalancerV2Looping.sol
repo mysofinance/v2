@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
 import {IEvents} from "../interfaces/IEvents.sol";
 import {DataTypes} from "../DataTypes.sol";
@@ -47,7 +47,7 @@ library BalancerDataTypes {
 contract BalancerV2Looping is IVaultCallback, IEvents {
     using SafeERC20 for IERC20Metadata;
 
-    address constant BALANCER_V2_VAULT =
+    address private constant BALANCER_V2_VAULT =
         0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
     function borrowCallback(

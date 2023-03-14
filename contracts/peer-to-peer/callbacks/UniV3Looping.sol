@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
 import {DataTypes} from "../DataTypes.sol";
 
@@ -66,7 +66,7 @@ interface ISwapRouter {
 contract UniV3Looping is IVaultCallback {
     using SafeERC20 for IERC20Metadata;
 
-    address constant UNI_V3_SWAP_ROUTER =
+    address private constant UNI_V3_SWAP_ROUTER =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     function borrowCallback(

@@ -3,6 +3,8 @@
   "plugins": ["prettier"],
   "rules": {
     "ordering": "error",
+    "no-global-import": "error",
+    "state-visibility": "error",
     "imports-on-top": "error",
     "no-unused-vars": "error",
     "code-complexity": ["error", 10],
