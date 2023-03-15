@@ -147,9 +147,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
             // if unlock, send to vault, else if callback send directly there, else to borrower
             address lpTokenReceiver = isUnlock
                 ? vaultAddr
-                : callbackAddr == address(0)
-                ? borrowerAddr
-                : callbackAddr;
+                : (callbackAddr == address(0) ? borrowerAddr : callbackAddr);
 
             IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
         }
