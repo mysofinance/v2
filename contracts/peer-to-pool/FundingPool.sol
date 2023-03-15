@@ -3,15 +3,16 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {LoanProposalImpl} from "./LoanProposalImpl.sol";
-import {LoanProposalFactory} from "./LoanProposalFactory.sol";
+import {IFundingPool} from "./interfaces/IFundingPool.sol";
+import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-contract FundingPool {
+contract FundingPool is IFundingPool {
     using SafeERC20 for IERC20Metadata;
 
-    address public loanProposalFactory;
-    address public depositToken;
+    address public immutable loanProposalFactory;
+    address public immutable depositToken;
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public totalSubscribed;
     mapping(address => bool) public totalSubscribedIsDeployed;
@@ -47,19 +48,19 @@ contract FundingPool {
 
     function subscribe(address loanProposal, uint256 amount) external {
         if (
-            !LoanProposalFactory(loanProposalFactory).isLoanProposal(
+            !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
                 loanProposal
             )
         ) {
             revert();
         }
-        if (!LoanProposalImpl(loanProposal).inSubscriptionPhase()) {
+        if (!ILoanProposalImpl(loanProposal).inSubscriptionPhase()) {
             revert();
         }
         if (amount > balanceOf[msg.sender]) {
             revert();
         }
-        DataTypes.LoanTerms memory loanTerms = LoanProposalImpl(loanProposal)
+        DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();
         if (amount + totalSubscribed[loanProposal] > loanTerms.maxLoanAmount) {
             revert();
@@ -71,13 +72,13 @@ contract FundingPool {
 
     function unsubscribe(address loanProposal, uint256 amount) external {
         if (
-            !LoanProposalFactory(loanProposalFactory).isLoanProposal(
+            !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
                 loanProposal
             )
         ) {
             revert();
         }
-        if (!LoanProposalImpl(loanProposal).inUnsubscriptionPhase()) {
+        if (!ILoanProposalImpl(loanProposal).inUnsubscriptionPhase()) {
             revert();
         }
         if (amount > subscribedBalanceOf[loanProposal][msg.sender]) {
@@ -90,39 +91,39 @@ contract FundingPool {
 
     function executeLoanProposal(address loanProposal) external {
         if (
-            !LoanProposalFactory(loanProposalFactory).isLoanProposal(
+            !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
                 loanProposal
             )
         ) {
             revert();
         }
         if (
-            LoanProposalImpl(loanProposal).status() !=
+            ILoanProposalImpl(loanProposal).status() !=
             DataTypes.LoanStatus.READY_TO_EXECUTE
         ) {
             revert();
         }
-        DataTypes.LoanTerms memory loanTerms = LoanProposalImpl(loanProposal)
+        DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();
-        uint256 finalLoanAmount = LoanProposalImpl(loanProposal)
+        uint256 finalLoanAmount = ILoanProposalImpl(loanProposal)
             .finalLoanAmount();
-        uint256 finalCollAmount = LoanProposalImpl(loanProposal)
+        uint256 finalCollAmount = ILoanProposalImpl(loanProposal)
             .finalCollAmount();
         totalSubscribedIsDeployed[loanProposal] = true;
-        LoanProposalImpl(loanProposal).updateStatusToDeployed();
+        ILoanProposalImpl(loanProposal).updateStatusToDeployed();
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
             finalLoanAmount
         );
-        IERC20Metadata(LoanProposalImpl(loanProposal).collToken())
+        IERC20Metadata(ILoanProposalImpl(loanProposal).collToken())
             .safeTransferFrom(
                 loanTerms.borrower,
                 loanProposal,
                 finalCollAmount
             );
         IERC20Metadata(depositToken).safeTransfer(
-            LoanProposalImpl(loanProposal).arranger(),
-            LoanProposalImpl(loanProposal).arrangerFee()
+            ILoanProposalImpl(loanProposal).arranger(),
+            ILoanProposalImpl(loanProposal).arrangerFee()
         );
     }
 }

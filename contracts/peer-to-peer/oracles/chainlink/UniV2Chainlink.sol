@@ -13,7 +13,7 @@ import {Errors} from "../../../Errors.sol";
  * @dev supports oracles which have one token which is a 50/50 LP token
  * compatible with v2v3 or v3 interfaces
  */
-contract UniV2Chainlink is IOracle, BaseOracle {
+contract UniV2Chainlink is BaseOracle, IOracle {
     mapping(address => bool) public isLpAddr;
 
     struct OracleData {
