@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.19;
 
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {AggregatorV3Interface} from "../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 import {Errors} from "../../Errors.sol";
 
 abstract contract BaseOracle {

@@ -2,15 +2,15 @@
 
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
 contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
-    address public addressRegistry;
-    address public lenderVaultImpl;
+    address public immutable addressRegistry;
+    address public immutable lenderVaultImpl;
 
     constructor(address _addressRegistry, address _lenderVaultImpl) {
         addressRegistry = _addressRegistry;

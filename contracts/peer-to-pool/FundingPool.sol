@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Constants} from "../Constants.sol";
 import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
-import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract FundingPool is IFundingPool {

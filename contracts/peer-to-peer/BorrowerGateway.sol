@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "../Errors.sol";
@@ -16,6 +16,8 @@ import {IEvents} from "./interfaces/IEvents.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
 contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
+    using SafeERC20 for IERC20Metadata;
+
     // putting fee info in borrow gateway since borrower always pays this upfront
     address public immutable addressRegistry;
     uint256 public protocolFee; // in BASE
@@ -23,8 +25,6 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
     }
-
-    using SafeERC20 for IERC20Metadata;
 
     function borrowWithOffChainQuote(
         address lenderVault,

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {IFundingPool} from "./interfaces/IFundingPool.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 
@@ -20,16 +20,17 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     uint256 public finalLoanAmount;
     uint256 public finalCollAmount;
     uint256 public loanTermsLockedTime;
-    uint256 lenderGracePeriod;
-    uint256 currentRepaymentIdx;
-    uint256 subscriptionsThatAlreadyClaimedRecoveryValue;
-    DataTypes.LoanTerms _loanTerms;
-    mapping(uint256 => uint256) loanTokenRepaid;
-    mapping(uint256 => uint256) collTokenRepaid;
-    mapping(uint256 => uint256) totalConvertedContributionsPerIdx; // denominated in loan Token
-    mapping(address => mapping(uint256 => bool)) lenderExercisedConversion;
-    mapping(address => mapping(uint256 => bool)) lenderClaimedRepayment;
-    mapping(address => bool) lenderClaimedCollateral;
+    uint256 public lenderGracePeriod;
+    uint256 public currentRepaymentIdx;
+    uint256 public subscriptionsThatAlreadyClaimedRecoveryValue;
+    DataTypes.LoanTerms internal _loanTerms;
+    mapping(uint256 => uint256) public loanTokenRepaid;
+    mapping(uint256 => uint256) public collTokenRepaid;
+    mapping(uint256 => uint256) public totalConvertedContributionsPerIdx; // denominated in loan Token
+    mapping(address => mapping(uint256 => bool))
+        public lenderExercisedConversion;
+    mapping(address => mapping(uint256 => bool)) public lenderClaimedRepayment;
+    mapping(address => bool) public lenderClaimedCollateral;
 
     constructor() {
         _disableInitializers();
