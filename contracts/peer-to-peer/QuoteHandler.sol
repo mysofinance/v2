@@ -5,7 +5,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
-import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
 
@@ -30,7 +30,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         ) {
             revert();
         }
-        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
+        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
         }
         if (!isValidOnChainQuote(onChainQuote)) {
@@ -65,7 +65,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         ) {
             revert();
         }
-        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
+        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
         }
         if (!isValidOnChainQuote(newOnChainQuote)) {
@@ -99,7 +99,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
         }
-        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
+        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
@@ -114,7 +114,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
         }
-        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
+        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
         }
         offChainQuoteNonce[lenderVault] += 1;
@@ -127,7 +127,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert();
         }
-        if (ILenderVault(lenderVault).vaultOwner() != msg.sender) {
+        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
         }
         offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
@@ -219,7 +219,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             v.length != r.length &&
             v.length != s.length &&
-            v.length != ILenderVault(lenderVault).minNumOfSigners()
+            v.length != ILenderVaultImpl(lenderVault).minNumOfSigners()
         ) {
             return false;
         }
@@ -240,7 +240,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 return false;
             }
 
-            if (!ILenderVault(lenderVault).isSigner(recoveredSigner)) {
+            if (!ILenderVaultImpl(lenderVault).isSigner(recoveredSigner)) {
                 return false;
             }
             tmp |= newHash;

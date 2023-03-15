@@ -7,7 +7,7 @@ import {AggregatorV3Interface} from "../interfaces/oracles/chainlink/AggregatorV
 import {IOracle} from "../interfaces/IOracle.sol";
 import {Errors} from "../../Errors.sol";
 
-contract BaseOracle {
+abstract contract BaseOracle {
     address internal immutable weth;
     // tokenAddr => chainlink oracle addr in eth
     mapping(address => address) public ethOracleAddrs;

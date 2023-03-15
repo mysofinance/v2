@@ -35,4 +35,5 @@ library Errors {
     error InvalidSendAmount();
     error TooSmallLoanAmount();
     error DeadlinePassed();
+    error WithdrawEntered();
 }

@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
@@ -24,7 +24,7 @@ contract LenderVaultFactory is ILenderVaultFactory, ReentrancyGuard {
     {
         bytes32 salt = keccak256(abi.encodePacked(lenderVaultImpl, msg.sender));
         newLenderVaultAddr = Clones.cloneDeterministic(lenderVaultImpl, salt);
-        ILenderVault(newLenderVaultAddr).initialize(
+        ILenderVaultImpl(newLenderVaultAddr).initialize(
             msg.sender,
             addressRegistry
         );

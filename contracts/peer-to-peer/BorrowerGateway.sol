@@ -9,7 +9,8 @@ import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
-import {ILenderVault} from "./interfaces/ILenderVault.sol";
+import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
+import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
@@ -53,7 +54,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
             uint256 loanId,
             uint256 upfrontFee,
             address collReceiver
-        ) = ILenderVault(lenderVault).processQuote(
+        ) = ILenderVaultImpl(lenderVault).processQuote(
                 msg.sender,
                 borrowInstructions,
                 offChainQuote.generalQuoteInfo,
@@ -114,7 +115,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
             uint256 loanId,
             uint256 upfrontFee,
             address collReceiver
-        ) = ILenderVault(lenderVault).processQuote(
+        ) = ILenderVaultImpl(lenderVault).processQuote(
                 msg.sender,
                 borrowInstructions,
                 onChainQuote.generalQuoteInfo,
@@ -140,7 +141,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
     }
 
     function repay(
-        DataTypes.LoanRepayInfo calldata loanRepayInfo,
+        DataTypes.LoanRepayInstructions calldata loanRepayInstructions,
         address vaultAddr,
         address callbackAddr,
         bytes calldata callbackData
@@ -149,39 +150,43 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
             revert Errors.UnregisteredVault();
         }
         if (
-            uint256(loanRepayInfo.repayAmount) +
-                loanRepayInfo.expectedTransferFee <
-            loanRepayInfo.repayAmount
+            uint256(loanRepayInstructions.targetRepayAmount) +
+                loanRepayInstructions.expectedTransferFee <
+            loanRepayInstructions.targetRepayAmount
         ) {
             revert Errors.InsufficientSendAmount();
         }
-        DataTypes.Loan memory loan = ILenderVault(vaultAddr).loans(
-            loanRepayInfo.loanId
+        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loans(
+            loanRepayInstructions.targetLoanId
         );
 
-        ILenderVault(vaultAddr).validateRepayInfo(
+        ILenderVaultImpl(vaultAddr).validateRepayInfo(
             msg.sender,
             loan,
-            loanRepayInfo
+            loanRepayInstructions
         );
 
         uint256 reclaimCollAmount = processRepayTransfers(
             vaultAddr,
-            loanRepayInfo,
+            loanRepayInstructions,
             loan,
             callbackAddr,
             callbackData
         );
 
-        ILenderVault(vaultAddr).updateLoanInfo(
+        ILenderVaultImpl(vaultAddr).updateLoanInfo(
             loan,
-            loanRepayInfo.repayAmount,
-            loanRepayInfo.loanId,
+            loanRepayInstructions.targetRepayAmount,
+            loanRepayInstructions.targetLoanId,
             reclaimCollAmount,
             true
         );
 
-        emit Repay(vaultAddr, loanRepayInfo.loanId, loanRepayInfo.repayAmount);
+        emit Repay(
+            vaultAddr,
+            loanRepayInstructions.targetLoanId,
+            loanRepayInstructions.targetRepayAmount
+        );
     }
 
     function setNewProtocolFee(uint256 _newFee) external {
@@ -203,7 +208,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
         uint256 upfrontFee
     ) internal {
         if (borrowInstructions.callbackAddr == address(0)) {
-            ILenderVault(lenderVault).transferTo(
+            ILenderVaultImpl(lenderVault).transferTo(
                 loan.loanToken,
                 loan.borrower,
                 loan.initLoanAmount
@@ -216,7 +221,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
             ) {
                 revert Errors.NonWhitelistedCallback();
             }
-            ILenderVault(lenderVault).transferTo(
+            ILenderVaultImpl(lenderVault).transferTo(
                 loan.loanToken,
                 borrowInstructions.callbackAddr,
                 loan.initLoanAmount
@@ -267,18 +272,18 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
 
     function processRepayTransfers(
         address lenderVault,
-        DataTypes.LoanRepayInfo memory loanRepayInfo,
+        DataTypes.LoanRepayInstructions memory loanRepayInstructions,
         DataTypes.Loan memory loan,
         address callbackAddr,
         bytes calldata callbackData
     ) internal returns (uint256 reclaimCollAmount) {
         reclaimCollAmount =
-            (loan.initCollAmount * loanRepayInfo.repayAmount) /
+            (loan.initCollAmount * loanRepayInstructions.targetRepayAmount) /
             loan.initRepayAmount;
         if (callbackAddr == address(0)) {
             if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVault(lenderVault).transferCollFromCompartment(
-                    loanRepayInfo.repayAmount,
+                ILenderVaultImpl(lenderVault).transferCollFromCompartment(
+                    loanRepayInstructions.targetRepayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,
                     loan.collToken,
@@ -286,7 +291,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
                     loan.collTokenCompartmentAddr
                 );
             } else {
-                ILenderVault(lenderVault).transferTo(
+                ILenderVaultImpl(lenderVault).transferTo(
                     loan.collToken,
                     loan.borrower,
                     reclaimCollAmount
@@ -301,8 +306,8 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
                 revert Errors.NonWhitelistedCallback();
             }
             if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVault(lenderVault).transferCollFromCompartment(
-                    loanRepayInfo.repayAmount,
+                ILenderVaultImpl(lenderVault).transferCollFromCompartment(
+                    loanRepayInstructions.targetRepayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,
                     loan.collToken,
@@ -311,7 +316,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
                 );
                 IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
             } else {
-                ILenderVault(lenderVault).transferTo(
+                ILenderVaultImpl(lenderVault).transferTo(
                     loan.collToken,
                     callbackAddr,
                     reclaimCollAmount
@@ -327,14 +332,14 @@ contract BorrowerGateway is ReentrancyGuard, IEvents {
         IERC20Metadata(loan.loanToken).safeTransferFrom(
             loan.borrower,
             lenderVault,
-            uint256(loanRepayInfo.repayAmount) +
-                loanRepayInfo.expectedTransferFee
+            uint256(loanRepayInstructions.targetRepayAmount) +
+                loanRepayInstructions.expectedTransferFee
         );
 
         loanTokenReceived =
             IERC20Metadata(loan.loanToken).balanceOf(lenderVault) -
             loanTokenReceived;
-        if (loanTokenReceived != loanRepayInfo.repayAmount) {
+        if (loanTokenReceived != loanRepayInstructions.targetRepayAmount) {
             revert Errors.InvalidSendAmount();
         }
     }

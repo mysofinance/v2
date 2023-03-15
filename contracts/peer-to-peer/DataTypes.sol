@@ -53,12 +53,10 @@ library DataTypes {
         bytes32[] s;
     }
 
-    struct LoanRepayInfo {
-        address collToken;
-        address loanToken;
-        uint256 loanId;
-        uint128 repayAmount;
-        uint256 expectedTransferFee;
+    struct LoanRepayInstructions {
+        uint256 targetLoanId;
+        uint128 targetRepayAmount;
+        uint128 expectedTransferFee;
     }
 
     struct BorrowTransferInstructions {

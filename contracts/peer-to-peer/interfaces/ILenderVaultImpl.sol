@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 
 import {DataTypes} from "../DataTypes.sol";
 
-interface ILenderVault {
+interface ILenderVaultImpl {
     function initialize(address vaultOwner, address addressRegistry) external;
 
     function transferTo(
@@ -44,8 +44,6 @@ interface ILenderVault {
             address collReceiver
         );
 
-    function vaultOwner() external view returns (address);
-
     function loans(
         uint256 index
     ) external view returns (DataTypes.Loan memory loan);
@@ -53,10 +51,14 @@ interface ILenderVault {
     function validateRepayInfo(
         address borrower,
         DataTypes.Loan memory loan,
-        DataTypes.LoanRepayInfo memory loanRepayInfo
+        DataTypes.LoanRepayInstructions memory loanRepayInstructions
     ) external view;
 
     function minNumOfSigners() external view returns (uint256);
 
     function isSigner(address signer) external view returns (bool);
+
+    function withdrawEntered() external view returns (bool);
+
+    function owner() external view returns (address);
 }

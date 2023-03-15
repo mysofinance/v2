@@ -4,25 +4,25 @@ pragma solidity 0.8.19;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {FundingPool} from "./FundingPool.sol";
+import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-contract LoanProposalImpl is Initializable {
+contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     using SafeERC20 for IERC20Metadata;
 
+    DataTypes.LoanStatus public status;
     address public fundingPool;
     address public collToken;
     address public arranger;
     uint256 public arrangerFee;
-    uint256 public loanTermsLockedTime;
-    uint256 public lenderGracePeriod;
     uint256 public finalLoanAmount;
     uint256 public finalCollAmount;
+    uint256 public loanTermsLockedTime;
+    uint256 public lenderGracePeriod;
     uint256 public currentRepaymentIdx;
     uint256 public subscriptionsThatAlreadyClaimedRecoveryValue;
-    DataTypes.LoanStatus public status;
-    mapping(address => uint256) public balanceOf;
     DataTypes.LoanTerms internal _loanTerms;
     mapping(uint256 => uint256) public loanTokenRepaid;
     mapping(uint256 => uint256) public collTokenRepaid;
@@ -31,6 +31,10 @@ contract LoanProposalImpl is Initializable {
         public lenderExercisedConversion;
     mapping(address => mapping(uint256 => bool)) public lenderClaimedRepayment;
     mapping(address => bool) public lenderClaimedCollateral;
+
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _arranger,
@@ -66,7 +70,7 @@ contract LoanProposalImpl is Initializable {
         if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
             revert();
         }
-        uint256 totalSubscribed = FundingPool(fundingPool).totalSubscribed(
+        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
         );
         if (
@@ -86,7 +90,7 @@ contract LoanProposalImpl is Initializable {
         ) {
             revert();
         }
-        uint256 totalSubscribed = FundingPool(fundingPool).totalSubscribed(
+        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
         );
         if (
@@ -101,7 +105,7 @@ contract LoanProposalImpl is Initializable {
         status = DataTypes.LoanStatus.READY_TO_EXECUTE;
         arrangerFee = (arrangerFee * totalSubscribed) / Constants.BASE;
         finalLoanAmount = totalSubscribed - arrangerFee;
-        address loanToken = FundingPool(fundingPool).depositToken();
+        address loanToken = IFundingPool(fundingPool).depositToken();
         finalCollAmount =
             (finalLoanAmount * _loanTerms.collPerLoanToken) /
             (10 ** IERC20Metadata(loanToken).decimals());
@@ -130,7 +134,7 @@ contract LoanProposalImpl is Initializable {
     }
 
     function rollback() external {
-        uint256 totalSubscribed = FundingPool(fundingPool).totalSubscribed(
+        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
         );
         if (status != DataTypes.LoanStatus.BORROWER_ACCEPTED) {
@@ -165,7 +169,7 @@ contract LoanProposalImpl is Initializable {
         }
         uint256 repaymentIdx = currentRepaymentIdx;
         checkRepaymentIdx(repaymentIdx);
-        uint256 lenderContribution = FundingPool(fundingPool)
+        uint256 lenderContribution = IFundingPool(fundingPool)
             .subscribedBalanceOf(address(this), msg.sender);
         if (lenderContribution == 0) {
             revert();
@@ -186,7 +190,7 @@ contract LoanProposalImpl is Initializable {
         uint256 conversionAmount = (_loanTerms
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted * lenderContribution) /
-            FundingPool(fundingPool).totalSubscribed(address(this));
+            IFundingPool(fundingPool).totalSubscribed(address(this));
         collTokenRepaid[repaymentIdx] += conversionAmount;
         totalConvertedContributionsPerIdx[repaymentIdx] += lenderContribution;
         lenderExercisedConversion[msg.sender][repaymentIdx] = true;
@@ -218,7 +222,7 @@ contract LoanProposalImpl is Initializable {
         ) {
             revert();
         }
-        address loanToken = FundingPool(fundingPool).depositToken();
+        address loanToken = IFundingPool(fundingPool).depositToken();
         uint256 collTokenDue = _loanTerms
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted;
@@ -271,16 +275,16 @@ contract LoanProposalImpl is Initializable {
         if (lenderExercisedConversion[msg.sender][repaymentIdx]) {
             revert();
         }
-        uint256 lenderContribution = FundingPool(fundingPool)
+        uint256 lenderContribution = IFundingPool(fundingPool)
             .subscribedBalanceOf(address(this), msg.sender);
         if (lenderContribution == 0) {
             revert();
         }
-        address loanToken = FundingPool(fundingPool).depositToken();
+        address loanToken = IFundingPool(fundingPool).depositToken();
         // repaid amount for that period split over those who didn't convert in that period
         uint256 claimAmount = (loanTokenRepaid[repaymentIdx] *
             lenderContribution) /
-            (FundingPool(fundingPool).totalSubscribed(address(this)) -
+            (IFundingPool(fundingPool).totalSubscribed(address(this)) -
                 totalConvertedContributionsPerIdx[repaymentIdx]);
         lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
         IERC20Metadata(loanToken).safeTransfer(msg.sender, claimAmount);
@@ -314,7 +318,7 @@ contract LoanProposalImpl is Initializable {
         if (status != DataTypes.LoanStatus.DEFAULTED) {
             revert();
         }
-        uint256 lenderContribution = FundingPool(fundingPool)
+        uint256 lenderContribution = IFundingPool(fundingPool)
             .subscribedBalanceOf(address(this), msg.sender);
         if (lenderContribution == 0) {
             revert();
@@ -333,10 +337,10 @@ contract LoanProposalImpl is Initializable {
             collTokenRepaid[lastPeriodIdx];
         uint256 recoveryCollAmount = collTokenBal -
             lastPeriodNonConvertedCollToken;
-        uint256 subscriptionsLeftForLastIdx = FundingPool(fundingPool)
+        uint256 subscriptionsLeftForLastIdx = IFundingPool(fundingPool)
             .totalSubscribed(address(this)) -
             totalConvertedContributionsPerIdx[lastPeriodIdx];
-        uint256 subscriptionsLeftForRecoveryClaim = FundingPool(fundingPool)
+        uint256 subscriptionsLeftForRecoveryClaim = IFundingPool(fundingPool)
             .totalSubscribed(address(this)) -
             subscriptionsThatAlreadyClaimedRecoveryValue;
         // recoveryVal split into two parts
