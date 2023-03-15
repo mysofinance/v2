@@ -1171,6 +1171,27 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(borrowerLoanBalPostRepay).to.be.greaterThan(partialRepayAmount)
       expect(compartmentCollBalPostRepay).to.equal(compartmentCollBalPost.div(coeffRepay))
     })
+
+    it('Should thwart malcious withdraw from vault impersonating token', async () => {
+      const { lender, team, weth, lenderVault } =
+        await setupTest()
+
+      await ethers.provider.send('hardhat_setBalance', [team.address, '0x2004FCE5E3E25026110000000'])
+      await weth.connect(team).deposit({ value: ONE_WETH.mul(10) })
+
+      await weth.connect(team).transfer(lenderVault.address, ONE_WETH.mul(10))
+
+      const wethBalPreAttack = await weth.balanceOf(lenderVault.address);
+
+      // create maliciousToken
+      const MyMaliciousERC20 = await ethers.getContractFactory('MyMaliciousERC20')
+      await MyMaliciousERC20.connect(team)
+      const myMaliciousERC20 = await MyMaliciousERC20.deploy('MalciousToken', 'MyMal',18, ZERO_ADDR, lenderVault.address)
+      await myMaliciousERC20.deployed()
+      await lenderVault.connect(lender).withdraw(myMaliciousERC20.address, ONE_WETH)
+      const wethBalPostAttack = await weth.balanceOf(lenderVault.address);
+      expect(wethBalPostAttack).to.equal(wethBalPreAttack);
+    })
   })
 
   describe('Testing with token transfer fees', function () {
