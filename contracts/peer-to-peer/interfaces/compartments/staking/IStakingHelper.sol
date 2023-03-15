@@ -33,11 +33,6 @@ interface IStakingHelper {
     function mint(address gaugeAddr) external;
 
     /**
-     * @notice stakesEverything in cvx style reward pool
-     */
-    function stakeAll() external;
-
-    /**
      * @notice returns lpToken address for crv style gauge
      */
     function lp_token() external view returns (address);

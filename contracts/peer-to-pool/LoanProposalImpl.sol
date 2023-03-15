@@ -23,7 +23,7 @@ contract LoanProposalImpl is Initializable {
     uint256 public subscriptionsThatAlreadyClaimedRecoveryValue;
     DataTypes.LoanStatus public status;
     mapping(address => uint256) public balanceOf;
-    DataTypes.LoanTerms public _loanTerms;
+    DataTypes.LoanTerms internal _loanTerms;
     mapping(uint256 => uint256) public loanTokenRepaid;
     mapping(uint256 => uint256) public collTokenRepaid;
     mapping(uint256 => uint256) public totalConvertedContributionsPerIdx; // denominated in loan Token

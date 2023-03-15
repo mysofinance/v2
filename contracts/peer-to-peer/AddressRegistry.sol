@@ -6,7 +6,7 @@ import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
 contract AddressRegistry is IAddressRegistry {
     bool private isInitialized;
-    address public immutable owner;
+    address public owner;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
