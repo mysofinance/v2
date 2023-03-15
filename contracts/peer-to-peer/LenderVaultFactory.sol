@@ -8,7 +8,7 @@ import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
-contract LenderVaultFactory is ILenderVaultFactory, ReentrancyGuard {
+contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
     address public immutable addressRegistry;
     address public immutable lenderVaultImpl;
 

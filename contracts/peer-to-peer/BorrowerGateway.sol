@@ -15,7 +15,7 @@ import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
-contract BorrowerGateway is ReentrancyGuard, IEvents {
+contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
     using SafeERC20 for IERC20Metadata;
 
     // putting fee info in borrow gateway since borrower always pays this upfront
