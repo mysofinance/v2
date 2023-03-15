@@ -13,12 +13,11 @@ import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
+import {Ownable} from "../Ownable.sol";
 
-contract LenderVaultImpl is Initializable, ILenderVaultImpl {
+contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     using SafeERC20 for IERC20Metadata;
 
-    address public vaultOwner;
-    address public newVaultOwner;
     address public addressRegistry;
     address[] public signers;
     uint256 public minNumOfSigners;
@@ -36,7 +35,7 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
         address _vaultOwner,
         address _addressRegistry
     ) external initializer {
-        vaultOwner = _vaultOwner;
+        _owner = _vaultOwner;
         addressRegistry = _addressRegistry;
         minNumOfSigners = 1;
     }
@@ -80,7 +79,7 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
                 .balanceOf(address(this));
 
             IERC20Metadata(collToken).safeTransfer(
-                vaultOwner,
+                _owner,
                 currentCollTokenBalance - lockedAmounts[collToken]
             );
         }
@@ -195,7 +194,7 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
         if (amount > vaultBalance - lockedAmounts[token]) {
             revert Errors.InvalidWithdrawAmount();
         }
-        IERC20Metadata(token).safeTransfer(vaultOwner, amount);
+        IERC20Metadata(token).safeTransfer(_owner, amount);
         withdrawEntered = false;
     }
 
@@ -263,18 +262,6 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
         isSigner[signer] = false;
     }
 
-    function proposeNewVaultOwner(address _newOwner) external {
-        senderCheckOwner();
-        newVaultOwner = _newOwner;
-    }
-
-    function claimVaultOwnership() external {
-        if (msg.sender != newVaultOwner) {
-            revert Errors.InvalidSender();
-        }
-        vaultOwner = newVaultOwner;
-    }
-
     function loans(
         uint256 loanId
     ) external view returns (DataTypes.Loan memory loan) {
@@ -307,6 +294,15 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
         }
     }
 
+    function owner()
+        external
+        view
+        override(Ownable, ILenderVaultImpl)
+        returns (address)
+    {
+        return _owner;
+    }
+
     function createCollCompartment(
         address borrowerCompartmentImplementation,
         uint256 loanId
@@ -330,12 +326,6 @@ contract LenderVaultImpl is Initializable, ILenderVaultImpl {
             salt
         );
         IBaseCompartment(collCompartment).initialize(address(this), loanId);
-    }
-
-    function senderCheckOwner() internal view {
-        if (msg.sender != vaultOwner) {
-            revert Errors.InvalidSender();
-        }
     }
 
     function senderCheckGateway() internal view {

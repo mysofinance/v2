@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
+import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract FundingPool is IFundingPool {
@@ -121,9 +122,17 @@ contract FundingPool is IFundingPool {
                 loanProposal,
                 finalCollAmount
             );
+        uint256 arrangerFee = ILoanProposalImpl(loanProposal).arrangerFee();
+        uint256 protocolFeeShare = (arrangerFee *
+            ILoanProposalFactory(loanProposalFactory).arrangerFeeSplit()) /
+            Constants.BASE;
         IERC20Metadata(depositToken).safeTransfer(
             ILoanProposalImpl(loanProposal).arranger(),
-            ILoanProposalImpl(loanProposal).arrangerFee()
+            arrangerFee - protocolFeeShare
+        );
+        IERC20Metadata(depositToken).safeTransfer(
+            ILoanProposalFactory(loanProposalFactory).owner(),
+            protocolFeeShare
         );
     }
 }
