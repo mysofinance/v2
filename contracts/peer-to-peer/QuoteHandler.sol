@@ -10,7 +10,7 @@ import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
 
 contract QuoteHandler is IQuoteHandler, IEvents {
-    address public immutable addressRegistry;
+    address internal immutable addressRegistry;
     mapping(address => uint256) public offChainQuoteNonce;
     mapping(address => mapping(bytes32 => bool))
         public offChainQuoteIsInvalidated;
