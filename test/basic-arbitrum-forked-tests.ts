@@ -223,10 +223,8 @@ describe('Basic Forked Arbitrum Tests', function () {
     await expect(
       borrowerGateway.connect(borrower).repay(
         {
-          collToken: collTokenAddress,
-          loanToken: usdc.address,
-          loanId,
-          repayAmount: partialRepayAmount,
+          targetLoanId: loanId,
+          targetRepayAmount: partialRepayAmount,
           expectedTransferFee: 0
         },
         lenderVault.address,
@@ -398,10 +396,8 @@ describe('Basic Forked Arbitrum Tests', function () {
     await expect(
       borrowerGateway.connect(borrower).repay(
         {
-          collToken: loan.collToken,
-          loanToken: loan.loanToken,
-          loanId: 0,
-          repayAmount: loan.initRepayAmount,
+          targetLoanId: 0,
+          targetRepayAmount: loan.initRepayAmount,
           expectedTransferFee: 0
         },
         lenderVault.address,

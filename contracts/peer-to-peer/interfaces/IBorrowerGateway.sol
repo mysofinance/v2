@@ -25,7 +25,7 @@ interface IBorrowerGateway {
     ) external;
 
     function repay(
-        DataTypes.LoanRepayInfo calldata loanRepayInfo,
+        DataTypes.LoanRepayInstructions calldata loanRepayInstructions,
         address vaultAddr,
         address callbackAddr,
         bytes calldata callbackData

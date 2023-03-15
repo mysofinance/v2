@@ -53,7 +53,7 @@ interface ILenderVaultImpl {
     function validateRepayInfo(
         address borrower,
         DataTypes.Loan memory loan,
-        DataTypes.LoanRepayInfo memory loanRepayInfo
+        DataTypes.LoanRepayInstructions memory loanRepayInstructions
     ) external view;
 
     function minNumOfSigners() external view returns (uint256);
