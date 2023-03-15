@@ -444,7 +444,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
 
     // whitelist token pair
-    await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address])
+    await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
