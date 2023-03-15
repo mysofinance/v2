@@ -294,7 +294,12 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
     }
 
-    function owner() external view returns (address) {
+    function owner()
+        external
+        view
+        override(Ownable, ILenderVaultImpl)
+        returns (address)
+    {
         return _owner;
     }
 

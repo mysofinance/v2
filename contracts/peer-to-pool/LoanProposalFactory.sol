@@ -9,7 +9,7 @@ import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 
-contract LoanProposalFactory is Ownable {
+contract LoanProposalFactory is Ownable, ILoanProposalFactory {
     address public immutable loanProposalImpl;
     address[] public loanProposals;
     mapping(address => bool) public isLoanProposal;
@@ -52,7 +52,12 @@ contract LoanProposalFactory is Ownable {
         arrangerFeeSplit = _newArrangerFeeSplit;
     }
 
-    function owner() external view returns (address) {
+    function owner()
+        external
+        view
+        override(Ownable, ILoanProposalFactory)
+        returns (address)
+    {
         return _owner;
     }
 }

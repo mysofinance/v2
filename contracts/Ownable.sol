@@ -25,4 +25,9 @@ abstract contract Ownable {
             revert Errors.InvalidSender();
         }
     }
+
+    // note: needs to be explicitly overriden by inheriting contracts
+    // (e.g., AddressRegistry) to avoid ambiguities regarding owner()
+    // definitions in corresponding interfaces (e.g., IAddressRegistry)
+    function owner() external view virtual returns (address);
 }

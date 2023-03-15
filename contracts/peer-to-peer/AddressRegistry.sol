@@ -94,7 +94,12 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         registeredVaults.push(addr);
     }
 
-    function owner() external view returns (address) {
+    function owner()
+        external
+        view
+        override(Ownable, IAddressRegistry)
+        returns (address)
+    {
         return _owner;
     }
 
