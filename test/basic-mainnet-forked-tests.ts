@@ -549,7 +549,7 @@ describe('Basic Forked Mainnet Tests', function () {
           borrowerGateway
             .connect(borrower)
             .repay(
-              { collToken: collTokenAddress, loanToken: usdc.address, loanId, repayAmount, expectedTransferFee: 0 },
+              { targetLoanId: loanId, targetRepayAmount: repayAmount, expectedTransferFee: 0 },
               lenderVault.address,
               callbackAddr,
               callbackData
@@ -585,10 +585,8 @@ describe('Basic Forked Mainnet Tests', function () {
         await expect(
           borrowerGateway.connect(borrower).repay(
             {
-              collToken: collTokenAddress,
-              loanToken: usdc.address,
-              loanId,
-              repayAmount: partialRepayAmount,
+              targetLoanId: loanId,
+              targetRepayAmount: partialRepayAmount,
               expectedTransferFee: 0
             },
             lenderVault.address,
@@ -824,10 +822,8 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         borrowerGateway.connect(borrower).repay(
           {
-            collToken: collTokenAddress,
-            loanToken: usdc.address,
-            loanId,
-            repayAmount: partialRepayAmount,
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0
           },
           lenderVault.address,
@@ -971,10 +967,8 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         borrowerGateway.connect(borrower).repay(
           {
-            collToken: collTokenAddress,
-            loanToken: usdc.address,
-            loanId,
-            repayAmount: partialRepayAmount,
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0
           },
           lenderVault.address,
@@ -1156,10 +1150,8 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         borrowerGateway.connect(borrower).repay(
           {
-            collToken: collTokenAddress,
-            loanToken: weth.address,
-            loanId,
-            repayAmount: partialRepayAmount,
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0
           },
           lenderVault.address,
@@ -1460,10 +1452,8 @@ describe('Basic Forked Mainnet Tests', function () {
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
 
       const repayBody = {
-        collToken: usdc.address,
-        loanToken: paxg.address,
-        loanId,
-        repayAmount: ONE_PAXG.mul(10).mul(110).div(100),
+        targetLoanId: loanId,
+        targetRepayAmount: ONE_PAXG.mul(10).mul(110).div(100),
         expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100), 2)
       }
 

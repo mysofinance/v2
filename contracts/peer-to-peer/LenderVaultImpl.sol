@@ -275,7 +275,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function validateRepayInfo(
         address borrower,
         DataTypes.Loan memory loan,
-        DataTypes.LoanRepayInfo memory loanRepayInfo
+        DataTypes.LoanRepayInstructions memory loanRepayInstructions
     ) external view {
         if (borrower != loan.borrower) {
             revert Errors.InvalidBorrower();
@@ -287,7 +287,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             revert Errors.OutsideValidRepayWindow();
         }
         if (
-            loanRepayInfo.repayAmount >
+            loanRepayInstructions.targetRepayAmount >
             loan.initRepayAmount - loan.amountRepaidSoFar
         ) {
             revert Errors.InvalidRepayAmount();

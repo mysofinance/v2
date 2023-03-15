@@ -141,7 +141,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
     }
 
     function repay(
-        DataTypes.LoanRepayInfo calldata loanRepayInfo,
+        DataTypes.LoanRepayInstructions calldata loanRepayInstructions,
         address vaultAddr,
         address callbackAddr,
         bytes calldata callbackData
@@ -150,25 +150,25 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             revert Errors.UnregisteredVault();
         }
         if (
-            uint256(loanRepayInfo.repayAmount) +
-                loanRepayInfo.expectedTransferFee <
-            loanRepayInfo.repayAmount
+            uint256(loanRepayInstructions.targetRepayAmount) +
+                loanRepayInstructions.expectedTransferFee <
+            loanRepayInstructions.targetRepayAmount
         ) {
             revert Errors.InsufficientSendAmount();
         }
         DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loans(
-            loanRepayInfo.loanId
+            loanRepayInstructions.targetLoanId
         );
 
         ILenderVaultImpl(vaultAddr).validateRepayInfo(
             msg.sender,
             loan,
-            loanRepayInfo
+            loanRepayInstructions
         );
 
         uint256 reclaimCollAmount = processRepayTransfers(
             vaultAddr,
-            loanRepayInfo,
+            loanRepayInstructions,
             loan,
             callbackAddr,
             callbackData
@@ -176,13 +176,17 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
 
         ILenderVaultImpl(vaultAddr).updateLoanInfo(
             loan,
-            loanRepayInfo.repayAmount,
-            loanRepayInfo.loanId,
+            loanRepayInstructions.targetRepayAmount,
+            loanRepayInstructions.targetLoanId,
             reclaimCollAmount,
             true
         );
 
-        emit Repay(vaultAddr, loanRepayInfo.loanId, loanRepayInfo.repayAmount);
+        emit Repay(
+            vaultAddr,
+            loanRepayInstructions.targetLoanId,
+            loanRepayInstructions.targetRepayAmount
+        );
     }
 
     function setNewProtocolFee(uint256 _newFee) external {
@@ -268,18 +272,18 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
 
     function processRepayTransfers(
         address lenderVault,
-        DataTypes.LoanRepayInfo memory loanRepayInfo,
+        DataTypes.LoanRepayInstructions memory loanRepayInstructions,
         DataTypes.Loan memory loan,
         address callbackAddr,
         bytes calldata callbackData
     ) internal returns (uint256 reclaimCollAmount) {
         reclaimCollAmount =
-            (loan.initCollAmount * loanRepayInfo.repayAmount) /
+            (loan.initCollAmount * loanRepayInstructions.targetRepayAmount) /
             loan.initRepayAmount;
         if (callbackAddr == address(0)) {
             if (loan.collTokenCompartmentAddr != address(0)) {
                 ILenderVaultImpl(lenderVault).transferCollFromCompartment(
-                    loanRepayInfo.repayAmount,
+                    loanRepayInstructions.targetRepayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,
                     loan.collToken,
@@ -303,7 +307,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             }
             if (loan.collTokenCompartmentAddr != address(0)) {
                 ILenderVaultImpl(lenderVault).transferCollFromCompartment(
-                    loanRepayInfo.repayAmount,
+                    loanRepayInstructions.targetRepayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,
                     loan.collToken,
@@ -328,14 +332,14 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
         IERC20Metadata(loan.loanToken).safeTransferFrom(
             loan.borrower,
             lenderVault,
-            uint256(loanRepayInfo.repayAmount) +
-                loanRepayInfo.expectedTransferFee
+            uint256(loanRepayInstructions.targetRepayAmount) +
+                loanRepayInstructions.expectedTransferFee
         );
 
         loanTokenReceived =
             IERC20Metadata(loan.loanToken).balanceOf(lenderVault) -
             loanTokenReceived;
-        if (loanTokenReceived != loanRepayInfo.repayAmount) {
+        if (loanTokenReceived != loanRepayInstructions.targetRepayAmount) {
             revert Errors.InvalidSendAmount();
         }
     }
