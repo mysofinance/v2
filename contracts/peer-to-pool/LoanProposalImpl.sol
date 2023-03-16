@@ -20,7 +20,6 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     uint256 public finalLoanAmount;
     uint256 public finalCollAmountReservedForDefault;
     uint256 public finalCollAmountReservedForConversions;
-    uint256 public totalCollConversionsSoFar;
     uint256 public loanTermsLockedTime;
     uint256 public lenderGracePeriod;
     uint256 public currentRepaymentIdx;
@@ -240,7 +239,6 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             .collTokenDueIfConverted * lenderContribution) /
             IFundingPool(fundingPool).totalSubscribed(address(this));
         collTokenConverted[repaymentIdx] += conversionAmount;
-        totalCollConversionsSoFar += conversionAmount;
         totalConvertedSubscriptionsPerIdx[repaymentIdx] += lenderContribution;
         lenderExercisedConversion[msg.sender][repaymentIdx] = true;
         IERC20Metadata(collToken).safeTransfer(msg.sender, conversionAmount);
@@ -353,7 +351,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
     }
 
-    function claimOnDefault() external {
+    function claimDefaultProceeds() external {
         if (status != DataTypes.LoanStatus.DEFAULTED) {
             revert();
         }

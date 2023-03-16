@@ -32,7 +32,7 @@ interface ILoanProposalImpl {
 
     function markAsDefaulted() external;
 
-    function claimOnDefault() external;
+    function claimDefaultProceeds() external;
 
     function status() external view returns (DataTypes.LoanStatus);
 
@@ -58,6 +58,15 @@ interface ILoanProposalImpl {
 
     function loanTermsLockedTime() external view returns (uint256);
 
+    function lenderGracePeriod() external view returns (uint256);
+
+    function currentRepaymentIdx() external view returns (uint256);
+
+    function totalSubscriptionsThatClaimedOnDefault()
+        external
+        view
+        returns (uint256);
+
     function loanTerms() external view returns (DataTypes.LoanTerms memory);
 
     function inUnsubscriptionPhase() external view returns (bool);
@@ -65,4 +74,19 @@ interface ILoanProposalImpl {
     function isReadyToExecute() external view returns (bool);
 
     function inSubscriptionPhase() external view returns (bool);
+
+    function getAbsoluteLoanTerms(
+        DataTypes.LoanTerms memory _tmpLoanTerms,
+        uint256 totalSubscribed,
+        uint256 loanTokenDecimals
+    )
+        external
+        view
+        returns (
+            DataTypes.LoanTerms memory loanTerms,
+            uint256 absArrangerFee,
+            uint256 absLoanAmount,
+            uint256 absCollAmountReservedForDefault,
+            uint256 absCollAmountReservedForConversions
+        );
 }
