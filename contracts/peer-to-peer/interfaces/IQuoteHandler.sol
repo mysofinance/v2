@@ -5,6 +5,11 @@ pragma solidity ^0.8.19;
 import {DataTypes} from "../DataTypes.sol";
 
 interface IQuoteHandler {
+    function addOnChainQuote(
+        address lenderVault,
+        DataTypes.OnChainQuote calldata onChainQuote
+    ) external;
+
     function updateOnChainQuote(
         address lenderVault,
         DataTypes.OnChainQuote calldata oldOnChainQuote,
@@ -47,9 +52,4 @@ interface IQuoteHandler {
     ) external view returns (bool);
 
     function isOnChainQuote(address, bytes32) external view returns (bool);
-
-    function addOnChainQuote(
-        address lenderVault,
-        DataTypes.OnChainQuote calldata onChainQuote
-    ) external view;
 }
