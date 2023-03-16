@@ -16,9 +16,9 @@ contract ChainlinkBasic is BaseOracle, IOracle {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        bool[] memory _isEth,
-        address _wethAddr
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, true, _isEth) {}
+        address _wethAddr,
+        bool _isUSDBased
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, _isUSDBased) {}
 
     function getPrice(
         address collToken,
@@ -51,18 +51,9 @@ contract ChainlinkBasic is BaseOracle, IOracle {
             address collTokenOracleAddr
         )
     {
-        // try to see if both have non-zero ethOracleAddrs
-        loanTokenOracleAddr = ethOracleAddrs[loanToken];
-        collTokenOracleAddr = ethOracleAddrs[collToken];
-        isValid =
-            loanTokenOracleAddr != address(0) &&
-            collTokenOracleAddr != address(0);
-        if (isValid) {
-            return (isValid, loanTokenOracleAddr, collTokenOracleAddr);
-        }
-        // now try usd oracle addresses
-        loanTokenOracleAddr = usdOracleAddrs[loanToken];
-        collTokenOracleAddr = usdOracleAddrs[collToken];
+        // try to see if both have non-zero oracleAddrs
+        loanTokenOracleAddr = oracleAddrs[loanToken];
+        collTokenOracleAddr = oracleAddrs[collToken];
         isValid =
             loanTokenOracleAddr != address(0) &&
             collTokenOracleAddr != address(0);
@@ -74,48 +65,25 @@ contract ChainlinkBasic is BaseOracle, IOracle {
         address loanToken
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
         int256 answer;
-        uint256 updatedAt;
-        uint256 loanTokenOracleDecimals;
-        uint256 collTokenOracleDecimals;
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         address wethAddress = weth;
         if (loanTokenOracleAddr == wethAddress) {
             answer = 10 ** 18;
-            updatedAt = block.timestamp;
-            loanTokenOracleDecimals = 18;
         } else {
-            (, answer, , updatedAt, ) = AggregatorV3Interface(
-                loanTokenOracleAddr
-            ).latestRoundData();
-            loanTokenOracleDecimals = AggregatorV3Interface(loanTokenOracleAddr)
-                .decimals();
+            (, answer, , , ) = AggregatorV3Interface(loanTokenOracleAddr)
+                .latestRoundData();
         }
-        // todo: decide on logic check for updatedAt versus current timestamp?
-        uint256 loanTokenPriceRaw = uint256(answer);
-        if (loanTokenPriceRaw < 1) {
-            revert();
-        }
+        uint256 loanTokenPriceRaw = tokenPriceConvertAndCheck(answer);
         if (collTokenOracleAddr == wethAddress) {
             answer = 10 ** 18;
-            updatedAt = block.timestamp;
-            collTokenOracleDecimals = 18;
         } else {
-            (, answer, , updatedAt, ) = AggregatorV3Interface(
-                collTokenOracleAddr
-            ).latestRoundData();
-            collTokenOracleDecimals = AggregatorV3Interface(collTokenOracleAddr)
-                .decimals();
+            (, answer, , , ) = AggregatorV3Interface(collTokenOracleAddr)
+                .latestRoundData();
         }
-        // todo: decide on logic check for updatedAt versus current timestamp?
-        uint256 collTokenPriceRaw = uint256(answer);
-        if (collTokenPriceRaw < 1) {
-            revert();
-        }
-        // typically loanTokenOracleDecimals should equal collTokenOracleDecimals
+        uint256 collTokenPriceRaw = tokenPriceConvertAndCheck(answer);
+
         collTokenPriceInLoanToken =
-            (collTokenPriceRaw *
-                (10 ** loanTokenDecimals) *
-                (10 ** loanTokenOracleDecimals)) /
-            (loanTokenPriceRaw * (10 ** collTokenOracleDecimals));
+            (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
+            (loanTokenPriceRaw);
     }
 }

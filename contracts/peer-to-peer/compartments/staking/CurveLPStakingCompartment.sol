@@ -140,16 +140,14 @@ contract CurveLPStakingCompartment is BaseCompartment {
 
         // transfer proportion of compartment lp token balance if never staked or an unlock, else all balance if staked
         {
-            uint256 lpTokenAmount = isUnlock || isStaked
+            uint256 lpTokenAmount = (isUnlock || isStaked)
                 ? currentCompartmentBal
                 : (repayAmount * currentCompartmentBal) / repayAmountLeft;
 
             // if unlock, send to vault, else if callback send directly there, else to borrower
             address lpTokenReceiver = isUnlock
                 ? vaultAddr
-                : callbackAddr == address(0)
-                ? borrowerAddr
-                : callbackAddr;
+                : (callbackAddr == address(0) ? borrowerAddr : callbackAddr);
 
             IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
         }

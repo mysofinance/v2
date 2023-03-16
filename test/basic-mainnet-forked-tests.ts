@@ -494,11 +494,12 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
-      await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.reverted
-      await expect(crvCompInstance.connect(borrower).stake(1000)).to.be.reverted
-      await expect(crvCompInstance.connect(borrower).stake(10)).to.be.reverted
+      await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.revertedWithCustomError(crvCompInstance, "InvalidSender")
+      await expect(crvCompInstance.connect(borrower).stake(1000)).to.be.revertedWithCustomError(crvCompInstance,"InvalidGaugeIndex")
+      await expect(crvCompInstance.connect(borrower).stake(10)).to.be.revertedWithCustomError(crvCompInstance, "IncorrectGaugeForLpToken")
       await crvCompInstance.connect(borrower).stake(compartmentData)
-      await expect(crvCompInstance.connect(borrower).stake(compartmentData)).to.be.reverted
+      await expect(crvCompInstance.connect(borrower).stake(compartmentData)).to.be.revertedWithCustomError(crvCompInstance, "AlreadyStaked")
+      await expect(crvCompInstance.connect(team).transferCollFromCompartment(1,1,borrower.address,collTokenAddress, ZERO_ADDR)).to.be.revertedWithCustomError(crvCompInstance, "InvalidSender")
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -1109,9 +1110,16 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const uniCompInstance = await votingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
+      await expect(uniCompInstance.connect(team).initialize(borrower.address,1)).to.be.reverted
+
+      await expect(uniCompInstance.connect(team).transferCollFromCompartment(1,1,borrower.address,collTokenAddress, ZERO_ADDR)).to.be.revertedWithCustomError(uniCompInstance, "InvalidSender")
+
+      await expect(uniCompInstance.connect(team).unlockCollToVault(collTokenAddress)).to.be.revertedWithCustomError(uniCompInstance, "InvalidSender")
+
       const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
 
-      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.reverted
+      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.revertedWithCustomError(uniCompInstance, "InvalidSender")
+      await expect(uniCompInstance.connect(borrower).delegate(ZERO_ADDR)).to.be.revertedWithCustomError(uniCompInstance, "InvalidDelegatee")
       await uniCompInstance.connect(borrower).delegate(borrower.address)
 
       // check balance post borrow
@@ -1476,7 +1484,7 @@ describe('Basic Forked Mainnet Tests', function () {
   })
 
   describe('Testing chainlink oracles', function () {
-    it('Should process onChain quote with oracle address (non-weth)', async function () {
+    it('Should process onChain quote with eth-based oracle address (non-weth)', async function () {
       const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, team, lenderVault } =
         await setupTest()
 
@@ -1484,11 +1492,34 @@ describe('Basic Forked Mainnet Tests', function () {
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+      /****deploy errors on base oracles****/
+      await expect(ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          ZERO_ADDR,
+          false)).to.be.reverted
+      await expect(ChainlinkBasicImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+        [usdcEthChainlinkAddr],
+        weth.address,
+        false)).to.be.reverted
+      await expect(ChainlinkBasicImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+        [ZERO_ADDR, paxgEthChainlinkAddr],
+        weth.address,
+        false)).to.be.reverted
+      await expect(ChainlinkBasicImplementation.connect(team).deploy(
+        [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+        [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+        weth.address,
+        false)).to.be.reverted
+        
+      /****correct deploy****/
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        [true, true],
-        weth.address
+        weth.address,
+        false
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1582,7 +1613,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
 
-    it('Should process onChain quote with oracle address (coll weth)', async function () {
+    it('Should process onChain quote with eth-based oracle address (coll weth)', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
         await setupTest()
 
@@ -1593,8 +1624,8 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        [true],
-        weth.address
+        weth.address,
+        false
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1681,7 +1712,7 @@ describe('Basic Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
 
-    it('Should process onChain quote with oracle address (loan weth)', async function () {
+    it('Should process onChain quote with eth-based oracle address (loan weth)', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
         await setupTest()
 
@@ -1692,8 +1723,8 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        [true],
-        weth.address
+        weth.address,
+        false
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1704,6 +1735,9 @@ describe('Basic Forked Mainnet Tests', function () {
       // lenderVault owner deposits weth
       await weth.connect(lender).deposit({ value: ONE_WETH.mul(1000) })
       await weth.connect(lender).transfer(lenderVault.address, ONE_WETH.mul(1000))
+
+      // lender gives borrower USDC for collateral
+      await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(100000))
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -1908,6 +1942,14 @@ describe('Basic Forked Mainnet Tests', function () {
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+      /****deploy error uni oracle****/
+      await expect(UniV2OracleImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+        [usdcEthChainlinkAddr],
+        [ZERO_ADDR],
+        weth.address
+      )).to.be.reverted
+      /****deploy correctly****/
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],

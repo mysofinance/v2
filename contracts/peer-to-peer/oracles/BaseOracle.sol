@@ -9,46 +9,47 @@ import {Errors} from "../../Errors.sol";
 
 abstract contract BaseOracle {
     address internal immutable weth;
-    // tokenAddr => chainlink oracle addr in eth
-    mapping(address => address) public ethOracleAddrs;
-    // tokenAddr => chainlink oracle addr in usd($)
-    mapping(address => address) public usdOracleAddrs;
+    // tokenAddr => chainlink oracle addr
+    // oracles will be eth or usd based
+    mapping(address => address) public oracleAddrs;
+    bool public isUSDBased;
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address _wethAddr,
-        bool hasUSDOracles,
-        bool[] memory _isEth
+        bool _isUSDBased
     ) {
         if (_wethAddr == address(0)) {
             revert Errors.InvalidAddress();
         }
         weth = _wethAddr;
+        isUSDBased = _isUSDBased;
         // if you use eth oracles with weth, will just return weth address
-        ethOracleAddrs[_wethAddr] = _wethAddr;
-        if (
-            _tokenAddrs.length != _oracleAddrs.length ||
-            (hasUSDOracles && (_tokenAddrs.length != _isEth.length))
-        ) {
+        // for usd-based oracle weth/usd oracle addr will need to be passed in like others
+        if (!_isUSDBased) {
+            oracleAddrs[_wethAddr] = _wethAddr;
+        }
+        if (_tokenAddrs.length != _oracleAddrs.length) {
             revert Errors.InvalidArrayLength();
         }
         for (uint i = 0; i < _oracleAddrs.length; ) {
             if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }
-            if (hasUSDOracles) {
-                if (_isEth[i]) {
-                    ethOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
-                } else {
-                    usdOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
-                }
-            } else {
-                ethOracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
-            }
+            oracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
             unchecked {
                 ++i;
             }
+        }
+    }
+
+    function tokenPriceConvertAndCheck(
+        int256 answer
+    ) internal view returns (uint256 tokenPriceRaw) {
+        tokenPriceRaw = uint256(answer);
+        if (tokenPriceRaw < 1) {
+            revert Errors.InvalidOracleAnswer();
         }
     }
 }

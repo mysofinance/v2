@@ -3,10 +3,12 @@ pragma solidity 0.8.19;
 
 library Errors {
     error UnregisteredVault();
+    error InvalidDelegatee();
     error InvalidSender();
     error InvalidFee();
     error InsufficientSendAmount();
     error InvalidOraclePair();
+    error InvalidOracleAnswer();
     error InvalidAddress();
     error InvalidArrayLength();
     error NeitherTokenIsGOHM();
