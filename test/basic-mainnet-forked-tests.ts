@@ -41,7 +41,7 @@ function getLoopingSendAmount(
 
 describe('Basic Forked Mainnet Tests', function () {
   async function setupTest() {
-    const [lender, borrower, team] = await ethers.getSigners()
+    const [lender, borrower, team, attacker] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -179,6 +179,7 @@ describe('Basic Forked Mainnet Tests', function () {
       lender,
       borrower,
       team,
+      attacker,
       usdc,
       weth,
       paxg,
@@ -652,7 +653,7 @@ describe('Basic Forked Mainnet Tests', function () {
         expect(lenderVaultCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVPostReward)
         if (compartmentRewardTokenBalancePost.gt(0) && lenderVaultRewardTokenBalancePostUnlock.gt(0)) {
           expect(compartmentRewardTokenBalancePostUnlock).to.be.equal(0)
-          /**todo: write check on partial repay reward to vault */
+          //todo: write check on partial repay reward to vault
         }
       }
 
@@ -1173,22 +1174,24 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should thwart malcious withdraw from vault impersonating token', async () => {
-      const { lender, team, weth, lenderVault } =
+      const { lender, team, attacker, weth, lenderVault } =
         await setupTest()
 
+      // add some funds to vault that attacker will try to steal
       await ethers.provider.send('hardhat_setBalance', [team.address, '0x2004FCE5E3E25026110000000'])
       await weth.connect(team).deposit({ value: ONE_WETH.mul(10) })
-
       await weth.connect(team).transfer(lenderVault.address, ONE_WETH.mul(10))
-
       const wethBalPreAttack = await weth.balanceOf(lenderVault.address);
-
+      expect(await weth.balanceOf(lenderVault.address)).to.equal(ONE_WETH.mul(10));
+      console.log("victim vault:", lenderVault.address) // will match msg.sender in MyMaliciousWETH
       // create maliciousToken
-      const MyMaliciousERC20 = await ethers.getContractFactory('MyMaliciousERC20')
-      await MyMaliciousERC20.connect(team)
-      const myMaliciousERC20 = await MyMaliciousERC20.deploy('MalciousToken', 'MyMal',18, ZERO_ADDR, lenderVault.address)
+      const MyMaliciousERC20 = await ethers.getContractFactory('MyMaliciousWETH')
+      const myMaliciousERC20 = await MyMaliciousERC20.connect(attacker).deploy()
       await myMaliciousERC20.deployed()
-      await lenderVault.connect(lender).withdraw(myMaliciousERC20.address, ONE_WETH)
+
+      // mint some pseudo token balance to vault to bypass vaultBalance check in withdraw
+      await myMaliciousERC20.mint(lenderVault.address, 1)
+      await lenderVault.connect(lender).withdraw(myMaliciousERC20.address, 1)
       const wethBalPostAttack = await weth.balanceOf(lenderVault.address);
       expect(wethBalPostAttack).to.equal(wethBalPreAttack);
     })

