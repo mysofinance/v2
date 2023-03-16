@@ -25,7 +25,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     bool public withdrawEntered;
 
     mapping(address => uint256) public lockedAmounts;
-    DataTypes.Loan[] public _loans; // stores loans
+    DataTypes.Loan[] internal _loans; // stores loans
 
     constructor() {
         _disableInitializers();
@@ -308,7 +308,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         uint256 loanId
     ) internal returns (address collCompartment) {
         if (
-            IAddressRegistry(addressRegistry).isWhitelistedCollTokenHandler(
+            IAddressRegistry(addressRegistry).isWhitelistedCompartmentImpl(
                 borrowerCompartmentImplementation
             )
         ) {
