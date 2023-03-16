@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {IFundingPool} from "./interfaces/IFundingPool.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 
@@ -22,16 +22,17 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     uint256 public finalCollAmountReservedForConversions;
     uint256 public totalCollConversionsSoFar;
     uint256 public loanTermsLockedTime;
-    uint256 lenderGracePeriod;
-    uint256 currentRepaymentIdx;
-    uint256 subscriptionsThatAlreadyClaimedRecoveryValue;
-    DataTypes.LoanTerms _loanTerms;
-    mapping(uint256 => uint256) loanTokenRepaid;
-    mapping(uint256 => uint256) collTokenRepaid;
-    mapping(uint256 => uint256) totalConvertedSubscriptionsPerIdx; // denominated in loan Token
-    mapping(address => mapping(uint256 => bool)) lenderExercisedConversion;
-    mapping(address => mapping(uint256 => bool)) lenderClaimedRepayment;
-    mapping(address => bool) lenderClaimedCollateralOnDefault;
+    uint256 public lenderGracePeriod;
+    uint256 public currentRepaymentIdx;
+    uint256 public totalSubscriptionsThatClaimedOnDefault;
+    mapping(address => mapping(uint256 => bool))
+        public lenderExercisedConversion;
+    mapping(address => mapping(uint256 => bool)) public lenderClaimedRepayment;
+    mapping(address => bool) public lenderClaimedCollateralOnDefault;
+    DataTypes.LoanTerms internal _loanTerms;
+    mapping(uint256 => uint256) internal loanTokenRepaid;
+    mapping(uint256 => uint256) internal collTokenRepaid;
+    mapping(uint256 => uint256) internal totalConvertedSubscriptionsPerIdx; // denominated in loan Token
 
     constructor() {
         _disableInitializers();
@@ -380,7 +381,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             totalConvertedSubscriptionsPerIdx[lastPeriodIdx];
         uint256 subscriptionsLeftForRecoveryClaim = IFundingPool(fundingPool)
             .totalSubscribed(address(this)) -
-            subscriptionsThatAlreadyClaimedRecoveryValue;
+            totalSubscriptionsThatClaimedOnDefault;
         // recoveryVal split into two parts
         // 1) unconverted portion of last index is split over lenders who didn't convert OR claim yet
         // 2) rest of coll split over everyone who has not claimed
@@ -399,8 +400,27 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             subscriptionsLeftForRecoveryClaim;
         lenderClaimedCollateralOnDefault[msg.sender] = true;
         // update counter for those who have claimed
-        subscriptionsThatAlreadyClaimedRecoveryValue += lenderContribution;
+        totalSubscriptionsThatClaimedOnDefault += lenderContribution;
         IERC20Metadata(collToken).safeTransfer(msg.sender, recoveryVal);
+    }
+
+    function loanTerms() external view returns (DataTypes.LoanTerms memory) {
+        return _loanTerms;
+    }
+
+    function inUnsubscriptionPhase() external view returns (bool) {
+        return inSubscriptionPhase() || status == DataTypes.LoanStatus.ROLLBACK;
+    }
+
+    function isReadyToExecute() external view returns (bool) {
+        return status == DataTypes.LoanStatus.READY_TO_EXECUTE;
+    }
+
+    function inSubscriptionPhase() public view returns (bool) {
+        return
+            status == DataTypes.LoanStatus.IN_NEGOTIATION ||
+            (status == DataTypes.LoanStatus.BORROWER_ACCEPTED &&
+                block.timestamp < timeUntilLendersCanUnsubscribe());
     }
 
     function getAbsoluteLoanTerms(
@@ -449,25 +469,6 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             _finalCollAmountReservedForDefault,
             _finalCollAmountReservedForConversions
         );
-    }
-
-    function loanTerms() external view returns (DataTypes.LoanTerms memory) {
-        return _loanTerms;
-    }
-
-    function inUnsubscriptionPhase() external view returns (bool) {
-        return inSubscriptionPhase() || status == DataTypes.LoanStatus.ROLLBACK;
-    }
-
-    function isReadyToExecute() external view returns (bool) {
-        return status == DataTypes.LoanStatus.READY_TO_EXECUTE;
-    }
-
-    function inSubscriptionPhase() public view returns (bool) {
-        return
-            status == DataTypes.LoanStatus.IN_NEGOTIATION ||
-            (status == DataTypes.LoanStatus.BORROWER_ACCEPTED &&
-                block.timestamp < timeUntilLendersCanUnsubscribe());
     }
 
     function checkRepaymentIdx(uint256 repaymentIdx) internal view {

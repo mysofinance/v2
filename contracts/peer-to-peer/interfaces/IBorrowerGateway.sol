@@ -5,10 +5,6 @@ pragma solidity 0.8.19;
 import {DataTypes} from "../DataTypes.sol";
 
 interface IBorrowerGateway {
-    function addressRegistry() external view returns (address);
-
-    function protocolFee() external view returns (uint256);
-
     function borrowWithOffChainQuote(
         address lenderVault,
         DataTypes.BorrowTransferInstructions calldata borrowInstructions,
@@ -32,4 +28,8 @@ interface IBorrowerGateway {
     ) external;
 
     function setNewProtocolFee(uint256 _newFee) external;
+
+    function addressRegistry() external view returns (address);
+
+    function protocolFee() external view returns (uint256);
 }

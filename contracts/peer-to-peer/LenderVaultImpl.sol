@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
+import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "../Errors.sol";
@@ -25,7 +25,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     bool public withdrawEntered;
 
     mapping(address => uint256) public lockedAmounts;
-    DataTypes.Loan[] _loans; // stores loans
+    DataTypes.Loan[] public _loans; // stores loans
 
     constructor() {
         _disableInitializers();

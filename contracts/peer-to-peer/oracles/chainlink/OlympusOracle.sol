@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
 import {BaseOracle} from "../BaseOracle.sol";
@@ -12,9 +12,7 @@ import {Errors} from "../../../Errors.sol";
 /**
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
  */
-contract OlympusOracle is BaseOracle, IOracle {
-    address internal constant SOHM_ADDR =
-        0x04906695D6D12CF5459975d7C3C03356E4Ccd460;
+contract OlympusOracle is IOracle, BaseOracle {
     address internal constant GOHM_ADDR =
         0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
     uint256 internal constant SOHM_DECIMALS = 9;

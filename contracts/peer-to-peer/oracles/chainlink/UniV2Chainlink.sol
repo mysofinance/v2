@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IUniV2} from "../../interfaces/oracles/IUniV2.sol";
 import {BaseOracle} from "../BaseOracle.sol";
@@ -13,15 +13,15 @@ import {Errors} from "../../../Errors.sol";
  * @dev supports oracles which have one token which is a 50/50 LP token
  * compatible with v2v3 or v3 interfaces
  */
-contract UniV2Chainlink is BaseOracle, IOracle {
-    mapping(address => bool) public isLpAddr;
-
+contract UniV2Chainlink is IOracle, BaseOracle {
     struct OracleData {
         address token0;
         address token1;
         address oracleAddrToken0;
         address oracleAddrToken1;
     }
+
+    mapping(address => bool) public isLpAddr;
 
     constructor(
         address[] memory _tokenAddrs,

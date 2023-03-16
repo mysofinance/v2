@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
@@ -12,8 +12,9 @@ contract GLPStakingCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
 
     // arbitrum WETH address
-    address constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address constant FEE_GLP = 0x4e971a87900b931fF39d1Aad67697F49835400b6;
+    address private constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address private constant FEE_GLP =
+        0x4e971a87900b931fF39d1Aad67697F49835400b6;
 
     // transfer coll on repays
     function transferCollFromCompartment(
