@@ -305,17 +305,13 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (lenderContribution == 0) {
             revert();
         }
+        // iff there's a repay, currentRepaymentIdx (initially 0) gets incremented;
+        // hence any `repaymentIdx` smaller than `currentRepaymentIdx` will always
+        // map to a valid repayment claim; no need to check `repaymentSchedule[repaymentIdx].repaid`
         if (repaymentIdx >= currentRepaymentIdx) {
             revert();
         }
-        if (!_loanTerms.repaymentSchedule[repaymentIdx].repaid) {
-            revert();
-        }
-        // can only claim after repayment cutoff date
-        uint256 repaymentCutoffTime = getRepaymentCutoffTime(repaymentIdx);
-        if (block.timestamp <= repaymentCutoffTime) {
-            revert();
-        }
+        // note: users can claim as soon as repaid, no need to check getRepaymentCutoffTime(...)
         if (lenderClaimedRepayment[msg.sender][repaymentIdx]) {
             revert();
         }
