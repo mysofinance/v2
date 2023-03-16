@@ -32,7 +32,7 @@ interface ILoanProposalImpl {
 
     function markAsDefaulted() external;
 
-    function claimCollateralOnDefault() external;
+    function claimOnDefault() external;
 
     function status() external view returns (DataTypes.LoanStatus);
 

@@ -31,7 +31,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     mapping(address => bool) public lenderClaimedCollateralOnDefault;
     DataTypes.LoanTerms internal _loanTerms;
     mapping(uint256 => uint256) internal loanTokenRepaid;
-    mapping(uint256 => uint256) internal collTokenRepaid;
+    mapping(uint256 => uint256) internal collTokenConverted;
     mapping(uint256 => uint256) internal totalConvertedSubscriptionsPerIdx; // denominated in loan Token
 
     constructor() {
@@ -239,7 +239,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted * lenderContribution) /
             IFundingPool(fundingPool).totalSubscribed(address(this));
-        collTokenRepaid[repaymentIdx] += conversionAmount;
+        collTokenConverted[repaymentIdx] += conversionAmount;
         totalCollConversionsSoFar += conversionAmount;
         totalConvertedSubscriptionsPerIdx[repaymentIdx] += lenderContribution;
         lenderExercisedConversion[msg.sender][repaymentIdx] = true;
@@ -274,7 +274,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted;
         uint256 collTokenLeftUnconverted = collTokenDueIfAllConverted -
-            collTokenRepaid[repaymentIdx];
+            collTokenConverted[repaymentIdx];
         uint256 remainingLoanTokenDue = (_loanTerms
             .repaymentSchedule[repaymentIdx]
             .loanTokenDue * collTokenLeftUnconverted) /
@@ -353,7 +353,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
     }
 
-    function claimCollateralOnDefault() external {
+    function claimOnDefault() external {
         if (status != DataTypes.LoanStatus.DEFAULTED) {
             revert();
         }
@@ -366,42 +366,48 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert();
         }
         uint256 lastPeriodIdx = currentRepaymentIdx;
-        uint256 lastPeriodCollTokenDue = _loanTerms
-            .repaymentSchedule[lastPeriodIdx]
-            .collTokenDueIfConverted;
         uint256 collTokenBal = IERC20Metadata(collToken).balanceOf(
             address(this)
         );
-        uint256 lastPeriodNonConvertedCollToken = lastPeriodCollTokenDue -
-            collTokenRepaid[lastPeriodIdx];
-        uint256 recoveryCollAmount = collTokenBal -
-            lastPeriodNonConvertedCollToken;
-        uint256 subscriptionsLeftForLastIdx = IFundingPool(fundingPool)
-            .totalSubscribed(address(this)) -
+        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
+            address(this)
+        );
+        uint256 stillToBeConvertedCollTokens = _loanTerms
+            .repaymentSchedule[lastPeriodIdx]
+            .collTokenDueIfConverted - collTokenConverted[lastPeriodIdx];
+        uint256 defaultClaimProRataShare;
+
+        // if only some lenders converted, then split 'stillToBeConvertedCollTokens'
+        // fairly among lenders who didn't already convert in default period to not
+        // put them at an unfair disadvantage
+        uint256 totalUnconvertedSubscriptionsFromLastIdx = totalSubscribed -
             totalConvertedSubscriptionsPerIdx[lastPeriodIdx];
-        uint256 subscriptionsLeftForRecoveryClaim = IFundingPool(fundingPool)
-            .totalSubscribed(address(this)) -
-            totalSubscriptionsThatClaimedOnDefault;
-        // recoveryVal split into two parts
-        // 1) unconverted portion of last index is split over lenders who didn't convert OR claim yet
-        // 2) rest of coll split over everyone who has not claimed
-        uint256 recoveryVal = !lenderExercisedConversion[msg.sender][
-            lastPeriodIdx
-        ]
-            ? (lastPeriodNonConvertedCollToken * lenderContribution) /
-                subscriptionsLeftForLastIdx
-            : 0;
-        // accounts for collateral and contribution towards last index
-        collTokenRepaid[lastPeriodIdx] += recoveryVal;
-        // update counter for those who have claimed/converted on the coll set aside for last round
-        totalConvertedSubscriptionsPerIdx[lastPeriodIdx] += lenderContribution;
-        recoveryVal +=
-            (recoveryCollAmount * lenderContribution) /
-            subscriptionsLeftForRecoveryClaim;
+        uint256 stillToBeConvertedCollTokenShare;
+        if (!lenderExercisedConversion[msg.sender][lastPeriodIdx]) {
+            stillToBeConvertedCollTokenShare =
+                (stillToBeConvertedCollTokens * lenderContribution) /
+                totalUnconvertedSubscriptionsFromLastIdx;
+            collTokenConverted[
+                lastPeriodIdx
+            ] += stillToBeConvertedCollTokenShare;
+            totalConvertedSubscriptionsPerIdx[
+                lastPeriodIdx
+            ] += lenderContribution;
+        }
+        // determine pro-rata share on remaining non-conversion related collToken balance
+        uint256 remainingDefaultClaimShare = ((collTokenBal -
+            stillToBeConvertedCollTokens) * lenderContribution) /
+            (totalSubscribed - totalSubscriptionsThatClaimedOnDefault);
         lenderClaimedCollateralOnDefault[msg.sender] = true;
-        // update counter for those who have claimed
         totalSubscriptionsThatClaimedOnDefault += lenderContribution;
-        IERC20Metadata(collToken).safeTransfer(msg.sender, recoveryVal);
+        defaultClaimProRataShare =
+            stillToBeConvertedCollTokenShare +
+            remainingDefaultClaimShare;
+
+        IERC20Metadata(collToken).safeTransfer(
+            msg.sender,
+            defaultClaimProRataShare
+        );
     }
 
     function loanTerms() external view returns (DataTypes.LoanTerms memory) {
