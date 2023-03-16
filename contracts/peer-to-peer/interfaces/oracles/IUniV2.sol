@@ -4,9 +4,9 @@ pragma solidity 0.8.19;
 interface IUniV2 {
     /**
      * @notice returns reserves of uni v2 pool
-     * @return _ token0 reserves
-     * @return _ token1 reserves
-     * @return _ timestamp (which isn't too relevant for us)
+     * @return token0 reserves
+     * @return token1 reserves
+     * @return timestamp (which isn't too relevant for us)
      */
     function getReserves() external view returns (uint112, uint112, uint32);
 
