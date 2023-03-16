@@ -600,6 +600,11 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
 
       await addressRegistry.connect(team).toggleTokens([weth.address], true)
+      await addressRegistry.connect(team).toggleTokens([usdc.address], false)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+
+      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -610,10 +615,13 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong updateOnChainQuote', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, paxg, lenderVault } = await setupTest()
+      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+        await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      const compAddress = '0xc00e94Cb662C3520282E6f5717214004A7f26888'
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -655,8 +663,6 @@ describe('Basic Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const compAddress = '0xc00e94Cb662C3520282E6f5717214004A7f26888'
-
       let newOnChainQuote = {
         ...onChainQuote,
         generalQuoteInfo: {
@@ -667,18 +673,32 @@ describe('Basic Forked Mainnet Tests', function () {
         }
       }
 
+      await addressRegistry.connect(team).toggleTokens([usdc.address], false)
+
       await expect(quoteHandler.connect(lender).updateOnChainQuote(borrower.address, onChainQuote, newOnChainQuote)).to
         .reverted
       await expect(quoteHandler.connect(borrower).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
         .reverted
       await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
         .reverted
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
 
       newOnChainQuote.generalQuoteInfo.loanToken = usdc.address
 
+      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
+        .reverted
+
       await addressRegistry.connect(team).toggleTokens([compAddress], true)
+
+      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
+        .reverted
+
+      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
+
+      onChainQuote.generalQuoteInfo.loanToken = compAddress
+      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
+        .reverted
+
+      onChainQuote.generalQuoteInfo.loanToken = usdc.address
 
       const updateOnChainQuoteTransaction = await quoteHandler
         .connect(lender)
@@ -697,6 +717,37 @@ describe('Basic Forked Mainnet Tests', function () {
       })
 
       expect(borrowQuoteAddedEvent).to.be.not.undefined
+
+      await quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, newOnChainQuote, onChainQuote)
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
