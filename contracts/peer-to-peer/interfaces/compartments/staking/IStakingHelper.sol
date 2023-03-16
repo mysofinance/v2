@@ -23,6 +23,7 @@ interface IStakingHelper {
 
     /**
      * @notice Claim fee reward tokens
+     * @param _receiver address which is recipient of the claim
      */
     function claim(address _receiver) external returns (uint256);
 
@@ -33,26 +34,19 @@ interface IStakingHelper {
     function mint(address gaugeAddr) external;
 
     /**
-     * @notice returns lpToken address for crv style gauge
+     * @notice returns lpToken address for gauge
      */
     function lp_token() external view returns (address);
 
     /**
-     * @notice returns lpToken address for cvx style reward pool
-     */
-    function staking_token() external view returns (address);
-
-    /**
-     * @notice returns reward token address for cvx reward pool
-     */
-    function reward_token() external view returns (address);
-
-    /**
      * @notice returns reward token address for liquidity gauge by index
+     * @param index index of particular token address in the reward token array
      */
     function reward_tokens(uint256 index) external view returns (address);
 
+    /**
+     * @notice returns gauge address by index from gaugeController
+     * @param index index in gauge controller array that returns liquidity gauge address
+     */
     function gauges(uint256 index) external view returns (address);
-
-    function n_gauges() external view returns (int128);
 }
