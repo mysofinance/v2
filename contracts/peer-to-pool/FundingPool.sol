@@ -108,20 +108,12 @@ contract FundingPool is IFundingPool {
             .loanTerms();
         uint256 finalLoanAmount = ILoanProposalImpl(loanProposal)
             .finalLoanAmount();
-        uint256 finalCollAmount = ILoanProposalImpl(loanProposal)
-            .finalCollAmount();
         totalSubscribedIsDeployed[loanProposal] = true;
         ILoanProposalImpl(loanProposal).updateStatusToDeployed();
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
             finalLoanAmount
         );
-        IERC20Metadata(ILoanProposalImpl(loanProposal).collToken())
-            .safeTransferFrom(
-                loanTerms.borrower,
-                loanProposal,
-                finalCollAmount
-            );
         uint256 arrangerFee = ILoanProposalImpl(loanProposal).arrangerFee();
         uint256 protocolFeeShare = (arrangerFee *
             ILoanProposalFactory(loanProposalFactory).arrangerFeeSplit()) /

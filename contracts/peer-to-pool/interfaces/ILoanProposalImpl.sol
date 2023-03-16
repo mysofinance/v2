@@ -18,7 +18,7 @@ interface ILoanProposalImpl {
 
     function acceptLoanTerms() external;
 
-    function lockInFinalAmounts() external;
+    function finalizeLoanTermsAndTransferColl() external;
 
     function rollback() external;
 
@@ -46,7 +46,15 @@ interface ILoanProposalImpl {
 
     function finalLoanAmount() external view returns (uint256);
 
-    function finalCollAmount() external view returns (uint256);
+    function finalCollAmountReservedForDefault()
+        external
+        view
+        returns (uint256);
+
+    function finalCollAmountReservedForConversions()
+        external
+        view
+        returns (uint256);
 
     function loanTermsLockedTime() external view returns (uint256);
 
