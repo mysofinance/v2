@@ -1,5 +1,5 @@
 import { ethers } from 'hardhat'
-import { LoanProposalFactory } from '../../typechain-types'
+import { LoanProposalFactory, LoanProposal, FundingPool, MyERC20 } from '../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { BigNumber } from 'ethers'
 
@@ -9,6 +9,7 @@ const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
+const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 
 export const getLoanTermsTemplate = () => {
   const repaymentSchedule = getRepaymentScheduleTemplate()
@@ -88,4 +89,21 @@ export const createLoanProposal = async (loanProposalFactory : LoanProposalFacto
     const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
     const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
     return loanProposal
+}
+
+export const addSubscriptionsToLoanProposal = async (lender1: SignerWithAddress, lender2: SignerWithAddress, lender3: SignerWithAddress, fundingToken: MyERC20, fundingPool: FundingPool, loanProposal :LoanProposal) => {
+  // 3 lenders each contribute 1/3 of maxLoanAmount
+  const loanTerms = await loanProposal.loanTerms()
+  const subscriptionAmount = (loanTerms.maxLoanAmount).div(3)
+  await fundingToken.connect(lender1).approve(fundingPool.address, subscriptionAmount)
+  await fundingPool.connect(lender1).deposit(subscriptionAmount, 0)
+  await fundingPool.connect(lender1).subscribe(loanProposal.address,subscriptionAmount)
+
+  await fundingToken.connect(lender2).approve(fundingPool.address, subscriptionAmount)
+  await fundingPool.connect(lender2).deposit(subscriptionAmount, 0)
+  await fundingPool.connect(lender2).subscribe(loanProposal.address,subscriptionAmount)
+
+  await fundingToken.connect(lender3).approve(fundingPool.address, subscriptionAmount)
+  await fundingPool.connect(lender3).deposit(subscriptionAmount, 0)
+  await fundingPool.connect(lender3).subscribe(loanProposal.address,subscriptionAmount)
 }

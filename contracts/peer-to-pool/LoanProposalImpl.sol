@@ -73,11 +73,26 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (msg.sender != arranger) {
             revert Errors.InvalidSender();
         }
-        if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
+        if (
+            status != DataTypes.LoanStatus.WITHOUT_LOAN_TERMS &&
+            status != DataTypes.LoanStatus.IN_NEGOTIATION
+        ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
         repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
+        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
+            address(this)
+        );
+        (, , uint256 _finalLoanAmount, , ) = getAbsoluteLoanTerms(
+            newLoanTerms,
+            totalSubscribed,
+            IERC20Metadata(IFundingPool(fundingPool).depositToken()).decimals()
+        );
+        if (_finalLoanAmount > newLoanTerms.maxLoanAmount) {
+            revert Errors.InvalidNewLoanTerms();
+        }
         _loanTerms = newLoanTerms;
+        status = DataTypes.LoanStatus.IN_NEGOTIATION;
     }
 
     function acceptLoanTerms() external {
