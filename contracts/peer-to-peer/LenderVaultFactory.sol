@@ -7,8 +7,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 
-contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
+contract LenderVaultFactory is ReentrancyGuard, IEvents, ILenderVaultFactory {
     address public immutable addressRegistry;
     address public immutable lenderVaultImpl;
 
@@ -29,5 +30,6 @@ contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
             addressRegistry
         );
         IAddressRegistry(addressRegistry).addLenderVault(newLenderVaultAddr);
+        emit NewVaultCreated(newLenderVaultAddr, msg.sender);
     }
 }
