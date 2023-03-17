@@ -122,16 +122,11 @@ contract CurveLPStakingCompartment is BaseCompartment {
         _withdrawCheck();
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
         address _liqGaugeAddr = liqGaugeAddr;
-        address _rewardTokenAddr = address(0);
-        bool isStaked = _liqGaugeAddr != address(0);
         // check staked balance in gauge if gaugeAddr has been set
-        // if not staked, then liqGaugeAddr = 0 and skip don't withdraw
-        if (isStaked) {
-            _rewardTokenAddr = withdrawCollFromGauge(
-                repayAmount,
-                repayAmountLeft
-            );
-        }
+        // if not staked, then liqGaugeAddr = 0 and will not withdraw or have a reward address
+        address _rewardTokenAddr = _liqGaugeAddr != address(0)
+            ? withdrawCollFromGauge(repayAmount, repayAmountLeft)
+            : address(0);
 
         // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
@@ -140,7 +135,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
 
         // transfer proportion of compartment lp token balance if never staked or an unlock, else all balance if staked
         {
-            uint256 lpTokenAmount = (isUnlock || isStaked)
+            uint256 lpTokenAmount = isUnlock || _liqGaugeAddr != address(0)
                 ? currentCompartmentBal
                 : (repayAmount * currentCompartmentBal) / repayAmountLeft;
 
