@@ -11,11 +11,13 @@ interface ILenderVaultFactory {
 
     /**
      * @notice function returns address registry
+     * @return address of registry
      */
     function addressRegistry() external view returns (address);
 
     /**
      * @notice function returns address of lender vault implementation contract
+     * @return address of lender vault implementation
      */
     function lenderVaultImpl() external view returns (address);
 }
