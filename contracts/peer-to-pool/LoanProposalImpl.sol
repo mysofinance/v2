@@ -26,6 +26,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     uint256 public currentRepaymentIdx;
     uint256 public totalSubscriptionsThatClaimedOnDefault;
     mapping(uint256 => uint256) public totalConvertedSubscriptionsPerIdx; // denominated in loan Token
+    mapping(uint256 => uint256) public collTokenConverted;
     mapping(address => mapping(uint256 => bool))
         internal lenderExercisedConversion;
     mapping(address => mapping(uint256 => bool))
@@ -33,7 +34,6 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     mapping(address => bool) internal lenderClaimedCollateralOnDefault;
     DataTypes.LoanTerms internal _loanTerms;
     mapping(uint256 => uint256) internal loanTokenRepaid;
-    mapping(uint256 => uint256) internal collTokenConverted;
 
     constructor() {
         _disableInitializers();
