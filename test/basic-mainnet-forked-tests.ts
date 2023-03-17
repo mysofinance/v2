@@ -160,6 +160,10 @@ describe('Basic Forked Mainnet Tests', function () {
 
     await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
+    const wbtc = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+    const btcToUSDChainlinkAddr = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c'
+    const wBTCToBTCChainlinkAddr = '0xfdfd9c85ad200c506cf9e21f1fd8dd01932fbb23'
+    
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
     await BalancerV2Looping.connect(lender)
@@ -185,6 +189,9 @@ describe('Basic Forked Mainnet Tests', function () {
       ldo,
       gohm,
       uniV2WethUsdc,
+      wbtc,
+      btcToUSDChainlinkAddr,
+      wBTCToBTCChainlinkAddr,
       lenderVault,
       lenderVaultFactory,
       balancerV2Looping
@@ -1506,7 +1513,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('Testing chainlink oracles', function () {
     it('Should process onChain quote with eth-based oracle address (non-weth)', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, team, lenderVault } =
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lenderVault } =
         await setupTest()
 
       // deploy chainlinkOracleContract
@@ -1517,21 +1524,34 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr],
-        weth.address)).to.be.reverted
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
+        )).to.be.reverted
       await expect(ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [ZERO_ADDR, paxgEthChainlinkAddr],
-        weth.address)).to.be.reverted
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr)).to.be.reverted
       await expect(ChainlinkBasicImplementation.connect(team).deploy(
         [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        weth.address)).to.be.reverted
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr)).to.be.reverted
         
       /****correct deploy****/
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        weth.address
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1626,7 +1646,7 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (coll weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } =
         await setupTest()
 
       // deploy chainlinkOracleContract
@@ -1636,7 +1656,10 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        weth.address
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1724,7 +1747,7 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (loan weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } =
         await setupTest()
 
       // deploy chainlinkOracleContract
@@ -1734,7 +1757,10 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        weth.address
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1825,7 +1851,7 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry } =
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } =
         await setupTest()
 
       // deploy chainlinkOracleContract
@@ -1835,7 +1861,10 @@ describe('Basic Forked Mainnet Tests', function () {
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        weth.address
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       )
       await olympusOracleImplementation.deployed()
 
@@ -1946,7 +1975,10 @@ describe('Basic Forked Mainnet Tests', function () {
         uniV2WethUsdc,
         team,
         lenderVault,
-        addressRegistry
+        addressRegistry,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       } = await setupTest()
 
       // deploy chainlinkOracleContract
@@ -1957,14 +1989,20 @@ describe('Basic Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         [ZERO_ADDR],
-        weth.address
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       )).to.be.reverted
       /****deploy correctly****/
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         [uniV2WethUsdc.address],
-        weth.address
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       )
       await uniV2OracleImplementation.deployed()
 

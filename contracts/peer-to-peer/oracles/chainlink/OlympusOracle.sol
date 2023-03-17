@@ -23,8 +23,20 @@ contract OlympusOracle is IOracle, BaseOracle {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        address _wethAddrOfGivenChain
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddrOfGivenChain) {}
+        address _wethAddrOfGivenChain,
+        address _wBTCAddrOfGivenChain,
+        address _btcToUSDOracleAddrOfGivenChain,
+        address _wBTCToBTCOracleAddrOfGivenChain
+    )
+        BaseOracle(
+            _tokenAddrs,
+            _oracleAddrs,
+            _wethAddrOfGivenChain,
+            _btcToUSDOracleAddrOfGivenChain,
+            wBTCAddrOfGivenChain,
+            _wBTCToBTCOracleAddrOfGivenChain
+        )
+    {}
 
     function getPrice(
         address collToken,
@@ -85,15 +97,8 @@ contract OlympusOracle is IOracle, BaseOracle {
         bool isColl
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        address wethAddress = wethAddrOfGivenChain;
-        uint256 loanTokenPriceRaw = getPriceOfToken(
-            loanTokenOracleAddr,
-            wethAddress
-        );
-        uint256 collTokenPriceRaw = getPriceOfToken(
-            collTokenOracleAddr,
-            wethAddress
-        );
+        uint256 loanTokenPriceRaw = getPriceOfToken(loanTokenOracleAddr);
+        uint256 collTokenPriceRaw = getPriceOfToken(collTokenOracleAddr);
         uint256 index = IOlympus(GOHM_ADDR).index();
 
         collTokenPriceInLoanToken = isColl

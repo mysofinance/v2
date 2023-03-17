@@ -27,8 +27,20 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _lpAddrs,
-        address _wethAddrOfGivenChain
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddrOfGivenChain) {
+        address _wethAddrOfGivenChain,
+        address _wBTCAddrOfGivenChain,
+        address _btcToUSDOracleAddrOfGivenChain,
+        address _wBTCToBTCOracleAddrOfGivenChain
+    )
+        BaseOracle(
+            _tokenAddrs,
+            _oracleAddrs,
+            _wethAddrOfGivenChain,
+            _btcToUSDOracleAddrOfGivenChain,
+            _wBTCAddrOfGivenChain,
+            _wBTCToBTCOracleAddrOfGivenChain
+        )
+    {
         if (_lpAddrs.length == 0) {
             revert Errors.InvalidArrayLength();
         }
@@ -138,14 +150,12 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address collToken
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        address wethAddress = wethAddrOfGivenChain;
         uint256 loanTokenPriceRaw;
         uint256 collTokenPriceRaw;
         // if token1 is address 0 means loan token was not an lp token
         if (loanTokenOracleData.token1 == address(0)) {
             loanTokenPriceRaw = getPriceOfToken(
-                loanTokenOracleData.oracleAddrToken0,
-                wethAddress
+                loanTokenOracleData.oracleAddrToken0
             );
         } else {
             // loan token was an Lp token
@@ -157,8 +167,7 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         // if token1 is address 0 means coll token was not an lp token
         if (collTokenOracleData.token1 == address(0)) {
             collTokenPriceRaw = getPriceOfToken(
-                collTokenOracleData.oracleAddrToken0,
-                wethAddress
+                collTokenOracleData.oracleAddrToken0
             );
         } else {
             // coll token was an Lp token
@@ -204,14 +213,11 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             .getReserves();
         uint256 decimalsToken0 = IERC20Metadata(token0).decimals();
         uint256 decimalsToken1 = IERC20Metadata(token1).decimals();
-        address wethAddress = wethAddrOfGivenChain;
         uint256 token0PriceRaw = getPriceOfToken(
-            lpTokenOracleData.oracleAddrToken0,
-            wethAddress
+            lpTokenOracleData.oracleAddrToken0
         );
         uint256 token1PriceRaw = getPriceOfToken(
-            lpTokenOracleData.oracleAddrToken1,
-            wethAddress
+            lpTokenOracleData.oracleAddrToken1
         );
 
         uint256 totalEthValueToken0 = (uint256(reserve0) * token0PriceRaw) /

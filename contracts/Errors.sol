@@ -13,6 +13,7 @@ library Errors {
     error InvalidOracleAnswer();
     error InvalidOracleDecimals();
     error InvalidOracleVersion();
+    error InvalidBTCOracle();
     error InvalidAddress();
     error InvalidArrayLength();
     error NeitherTokenIsGOHM();
