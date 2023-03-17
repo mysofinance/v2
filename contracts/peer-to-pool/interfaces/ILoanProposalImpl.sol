@@ -89,92 +89,6 @@ interface ILoanProposalImpl {
     function claimDefaultProceeds() external;
 
     /**
-     * @notice Returns the current status of the loan proposal
-     * @return The current loan proposal status
-     */
-    function status() external view returns (DataTypes.LoanStatus);
-
-    /**
-     * @notice Returns the given funding pool address
-     * @return The address of the linked funding pool
-     */
-    function fundingPool() external view returns (address);
-
-    /**
-     * @notice Returns the given collateral token address
-     * @return The address of the given collateral token
-     */
-    function collToken() external view returns (address);
-
-    /**
-     * @notice Returns the arranger address
-     * @return The address of the given arranger
-     */
-    function arranger() external view returns (address);
-
-    /**
-     * @notice Returns the arranger fee
-     * @return The arranger fee
-     * @dev The arranger fee is initially expressed in relative terms (i.e., 100% = BASE) and once the proposal gets finalized in absolute terms (e.g., 1000 USDC)
-     */
-    function arrangerFee() external view returns (uint256);
-
-    /**
-     * @notice Returns the final loan amount
-     * @return The final loan amount
-     * @dev Initially, this value is zero and gets set once final amounts are known and finalizeLoanTermsAndTransferColl method is called
-     */
-    function finalLoanAmount() external view returns (uint256);
-
-    /**
-     * @notice Returns the final collateral amount reserved for default case
-     * @return The final collateral amount reserved for default case
-     * @dev Initially, this value is zero and gets set once final amounts are known and finalizeLoanTermsAndTransferColl method is called
-     */
-    function finalCollAmountReservedForDefault()
-        external
-        view
-        returns (uint256);
-
-    /**
-     * @notice Returns the final collateral amount reserved for lender conversions
-     * @return The final collateral amount reserved for lender conversions
-     * @dev Initially, this value is zero and gets set once final amounts are known and finalizeLoanTermsAndTransferColl method is called
-     */
-    function finalCollAmountReservedForConversions()
-        external
-        view
-        returns (uint256);
-
-    /**
-     * @notice Returns the timestamp when loan terms got locked in
-     * @return The timestamp when loan terms got locked in
-     * @dev Initially, this value is zero and gets set once final amounts are known and finalizeLoanTermsAndTransferColl method is called
-     */
-    function loanTermsLockedTime() external view returns (uint256);
-
-    /**
-     * @notice Returns the lender grace period until which lenders can unsubscribe after a loan proposal got accepted by the borrower
-     * @return The lender grace period
-     */
-    function lenderGracePeriod() external view returns (uint256);
-
-    /**
-     * @notice Returns the current repayment index
-     * @return The current repayment index
-     */
-    function currentRepaymentIdx() external view returns (uint256);
-
-    /**
-     * @notice In case of a default, returns the total subscriptions that claimed default proceeds so far
-     * @return The total subscriptions that claimed their pro-rata share of default proceeds
-     */
-    function totalSubscriptionsThatClaimedOnDefault()
-        external
-        view
-        returns (uint256);
-
-    /**
      * @notice Returns the amount of subscriptions that converted for given repayment period
      * @param repaymentIdx The respective repayment index of given period
      * @return The total amount of subscriptions that converted for given repayment period
@@ -191,6 +105,29 @@ interface ILoanProposalImpl {
     function collTokenConverted(
         uint256 repaymentIdx
     ) external view returns (uint256);
+
+    function dynamicData()
+        external
+        view
+        returns (
+            uint256 arrangerFee,
+            uint256 finalLoanAmount,
+            uint256 finalCollAmountReservedForDefault,
+            uint256 finalCollAmountReservedForConversions,
+            uint256 loanTermsLockedTime,
+            uint256 currentRepaymentIdx,
+            DataTypes.LoanStatus status
+        );
+
+    function staticData()
+        external
+        view
+        returns (
+            address fundingPool,
+            address collToken,
+            address arranger,
+            uint256 lenderGracePeriod
+        );
 
     /**
      * @notice Returns the current loan terms

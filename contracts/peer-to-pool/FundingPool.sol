@@ -114,28 +114,33 @@ contract FundingPool is IEvents, IFundingPool {
         ) {
             revert Errors.UnregisteredLoanProposal();
         }
-        if (
-            ILoanProposalImpl(loanProposal).status() !=
-            DataTypes.LoanStatus.READY_TO_EXECUTE
-        ) {
+
+        (
+            uint256 arrangerFee,
+            uint256 finalLoanAmount,
+            ,
+            ,
+            ,
+            ,
+            DataTypes.LoanStatus status
+        ) = ILoanProposalImpl(loanProposal).dynamicData();
+        if (status != DataTypes.LoanStatus.READY_TO_EXECUTE) {
             revert Errors.ProposalNotReadyForExecution();
         }
         DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();
-        uint256 finalLoanAmount = ILoanProposalImpl(loanProposal)
-            .finalLoanAmount();
         totalSubscribedIsDeployed[loanProposal] = true;
         ILoanProposalImpl(loanProposal).updateStatusToDeployed();
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
             finalLoanAmount
         );
-        uint256 arrangerFee = ILoanProposalImpl(loanProposal).arrangerFee();
+        (, , address arranger, ) = ILoanProposalImpl(loanProposal).staticData();
         uint256 protocolFeeShare = (arrangerFee *
             ILoanProposalFactory(loanProposalFactory).arrangerFeeSplit()) /
             Constants.BASE;
         IERC20Metadata(depositToken).safeTransfer(
-            ILoanProposalImpl(loanProposal).arranger(),
+            arranger,
             arrangerFee - protocolFeeShare
         );
         IERC20Metadata(depositToken).safeTransfer(
