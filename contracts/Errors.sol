@@ -9,6 +9,8 @@ library Errors {
     error InsufficientSendAmount();
     error InvalidOraclePair();
     error InvalidOracleAnswer();
+    error InvalidOracleDecimals();
+    error InvalidOracleVersion();
     error InvalidAddress();
     error InvalidArrayLength();
     error NeitherTokenIsGOHM();

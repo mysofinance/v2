@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 interface AggregatorV3Interface {
-    function description() external view returns (string memory);
+    function decimals() external view returns (uint8);
 
     function version() external view returns (uint256);
 

@@ -27,8 +27,11 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _lpAddrs,
-        address _wethAddr
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, false) {
+        address _wethAddrOfGivenChain
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddrOfGivenChain) {
+        if (_lpAddrs.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
         for (uint i = 0; i < _lpAddrs.length; ) {
             if (_lpAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
@@ -134,37 +137,35 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address loanToken,
         address collToken
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
-        int256 answer;
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        address wethAddress = weth;
+        address wethAddress = wethAddrOfGivenChain;
+        uint256 loanTokenPriceRaw;
+        uint256 collTokenPriceRaw;
         // if token1 is address 0 means loan token was not an lp token
         if (loanTokenOracleData.token1 == address(0)) {
-            if (loanTokenOracleData.token0 == wethAddress) {
-                answer = 10 ** 18;
-            } else {
-                (, answer, , , ) = AggregatorV3Interface(
-                    loanTokenOracleData.oracleAddrToken0
-                ).latestRoundData();
-            }
+            loanTokenPriceRaw = getPriceOfToken(
+                loanTokenOracleData.oracleAddrToken0,
+                wethAddress
+            );
         } else {
             // loan token was an Lp token
-            answer = getLpTokenPrice(loanTokenOracleData, loanToken);
+            loanTokenPriceRaw = uint256(
+                getLpTokenPrice(loanTokenOracleData, loanToken)
+            );
         }
-        uint256 loanTokenPriceRaw = tokenPriceConvertAndCheck(answer);
+
         // if token1 is address 0 means coll token was not an lp token
         if (collTokenOracleData.token1 == address(0)) {
-            if (collTokenOracleData.token0 == wethAddress) {
-                answer = 10 ** 18;
-            } else {
-                (, answer, , , ) = AggregatorV3Interface(
-                    collTokenOracleData.oracleAddrToken0
-                ).latestRoundData();
-            }
+            collTokenPriceRaw = getPriceOfToken(
+                collTokenOracleData.oracleAddrToken0,
+                wethAddress
+            );
         } else {
             // coll token was an Lp token
-            answer = getLpTokenPrice(collTokenOracleData, collToken);
+            collTokenPriceRaw = uint256(
+                getLpTokenPrice(collTokenOracleData, collToken)
+            );
         }
-        uint256 collTokenPriceRaw = tokenPriceConvertAndCheck(answer);
 
         collTokenPriceInLoanToken =
             (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
@@ -185,6 +186,9 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             (unsignedLpTokenPriceInEth * (10 ** lpTokenDecimals)) /
                 totalLpSupply
         );
+        if (lpTokenPriceInEth < 1) {
+            revert Errors.InvalidOracleAnswer();
+        }
     }
 
     function getTotalEthValue(
@@ -197,24 +201,15 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             .getReserves();
         uint256 decimalsToken0 = IERC20Metadata(token0).decimals();
         uint256 decimalsToken1 = IERC20Metadata(token1).decimals();
-        int256 answer;
-        address wethAddress = weth;
-        if (lpTokenOracleData.oracleAddrToken0 == wethAddress) {
-            answer = 10 ** 18;
-        } else {
-            (, answer, , , ) = AggregatorV3Interface(
-                lpTokenOracleData.oracleAddrToken0
-            ).latestRoundData();
-        }
-        uint256 token0PriceRaw = tokenPriceConvertAndCheck(answer);
-        if (lpTokenOracleData.oracleAddrToken1 == wethAddress) {
-            answer = 10 ** 18;
-        } else {
-            (, answer, , , ) = AggregatorV3Interface(
-                lpTokenOracleData.oracleAddrToken1
-            ).latestRoundData();
-        }
-        uint256 token1PriceRaw = tokenPriceConvertAndCheck(answer);
+        address wethAddress = wethAddrOfGivenChain;
+        uint256 token0PriceRaw = getPriceOfToken(
+            lpTokenOracleData.oracleAddrToken0,
+            wethAddress
+        );
+        uint256 token1PriceRaw = getPriceOfToken(
+            lpTokenOracleData.oracleAddrToken1,
+            wethAddress
+        );
 
         uint256 totalEthValueToken0 = (uint256(reserve0) * token0PriceRaw) /
             (10 ** decimalsToken0);

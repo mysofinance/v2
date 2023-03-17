@@ -16,9 +16,8 @@ contract ChainlinkBasic is BaseOracle, IOracle {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        address _wethAddr,
-        bool _isUSDBased
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, _isUSDBased) {}
+        address _wethAddrOfGivenChain
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddrOfGivenChain) {}
 
     function getPrice(
         address collToken,
@@ -64,24 +63,16 @@ contract ChainlinkBasic is BaseOracle, IOracle {
         address collTokenOracleAddr,
         address loanToken
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
-        int256 answer;
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        address wethAddress = weth;
-        if (loanTokenOracleAddr == wethAddress) {
-            answer = 10 ** 18;
-        } else {
-            (, answer, , , ) = AggregatorV3Interface(loanTokenOracleAddr)
-                .latestRoundData();
-        }
-        uint256 loanTokenPriceRaw = tokenPriceConvertAndCheck(answer);
-        if (collTokenOracleAddr == wethAddress) {
-            answer = 10 ** 18;
-        } else {
-            (, answer, , , ) = AggregatorV3Interface(collTokenOracleAddr)
-                .latestRoundData();
-        }
-        uint256 collTokenPriceRaw = tokenPriceConvertAndCheck(answer);
-
+        address wethAddress = wethAddrOfGivenChain;
+        uint256 loanTokenPriceRaw = getPriceOfToken(
+            loanTokenOracleAddr,
+            wethAddress
+        );
+        uint256 collTokenPriceRaw = getPriceOfToken(
+            collTokenOracleAddr,
+            wethAddress
+        );
         collTokenPriceInLoanToken =
             (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
             (loanTokenPriceRaw);

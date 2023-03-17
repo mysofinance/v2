@@ -8,7 +8,7 @@ import {IOracle} from "../interfaces/IOracle.sol";
 import {Errors} from "../../Errors.sol";
 
 abstract contract BaseOracle {
-    address internal immutable weth;
+    address internal immutable wethAddrOfGivenChain;
     // tokenAddr => chainlink oracle addr
     // oracles will be eth or usd based
     mapping(address => address) public oracleAddrs;
@@ -17,25 +17,39 @@ abstract contract BaseOracle {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        address _wethAddr,
-        bool _isUSDBased
+        address _wethAddrOfGivenChain
     ) {
-        if (_wethAddr == address(0)) {
+        if (_wethAddrOfGivenChain == address(0)) {
             revert Errors.InvalidAddress();
         }
-        weth = _wethAddr;
-        isUSDBased = _isUSDBased;
+        wethAddrOfGivenChain = _wethAddrOfGivenChain;
+        isUSDBased = _wethAddrOfGivenChain == address(0);
         // if you use eth oracles with weth, will just return weth address
         // for usd-based oracle weth/usd oracle addr will need to be passed in like others
-        if (!_isUSDBased) {
-            oracleAddrs[_wethAddr] = _wethAddr;
+        if (!isUSDBased) {
+            oracleAddrs[_wethAddrOfGivenChain] = _wethAddrOfGivenChain;
         }
-        if (_tokenAddrs.length != _oracleAddrs.length) {
+        if (
+            _tokenAddrs.length == 0 || _tokenAddrs.length != _oracleAddrs.length
+        ) {
             revert Errors.InvalidArrayLength();
         }
+        uint8 oracleDecimals;
+        uint256 version;
         for (uint i = 0; i < _oracleAddrs.length; ) {
             if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
+            }
+            oracleDecimals = AggregatorV3Interface(_oracleAddrs[i]).decimals();
+            if (
+                (isUSDBased && oracleDecimals != 8) ||
+                (!isUSDBased && oracleDecimals != 18)
+            ) {
+                revert Errors.InvalidOracleDecimals();
+            }
+            version = AggregatorV3Interface(_oracleAddrs[i]).version();
+            if (version != 4) {
+                revert Errors.InvalidOracleVersion();
             }
             oracleAddrs[_tokenAddrs[i]] = _oracleAddrs[i];
             unchecked {
@@ -44,9 +58,17 @@ abstract contract BaseOracle {
         }
     }
 
-    function tokenPriceConvertAndCheck(
-        int256 answer
+    function getPriceOfToken(
+        address oracleAddr,
+        address wethAddress
     ) internal view returns (uint256 tokenPriceRaw) {
+        int256 answer;
+        if (oracleAddr == wethAddress) {
+            answer = 10 ** 18;
+        } else {
+            (, answer, , , ) = AggregatorV3Interface(oracleAddr)
+                .latestRoundData();
+        }
         tokenPriceRaw = uint256(answer);
         if (tokenPriceRaw < 1) {
             revert Errors.InvalidOracleAnswer();

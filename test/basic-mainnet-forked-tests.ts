@@ -1494,32 +1494,23 @@ describe('Basic Forked Mainnet Tests', function () {
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       /****deploy errors on base oracles****/
       await expect(ChainlinkBasicImplementation.connect(team).deploy(
-          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
-          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-          ZERO_ADDR,
-          false)).to.be.reverted
-      await expect(ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr],
-        weth.address,
-        false)).to.be.reverted
+        weth.address)).to.be.reverted
       await expect(ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [ZERO_ADDR, paxgEthChainlinkAddr],
-        weth.address,
-        false)).to.be.reverted
+        weth.address)).to.be.reverted
       await expect(ChainlinkBasicImplementation.connect(team).deploy(
         [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        weth.address,
-        false)).to.be.reverted
+        weth.address)).to.be.reverted
         
       /****correct deploy****/
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        weth.address,
-        false
+        weth.address
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1624,8 +1615,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        weth.address,
-        false
+        weth.address
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -1723,8 +1713,7 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        weth.address,
-        false
+        weth.address
       )
       await chainlinkBasicImplementation.deployed()
 
