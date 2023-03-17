@@ -44,4 +44,16 @@ library Errors {
     error WithdrawEntered();
     error DuplicateAddresses();
     error Uninitialized();
+    error EmptyRepaymentSchedule();
+    error FirstDueDateTooClose();
+    error DueDatesTooClose();
+    error GracePeriodsTooShort();
+    error InvalidRepaidStatus();
+    error UnsubscribeGracePeriodTooShort();
+    error UnregisteredLoanProposal();
+    error NotInSubscribtionPhase();
+    error InsufficientBalance();
+    error SubscriptionAmountTooHigh();
+    error BeforeEarliestUnsubscribe();
+    error TotalSubscribedNotTargetInRange();
 }

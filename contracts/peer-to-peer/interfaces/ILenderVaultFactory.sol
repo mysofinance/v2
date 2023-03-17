@@ -7,7 +7,7 @@ import {DataTypes} from "../DataTypes.sol";
 interface ILenderVaultFactory {
     function createVault() external returns (address newLenderVaultAddr);
 
-    function addressRegistry() external returns (address);
+    function addressRegistry() external view returns (address);
 
-    function lenderVaultImpl() external returns (address);
+    function lenderVaultImpl() external view returns (address);
 }

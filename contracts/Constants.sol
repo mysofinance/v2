@@ -11,4 +11,5 @@ library Constants {
     uint256 internal constant MIN_REPAYMENT_GRACE_PERIOD = 1800; // min 30 minutes
     uint256 internal constant MIN_TIME_UNTIL_FIRST_DUE_DATE = 1440; // min 1 day
     uint256 internal constant MIN_TIME_BETWEEN_DUE_DATES = 1440; // min 1 day
+    uint256 internal constant MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE = 60; // 60 seconds
 }

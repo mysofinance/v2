@@ -7,14 +7,14 @@ import {Ownable} from "../Ownable.sol";
 import {Errors} from "../Errors.sol";
 
 contract AddressRegistry is Ownable, IAddressRegistry {
-    bool private isInitialized;
+    bool internal isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => bool) public isWhitelistedToken;
     mapping(address => bool) public isWhitelistedCallbackAddr;
-    mapping(address => bool) public isWhitelistedCollTokenHandler;
+    mapping(address => bool) public isWhitelistedCompartmentImpl;
     mapping(address => bool) public isWhitelistedOracle;
     address[] public registeredVaults;
 
@@ -71,12 +71,12 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         isWhitelistedCallbackAddr[addr] = whitelistStatus;
     }
 
-    function toggleCollTokenHandler(
+    function toggleCompartmentImpl(
         address addr,
         bool whitelistStatus
     ) external {
         checkSenderAndIsInitialized();
-        isWhitelistedCollTokenHandler[addr] = whitelistStatus;
+        isWhitelistedCompartmentImpl[addr] = whitelistStatus;
     }
 
     function toggleOracle(address addr, bool whitelistStatus) external {

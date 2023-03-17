@@ -1,9 +1,12 @@
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
+import { getLoanTermsTemplate, getRepaymentScheduleTemplate, createLoanProposal, getDummyLoanTerms } from '../helpers/misc'
+import { ADDRESS_ZERO } from '@uniswap/v3-sdk'
 
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
+const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 
@@ -23,9 +26,9 @@ describe('Basic Local Tests', function () {
     await daoToken.deployed()
 
     // transfer some test tokens
-    await usdc.mint(lender1.address, ONE_USDC.mul(50000))
-    await usdc.mint(lender2.address, ONE_USDC.mul(30000))
-    await usdc.mint(lender3.address, ONE_USDC.mul(20000))
+    await usdc.mint(lender1.address, ONE_USDC.mul(1000000))
+    await usdc.mint(lender2.address, ONE_USDC.mul(1000000))
+    await usdc.mint(lender3.address, ONE_USDC.mul(1000000))
     await daoToken.mint(daoTreasury.address, ONE_WETH.mul(10000000))
     
     const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
@@ -45,7 +48,196 @@ describe('Basic Local Tests', function () {
     return { fundingPool, loanProposalFactory, usdc, daoToken, lender1, lender2, lender3, arranger, daoTreasury, team }
   }
 
-  describe('...', function () {
+  describe('Peer-to-Pool Tests', function () {
+    describe('Loan Proposal Implementation Tests', function () {
+      it('Should handle new loan proposal creation correctly', async function () {
+        const { fundingPool, loanProposalFactory, daoToken, arranger, team } = await setupTest()
+
+        // arranger creates loan proposal
+        const relArrangerFee = BASE.mul(50).div(10000)
+        const lenderGracePeriod = ONE_DAY
+        const loanProposal = await createLoanProposal(loanProposalFactory, arranger, fundingPool.address, daoToken.address, relArrangerFee, lenderGracePeriod)
+
+        // revert on zero addresses
+        await expect(loanProposalFactory.connect(arranger).createLoanProposal(ADDRESS_ZERO, daoToken.address, BASE.mul(10).div(100), ONE_DAY)).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
+        await expect(loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, ADDRESS_ZERO, BASE.mul(10).div(100), ONE_DAY)).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
+        // revert on zero arranger fee
+        await expect(loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, 0, ONE_DAY)).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
+        // revert on too short unsubscribe grace period
+        await expect(loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, 1, 0)).to.be.revertedWithCustomError(loanProposal, 'UnsubscribeGracePeriodTooShort')
+      })
+
+      it('Should handle loan proposals correctly', async function () {
+        const { fundingPool, loanProposalFactory, daoToken, arranger, team } = await setupTest()
+
+        // arranger creates loan proposal
+        const relArrangerFee = BASE.mul(50).div(10000)
+        const lenderGracePeriod = ONE_DAY
+        const blocknum = await ethers.provider.getBlockNumber()
+        const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+        const firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY)
+        await loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, relArrangerFee, lenderGracePeriod)
+        const loanProposalAddr = await loanProposalFactory.loanProposals(0)
+        const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
+        const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
+
+        // check various loan terms
+        let loanTerms = getLoanTermsTemplate()
+        loanTerms.repaymentSchedule = []
+        // revert on unauthorized sender
+        await expect(loanProposal.connect(team).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
+
+        // revert on empty repayment schedule
+        await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'EmptyRepaymentSchedule')
+
+        let repaymentSchedule = [getRepaymentScheduleTemplate(), getRepaymentScheduleTemplate()]
+        repaymentSchedule[0].dueTimestamp = ethers.BigNumber.from(timestamp)
+        repaymentSchedule[0].conversionGracePeriod = ONE_DAY
+        repaymentSchedule[0].repaymentGracePeriod = ONE_DAY
+        let nextDueDate = repaymentSchedule[0].dueTimestamp.add(repaymentSchedule[0].conversionGracePeriod).add(repaymentSchedule[0].repaymentGracePeriod)
+        repaymentSchedule[1].dueTimestamp = nextDueDate.add(ONE_DAY)
+        repaymentSchedule[1].conversionGracePeriod = ONE_DAY
+        repaymentSchedule[1].repaymentGracePeriod = ONE_DAY
+        loanTerms.repaymentSchedule = repaymentSchedule
+        // revert on too close first due date
+        await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'FirstDueDateTooClose')
+
+        repaymentSchedule[0].dueTimestamp = firstDueDate
+        repaymentSchedule[0].conversionGracePeriod = ONE_DAY
+        repaymentSchedule[0].repaymentGracePeriod = ONE_DAY
+        nextDueDate = repaymentSchedule[0].dueTimestamp.add(repaymentSchedule[0].conversionGracePeriod).add(repaymentSchedule[0].repaymentGracePeriod)
+        repaymentSchedule[1].dueTimestamp = nextDueDate.add(1)
+        repaymentSchedule[1].conversionGracePeriod = ONE_DAY
+        repaymentSchedule[1].repaymentGracePeriod = ONE_DAY
+        loanTerms.repaymentSchedule = repaymentSchedule
+        // revert on too close due timestamps
+        await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'DueDatesTooClose')
+
+        repaymentSchedule[0].dueTimestamp = firstDueDate
+        repaymentSchedule[0].conversionGracePeriod = 1
+        repaymentSchedule[0].repaymentGracePeriod = 1
+        nextDueDate = repaymentSchedule[0].dueTimestamp.add(repaymentSchedule[0].conversionGracePeriod).add(repaymentSchedule[0].repaymentGracePeriod)
+        repaymentSchedule[1].dueTimestamp = nextDueDate.add(ONE_DAY)
+        repaymentSchedule[1].conversionGracePeriod = 1
+        repaymentSchedule[1].repaymentGracePeriod = 1
+        loanTerms.repaymentSchedule = repaymentSchedule
+        // revert when grace periods too short
+        await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'GracePeriodsTooShort')
+
+        repaymentSchedule[0].dueTimestamp = firstDueDate
+        repaymentSchedule[0].conversionGracePeriod = ONE_DAY
+        repaymentSchedule[0].repaymentGracePeriod = ONE_DAY
+        nextDueDate = repaymentSchedule[0].dueTimestamp.add(repaymentSchedule[0].conversionGracePeriod).add(repaymentSchedule[0].repaymentGracePeriod)
+        repaymentSchedule[1].dueTimestamp = nextDueDate.add(ONE_DAY)
+        repaymentSchedule[1].conversionGracePeriod = ONE_DAY
+        repaymentSchedule[1].repaymentGracePeriod = ONE_DAY
+        repaymentSchedule[1].repaid = true
+        loanTerms.repaymentSchedule = repaymentSchedule
+        // revert when grace periods too short
+        await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'InvalidRepaidStatus')
+
+        repaymentSchedule[1].repaid = false
+        // now should pass
+        await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+      })
+
+      it('Should handle loan term acceptance correctly', async function () {
+        const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2} = await setupTest()
+        // arranger creates loan proposal
+        const relArrangerFee = BASE.mul(50).div(10000)
+        const lenderGracePeriod = ONE_DAY
+        const loanProposal = await createLoanProposal(loanProposalFactory, arranger, fundingPool.address, daoToken.address, relArrangerFee, lenderGracePeriod)
+
+        const loanTerms = await getDummyLoanTerms(daoTreasury.address, daoToken.address, usdc.address)
+        // revert if converting relative loan terms to absolute values would cause overflow
+        await expect(loanProposal.getAbsoluteLoanTerms(loanTerms, MAX_UINT256, 6)).to.be.reverted
+
+        await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+        
+        // check values correctly set
+        expect(await loanProposal.fundingPool()).to.equal(fundingPool.address)
+        expect(await loanProposal.collToken()).to.equal(daoToken.address)
+        expect(await loanProposal.arrangerFee()).to.equal(relArrangerFee)
+        
+        // check loan terms correctly set
+      const unfinalizedLoanTerms = await loanProposal.loanTerms()
+      for (var i = 0; i < unfinalizedLoanTerms.repaymentSchedule.length; i++) {
+        expect(unfinalizedLoanTerms.repaymentSchedule[i].loanTokenDue).to.equal(loanTerms.repaymentSchedule[i].loanTokenDue)
+        expect(unfinalizedLoanTerms.repaymentSchedule[i].collTokenDueIfConverted).to.equal(loanTerms.repaymentSchedule[i].collTokenDueIfConverted)
+        expect(unfinalizedLoanTerms.repaymentSchedule[i].dueTimestamp).to.equal(loanTerms.repaymentSchedule[i].dueTimestamp)
+        expect(unfinalizedLoanTerms.repaymentSchedule[i].conversionGracePeriod).to.equal(loanTerms.repaymentSchedule[i].conversionGracePeriod)
+        expect(unfinalizedLoanTerms.repaymentSchedule[i].repaymentGracePeriod).to.equal(loanTerms.repaymentSchedule[i].repaymentGracePeriod)
+      }
+
+        // lender can deposit
+        await usdc.connect(lender1).approve(fundingPool.address, MAX_UINT256)
+        let preBalLender = await usdc.balanceOf(lender1.address)
+        let addAmount = preBalLender
+        await expect(fundingPool.connect(lender1).deposit(addAmount.add(1), 0)).to.be.revertedWith
+        await fundingPool.connect(lender1).deposit(addAmount, 0)
+        expect(await fundingPool.balanceOf(lender1.address)).to.be.equal(await usdc.balanceOf(fundingPool.address))
+        expect(await fundingPool.balanceOf(lender1.address)).to.be.equal(addAmount)
+
+        // lender can withdraw
+        preBalLender = await usdc.balanceOf(lender1.address)
+        let preBalPool = await usdc.balanceOf(fundingPool.address)
+        await expect(fundingPool.connect(lender1).withdraw(addAmount.add(1))).to.be.revertedWithCustomError(fundingPool, 'InvalidWithdrawAmount')
+        let withdrawAmount = addAmount.div(10)
+        await fundingPool.connect(lender1).withdraw(withdrawAmount)
+        let postBalLender = await usdc.balanceOf(lender1.address)
+        let postBalPool = await usdc.balanceOf(fundingPool.address)
+        expect(withdrawAmount).to.be.equal(postBalLender.sub(preBalLender))
+        expect(withdrawAmount).to.be.equal(preBalPool.sub(postBalPool))
+        await fundingPool.connect(lender1).withdraw(await fundingPool.balanceOf(lender1.address))
+
+        // other lender deposits
+        expect(await usdc.balanceOf(fundingPool.address)).to.be.equal(0)
+        await usdc.connect(lender2).approve(fundingPool.address, MAX_UINT256)
+        let deposit1 = ONE_USDC.mul(500000)
+        await fundingPool.connect(lender2).deposit(deposit1, 0)
+        let deposit2 = ONE_USDC.mul(500000)
+        await fundingPool.connect(lender2).deposit(deposit2, 0)
+        let totalDeposited = deposit1.add(deposit2)
+        let poolBal = await usdc.balanceOf(fundingPool.address)
+        expect(poolBal).to.be.equal(totalDeposited)
+
+        // lender subscribes
+        await expect(fundingPool.connect(lender2).subscribe(lender2.address, ONE_USDC.mul(80000))).to.be.revertedWithCustomError(fundingPool, 'UnregisteredLoanProposal')
+        // users without or too low balance can't subscribe
+        let subscriptionAmount = ONE_USDC.mul(80000)
+        await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionAmount)).to.be.revertedWithCustomError(fundingPool, 'InsufficientBalance')
+        let depositedBalance = await fundingPool.balanceOf(lender2.address)
+        await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, depositedBalance.add(1))).to.be.revertedWithCustomError(fundingPool, 'InsufficientBalance')
+        await fundingPool.connect(lender2).subscribe(loanProposal.address,subscriptionAmount)
+        // revert when unsubscribing during cool down period
+        await expect(fundingPool.connect(lender2).unsubscribe(loanProposal.address,subscriptionAmount)).to.be.revertedWithCustomError(fundingPool, 'BeforeEarliestUnsubscribe')
+        // move forward to check unsubscription
+        const blocknum = await ethers.provider.getBlockNumber()
+        const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+        await ethers.provider.send('evm_mine', [timestamp+60])
+        let preBal = await fundingPool.balanceOf(lender2.address)
+        let preSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+        await fundingPool.connect(lender2).unsubscribe(loanProposal.address,subscriptionAmount)
+        let postBal = await fundingPool.balanceOf(lender2.address)
+        let postSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+        expect(preSubscribedBal.sub(postSubscribedBal)).to.be.equal(postBal.sub(preBal))
+        // subscribe again
+        await fundingPool.connect(lender2).subscribe(loanProposal.address,subscriptionAmount)
+
+        // check subscriptions don't change pool balance, only shift regular balance and subscription balance
+        let remainingDepositBalance = await fundingPool.balanceOf(lender2.address)
+        expect(remainingDepositBalance).to.be.equal(totalDeposited.sub(subscriptionAmount))
+        expect(await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)).to.be.equal(subscriptionAmount)
+        expect(await usdc.balanceOf(fundingPool.address)).to.be.equal(poolBal)
+        await expect(fundingPool.connect(lender2).subscribe(loanProposal.address,remainingDepositBalance)).to.be.revertedWithCustomError(fundingPool, 'SubscriptionAmountTooHigh')
+
+        // dao accepts
+        await expect(loanProposal.connect(lender1).acceptLoanTerms()).to.be.reverted
+        await loanProposal.connect(daoTreasury).acceptLoanTerms()
+
+      })
+    })
+
     it('...', async function () {
       const { fundingPool, loanProposalFactory, usdc, daoToken, lender1, lender2, lender3, arranger, daoTreasury, team } = await setupTest()
 
