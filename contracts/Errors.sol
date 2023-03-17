@@ -56,5 +56,8 @@ library Errors {
     error InsufficientBalance();
     error SubscriptionAmountTooHigh();
     error BeforeEarliestUnsubscribe();
+    error TotalSubscribedTooLow();
+    error InvalidActionForCurrentStatus();
     error TotalSubscribedNotTargetInRange();
+    error InvalidRollBackRequest();
 }
