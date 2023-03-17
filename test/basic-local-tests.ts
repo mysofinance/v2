@@ -444,7 +444,9 @@ describe('Basic Local Tests', function () {
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
 
       // invalidate off chain quote
-      await expect(quoteHandler.connect(lender).invalidateOffChainQuote(borrower.address, payloadHash)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).invalidateOffChainQuote(borrower.address, payloadHash)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
       await expect(quoteHandler.connect(borrower).invalidateOffChainQuote(lenderVault.address, payloadHash)).to.reverted
 
       await expect(quoteHandler.connect(lender).invalidateOffChainQuote(lenderVault.address, payloadHash)).to.emit(
@@ -712,7 +714,10 @@ describe('Basic Local Tests', function () {
 
       const offChainQuoteNoncePre = await quoteHandler.connect(lender).offChainQuoteNonce(lenderVault.address)
 
-      await expect(quoteHandler.connect(lender).incrementOffChainQuoteNonce(lender.address)).to.be.reverted
+      await expect(quoteHandler.connect(lender).incrementOffChainQuoteNonce(lender.address)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'UnregisteredVault'
+      )
       await expect(quoteHandler.connect(borrower).incrementOffChainQuoteNonce(lenderVault.address)).to.be.reverted
 
       await expect(quoteHandler.connect(lender).incrementOffChainQuoteNonce(lenderVault.address))

@@ -8,6 +8,7 @@ import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
+import {Errors} from "../Errors.sol";
 
 contract QuoteHandler is IQuoteHandler, IEvents {
     address public immutable addressRegistry;
@@ -28,7 +29,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
         ) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
@@ -63,7 +64,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
         ) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
@@ -97,7 +98,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         DataTypes.OnChainQuote calldata onChainQuote
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
@@ -112,7 +113,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
 
     function incrementOffChainQuoteNonce(address lenderVault) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
@@ -125,7 +126,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         bytes32 offChainQuoteHash
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert();
@@ -279,7 +280,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
         ) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(
