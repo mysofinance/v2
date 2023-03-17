@@ -25,14 +25,15 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     uint256 public lenderGracePeriod;
     uint256 public currentRepaymentIdx;
     uint256 public totalSubscriptionsThatClaimedOnDefault;
+    mapping(uint256 => uint256) public totalConvertedSubscriptionsPerIdx; // denominated in loan Token
+    mapping(uint256 => uint256) public collTokenConverted;
     mapping(address => mapping(uint256 => bool))
-        public lenderExercisedConversion;
-    mapping(address => mapping(uint256 => bool)) public lenderClaimedRepayment;
-    mapping(address => bool) public lenderClaimedCollateralOnDefault;
+        internal lenderExercisedConversion;
+    mapping(address => mapping(uint256 => bool))
+        internal lenderClaimedRepayment;
+    mapping(address => bool) internal lenderClaimedCollateralOnDefault;
     DataTypes.LoanTerms internal _loanTerms;
     mapping(uint256 => uint256) internal loanTokenRepaid;
-    mapping(uint256 => uint256) internal collTokenConverted;
-    mapping(uint256 => uint256) internal totalConvertedSubscriptionsPerIdx; // denominated in loan Token
 
     constructor() {
         _disableInitializers();
@@ -236,18 +237,18 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function exerciseConversion() external {
+        uint256 lenderContribution = IFundingPool(fundingPool)
+            .subscribedBalanceOf(address(this), msg.sender);
+        if (lenderContribution == 0) {
+            revert Errors.InvalidSender();
+        }
         if (status != DataTypes.LoanStatus.LOAN_DEPLOYED) {
             revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = currentRepaymentIdx;
         checkRepaymentIdx(repaymentIdx);
-        uint256 lenderContribution = IFundingPool(fundingPool)
-            .subscribedBalanceOf(address(this), msg.sender);
-        if (lenderContribution == 0) {
-            revert();
-        }
         if (lenderExercisedConversion[msg.sender][repaymentIdx]) {
-            revert();
+            revert Errors.AlreadyConvertedForCurrenPeriod();
         }
         // must be after when the period of this loan is due, but before borrower can repay
         if (
@@ -257,7 +258,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
                 _loanTerms.repaymentSchedule[repaymentIdx].conversionGracePeriod
         ) {
-            revert();
+            revert Errors.OutsideConversionTimeWindow();
         }
         uint256 conversionAmount = (_loanTerms
             .repaymentSchedule[repaymentIdx]
@@ -269,12 +270,12 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         IERC20Metadata(collToken).safeTransfer(msg.sender, conversionAmount);
     }
 
-    function repay() external {
-        if (status != DataTypes.LoanStatus.LOAN_DEPLOYED) {
-            revert();
-        }
+    function repay(uint256 expectedTransferFee) external {
         if (msg.sender != _loanTerms.borrower) {
-            revert();
+            revert Errors.InvalidSender();
+        }
+        if (status != DataTypes.LoanStatus.LOAN_DEPLOYED) {
+            revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = currentRepaymentIdx++;
         checkRepaymentIdx(repaymentIdx);
@@ -290,7 +291,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             (block.timestamp < currConversionCutoffTime) ||
             (block.timestamp > currRepaymentCutoffTime)
         ) {
-            revert();
+            revert Errors.OutsideRepaymentTimeWindow();
         }
         address loanToken = IFundingPool(fundingPool).depositToken();
         uint256 collTokenDueIfAllConverted = _loanTerms
@@ -304,11 +305,16 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             collTokenDueIfAllConverted;
         loanTokenRepaid[repaymentIdx] = remainingLoanTokenDue;
         _loanTerms.repaymentSchedule[repaymentIdx].repaid = true;
+        uint256 preBal = IERC20Metadata(loanToken).balanceOf(address(this));
         IERC20Metadata(loanToken).safeTransferFrom(
             msg.sender,
             address(this),
-            remainingLoanTokenDue
+            remainingLoanTokenDue + expectedTransferFee
         );
+        uint256 postBal = IERC20Metadata(loanToken).balanceOf(address(this));
+        if (postBal - preBal != remainingLoanTokenDue) {
+            revert Errors.InvalidSendAmount();
+        }
         // if final repayment, send all remaining coll token back to borrower
         if (_loanTerms.repaymentSchedule.length - 1 == repaymentIdx) {
             uint256 collBal = IERC20Metadata(collToken).balanceOf(
