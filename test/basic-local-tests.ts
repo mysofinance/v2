@@ -415,7 +415,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSender')
 
       // if quote tuple that's not part of tree, reverts
       const unregisteredQuoteTuple = {
@@ -447,7 +447,9 @@ describe('Basic Local Tests', function () {
       await expect(
         quoteHandler.connect(lender).invalidateOffChainQuote(borrower.address, payloadHash)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
-      await expect(quoteHandler.connect(borrower).invalidateOffChainQuote(lenderVault.address, payloadHash)).to.reverted
+      await expect(
+        quoteHandler.connect(borrower).invalidateOffChainQuote(lenderVault.address, payloadHash)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await expect(quoteHandler.connect(lender).invalidateOffChainQuote(lenderVault.address, payloadHash)).to.emit(
         quoteHandler,
@@ -718,7 +720,9 @@ describe('Basic Local Tests', function () {
         quoteHandler,
         'UnregisteredVault'
       )
-      await expect(quoteHandler.connect(borrower).incrementOffChainQuoteNonce(lenderVault.address)).to.be.reverted
+      await expect(
+        quoteHandler.connect(borrower).incrementOffChainQuoteNonce(lenderVault.address)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await expect(quoteHandler.connect(lender).incrementOffChainQuoteNonce(lenderVault.address))
 

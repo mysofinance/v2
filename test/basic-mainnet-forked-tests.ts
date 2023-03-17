@@ -615,7 +615,9 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(borrower.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
-      await expect(quoteHandler.connect(borrower).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(borrower).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
@@ -701,8 +703,9 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(borrower.address, onChainQuote, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
-      await expect(quoteHandler.connect(borrower).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
+      await expect(
+        quoteHandler.connect(borrower).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
       await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
         .reverted
 
@@ -823,8 +826,9 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
-      await expect(quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
-
+      await expect(
+        quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
       onChainQuote.generalQuoteInfo.loanToken = weth.address
       await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
 
