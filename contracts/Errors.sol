@@ -71,4 +71,7 @@ library Errors {
     error ProposalNotReadyForExecution();
     error UnsubscriptionAmountTooLarge();
     error InvalidNewLoanTerms();
+    error AlreadyConvertedForCurrenPeriod();
+    error OutsideConversionTimeWindow();
+    error OutsideRepaymentTimeWindow();
 }
