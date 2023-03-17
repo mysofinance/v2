@@ -113,7 +113,7 @@ contract FundingPool is IFundingPool {
             ILoanProposalImpl(loanProposal).status() !=
             DataTypes.LoanStatus.READY_TO_EXECUTE
         ) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();
