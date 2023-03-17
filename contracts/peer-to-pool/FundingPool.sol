@@ -60,7 +60,7 @@ contract FundingPool is IFundingPool {
             revert Errors.UnregisteredLoanProposal();
         }
         if (!ILoanProposalImpl(loanProposal).inSubscriptionPhase()) {
-            revert Errors.NotInSubscribtionPhase();
+            revert Errors.NotInSubscriptionPhase();
         }
         if (amount > balanceOf[msg.sender]) {
             revert Errors.InsufficientBalance();
@@ -87,10 +87,10 @@ contract FundingPool is IFundingPool {
             revert Errors.UnregisteredLoanProposal();
         }
         if (!ILoanProposalImpl(loanProposal).inUnsubscriptionPhase()) {
-            revert();
+            revert Errors.NotInUnsubscriptionPhase();
         }
         if (amount > subscribedBalanceOf[loanProposal][msg.sender]) {
-            revert();
+            revert Errors.UnsubscriptionAmountTooLarge();
         }
         if (block.timestamp < earliestUnsubscribe[loanProposal][msg.sender]) {
             revert Errors.BeforeEarliestUnsubscribe();
@@ -113,7 +113,7 @@ contract FundingPool is IFundingPool {
             ILoanProposalImpl(loanProposal).status() !=
             DataTypes.LoanStatus.READY_TO_EXECUTE
         ) {
-            revert();
+            revert Errors.ProposalNotReadyForExecution();
         }
         DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();

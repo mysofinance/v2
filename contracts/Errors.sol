@@ -52,7 +52,8 @@ library Errors {
     error InvalidRepaidStatus();
     error UnsubscribeGracePeriodTooShort();
     error UnregisteredLoanProposal();
-    error NotInSubscribtionPhase();
+    error NotInSubscriptionPhase();
+    error NotInUnsubscriptionPhase();
     error InsufficientBalance();
     error SubscriptionAmountTooHigh();
     error BeforeEarliestUnsubscribe();
@@ -60,5 +61,7 @@ library Errors {
     error InvalidActionForCurrentStatus();
     error TotalSubscribedNotTargetInRange();
     error InvalidRollBackRequest();
+    error ProposalNotReadyForExecution();
+    error UnsubscriptionAmountTooLarge();
     error InvalidNewLoanTerms();
 }
