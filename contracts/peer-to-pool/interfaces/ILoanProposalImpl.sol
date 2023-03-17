@@ -64,9 +64,10 @@ interface ILoanProposalImpl {
 
     /**
      * @notice Allows borrower to repay
-     * @dev Can only be called by borrower and during repayment grace period of given repayment period; if borrower doesn't repay in time the loan can be marked as defaulted and borrowers loses control over pledged collateral
+     * @param expectedTransferFee The expected transfer fee (if any) of the loan token
+     * @dev Can only be called by borrower and during repayment grace period of given repayment period. If borrower doesn't repay in time the loan can be marked as defaulted and borrowers loses control over pledged collateral. Note that the repayment amount can be lower than the loanTokenDue if lenders convert (potentially 0 if all convert, in which case borrower still needs to call the repay function to not default). Also note that on repay any unconverted collateral token reserved for conversions for that period get transferred back to borrower.
      */
-    function repay() external;
+    function repay(uint256 expectedTransferFee) external;
 
     /**
      * @notice Allows lenders to claim any repayments for given repayment period
@@ -172,6 +173,24 @@ interface ILoanProposalImpl {
         external
         view
         returns (uint256);
+
+    /**
+     * @notice Returns the amount of subscriptions that converted for given repayment period
+     * @param repaymentIdx The respective repayment index of given period
+     * @return The total amount of subscriptions that converted for given repayment period
+     */
+    function totalConvertedSubscriptionsPerIdx(
+        uint256 repaymentIdx
+    ) external view returns (uint256);
+
+    /**
+     * @notice Returns the amount of collateral tokens that were converted during given repayment period
+     * @param repaymentIdx The respective repayment index of given period
+     * @return The total amount of collateral tokens that were converted during given repayment period
+     */
+    function collTokenConverted(
+        uint256 repaymentIdx
+    ) external view returns (uint256);
 
     /**
      * @notice Returns the current loan terms

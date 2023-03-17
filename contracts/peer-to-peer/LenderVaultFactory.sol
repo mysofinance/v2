@@ -9,7 +9,7 @@ import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
 
-contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory, IEvents {
+contract LenderVaultFactory is ReentrancyGuard, IEvents, ILenderVaultFactory {
     address public immutable addressRegistry;
     address public immutable lenderVaultImpl;
 
@@ -30,6 +30,6 @@ contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory, IEvents {
             addressRegistry
         );
         IAddressRegistry(addressRegistry).addLenderVault(newLenderVaultAddr);
-        emit VaultCreated(newLenderVaultAddr);
+        emit NewVaultCreated(newLenderVaultAddr, msg.sender);
     }
 }
