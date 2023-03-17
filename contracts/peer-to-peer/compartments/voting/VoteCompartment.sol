@@ -19,9 +19,10 @@ contract VoteCompartment is BaseCompartment {
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }
-        if (_delegatee != address(0)) {
-            IVotes(loan.collToken).delegate(_delegatee);
+        if (_delegatee == address(0)) {
+            revert Errors.InvalidDelegatee();
         }
+        IVotes(loan.collToken).delegate(_delegatee);
     }
 
     // transfer coll on repays

@@ -23,8 +23,8 @@ contract OlympusOracle is IOracle, BaseOracle {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        address _wethAddr
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, false, new bool[](0)) {}
+        address _wethAddrOfGivenChain
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddrOfGivenChain) {}
 
     function getPrice(
         address collToken,
@@ -63,14 +63,14 @@ contract OlympusOracle is IOracle, BaseOracle {
             bool isColl
         )
     {
-        // try to see if both have non-zero ethOracleAddrs
+        // try to see if both have non-zero oracleAddrs
         if (collToken == GOHM_ADDR) {
-            loanTokenOracleAddr = ethOracleAddrs[loanToken];
+            loanTokenOracleAddr = oracleAddrs[loanToken];
             collTokenOracleAddr = ETH_OHM_ORACLE_ADDR;
             isColl = true;
         } else {
             loanTokenOracleAddr = ETH_OHM_ORACLE_ADDR;
-            collTokenOracleAddr = ethOracleAddrs[collToken];
+            collTokenOracleAddr = oracleAddrs[collToken];
         }
         isValid =
             loanTokenOracleAddr != address(0) &&
@@ -84,36 +84,16 @@ contract OlympusOracle is IOracle, BaseOracle {
         address loanToken,
         bool isColl
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
-        int256 answer;
-        uint256 updatedAt;
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        address wethAddress = weth;
-        if (loanTokenOracleAddr == wethAddress) {
-            answer = 10 ** 18;
-            updatedAt = block.timestamp;
-        } else {
-            (, answer, , updatedAt, ) = AggregatorV3Interface(
-                loanTokenOracleAddr
-            ).latestRoundData();
-        }
-
-        uint256 loanTokenPriceRaw = uint256(answer);
-        if (loanTokenPriceRaw < 1) {
-            revert();
-        }
-        if (collTokenOracleAddr == wethAddress) {
-            answer = 10 ** 18;
-            updatedAt = block.timestamp;
-        } else {
-            (, answer, , updatedAt, ) = AggregatorV3Interface(
-                collTokenOracleAddr
-            ).latestRoundData();
-        }
-        // todo: decide on logic check for updatedAt versus current timestamp?
-        uint256 collTokenPriceRaw = uint256(answer);
-        if (collTokenPriceRaw < 1) {
-            revert();
-        }
+        address wethAddress = wethAddrOfGivenChain;
+        uint256 loanTokenPriceRaw = getPriceOfToken(
+            loanTokenOracleAddr,
+            wethAddress
+        );
+        uint256 collTokenPriceRaw = getPriceOfToken(
+            collTokenOracleAddr,
+            wethAddress
+        );
         uint256 index = IOlympus(GOHM_ADDR).index();
 
         collTokenPriceInLoanToken = isColl

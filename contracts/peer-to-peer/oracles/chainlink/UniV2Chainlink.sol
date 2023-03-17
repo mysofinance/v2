@@ -27,8 +27,11 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _lpAddrs,
-        address _wethAddr
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddr, false, new bool[](0)) {
+        address _wethAddrOfGivenChain
+    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddrOfGivenChain) {
+        if (_lpAddrs.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
         for (uint i = 0; i < _lpAddrs.length; ) {
             if (_lpAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
@@ -75,54 +78,54 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         if (isLpAddr[loanToken]) {
             _token0 = IUniV2(loanToken).token0();
             _token1 = IUniV2(loanToken).token1();
-            // check eth oracles exist for both
+            // check oracles exist for both
             if (
-                ethOracleAddrs[_token0] == address(0) ||
-                ethOracleAddrs[_token1] == address(0)
+                oracleAddrs[_token0] == address(0) ||
+                oracleAddrs[_token1] == address(0)
             ) {
                 revert Errors.InvalidOraclePair();
             }
             loanTokenOracleData = OracleData({
                 token0: _token0,
                 token1: _token1,
-                oracleAddrToken0: ethOracleAddrs[_token0],
-                oracleAddrToken1: ethOracleAddrs[_token1]
+                oracleAddrToken0: oracleAddrs[_token0],
+                oracleAddrToken1: oracleAddrs[_token1]
             });
         } else {
-            if (ethOracleAddrs[loanToken] == address(0)) {
+            if (oracleAddrs[loanToken] == address(0)) {
                 revert Errors.InvalidOraclePair();
             }
             loanTokenOracleData = OracleData({
                 token0: loanToken,
                 token1: address(0),
-                oracleAddrToken0: ethOracleAddrs[loanToken],
+                oracleAddrToken0: oracleAddrs[loanToken],
                 oracleAddrToken1: address(0)
             });
         }
         if (isLpAddr[collToken]) {
             _token0 = IUniV2(collToken).token0();
             _token1 = IUniV2(collToken).token1();
-            // check eth oracles exist for both
+            // check oracles exist for both
             if (
-                ethOracleAddrs[_token0] == address(0) ||
-                ethOracleAddrs[_token1] == address(0)
+                oracleAddrs[_token0] == address(0) ||
+                oracleAddrs[_token1] == address(0)
             ) {
                 revert Errors.InvalidOraclePair();
             }
             collTokenOracleData = OracleData({
                 token0: _token0,
                 token1: _token1,
-                oracleAddrToken0: ethOracleAddrs[_token0],
-                oracleAddrToken1: ethOracleAddrs[_token1]
+                oracleAddrToken0: oracleAddrs[_token0],
+                oracleAddrToken1: oracleAddrs[_token1]
             });
         } else {
-            if (ethOracleAddrs[collToken] == address(0)) {
+            if (oracleAddrs[collToken] == address(0)) {
                 revert Errors.InvalidOraclePair();
             }
             collTokenOracleData = OracleData({
                 token0: collToken,
                 token1: address(0),
-                oracleAddrToken0: ethOracleAddrs[collToken],
+                oracleAddrToken0: oracleAddrs[collToken],
                 oracleAddrToken1: address(0)
             });
         }
@@ -134,47 +137,34 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address loanToken,
         address collToken
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
-        int256 answer;
-        uint256 updatedAt;
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        address wethAddress = weth;
+        address wethAddress = wethAddrOfGivenChain;
+        uint256 loanTokenPriceRaw;
+        uint256 collTokenPriceRaw;
         // if token1 is address 0 means loan token was not an lp token
         if (loanTokenOracleData.token1 == address(0)) {
-            if (loanTokenOracleData.token0 == wethAddress) {
-                answer = 10 ** 18;
-                updatedAt = block.timestamp;
-            } else {
-                (, answer, , updatedAt, ) = AggregatorV3Interface(
-                    loanTokenOracleData.oracleAddrToken0
-                ).latestRoundData();
-            }
+            loanTokenPriceRaw = getPriceOfToken(
+                loanTokenOracleData.oracleAddrToken0,
+                wethAddress
+            );
         } else {
             // loan token was an Lp token
-            answer = getLpTokenPrice(loanTokenOracleData, loanToken);
-            updatedAt = block.timestamp;
+            loanTokenPriceRaw = uint256(
+                getLpTokenPrice(loanTokenOracleData, loanToken)
+            );
         }
-        uint256 loanTokenPriceRaw = uint256(answer);
-        if (loanTokenPriceRaw < 1) {
-            revert();
-        }
+
         // if token1 is address 0 means coll token was not an lp token
         if (collTokenOracleData.token1 == address(0)) {
-            if (collTokenOracleData.token0 == wethAddress) {
-                answer = 10 ** 18;
-                updatedAt = block.timestamp;
-            } else {
-                (, answer, , updatedAt, ) = AggregatorV3Interface(
-                    collTokenOracleData.oracleAddrToken0
-                ).latestRoundData();
-            }
+            collTokenPriceRaw = getPriceOfToken(
+                collTokenOracleData.oracleAddrToken0,
+                wethAddress
+            );
         } else {
             // coll token was an Lp token
-            answer = getLpTokenPrice(collTokenOracleData, collToken);
-            updatedAt = block.timestamp;
-        }
-        uint256 collTokenPriceRaw = uint256(answer);
-        if (collTokenPriceRaw < 1) {
-            revert();
+            collTokenPriceRaw = uint256(
+                getLpTokenPrice(collTokenOracleData, collToken)
+            );
         }
 
         collTokenPriceInLoanToken =
@@ -196,6 +186,9 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             (unsignedLpTokenPriceInEth * (10 ** lpTokenDecimals)) /
                 totalLpSupply
         );
+        if (lpTokenPriceInEth < 1) {
+            revert Errors.InvalidOracleAnswer();
+        }
     }
 
     function getTotalEthValue(
@@ -208,30 +201,15 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             .getReserves();
         uint256 decimalsToken0 = IERC20Metadata(token0).decimals();
         uint256 decimalsToken1 = IERC20Metadata(token1).decimals();
-        int256 answer;
-        address wethAddress = weth;
-        if (lpTokenOracleData.oracleAddrToken0 == wethAddress) {
-            answer = 10 ** 18;
-        } else {
-            (, answer, , , ) = AggregatorV3Interface(
-                lpTokenOracleData.oracleAddrToken0
-            ).latestRoundData();
-        }
-        uint256 token0PriceRaw = uint256(answer);
-        if (token0PriceRaw < 1) {
-            revert();
-        }
-        if (lpTokenOracleData.oracleAddrToken1 == wethAddress) {
-            answer = 10 ** 18;
-        } else {
-            (, answer, , , ) = AggregatorV3Interface(
-                lpTokenOracleData.oracleAddrToken1
-            ).latestRoundData();
-        }
-        uint256 token1PriceRaw = uint256(answer);
-        if (token1PriceRaw < 1) {
-            revert();
-        }
+        address wethAddress = wethAddrOfGivenChain;
+        uint256 token0PriceRaw = getPriceOfToken(
+            lpTokenOracleData.oracleAddrToken0,
+            wethAddress
+        );
+        uint256 token1PriceRaw = getPriceOfToken(
+            lpTokenOracleData.oracleAddrToken1,
+            wethAddress
+        );
 
         uint256 totalEthValueToken0 = (uint256(reserve0) * token0PriceRaw) /
             (10 ** decimalsToken0);
