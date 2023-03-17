@@ -6,6 +6,7 @@ import {DataTypes} from "../DataTypes.sol";
 
 interface IEvents {
     event CollateralUnlocked(
+        address indexed vaultOwner,
         address indexed collToken,
         uint256[] loanIds,
         bool autoWithdraw

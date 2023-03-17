@@ -85,7 +85,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
             );
         }
 
-        emit CollateralUnlocked(collToken, _loanIds, autoWithdraw);
+        emit CollateralUnlocked(_owner, collToken, _loanIds, autoWithdraw);
     }
 
     function updateLoanInfo(
