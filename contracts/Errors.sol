@@ -60,4 +60,5 @@ library Errors {
     error InvalidActionForCurrentStatus();
     error TotalSubscribedNotTargetInRange();
     error InvalidRollBackRequest();
+    error InvalidNewLoanTerms();
 }
