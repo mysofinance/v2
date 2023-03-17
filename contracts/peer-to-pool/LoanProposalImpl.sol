@@ -328,20 +328,20 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         uint256 lenderContribution = IFundingPool(fundingPool)
             .subscribedBalanceOf(address(this), msg.sender);
         if (lenderContribution == 0) {
-            revert();
+            revert Errors.InvalidSender();
         }
         // iff there's a repay, currentRepaymentIdx (initially 0) gets incremented;
         // hence any `repaymentIdx` smaller than `currentRepaymentIdx` will always
         // map to a valid repayment claim; no need to check `repaymentSchedule[repaymentIdx].repaid`
         if (repaymentIdx >= currentRepaymentIdx) {
-            revert();
+            revert Errors.RepaymentIdxTooLarge();
         }
         // note: users can claim as soon as repaid, no need to check getRepaymentCutoffTime(...)
         if (lenderClaimedRepayment[msg.sender][repaymentIdx]) {
-            revert();
+            revert Errors.AlreadyClaimed();
         }
         if (lenderExercisedConversion[msg.sender][repaymentIdx]) {
-            revert();
+            revert Errors.AlreadyConverted();
         }
         address loanToken = IFundingPool(fundingPool).depositToken();
         // repaid amount for that period split over those who didn't convert in that period

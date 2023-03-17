@@ -859,6 +859,9 @@ describe('Basic Local Tests', function () {
       // reverts if non-borrower tries to repay
       await expect(loanProposal.connect(anyUser).repay(0)).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
 
+      // revert if lender tries to claim repayment before actual repay
+      await expect(loanProposal.connect(lender1).claimRepayment(0)).to.be.revertedWithCustomError(loanProposal, 'RepaymentIdxTooLarge')
+      
       // check current repayment idx is still zero
       expect(await loanProposal.currentRepaymentIdx()).to.be.equal(0)
       
@@ -906,6 +909,23 @@ describe('Basic Local Tests', function () {
       // check that repayment is now marked as repaid
       const postRepayLoanTermsState = await loanProposal.loanTerms()
       expect(postRepayLoanTermsState.repaymentSchedule[0].repaid).to.be.true
+
+      // revert if unentitled user tries to claim repayment
+      await expect(loanProposal.connect(anyUser).claimRepayment(0)).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
+
+      // revert if lender that previously converted tries to also claim repayment
+      await expect(loanProposal.connect(lender1).claimRepayment(0)).to.be.revertedWithCustomError(loanProposal, 'AlreadyConverted')
+
+      // valid claim
+      let subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+      let preBal = await usdc.balanceOf(lender2.address)
+      await loanProposal.connect(lender2).claimRepayment(0)
+      let postBal = await usdc.balanceOf(lender2.address)
+
+      // check bal diff matches expected repayment claim
+      let remainingEntitledSubscriptions = totalSubscribed.sub(totalConvertedSubscriptionsOfPeriod)
+      let expectedRepaymentClaim = leftRepaymentAmountDue.mul(subscriptionBalOf).div(remainingEntitledSubscriptions)
+      expect(postBal.sub(preBal)).to.be.equal(expectedRepaymentClaim)
     })
 
     it('Should handle repayments correctly (2/4)', async function () {

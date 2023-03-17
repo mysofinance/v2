@@ -76,4 +76,7 @@ library Errors {
     error OutsideRepaymentTimeWindow();
     error NoDefault();
     error LoanIsFullyRepaid();
+    error RepaymentIdxTooLarge();
+    error AlreadyClaimed();
+    error AlreadyConverted();
 }
