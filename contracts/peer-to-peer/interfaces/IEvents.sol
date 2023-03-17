@@ -24,6 +24,8 @@ interface IEvents {
 
     event NewProtocolFee(uint256 newFee);
 
+    event NewVaultCreated(address newLenderVaultAddr, address vaultOwner);
+
     event OnChainQuoteAdded(
         address lenderVault,
         DataTypes.OnChainQuote onChainQuote,
