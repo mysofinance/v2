@@ -45,7 +45,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 onChainQuote.generalQuoteInfo.loanToken
             )
         ) {
-            revert();
+            revert Errors.NonWhitelistedToken();
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (isOnChainQuote[lenderVault][onChainQuoteHash]) {
@@ -80,7 +80,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 newOnChainQuote.generalQuoteInfo.loanToken
             )
         ) {
-            revert();
+            revert Errors.NonWhitelistedToken();
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
@@ -290,7 +290,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 generalQuoteInfo.loanToken
             )
         ) {
-            revert();
+            revert Errors.NonWhitelistedToken();
         }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
             revert();

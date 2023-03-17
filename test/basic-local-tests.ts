@@ -878,11 +878,11 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(borrower.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
 
       await expect(
         quoteHandler.connect(lender).checkAndRegisterOnChainQuote(borrower.address, borrower.address, onChainQuote)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], false)
 
@@ -890,7 +890,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([weth.address], true)
 
@@ -898,7 +898,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
       await addressRegistry.connect(team).toggleTokens([weth.address], false)
@@ -907,7 +907,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([weth.address], true)
 

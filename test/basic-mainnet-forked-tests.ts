@@ -620,16 +620,22 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         quoteHandler.connect(borrower).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([weth.address], true)
       await addressRegistry.connect(team).toggleTokens([usdc.address], false)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
 
@@ -714,12 +720,12 @@ describe('Basic Forked Mainnet Tests', function () {
 
       newOnChainQuote.generalQuoteInfo.loanToken = usdc.address
 
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
+      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to.be
         .reverted
 
       await addressRegistry.connect(team).toggleTokens([compAddress], true)
 
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
+      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to.be
         .reverted
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
@@ -778,6 +784,8 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
         return x.event === 'Borrow'
       })
+
+      expect(borrowEvent).to.not.be.undefined
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {

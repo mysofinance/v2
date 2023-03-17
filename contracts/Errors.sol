@@ -30,6 +30,7 @@ library Errors {
     error NonWhitelistedOracle();
     error NonWhitelistedCompartment();
     error NonWhitelistedCallback();
+    error NonWhitelistedToken();
     error LTVHigherThanMax();
     error InsufficientVaultFunds();
     error NegativeRepaymentAmount();
