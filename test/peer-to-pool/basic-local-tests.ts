@@ -862,6 +862,10 @@ describe('Basic Local Tests', function () {
       // check current repayment idx is still zero
       expect(await loanProposal.currentRepaymentIdx()).to.be.equal(0)
       
+      // check that repayment is not marked as repaid
+      const preRepayLoanTermsState = await loanProposal.loanTerms()
+      expect(preRepayLoanTermsState.repaymentSchedule[0].repaid).to.be.false
+
       // approve and repay
       let totalConvertedSubscriptionsOfPeriod = await loanProposal.totalConvertedSubscriptionsPerIdx(0)
       let originalRepaymentAmountDue = finalLoanTerms.repaymentSchedule[0].loanTokenDue
@@ -898,6 +902,10 @@ describe('Basic Local Tests', function () {
 
       // check current repayment idx was updated
       expect(await loanProposal.currentRepaymentIdx()).to.be.equal(1)
+
+      // check that repayment is now marked as repaid
+      const postRepayLoanTermsState = await loanProposal.loanTerms()
+      expect(postRepayLoanTermsState.repaymentSchedule[0].repaid).to.be.true
     })
 
     it('Should handle repayments correctly (2/3)', async function () {
