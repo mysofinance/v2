@@ -8,6 +8,7 @@ import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 import {IEvents} from "./interfaces/IEvents.sol";
+import {Errors} from "../Errors.sol";
 
 contract QuoteHandler is IQuoteHandler, IEvents {
     address public immutable addressRegistry;
@@ -28,13 +29,13 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
         ) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (!isValidOnChainQuote(onChainQuote)) {
-            revert();
+            revert Errors.InvalidQuote();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(
@@ -44,11 +45,11 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 onChainQuote.generalQuoteInfo.loanToken
             )
         ) {
-            revert();
+            revert Errors.NonWhitelistedToken();
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.OnChainQuoteAlreadyAdded();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = true;
         emit OnChainQuoteAdded(lenderVault, onChainQuote, onChainQuoteHash);
@@ -63,13 +64,13 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
         ) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (!isValidOnChainQuote(newOnChainQuote)) {
-            revert();
+            revert Errors.InvalidQuote();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(
@@ -79,11 +80,11 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 newOnChainQuote.generalQuoteInfo.loanToken
             )
         ) {
-            revert();
+            revert Errors.NonWhitelistedToken();
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.UnknownOnChainQuote();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
@@ -97,14 +98,14 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         DataTypes.OnChainQuote calldata onChainQuote
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert();
+            revert Errors.InvalidSender();
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.UnknownOnChainQuote();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
@@ -112,10 +113,10 @@ contract QuoteHandler is IQuoteHandler, IEvents {
 
     function incrementOffChainQuoteNonce(address lenderVault) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert();
+            revert Errors.InvalidSender();
         }
         offChainQuoteNonce[lenderVault] += 1;
     }
@@ -125,10 +126,10 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         bytes32 offChainQuoteHash
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert();
+            revert Errors.InvalidSender();
         }
         offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
         emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
@@ -146,7 +147,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         );
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.UnknownOnChainQuote();
         }
         if (onChainQuote.generalQuoteInfo.isSingleUse) {
             isOnChainQuote[lenderVault][onChainQuoteHash] = false;
@@ -166,15 +167,15 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             lenderVault,
             offChainQuote.generalQuoteInfo
         );
-        if (offChainQuote.nonce > offChainQuoteNonce[lenderVault]) {
-            revert();
-        }
-        if (offChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
-            revert();
+        if (
+            offChainQuote.nonce > offChainQuoteNonce[lenderVault] ||
+            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
+        ) {
+            revert Errors.InvalidQuote();
         }
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
-            revert();
+            revert Errors.OffChainQuoteHasBeenInvalidated();
         }
         if (
             !areValidSignatures(
@@ -185,7 +186,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 offChainQuote.s
             )
         ) {
-            revert();
+            revert Errors.InvalidOffChainSignature();
         }
 
         bytes32 leaf = keccak256(
@@ -201,7 +202,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             )
         );
         if (!MerkleProof.verify(proof, offChainQuote.quoteTuplesRoot, leaf)) {
-            revert();
+            revert Errors.InvalidOffChainMerkleProof();
         }
         if (offChainQuote.generalQuoteInfo.isSingleUse) {
             offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
@@ -274,12 +275,12 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             msg.sender != IAddressRegistry(_addressRegistry).borrowerGateway()
         ) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (
             !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
         ) {
-            revert();
+            revert Errors.UnregisteredVault();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(
@@ -289,16 +290,16 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 generalQuoteInfo.loanToken
             )
         ) {
-            revert();
+            revert Errors.NonWhitelistedToken();
         }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
-            revert();
+            revert Errors.InvalidQuote();
         }
         if (
             generalQuoteInfo.borrower != address(0) &&
             generalQuoteInfo.borrower != borrower
         ) {
-            revert();
+            revert Errors.InvalidBorrower();
         }
     }
 
