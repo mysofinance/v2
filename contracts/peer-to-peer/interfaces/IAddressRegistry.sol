@@ -25,7 +25,7 @@ interface IAddressRegistry {
     /**
      * @notice toggles whitelist status of provided tokens
      * @dev can only be called by registry owner
-     * @param addrs addresses of token addresses
+     * @param addrs addresses of tokens
      * @param whitelistStatus true if whitelisted, else false to delist
      */
     function toggleTokens(
@@ -33,13 +33,29 @@ interface IAddressRegistry {
         bool whitelistStatus
     ) external;
 
+    /**
+     * @notice toggles whitelist status of callback
+     * @dev can only be called by registry owner
+     * @param addr address of callback
+     * @param whitelistStatus true if whitelisted, else false to delist
+     */
     function toggleCallbackAddr(address addr, bool whitelistStatus) external;
 
+    /**
+     * @notice toggles whitelist status of compartment
+     * @dev can only be called by registry owner
+     * @param addr address of compartment
+     * @param whitelistStatus true if whitelisted, else false to delist
+     */
     function toggleCompartmentImpl(address addr, bool whitelistStatus) external;
 
+    /**
+     * @notice toggles whitelist status of oracle
+     * @dev can only be called by registry owner
+     * @param addr address of oracle
+     * @param whitelistStatus true if whitelisted, else false to delist
+     */
     function toggleOracle(address addr, bool whitelistStatus) external;
-
-    function addLenderVault(address addr) external;
 
     function lenderVaultFactory() external view returns (address);
 
