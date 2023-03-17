@@ -49,7 +49,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.DuplicateChainQuote();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = true;
         emit OnChainQuoteAdded(lenderVault, onChainQuote, onChainQuoteHash);
@@ -84,7 +84,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.MissingChainQuote();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
@@ -105,7 +105,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.MissingChainQuote();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
@@ -147,7 +147,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         );
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert();
+            revert Errors.MissingChainQuote();
         }
         if (onChainQuote.generalQuoteInfo.isSingleUse) {
             isOnChainQuote[lenderVault][onChainQuoteHash] = false;
@@ -168,14 +168,14 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             offChainQuote.generalQuoteInfo
         );
         if (offChainQuote.nonce > offChainQuoteNonce[lenderVault]) {
-            revert();
+            revert Errors.InvalidChainQuote();
         }
         if (offChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
-            revert();
+            revert Errors.InvalidChainQuote();
         }
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
-            revert();
+            revert Errors.DuplicateChainQuote();
         }
         if (
             !areValidSignatures(
@@ -186,7 +186,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 offChainQuote.s
             )
         ) {
-            revert();
+            revert Errors.InvalidSignature();
         }
 
         bytes32 leaf = keccak256(
@@ -202,7 +202,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             )
         );
         if (!MerkleProof.verify(proof, offChainQuote.quoteTuplesRoot, leaf)) {
-            revert();
+            revert Errors.InvalidChainQuoteProof();
         }
         if (offChainQuote.generalQuoteInfo.isSingleUse) {
             offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
@@ -275,7 +275,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         if (
             msg.sender != IAddressRegistry(_addressRegistry).borrowerGateway()
         ) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (
             !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
@@ -293,13 +293,13 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.NonWhitelistedToken();
         }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
-            revert();
+            revert Errors.InvalidChainQuote();
         }
         if (
             generalQuoteInfo.borrower != address(0) &&
             generalQuoteInfo.borrower != borrower
         ) {
-            revert();
+            revert Errors.InvalidBorrower();
         }
     }
 

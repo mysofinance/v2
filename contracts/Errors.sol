@@ -17,6 +17,9 @@ library Errors {
     error InvalidAddress();
     error InvalidArrayLength();
     error InvalidChainQuote();
+    error InvalidSignature();
+    error InvalidChainQuoteProof();
+    error MissingChainQuote();
     error NeitherTokenIsGOHM();
     error NoLpTokens();
     error IncorrectGaugeForLpToken();
@@ -46,6 +49,7 @@ library Errors {
     error DeadlinePassed();
     error WithdrawEntered();
     error DuplicateAddresses();
+    error DuplicateChainQuote();
     error Uninitialized();
     error EmptyRepaymentSchedule();
     error FirstDueDateTooClose();

@@ -135,8 +135,6 @@ async function generateOffChainQuote({
     ['uint256', 'uint256', 'uint256', 'uint256']
   )
   const quoteTuplesRoot = quoteTuplesTree.root
-  console.log('quoteTuplesTree:', quoteTuplesTree)
-  console.log('quoteTuplesRoot:', quoteTuplesRoot)
   const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
   console.log('chainId:', chainId)
   let offChainQuote = {
@@ -415,7 +413,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSender')
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidBorrower')
 
       // if quote tuple that's not part of tree, reverts
       const unregisteredQuoteTuple = {
@@ -428,7 +426,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, unregisteredQuoteTuple, proof)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidChainQuote')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -460,7 +458,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'MissingChainQuote')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
@@ -610,7 +608,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidChainQuote')
     })
 
     it('Should validate off-chain MerkleProof correctly', async function () {
@@ -662,7 +660,7 @@ describe('Basic Local Tests', function () {
             selectedQuoteTuple,
             proof.slice(2)
           )
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidChainQuoteProof')
     })
 
     it('Should validate off-chain wrong signature correctly', async function () {
@@ -708,7 +706,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSignature')
     })
 
     it('Should validate correctly the wrong incrementOffChainQuoteNonce', async function () {
@@ -929,7 +927,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'MissingChainQuote')
     })
 
     it('Should update and delete on-chain quota successfully', async function () {

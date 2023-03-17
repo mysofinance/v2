@@ -720,19 +720,23 @@ describe('Basic Forked Mainnet Tests', function () {
 
       newOnChainQuote.generalQuoteInfo.loanToken = usdc.address
 
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to.be
-        .reverted
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([compAddress], true)
 
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to.be
-        .reverted
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
 
       onChainQuote.generalQuoteInfo.loanToken = compAddress
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
+
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'MissingChainQuote')
 
       onChainQuote.generalQuoteInfo.loanToken = usdc.address
 
