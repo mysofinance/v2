@@ -8,8 +8,7 @@ import {
   aavePoolAbi,
   crvRewardsDistributorAbi,
   chainlinkAggregatorAbi,
-  gohmAbi,
-  uniV2Abi
+  gohmAbi
 } from './abi'
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers'
 
@@ -160,10 +159,10 @@ describe('Basic Forked Mainnet Tests', function () {
 
     await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
-    const wbtc = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
+    const wbtc = '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'
     const btcToUSDChainlinkAddr = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c'
     const wBTCToBTCChainlinkAddr = '0xfdfd9c85ad200c506cf9e21f1fd8dd01932fbb23'
-    
+
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
     await BalancerV2Looping.connect(lender)
@@ -200,7 +199,19 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } = await setupTest()
+      const {
+        addressRegistry,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        usdc,
+        weth,
+        lenderVault,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
+      } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -212,7 +223,7 @@ describe('Basic Forked Mainnet Tests', function () {
         weth.address,
         wbtc,
         btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr,
+        wBTCToBTCChainlinkAddr
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -513,7 +524,9 @@ describe('Basic Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote collToken, loanToken', async function () {
@@ -600,18 +613,28 @@ describe('Basic Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(borrower.address, onChainQuote)).to.reverted
-      await expect(quoteHandler.connect(borrower).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(borrower.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+      await expect(
+        quoteHandler.connect(borrower).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([weth.address], true)
       await addressRegistry.connect(team).toggleTokens([usdc.address], false)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
 
@@ -684,28 +707,35 @@ describe('Basic Forked Mainnet Tests', function () {
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], false)
 
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(borrower.address, onChainQuote, newOnChainQuote)).to
-        .reverted
-      await expect(quoteHandler.connect(borrower).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(borrower.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+      await expect(
+        quoteHandler.connect(borrower).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       newOnChainQuote.generalQuoteInfo.loanToken = usdc.address
 
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([compAddress], true)
 
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
 
       onChainQuote.generalQuoteInfo.loanToken = compAddress
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
+
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnknownOnChainQuote')
 
       onChainQuote.generalQuoteInfo.loanToken = usdc.address
 
@@ -757,6 +787,8 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
         return x.event === 'Borrow'
       })
+
+      expect(borrowEvent).to.not.be.undefined
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
@@ -805,9 +837,12 @@ describe('Basic Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, onChainQuote)).to.reverted
-      await expect(quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
-
+      await expect(
+        quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+      await expect(
+        quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
       onChainQuote.generalQuoteInfo.loanToken = weth.address
       await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
 
@@ -1121,12 +1156,26 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
-      await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.revertedWithCustomError(crvCompInstance, "InvalidSender")
-      await expect(crvCompInstance.connect(borrower).stake(1000)).to.be.revertedWithCustomError(crvCompInstance,"InvalidGaugeIndex")
-      await expect(crvCompInstance.connect(borrower).stake(10)).to.be.revertedWithCustomError(crvCompInstance, "IncorrectGaugeForLpToken")
+      await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'InvalidSender'
+      )
+      await expect(crvCompInstance.connect(borrower).stake(1000)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'InvalidGaugeIndex'
+      )
+      await expect(crvCompInstance.connect(borrower).stake(10)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'IncorrectGaugeForLpToken'
+      )
       await crvCompInstance.connect(borrower).stake(compartmentData)
-      await expect(crvCompInstance.connect(borrower).stake(compartmentData)).to.be.revertedWithCustomError(crvCompInstance, "AlreadyStaked")
-      await expect(crvCompInstance.connect(team).transferCollFromCompartment(1,1,borrower.address,collTokenAddress, ZERO_ADDR)).to.be.revertedWithCustomError(crvCompInstance, "InvalidSender")
+      await expect(crvCompInstance.connect(borrower).stake(compartmentData)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'AlreadyStaked'
+      )
+      await expect(
+        crvCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
+      ).to.be.revertedWithCustomError(crvCompInstance, 'InvalidSender')
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -1737,16 +1786,27 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const uniCompInstance = await votingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
-      await expect(uniCompInstance.connect(team).initialize(borrower.address,1)).to.be.reverted
+      await expect(uniCompInstance.connect(team).initialize(borrower.address, 1)).to.be.reverted
 
-      await expect(uniCompInstance.connect(team).transferCollFromCompartment(1,1,borrower.address,collTokenAddress, ZERO_ADDR)).to.be.revertedWithCustomError(uniCompInstance, "InvalidSender")
+      await expect(
+        uniCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
+      ).to.be.revertedWithCustomError(uniCompInstance, 'InvalidSender')
 
-      await expect(uniCompInstance.connect(team).unlockCollToVault(collTokenAddress)).to.be.revertedWithCustomError(uniCompInstance, "InvalidSender")
+      await expect(uniCompInstance.connect(team).unlockCollToVault(collTokenAddress)).to.be.revertedWithCustomError(
+        uniCompInstance,
+        'InvalidSender'
+      )
 
       const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
 
-      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.revertedWithCustomError(uniCompInstance, "InvalidSender")
-      await expect(uniCompInstance.connect(borrower).delegate(ZERO_ADDR)).to.be.revertedWithCustomError(uniCompInstance, "InvalidDelegatee")
+      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.revertedWithCustomError(
+        uniCompInstance,
+        'InvalidSender'
+      )
+      await expect(uniCompInstance.connect(borrower).delegate(ZERO_ADDR)).to.be.revertedWithCustomError(
+        uniCompInstance,
+        'InvalidDelegatee'
+      )
       await uniCompInstance.connect(borrower).delegate(borrower.address)
 
       // check balance post borrow
@@ -1808,24 +1868,23 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should thwart malcious withdraw from vault impersonating token', async () => {
-      const { lender, team, weth, lenderVault } =
-        await setupTest()
+      const { lender, team, weth, lenderVault } = await setupTest()
 
       await ethers.provider.send('hardhat_setBalance', [team.address, '0x2004FCE5E3E25026110000000'])
       await weth.connect(team).deposit({ value: ONE_WETH.mul(10) })
 
       await weth.connect(team).transfer(lenderVault.address, ONE_WETH.mul(10))
 
-      const wethBalPreAttack = await weth.balanceOf(lenderVault.address);
+      const wethBalPreAttack = await weth.balanceOf(lenderVault.address)
 
       // create maliciousToken
       const MyMaliciousERC20 = await ethers.getContractFactory('MyMaliciousERC20')
       await MyMaliciousERC20.connect(team)
-      const myMaliciousERC20 = await MyMaliciousERC20.deploy('MalciousToken', 'MyMal',18, ZERO_ADDR, lenderVault.address)
+      const myMaliciousERC20 = await MyMaliciousERC20.deploy('MalciousToken', 'MyMal', 18, ZERO_ADDR, lenderVault.address)
       await myMaliciousERC20.deployed()
       await lenderVault.connect(lender).withdraw(myMaliciousERC20.address, ONE_WETH)
-      const wethBalPostAttack = await weth.balanceOf(lenderVault.address);
-      expect(wethBalPostAttack).to.equal(wethBalPreAttack);
+      const wethBalPostAttack = await weth.balanceOf(lenderVault.address)
+      expect(wethBalPostAttack).to.equal(wethBalPreAttack)
     })
   })
 
@@ -2133,37 +2192,58 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('Testing chainlink oracles', function () {
     it('Should process onChain quote with eth-based oracle address (non-weth)', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lenderVault } =
-        await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        usdc,
+        paxg,
+        weth,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr,
+        team,
+        lenderVault
+      } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       /****deploy errors on base oracles****/
-      await expect(ChainlinkBasicImplementation.connect(team).deploy(
-        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
-        [usdcEthChainlinkAddr],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-        )).to.be.reverted
-      await expect(ChainlinkBasicImplementation.connect(team).deploy(
-        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
-        [ZERO_ADDR, paxgEthChainlinkAddr],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr)).to.be.reverted
-      await expect(ChainlinkBasicImplementation.connect(team).deploy(
-        [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
-        [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr)).to.be.reverted
-        
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [usdcEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+      ).to.be.reverted
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [ZERO_ADDR, paxgEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+      ).to.be.reverted
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
+          [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+      ).to.be.reverted
+
       /****correct deploy****/
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
@@ -2266,8 +2346,20 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (coll weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        usdc,
+        weth,
+        team,
+        lenderVault,
+        addressRegistry,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
+      } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -2367,8 +2459,20 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (loan weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        usdc,
+        weth,
+        team,
+        lenderVault,
+        addressRegistry,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
+      } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -2471,8 +2575,21 @@ describe('Basic Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        usdc,
+        gohm,
+        weth,
+        team,
+        lenderVault,
+        addressRegistry,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
+      } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -2605,15 +2722,17 @@ describe('Basic Forked Mainnet Tests', function () {
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
       /****deploy error uni oracle****/
-      await expect(UniV2OracleImplementation.connect(team).deploy(
-        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
-        [usdcEthChainlinkAddr],
-        [ZERO_ADDR],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      )).to.be.reverted
+      await expect(
+        UniV2OracleImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+          [usdcEthChainlinkAddr],
+          [ZERO_ADDR],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+      ).to.be.reverted
       /****deploy correctly****/
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],

@@ -135,8 +135,6 @@ async function generateOffChainQuote({
     ['uint256', 'uint256', 'uint256', 'uint256']
   )
   const quoteTuplesRoot = quoteTuplesTree.root
-  console.log('quoteTuplesTree:', quoteTuplesTree)
-  console.log('quoteTuplesRoot:', quoteTuplesRoot)
   const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
   console.log('chainId:', chainId)
   let offChainQuote = {
@@ -288,6 +286,9 @@ describe('Basic Local Tests', function () {
     it('Should not proccess with insufficient vault funds', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
+      // check that only owner can propose new owner
+      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
@@ -348,12 +349,18 @@ describe('Basic Local Tests', function () {
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.reverted
+
+      // allow for transfer of vault ownership
+      await lenderVault.connect(lender).proposeNewOwner(borrower.address)
+      // only new proposed owner can claim vault
+      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+      await lenderVault.connect(borrower).claimOwnership()
     })
   })
 
   describe('Borrow Gateway', function () {
     it('Should not proccess with bigger fee than max fee', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       await expect(borrowerGateway.connect(lender).setNewProtocolFee(0)).to.be.reverted
       await expect(borrowerGateway.connect(team).setNewProtocolFee(BASE)).to.be.reverted
@@ -415,7 +422,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidBorrower')
 
       // if quote tuple that's not part of tree, reverts
       const unregisteredQuoteTuple = {
@@ -424,11 +431,12 @@ describe('Basic Local Tests', function () {
         upfrontFeePctInBase: 0,
         tenor: ONE_DAY.mul(360)
       }
+
       await expect(
         borrowerGateway
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, unregisteredQuoteTuple, proof)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidBorrower')
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -444,8 +452,12 @@ describe('Basic Local Tests', function () {
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
 
       // invalidate off chain quote
-      await expect(quoteHandler.connect(lender).invalidateOffChainQuote(borrower.address, payloadHash)).to.reverted
-      await expect(quoteHandler.connect(borrower).invalidateOffChainQuote(lenderVault.address, payloadHash)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).invalidateOffChainQuote(borrower.address, payloadHash)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+      await expect(
+        quoteHandler.connect(borrower).invalidateOffChainQuote(lenderVault.address, payloadHash)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await expect(quoteHandler.connect(lender).invalidateOffChainQuote(lenderVault.address, payloadHash)).to.emit(
         quoteHandler,
@@ -456,11 +468,11 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidBorrower')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
-      const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -502,11 +514,11 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
-      const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -548,11 +560,11 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate off-chain singleUse quote correctly', async function () {
-      const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -606,11 +618,11 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(quoteHandler, 'OffChainQuoteHasBeenInvalidated')
     })
 
     it('Should validate off-chain MerkleProof correctly', async function () {
-      const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -658,11 +670,11 @@ describe('Basic Local Tests', function () {
             selectedQuoteTuple,
             proof.slice(2)
           )
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainMerkleProof')
     })
 
     it('Should validate off-chain wrong signature correctly', async function () {
-      const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -704,7 +716,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
     })
 
     it('Should validate correctly the wrong incrementOffChainQuoteNonce', async function () {
@@ -712,8 +724,13 @@ describe('Basic Local Tests', function () {
 
       const offChainQuoteNoncePre = await quoteHandler.connect(lender).offChainQuoteNonce(lenderVault.address)
 
-      await expect(quoteHandler.connect(lender).incrementOffChainQuoteNonce(lender.address)).to.be.reverted
-      await expect(quoteHandler.connect(borrower).incrementOffChainQuoteNonce(lenderVault.address)).to.be.reverted
+      await expect(quoteHandler.connect(lender).incrementOffChainQuoteNonce(lender.address)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'UnregisteredVault'
+      )
+      await expect(
+        quoteHandler.connect(borrower).incrementOffChainQuoteNonce(lenderVault.address)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await expect(quoteHandler.connect(lender).incrementOffChainQuoteNonce(lenderVault.address))
 
@@ -869,11 +886,11 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(borrower.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
 
       await expect(
         quoteHandler.connect(lender).checkAndRegisterOnChainQuote(borrower.address, borrower.address, onChainQuote)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], false)
 
@@ -881,7 +898,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([weth.address], true)
 
@@ -889,7 +906,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([usdc.address], true)
       await addressRegistry.connect(team).toggleTokens([weth.address], false)
@@ -898,7 +915,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).toggleTokens([weth.address], true)
 
@@ -908,7 +925,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       onChainQuote.generalQuoteInfo.collToken = weth.address
 
@@ -920,7 +937,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnknownOnChainQuote')
     })
 
     it('Should update and delete on-chain quota successfully', async function () {

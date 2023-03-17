@@ -10,7 +10,7 @@ abstract contract Ownable {
 
     function proposeNewOwner(address _newOwnerProposal) external {
         senderCheckOwner();
-        _owner = _newOwnerProposal;
+        _newOwner = _newOwnerProposal;
     }
 
     function claimOwnership() external {
