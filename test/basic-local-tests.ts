@@ -353,10 +353,10 @@ describe('Basic Local Tests', function () {
       ).to.be.reverted
 
       // allow for transfer of vault ownership
-    await lenderVault.connect(lender).proposeNewOwner(borrower.address)
-    // only new proposed owner can claim vault
-    await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
-    await lenderVault.connect(borrower).claimOwnership()
+      await lenderVault.connect(lender).proposeNewOwner(borrower.address)
+      // only new proposed owner can claim vault
+      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+      await lenderVault.connect(borrower).claimOwnership()
     })
   })
 
