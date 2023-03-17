@@ -286,6 +286,9 @@ describe('Basic Local Tests', function () {
     it('Should not proccess with insufficient vault funds', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
+      // check that only owner can propose new owner
+      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
@@ -346,6 +349,12 @@ describe('Basic Local Tests', function () {
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.reverted
+
+      // allow for transfer of vault ownership
+      await lenderVault.connect(lender).proposeNewOwner(borrower.address)
+      // only new proposed owner can claim vault
+      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+      await lenderVault.connect(borrower).claimOwnership()
     })
   })
 
