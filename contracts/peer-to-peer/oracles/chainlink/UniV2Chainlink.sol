@@ -150,7 +150,7 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         } else {
             // loan token was an Lp token
             loanTokenPriceRaw = uint256(
-                getLpTokenPrice(loanTokenOracleData, loanToken)
+                getLpTokenPrice(loanTokenOracleData, loanToken, false)
             );
         }
 
@@ -163,7 +163,7 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         } else {
             // coll token was an Lp token
             collTokenPriceRaw = uint256(
-                getLpTokenPrice(collTokenOracleData, collToken)
+                getLpTokenPrice(collTokenOracleData, collToken, true)
             );
         }
 
@@ -174,11 +174,13 @@ contract UniV2Chainlink is IOracle, BaseOracle {
 
     function getLpTokenPrice(
         OracleData memory lpTokenOracleData,
-        address lpTokenAddr
+        address lpTokenAddr,
+        bool isColl
     ) internal view returns (int256 lpTokenPriceInEth) {
         uint256 unsignedLpTokenPriceInEth = getTotalEthValue(
             lpTokenOracleData,
-            lpTokenAddr
+            lpTokenAddr,
+            isColl
         );
         uint256 lpTokenDecimals = IERC20Metadata(lpTokenAddr).decimals();
         uint256 totalLpSupply = IUniV2(lpTokenAddr).totalSupply();
@@ -193,8 +195,9 @@ contract UniV2Chainlink is IOracle, BaseOracle {
 
     function getTotalEthValue(
         OracleData memory lpTokenOracleData,
-        address lpTokenAddr
-    ) internal view returns (uint256 ethValueLowerBound) {
+        address lpTokenAddr,
+        bool isColl
+    ) internal view returns (uint256 ethValueBounded) {
         address token0 = lpTokenOracleData.token0;
         address token1 = lpTokenOracleData.token1;
         (uint112 reserve0, uint112 reserve1, ) = IUniV2(lpTokenAddr)
@@ -216,8 +219,16 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         uint256 totalEthValueToken1 = (uint256(reserve1) * token1PriceRaw) /
             (10 ** decimalsToken1);
 
-        ethValueLowerBound = totalEthValueToken0 > totalEthValueToken1
-            ? totalEthValueToken1 * 2
-            : totalEthValueToken0 * 2;
+        if (isColl) {
+            // for collateral LP tokens use the lower bound (since coll token in numerator)
+            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
+                ? totalEthValueToken1 * 2
+                : totalEthValueToken0 * 2;
+        } else {
+            // for loan LP tokens use the upper bound (since loan token is in denominator)
+            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
+                ? totalEthValueToken0 * 2
+                : totalEthValueToken1 * 2;
+        }
     }
 }

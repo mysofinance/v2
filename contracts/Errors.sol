@@ -2,6 +2,8 @@
 pragma solidity 0.8.19;
 
 library Errors {
+    error AlreadyInitialized();
+    error AlreadyRegisteredVault();
     error UnregisteredVault();
     error InvalidDelegatee();
     error InvalidSender();
@@ -40,4 +42,6 @@ library Errors {
     error TooSmallLoanAmount();
     error DeadlinePassed();
     error WithdrawEntered();
+    error DuplicateAddresses();
+    error Uninitialized();
 }
