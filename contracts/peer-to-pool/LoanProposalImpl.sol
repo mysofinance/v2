@@ -212,17 +212,17 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
 
     function updateStatusToDeployed() external {
         if (msg.sender != fundingPool) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (status != DataTypes.LoanStatus.READY_TO_EXECUTE) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         status = DataTypes.LoanStatus.LOAN_DEPLOYED;
     }
 
     function exerciseConversion() external {
         if (status != DataTypes.LoanStatus.LOAN_DEPLOYED) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = currentRepaymentIdx;
         checkRepaymentIdx(repaymentIdx);

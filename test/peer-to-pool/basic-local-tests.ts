@@ -160,14 +160,14 @@ describe('Basic Local Tests', function () {
         expect(await loanProposal.arrangerFee()).to.equal(relArrangerFee)
         
         // check loan terms correctly set
-      const unfinalizedLoanTerms = await loanProposal.loanTerms()
-      for (var i = 0; i < unfinalizedLoanTerms.repaymentSchedule.length; i++) {
-        expect(unfinalizedLoanTerms.repaymentSchedule[i].loanTokenDue).to.equal(loanTerms.repaymentSchedule[i].loanTokenDue)
-        expect(unfinalizedLoanTerms.repaymentSchedule[i].collTokenDueIfConverted).to.equal(loanTerms.repaymentSchedule[i].collTokenDueIfConverted)
-        expect(unfinalizedLoanTerms.repaymentSchedule[i].dueTimestamp).to.equal(loanTerms.repaymentSchedule[i].dueTimestamp)
-        expect(unfinalizedLoanTerms.repaymentSchedule[i].conversionGracePeriod).to.equal(loanTerms.repaymentSchedule[i].conversionGracePeriod)
-        expect(unfinalizedLoanTerms.repaymentSchedule[i].repaymentGracePeriod).to.equal(loanTerms.repaymentSchedule[i].repaymentGracePeriod)
-      }
+        const unfinalizedLoanTerms = await loanProposal.loanTerms()
+        for (var i = 0; i < unfinalizedLoanTerms.repaymentSchedule.length; i++) {
+          expect(unfinalizedLoanTerms.repaymentSchedule[i].loanTokenDue).to.equal(loanTerms.repaymentSchedule[i].loanTokenDue)
+          expect(unfinalizedLoanTerms.repaymentSchedule[i].collTokenDueIfConverted).to.equal(loanTerms.repaymentSchedule[i].collTokenDueIfConverted)
+          expect(unfinalizedLoanTerms.repaymentSchedule[i].dueTimestamp).to.equal(loanTerms.repaymentSchedule[i].dueTimestamp)
+          expect(unfinalizedLoanTerms.repaymentSchedule[i].conversionGracePeriod).to.equal(loanTerms.repaymentSchedule[i].conversionGracePeriod)
+          expect(unfinalizedLoanTerms.repaymentSchedule[i].repaymentGracePeriod).to.equal(loanTerms.repaymentSchedule[i].repaymentGracePeriod)
+        }
         // reverts if too few subscriptions
         await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(loanProposal, 'TotalSubscribedTooLow')
 
@@ -236,10 +236,15 @@ describe('Basic Local Tests', function () {
         // reverts if trying to finalize loan terms prior to acceptance
         await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(loanProposal, 'InvalidActionForCurrentStatus')
 
+        // reverts if users tries to rollback prior to borrower acceptance
+        await expect(loanProposal.connect(daoTreasury).rollback()).to.be.revertedWithCustomError(loanProposal, 'InvalidActionForCurrentStatus')
+
         // reverts if unauthorized user tries to accept loan terms
         await expect(loanProposal.connect(lender1).acceptLoanTerms()).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
         // check status didn't change
         expect(await loanProposal.status()).to.be.equal(0)
+
+        // test that dao treasury can accept loan terms and move forward
         let tx = await loanProposal.connect(daoTreasury).acceptLoanTerms()
         let receipt = await tx.wait()
         timestamp = (await ethers.provider.getBlock(receipt.blockNumber)).timestamp
@@ -270,6 +275,11 @@ describe('Basic Local Tests', function () {
         let loanTokenDecimals = await usdc.decimals()
         let [ finalLoanTerms, arrangerFee, finalLoanAmount, finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
         let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
+
+        // reverts if non-borrower tries to rollback during lender grace period
+        await expect(loanProposal.connect(lender1).rollback()).to.be.revertedWithCustomError(loanProposal, 'InvalidRollBackRequest')
+
+        // dao treasury approves and finalizes and transfers coll amounts
         await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
         let daoTreasuryBalPre = await daoToken.balanceOf(daoTreasury.address)
         let loanProposalBalPre = await daoToken.balanceOf(loanProposal.address)
@@ -277,6 +287,8 @@ describe('Basic Local Tests', function () {
         let daoTreasuryBalPost = await daoToken.balanceOf(daoTreasury.address)
         let loanProposalBalPost = await daoToken.balanceOf(loanProposal.address)
         expect(loanProposalBalPost.sub(loanProposalBalPre)).to.be.equal(daoTreasuryBalPre.sub(daoTreasuryBalPost))
+        // check updated loan proposal status
+        expect(await loanProposal.status()).to.be.equal(2)
       })
     })
 
