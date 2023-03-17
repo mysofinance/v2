@@ -35,7 +35,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.InvalidSender();
         }
         if (!isValidOnChainQuote(onChainQuote)) {
-            revert();
+            revert Errors.InvalidChainQuote();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(
@@ -70,7 +70,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.InvalidSender();
         }
         if (!isValidOnChainQuote(newOnChainQuote)) {
-            revert();
+            revert Errors.InvalidChainQuote();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(

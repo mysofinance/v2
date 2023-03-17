@@ -525,7 +525,9 @@ describe('Basic Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidChainQuote')
     })
 
     it('Should validate correctly the wrong quote collToken, loanToken', async function () {
@@ -706,8 +708,9 @@ describe('Basic Forked Mainnet Tests', function () {
       await expect(
         quoteHandler.connect(borrower).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
-      await expect(quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)).to
-        .reverted
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidChainQuote')
 
       newOnChainQuote.generalQuoteInfo.loanToken = usdc.address
 

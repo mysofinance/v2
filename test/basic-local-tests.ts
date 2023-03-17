@@ -506,7 +506,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidChainQuote')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
@@ -552,7 +552,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.rejected
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidChainQuote')
     })
 
     it('Should validate off-chain singleUse quote correctly', async function () {
@@ -917,7 +917,7 @@ describe('Basic Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidChainQuote')
 
       onChainQuote.generalQuoteInfo.collToken = weth.address
 

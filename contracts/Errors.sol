@@ -16,6 +16,7 @@ library Errors {
     error InvalidBTCOracle();
     error InvalidAddress();
     error InvalidArrayLength();
+    error InvalidChainQuote();
     error NeitherTokenIsGOHM();
     error NoLpTokens();
     error IncorrectGaugeForLpToken();
