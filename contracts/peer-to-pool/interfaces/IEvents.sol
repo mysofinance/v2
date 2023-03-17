@@ -9,6 +9,7 @@ interface IEvents {
     event LoanProposalCreated(
         address indexed loanProposalAddr,
         address indexed fundingPool,
+        address indexed sender,
         address collToken,
         uint256 arrangerFee,
         uint256 lenderGracePeriod
@@ -20,12 +21,34 @@ interface IEvents {
         DataTypes.LoanTerms loanTerms
     );
     event LoanTermsAccepted(address indexed fundingPool);
-    event LoanTermsAndTransferCollFinalized(address indexed fundingPool);
+    event LoanTermsAndTransferCollFinalized(
+        address indexed fundingPool,
+        uint256 finalLoanAmount,
+        uint256 _finalCollAmountReservedForDefault,
+        uint256 _finalCollAmountReservedForConversions,
+        uint256 _arrangerFee
+    );
     event Rollback(address indexed fundingPool);
     event LoanDeployed(address indexed fundingPool);
-    event ConversionExercised(address indexed fundingPool);
-    event ClaimRepayment(address indexed fundingPool);
-    event Repay(address indexed fundingPool);
+    event ConversionExercised(
+        address indexed fundingPool,
+        address indexed sender,
+        uint256 repaymentIdx,
+        uint256 amount
+    );
+    event ClaimRepayment(
+        address indexed fundingPool,
+        address indexed sender,
+        uint256 amount
+    );
+    event Repay(
+        address indexed fundingPool,
+        uint256 remainingLoanTokenDue,
+        uint256 collTokenLeftUnconverted
+    );
     event LoanDefaulted(address indexed fundingPool);
-    event ClaimDefaultProceeded(address indexed fundingPool);
+    event DefaultProceedsClaimed(
+        address indexed fundingPool,
+        address indexed sender
+    );
 }

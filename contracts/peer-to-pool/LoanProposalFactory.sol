@@ -47,6 +47,7 @@ contract LoanProposalFactory is Ownable, IEvents, ILoanProposalFactory {
         emit LoanProposalCreated(
             newLoanProposal,
             _fundingPool,
+            msg.sender,
             _collToken,
             _arrangerFee,
             _lenderGracePeriod

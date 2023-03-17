@@ -204,7 +204,13 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.InvalidSendAmount();
         }
 
-        emit LoanTermsAndTransferCollFinalized(fundingPool);
+        emit LoanTermsAndTransferCollFinalized(
+            fundingPool,
+            _finalLoanAmount,
+            _finalCollAmountReservedForDefault,
+            _finalCollAmountReservedForConversions,
+            _arrangerFee
+        );
     }
 
     function rollback() external {
@@ -280,7 +286,12 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         lenderExercisedConversion[msg.sender][repaymentIdx] = true;
         IERC20Metadata(collToken).safeTransfer(msg.sender, conversionAmount);
 
-        emit ConversionExercised(fundingPool);
+        emit ConversionExercised(
+            fundingPool,
+            msg.sender,
+            repaymentIdx,
+            conversionAmount
+        );
     }
 
     function repay(uint256 expectedTransferFee) external {
@@ -336,7 +347,11 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             : collTokenLeftUnconverted;
         IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
 
-        emit Repay(fundingPool);
+        emit Repay(
+            fundingPool,
+            remainingLoanTokenDue,
+            collTokenLeftUnconverted
+        );
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
@@ -368,7 +383,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
         IERC20Metadata(loanToken).safeTransfer(msg.sender, claimAmount);
 
-        emit ClaimRepayment(fundingPool);
+        emit ClaimRepayment(fundingPool, msg.sender, claimAmount);
     }
 
     function markAsDefaulted() external {
@@ -447,7 +462,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             defaultClaimProRataShare
         );
 
-        emit ClaimDefaultProceeded(fundingPool);
+        emit DefaultProceedsClaimed(fundingPool, msg.sender);
     }
 
     function loanTerms() external view returns (DataTypes.LoanTerms memory) {
