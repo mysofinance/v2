@@ -9,6 +9,10 @@ import {Errors} from "../../Errors.sol";
 
 abstract contract BaseOracle {
     address internal immutable wethAddrOfGivenChain;
+    // since arbitrum and eth support BTC/USD and wBTC/BTC only use USD oracles
+    address internal immutable wBTCAddrOfGivenChain;
+    address internal immutable btcToUSDOracleAddrOfGivenChain;
+    address internal immutable wBTCToBTCOracleAddrOfGivenChain;
     // tokenAddr => chainlink oracle addr
     // oracles will be eth or usd based
     mapping(address => address) public oracleAddrs;
@@ -17,17 +21,26 @@ abstract contract BaseOracle {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        address _wethAddrOfGivenChain
+        address _wethAddrOfGivenChain,
+        address _wBTCAddrOfGivenChain,
+        address _btcToUSDOracleAddrOfGivenChain,
+        address _wBTCToBTCOracleAddrOfGivenChain
     ) {
         if (_wethAddrOfGivenChain == address(0)) {
             revert Errors.InvalidAddress();
         }
         wethAddrOfGivenChain = _wethAddrOfGivenChain;
         isUSDBased = _wethAddrOfGivenChain == address(0);
+        wBTCAddrOfGivenChain = _wBTCAddrOfGivenChain;
+        btcToUSDOracleAddrOfGivenChain = _btcToUSDOracleAddrOfGivenChain;
+        wBTCToBTCOracleAddrOfGivenChain = _wBTCToBTCOracleAddrOfGivenChain;
         // if you use eth oracles with weth, will just return weth address
         // for usd-based oracle weth/usd oracle addr will need to be passed in like others
         if (!isUSDBased) {
             oracleAddrs[_wethAddrOfGivenChain] = _wethAddrOfGivenChain;
+        }
+        if (isUSDBased) {
+            oracleAddrs[_wBTCAddrOfGivenChain] = _wBTCAddrOfGivenChain;
         }
         if (
             _tokenAddrs.length == 0 || _tokenAddrs.length != _oracleAddrs.length
@@ -58,13 +71,20 @@ abstract contract BaseOracle {
         }
     }
 
+    /**
+     * @notice helper function to get price across weth/eth, btc or other cases
+     * @dev this performs a check to make sure only positive values are returned from oracle
+     * @param oracleAddr address of the chainlink oracle
+     * @return tokenPriceRaw return value of token price
+     */
     function getPriceOfToken(
-        address oracleAddr,
-        address wethAddress
+        address oracleAddr
     ) internal view returns (uint256 tokenPriceRaw) {
         int256 answer;
-        if (oracleAddr == wethAddress) {
+        if (oracleAddr == wethAddrOfGivenChain) {
             answer = 10 ** 18;
+        } else if (oracleAddr == wBTCAddrOfGivenChain) {
+            answer = getBTCPrice();
         } else {
             (, answer, , , ) = AggregatorV3Interface(oracleAddr)
                 .latestRoundData();
@@ -72,6 +92,39 @@ abstract contract BaseOracle {
         tokenPriceRaw = uint256(answer);
         if (tokenPriceRaw < 1) {
             revert Errors.InvalidOracleAnswer();
+        }
+    }
+
+    /**
+     * @dev this functon first retrieves btc price in USD
+     * the wbtc price is retreived denominated in btc
+     * wbtc/usd (wbtc/btc * btc/usd)/(10**8)
+     * denominator accounts for 8 decimals of btc
+     * @return answer price of wbtch in USD which has 8 oracle decimals
+     */
+    function getBTCPrice() internal view returns (int256 answer) {
+        (, int256 BTCUSDAnswer, , , ) = AggregatorV3Interface(
+            btcToUSDOracleAddrOfGivenChain
+        ).latestRoundData();
+        (, int256 wBTCBTCAnswer, , , ) = AggregatorV3Interface(
+            wBTCToBTCOracleAddrOfGivenChain
+        ).latestRoundData();
+        answer = (wBTCBTCAnswer * BTCUSDAnswer) / (10 ** 8);
+    }
+
+    /**
+     * @dev oracles for btc should only be with USD based oracles,
+     * since that is the only cross-chain support provided by chainlink
+     * across mainnet and arbitrum
+     * @param collToken address of coll token
+     * @param loanToken address of loan token
+     */
+    function validBTCCheck(address collToken, address loanToken) internal view {
+        if (
+            (loanToken == wBTCAddrOfGivenChain ||
+                collToken == wBTCAddrOfGivenChain) && !isUSDBased
+        ) {
+            revert Errors.InvalidBTCOracle();
         }
     }
 }

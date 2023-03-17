@@ -27,8 +27,20 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _lpAddrs,
-        address _wethAddrOfGivenChain
-    ) BaseOracle(_tokenAddrs, _oracleAddrs, _wethAddrOfGivenChain) {
+        address _wethAddrOfGivenChain,
+        address _wBTCAddrOfGivenChain,
+        address _btcToUSDOracleAddrOfGivenChain,
+        address _wBTCToBTCOracleAddrOfGivenChain
+    )
+        BaseOracle(
+            _tokenAddrs,
+            _oracleAddrs,
+            _wethAddrOfGivenChain,
+            _wBTCAddrOfGivenChain,
+            _btcToUSDOracleAddrOfGivenChain,
+            _wBTCToBTCOracleAddrOfGivenChain
+        )
+    {
         if (_lpAddrs.length == 0) {
             revert Errors.InvalidArrayLength();
         }
@@ -138,32 +150,29 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address collToken
     ) internal view returns (uint256 collTokenPriceInLoanToken) {
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        address wethAddress = wethAddrOfGivenChain;
         uint256 loanTokenPriceRaw;
         uint256 collTokenPriceRaw;
         // if token1 is address 0 means loan token was not an lp token
         if (loanTokenOracleData.token1 == address(0)) {
             loanTokenPriceRaw = getPriceOfToken(
-                loanTokenOracleData.oracleAddrToken0,
-                wethAddress
+                loanTokenOracleData.oracleAddrToken0
             );
         } else {
             // loan token was an Lp token
             loanTokenPriceRaw = uint256(
-                getLpTokenPrice(loanTokenOracleData, loanToken)
+                getLpTokenPrice(loanTokenOracleData, loanToken, false)
             );
         }
 
         // if token1 is address 0 means coll token was not an lp token
         if (collTokenOracleData.token1 == address(0)) {
             collTokenPriceRaw = getPriceOfToken(
-                collTokenOracleData.oracleAddrToken0,
-                wethAddress
+                collTokenOracleData.oracleAddrToken0
             );
         } else {
             // coll token was an Lp token
             collTokenPriceRaw = uint256(
-                getLpTokenPrice(collTokenOracleData, collToken)
+                getLpTokenPrice(collTokenOracleData, collToken, true)
             );
         }
 
@@ -174,11 +183,13 @@ contract UniV2Chainlink is IOracle, BaseOracle {
 
     function getLpTokenPrice(
         OracleData memory lpTokenOracleData,
-        address lpTokenAddr
+        address lpTokenAddr,
+        bool isColl
     ) internal view returns (int256 lpTokenPriceInEth) {
         uint256 unsignedLpTokenPriceInEth = getTotalEthValue(
             lpTokenOracleData,
-            lpTokenAddr
+            lpTokenAddr,
+            isColl
         );
         uint256 lpTokenDecimals = IERC20Metadata(lpTokenAddr).decimals();
         uint256 totalLpSupply = IUniV2(lpTokenAddr).totalSupply();
@@ -193,22 +204,20 @@ contract UniV2Chainlink is IOracle, BaseOracle {
 
     function getTotalEthValue(
         OracleData memory lpTokenOracleData,
-        address lpTokenAddr
-    ) internal view returns (uint256 ethValueLowerBound) {
+        address lpTokenAddr,
+        bool isColl
+    ) internal view returns (uint256 ethValueBounded) {
         address token0 = lpTokenOracleData.token0;
         address token1 = lpTokenOracleData.token1;
         (uint112 reserve0, uint112 reserve1, ) = IUniV2(lpTokenAddr)
             .getReserves();
         uint256 decimalsToken0 = IERC20Metadata(token0).decimals();
         uint256 decimalsToken1 = IERC20Metadata(token1).decimals();
-        address wethAddress = wethAddrOfGivenChain;
         uint256 token0PriceRaw = getPriceOfToken(
-            lpTokenOracleData.oracleAddrToken0,
-            wethAddress
+            lpTokenOracleData.oracleAddrToken0
         );
         uint256 token1PriceRaw = getPriceOfToken(
-            lpTokenOracleData.oracleAddrToken1,
-            wethAddress
+            lpTokenOracleData.oracleAddrToken1
         );
 
         uint256 totalEthValueToken0 = (uint256(reserve0) * token0PriceRaw) /
@@ -216,8 +225,16 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         uint256 totalEthValueToken1 = (uint256(reserve1) * token1PriceRaw) /
             (10 ** decimalsToken1);
 
-        ethValueLowerBound = totalEthValueToken0 > totalEthValueToken1
-            ? totalEthValueToken1 * 2
-            : totalEthValueToken0 * 2;
+        if (isColl) {
+            // for collateral LP tokens use the lower bound (since coll token in numerator)
+            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
+                ? totalEthValueToken1 * 2
+                : totalEthValueToken0 * 2;
+        } else {
+            // for loan LP tokens use the upper bound (since loan token is in denominator)
+            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
+                ? totalEthValueToken0 * 2
+                : totalEthValueToken1 * 2;
+        }
     }
 }

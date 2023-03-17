@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {Ownable} from "../Ownable.sol";
+import {Errors} from "../Errors.sol";
 
 contract AddressRegistry is Ownable, IAddressRegistry {
     bool internal isInitialized;
@@ -28,21 +29,21 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     ) external {
         senderCheckOwner();
         if (isInitialized) {
-            revert();
+            revert Errors.AlreadyInitialized();
         }
         if (
             _lenderVaultFactory == address(0) ||
             _borrowerGateway == address(0) ||
             _quoteHandler == address(0)
         ) {
-            revert();
+            revert Errors.InvalidAddress();
         }
         if (
             _lenderVaultFactory == _borrowerGateway ||
             _lenderVaultFactory == _quoteHandler ||
             _borrowerGateway == _quoteHandler
         ) {
-            revert();
+            revert Errors.DuplicateAddresses();
         }
         lenderVaultFactory = _lenderVaultFactory;
         borrowerGateway = _borrowerGateway;
@@ -84,11 +85,14 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     }
 
     function addLenderVault(address addr) external {
+        if (msg.sender != lenderVaultFactory) {
+            revert Errors.InvalidSender();
+        }
         if (!isInitialized) {
-            revert();
+            revert Errors.Uninitialized();
         }
         if (isRegisteredVault[addr]) {
-            revert();
+            revert Errors.AlreadyRegisteredVault();
         }
         isRegisteredVault[addr] = true;
         registeredVaults.push(addr);
@@ -106,7 +110,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     function checkSenderAndIsInitialized() internal view {
         senderCheckOwner();
         if (!isInitialized) {
-            revert();
+            revert Errors.Uninitialized();
         }
     }
 }
