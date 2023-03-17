@@ -208,8 +208,8 @@ describe('Basic Forked Mainnet Tests', function () {
         team,
         usdc,
         weth,
-        wbtc,
         lenderVault,
+        wbtc,
         btcToUSDChainlinkAddr,
         wBTCToBTCChainlinkAddr
       } = await setupTest()

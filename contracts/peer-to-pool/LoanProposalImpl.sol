@@ -73,43 +73,60 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (msg.sender != arranger) {
             revert Errors.InvalidSender();
         }
-        if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
-            revert();
+        if (
+            status != DataTypes.LoanStatus.WITHOUT_LOAN_TERMS &&
+            status != DataTypes.LoanStatus.IN_NEGOTIATION
+        ) {
+            revert Errors.InvalidActionForCurrentStatus();
         }
         repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
+        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
+            address(this)
+        );
+        (, , uint256 _finalLoanAmount, , ) = getAbsoluteLoanTerms(
+            newLoanTerms,
+            totalSubscribed,
+            IERC20Metadata(IFundingPool(fundingPool).depositToken()).decimals()
+        );
+        if (_finalLoanAmount > newLoanTerms.maxLoanAmount) {
+            revert Errors.InvalidNewLoanTerms();
+        }
         _loanTerms = newLoanTerms;
+        status = DataTypes.LoanStatus.IN_NEGOTIATION;
     }
 
     function acceptLoanTerms() external {
         if (msg.sender != _loanTerms.borrower) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
         );
-        if (
-            totalSubscribed < _loanTerms.minLoanAmount ||
-            totalSubscribed > _loanTerms.maxLoanAmount
-        ) {
-            revert Errors.TotalSubscribedNotTargetInRange();
+        // check if enough subscriptions
+        // note: no need to check if subscriptions are > maxLoanAmount as
+        // this is already done in funding pool
+        if (totalSubscribed < _loanTerms.minLoanAmount) {
+            revert Errors.TotalSubscribedTooLow();
         }
         loanTermsLockedTime = block.timestamp;
         status = DataTypes.LoanStatus.BORROWER_ACCEPTED;
     }
 
-    function finalizeLoanTermsAndTransferColl() external {
+    function finalizeLoanTermsAndTransferColl(
+        uint256 expectedTransferFee
+    ) external {
         DataTypes.LoanTerms memory _unfinalizedLoanTerms = _loanTerms;
         if (msg.sender != _unfinalizedLoanTerms.borrower) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (
             status != DataTypes.LoanStatus.BORROWER_ACCEPTED ||
             block.timestamp < timeUntilLendersCanUnsubscribe()
         ) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
@@ -118,7 +135,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             totalSubscribed < _unfinalizedLoanTerms.minLoanAmount ||
             totalSubscribed > _unfinalizedLoanTerms.maxLoanAmount
         ) {
-            revert();
+            revert Errors.TotalSubscribedNotTargetInRange();
         }
         if (
             _unfinalizedLoanTerms.repaymentSchedule[0].dueTimestamp <=
@@ -164,18 +181,28 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         // note: final collToken amount that borrower needs to transfer is sum of:
         // 1) amount reserved for lenders in case of default, and
         // 2) amount reserved for lenders in case all convert
+        uint256 preBal = IERC20Metadata(collToken).balanceOf(address(this));
         IERC20Metadata(collToken).safeTransferFrom(
             msg.sender,
             address(this),
             _finalCollAmountReservedForDefault +
-                _finalCollAmountReservedForConversions
+                _finalCollAmountReservedForConversions +
+                expectedTransferFee
         );
+        uint256 postBal = IERC20Metadata(collToken).balanceOf(address(this));
+        if (
+            postBal - preBal !=
+            _finalCollAmountReservedForDefault +
+                _finalCollAmountReservedForConversions
+        ) {
+            revert Errors.InvalidSendAmount();
+        }
     }
 
     function rollback() external {
         // cannot be called anymore once lockInFinalAmountsAndProvideCollateral() called
         if (status != DataTypes.LoanStatus.BORROWER_ACCEPTED) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
@@ -185,8 +212,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             (msg.sender == _loanTerms.borrower &&
                 block.timestamp < _timeUntilLendersCanUnsubscribe) ||
             (block.timestamp >= _timeUntilLendersCanUnsubscribe &&
-                (totalSubscribed < _loanTerms.minLoanAmount ||
-                    totalSubscribed > _loanTerms.maxLoanAmount))
+                totalSubscribed < _loanTerms.minLoanAmount)
         ) {
             status = DataTypes.LoanStatus.ROLLBACK;
             // transfer any previously provided collToken back to borrower
@@ -195,23 +221,23 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             );
             IERC20Metadata(collToken).safeTransfer(msg.sender, collTokenBal);
         } else {
-            revert();
+            revert Errors.InvalidRollBackRequest();
         }
     }
 
     function updateStatusToDeployed() external {
         if (msg.sender != fundingPool) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (status != DataTypes.LoanStatus.READY_TO_EXECUTE) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         status = DataTypes.LoanStatus.LOAN_DEPLOYED;
     }
 
     function exerciseConversion() external {
         if (status != DataTypes.LoanStatus.LOAN_DEPLOYED) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = currentRepaymentIdx;
         checkRepaymentIdx(repaymentIdx);
