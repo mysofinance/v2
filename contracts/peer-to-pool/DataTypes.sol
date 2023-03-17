@@ -20,6 +20,7 @@ library DataTypes {
     }
 
     enum LoanStatus {
+        WITHOUT_LOAN_TERMS,
         IN_NEGOTIATION,
         BORROWER_ACCEPTED,
         READY_TO_EXECUTE,

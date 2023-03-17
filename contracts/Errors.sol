@@ -63,4 +63,5 @@ library Errors {
     error InvalidRollBackRequest();
     error ProposalNotReadyForExecution();
     error UnsubscriptionAmountTooLarge();
+    error InvalidNewLoanTerms();
 }
