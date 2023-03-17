@@ -62,29 +62,42 @@ export const createOnChainRequest = async ({
   return onChainQuote
 }
 
-export const transferFeeHelper = (amountReceived : BigNumber, feeInBasisPoints : number) : BigNumber => {
+export const transferFeeHelper = (amountReceived: BigNumber, feeInBasisPoints: number): BigNumber => {
   const initSendAmount = amountReceived.mul(10000).div(10000 - feeInBasisPoints)
   const initFeeAmount = initSendAmount.mul(feeInBasisPoints).div(10000)
-  if(initSendAmount.sub(initFeeAmount).eq(amountReceived)){
+  if (initSendAmount.sub(initFeeAmount).eq(amountReceived)) {
     return initFeeAmount
-  }
-  else{
+  } else {
     let sendAmount = initSendAmount.add(1)
     let feeAmount = sendAmount.mul(feeInBasisPoints).div(10000)
-    while(sendAmount.sub(feeAmount).lt(amountReceived)){
+    while (sendAmount.sub(feeAmount).lt(amountReceived)) {
       sendAmount = sendAmount.add(1)
       feeAmount = sendAmount.mul(feeInBasisPoints).div(10000)
     }
     return feeAmount
   }
-  
 }
 
-export const calcLoanBalanceDelta = (maxLoanPerColl : BigNumber, feeInBasisPoints : number, collSendAmount : BigNumber, loanDecimals : number) : BigNumber => {
-  return maxLoanPerColl.mul(collSendAmount).mul(10000 - feeInBasisPoints).div(10000).div(10**loanDecimals)
+export const calcLoanBalanceDelta = (
+  maxLoanPerColl: BigNumber,
+  feeInBasisPoints: number,
+  collSendAmount: BigNumber,
+  loanDecimals: number
+): BigNumber => {
+  return maxLoanPerColl
+    .mul(collSendAmount)
+    .mul(10000 - feeInBasisPoints)
+    .div(10000)
+    .div(10 ** loanDecimals)
 }
 
-export const getTotalEthValue = async (lpTokenAddr : string, provider : SignerWithAddress, token0OracleAddr : string, token1OracleAddr : string, wethAddr : string) : Promise<BigNumber> => {
+export const getTotalEthValue = async (
+  lpTokenAddr: string,
+  provider: SignerWithAddress,
+  token0OracleAddr: string,
+  token1OracleAddr: string,
+  wethAddr: string
+): Promise<BigNumber> => {
   const uniV2Instance = new ethers.Contract(lpTokenAddr, uniV2Abi, provider)
   const token0 = await uniV2Instance.token0()
   const token1 = await uniV2Instance.token1()
@@ -92,24 +105,22 @@ export const getTotalEthValue = async (lpTokenAddr : string, provider : SignerWi
   const token1Instance = new ethers.Contract(token1, collTokenAbi, provider.provider)
   const token0OracleInstance = new ethers.Contract(token0OracleAddr, chainlinkAggregatorAbi, provider.provider)
   const token1OracleInstance = new ethers.Contract(token1OracleAddr, chainlinkAggregatorAbi, provider.provider)
-  let answer : BigNumber
+  let answer: BigNumber
   const reserveData = await uniV2Instance.getReserves()
   const reserve0 = reserveData._reserve0
   const reserve1 = reserveData._reserve1
   const decimals0 = await token0Instance.decimals()
   const decimals1 = await token1Instance.decimals()
-  if (token0 == wethAddr){
+  if (token0 == wethAddr) {
     answer = BASE
-  }
-  else{
+  } else {
     const token0OracleData = await token0OracleInstance.latestRoundData()
     answer = token0OracleData.answer
   }
   const token0EthValue = answer.mul(reserve0).div(BigNumber.from(10).pow(decimals0))
-  if (token1 == wethAddr){
+  if (token1 == wethAddr) {
     answer = BASE
-  }
-  else{
+  } else {
     const token1OracleData = await token1OracleInstance.latestRoundData()
     answer = token1OracleData.answer
   }

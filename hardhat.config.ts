@@ -6,7 +6,7 @@ require('hardhat-contract-sizer')
 require('dotenv').config()
 require('solidity-coverage')
 
-const INFURA_API_KEY = '784f22eb941e460c88051464d44c4422' // added for private repo, otherwise use process.env.INFURA_API_KEY;
+const INFURA_API_KEY = '9e475f2f05d64656aa980a2e288e7175' // added for private repo, otherwise use process.env.INFURA_API_KEY;
 const ALCHEMY_API_KEY = 'QLXkHVq78U_cbV-q0TMWTH8-QmK2Zp3y'
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? '000000000000000000000000000000000000000000000000000000000000dead'
 
