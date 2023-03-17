@@ -316,18 +316,12 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidSendAmount();
         }
         // if final repayment, send all remaining coll token back to borrower
-        if (_loanTerms.repaymentSchedule.length - 1 == repaymentIdx) {
-            uint256 collBal = IERC20Metadata(collToken).balanceOf(
-                address(this)
-            );
-            IERC20Metadata(collToken).safeTransfer(msg.sender, collBal);
-            // else send only unconverted coll token back to borrower
-        } else {
-            IERC20Metadata(collToken).safeTransfer(
-                msg.sender,
-                collTokenLeftUnconverted
-            );
-        }
+        // else send only unconverted coll token back to borrower
+        uint256 collSendAmount = _loanTerms.repaymentSchedule.length - 1 ==
+            repaymentIdx
+            ? IERC20Metadata(collToken).balanceOf(address(this))
+            : collTokenLeftUnconverted;
+        IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
