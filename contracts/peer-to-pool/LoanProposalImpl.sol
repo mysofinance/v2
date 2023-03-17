@@ -8,6 +8,7 @@ import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
+import {Errors} from "../Errors.sol";
 
 contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     using SafeERC20 for IERC20Metadata;
@@ -44,22 +45,20 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         uint256 _arrangerFee,
         uint256 _lenderGracePeriod
     ) external initializer {
-        if (_fundingPool == address(0)) {
-            revert();
-        }
-        if (_collToken == address(0)) {
-            revert();
-        }
-        if (_arranger == address(0)) {
-            revert();
+        if (
+            _fundingPool == address(0) ||
+            _collToken == address(0) ||
+            _arranger == address(0)
+        ) {
+            revert Errors.InvalidAddress();
         }
         if (_arrangerFee == 0) {
-            revert();
+            revert Errors.InvalidFee();
         }
         if (
             _lenderGracePeriod < Constants.MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD
         ) {
-            revert();
+            revert Errors.UnsubscribeGracePeriodTooShort();
         }
         fundingPool = _fundingPool;
         collToken = _collToken;
@@ -72,7 +71,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         DataTypes.LoanTerms calldata newLoanTerms
     ) external {
         if (msg.sender != arranger) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (status != DataTypes.LoanStatus.IN_NEGOTIATION) {
             revert();
@@ -95,7 +94,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             totalSubscribed < _loanTerms.minLoanAmount ||
             totalSubscribed > _loanTerms.maxLoanAmount
         ) {
-            revert();
+            revert Errors.TotalSubscribedNotTargetInRange();
         }
         loanTermsLockedTime = block.timestamp;
         status = DataTypes.LoanStatus.BORROWER_ACCEPTED;
@@ -123,9 +122,9 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         if (
             _unfinalizedLoanTerms.repaymentSchedule[0].dueTimestamp <=
-            block.timestamp
+            block.timestamp + Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
         ) {
-            revert(); // loan already due
+            revert Errors.DueDatesTooClose();
         }
         status = DataTypes.LoanStatus.READY_TO_EXECUTE;
         // note: now that final subscription amounts are known, convert relative values
@@ -486,13 +485,13 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         DataTypes.Repayment[] calldata repaymentSchedule
     ) internal view {
         if (repaymentSchedule.length == 0) {
-            revert(); // must have at least one entry
+            revert Errors.EmptyRepaymentSchedule();
         }
         if (
             repaymentSchedule[0].dueTimestamp <
             block.timestamp + Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
         ) {
-            revert();
+            revert Errors.FirstDueDateTooClose();
         }
         uint256 prevPeriodEnd;
         uint256 currPeriodStart;
@@ -503,7 +502,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 currPeriodStart - prevPeriodEnd <
                 Constants.MIN_TIME_BETWEEN_DUE_DATES
             ) {
-                revert(); // overlapping intervals or too short time between due dates
+                revert Errors.DueDatesTooClose(); // overlapping intervals or too short time between due dates
             }
             if (
                 repaymentSchedule[i].conversionGracePeriod <
@@ -511,7 +510,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 repaymentSchedule[i].repaymentGracePeriod <
                 Constants.MIN_REPAYMENT_GRACE_PERIOD
             ) {
-                revert();
+                revert Errors.GracePeriodsTooShort();
+            }
+            if (repaymentSchedule[i].repaid) {
+                revert Errors.InvalidRepaidStatus();
             }
             prevPeriodEnd =
                 currPeriodStart +
@@ -535,7 +537,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     function toUint128(uint256 x) internal pure returns (uint128 y) {
         y = uint128(x);
         if (y != x) {
-            revert();
+            revert Errors.OverflowUint128();
         }
     }
 }

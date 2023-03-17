@@ -7,7 +7,9 @@ import {Constants} from "../Constants.sol";
 import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
+import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
+import {Errors} from "../Errors.sol";
 
 contract FundingPool is IFundingPool {
     using SafeERC20 for IERC20Metadata;
@@ -18,6 +20,9 @@ contract FundingPool is IFundingPool {
     mapping(address => uint256) public totalSubscribed;
     mapping(address => bool) public totalSubscribedIsDeployed;
     mapping(address => mapping(address => uint256)) public subscribedBalanceOf;
+    // note: earliest unsubscribe time is to prevent griefing accept loans through atomic flashborrow, deposit, subscribe, unsubscribe, and withdraw
+    mapping(address => mapping(address => uint256))
+        internal earliestUnsubscribe;
 
     constructor(address _loanProposalFactory, address _depositToken) {
         loanProposalFactory = _loanProposalFactory;
@@ -33,15 +38,14 @@ contract FundingPool is IFundingPool {
         );
         uint256 postBal = IERC20Metadata(depositToken).balanceOf(address(this));
         if ((postBal - preBal) != amount - transferFee) {
-            revert();
+            revert Errors.InvalidSendAmount();
         }
         balanceOf[msg.sender] += postBal - preBal;
     }
 
     function withdraw(uint256 amount) external {
-        uint256 userBal = IERC20Metadata(depositToken).balanceOf(msg.sender);
-        if (amount > userBal) {
-            revert();
+        if (amount > balanceOf[msg.sender]) {
+            revert Errors.InvalidWithdrawAmount();
         }
         balanceOf[msg.sender] -= amount;
         IERC20Metadata(depositToken).safeTransfer(msg.sender, amount);
@@ -53,22 +57,25 @@ contract FundingPool is IFundingPool {
                 loanProposal
             )
         ) {
-            revert();
+            revert Errors.UnregisteredLoanProposal();
         }
         if (!ILoanProposalImpl(loanProposal).inSubscriptionPhase()) {
-            revert();
+            revert Errors.NotInSubscribtionPhase();
         }
         if (amount > balanceOf[msg.sender]) {
-            revert();
+            revert Errors.InsufficientBalance();
         }
         DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();
         if (amount + totalSubscribed[loanProposal] > loanTerms.maxLoanAmount) {
-            revert();
+            revert Errors.SubscriptionAmountTooHigh();
         }
         balanceOf[msg.sender] -= amount;
         totalSubscribed[loanProposal] += amount;
         subscribedBalanceOf[loanProposal][msg.sender] += amount;
+        earliestUnsubscribe[loanProposal][msg.sender] =
+            block.timestamp +
+            Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
     }
 
     function unsubscribe(address loanProposal, uint256 amount) external {
@@ -77,7 +84,7 @@ contract FundingPool is IFundingPool {
                 loanProposal
             )
         ) {
-            revert();
+            revert Errors.UnregisteredLoanProposal();
         }
         if (!ILoanProposalImpl(loanProposal).inUnsubscriptionPhase()) {
             revert();
@@ -85,9 +92,13 @@ contract FundingPool is IFundingPool {
         if (amount > subscribedBalanceOf[loanProposal][msg.sender]) {
             revert();
         }
+        if (block.timestamp < earliestUnsubscribe[loanProposal][msg.sender]) {
+            revert Errors.BeforeEarliestUnsubscribe();
+        }
         balanceOf[msg.sender] += amount;
         totalSubscribed[loanProposal] -= amount;
         subscribedBalanceOf[loanProposal][msg.sender] -= amount;
+        earliestUnsubscribe[loanProposal][msg.sender] = 0;
     }
 
     function executeLoanProposal(address loanProposal) external {
@@ -96,7 +107,7 @@ contract FundingPool is IFundingPool {
                 loanProposal
             )
         ) {
-            revert();
+            revert Errors.UnregisteredLoanProposal();
         }
         if (
             ILoanProposalImpl(loanProposal).status() !=
