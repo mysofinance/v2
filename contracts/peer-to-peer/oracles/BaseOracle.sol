@@ -9,7 +9,7 @@ import {Errors} from "../../Errors.sol";
 
 abstract contract BaseOracle {
     address internal immutable wethAddrOfGivenChain;
-    // since arbitrum and eth support BTC/USD and wBTC/BTC only use on USD oracles
+    // since arbitrum and eth support BTC/USD and wBTC/BTC only use USD oracles
     address internal immutable wBTCAddrOfGivenChain;
     address internal immutable btcToUSDOracleAddrOfGivenChain;
     address internal immutable wBTCToBTCOracleAddrOfGivenChain;
@@ -71,6 +71,12 @@ abstract contract BaseOracle {
         }
     }
 
+    /**
+     * @notice helper function to get price across weth/eth, btc or other cases
+     * @dev this performs a check to make sure only positive values are returned from oracle
+     * @param oracleAddr address of the chainlink oracle
+     * @return tokenPriceRaw return value of token price
+     */
     function getPriceOfToken(
         address oracleAddr
     ) internal view returns (uint256 tokenPriceRaw) {
@@ -89,6 +95,13 @@ abstract contract BaseOracle {
         }
     }
 
+    /**
+     * @dev this functon first retrieves btc price in USD
+     * the wbtc price is retreived denominated in btc
+     * wbtc/usd (wbtc/btc * btc/usd)/(10**8)
+     * denominator accounts for 8 decimals of btc
+     * @return answer price of wbtch in USD which has 8 oracle decimals
+     */
     function getBTCPrice() internal view returns (int256 answer) {
         (, int256 BTCUSDAnswer, , , ) = AggregatorV3Interface(
             btcToUSDOracleAddrOfGivenChain
@@ -99,7 +112,14 @@ abstract contract BaseOracle {
         answer = (wBTCBTCAnswer * BTCUSDAnswer) / (10 ** 8);
     }
 
-    function validBTCCheck(address loanToken, address collToken) internal view {
+    /**
+     * @dev oracles for btc should only be with USD based oracles,
+     * since that is the only cross-chain support provided by chainlink
+     * across mainnet and arbitrum
+     * @param collToken address of coll token
+     * @param loanToken address of loan token
+     */
+    function validBTCCheck(address collToken, address loanToken) internal view {
         if (
             (loanToken == wBTCAddrOfGivenChain ||
                 collToken == wBTCAddrOfGivenChain) && !isUSDBased

@@ -25,8 +25,8 @@ contract ChainlinkBasic is BaseOracle, IOracle {
             _tokenAddrs,
             _oracleAddrs,
             _wethAddrOfGivenChain,
-            _btcToUSDOracleAddrOfGivenChain,
             _wBTCAddrOfGivenChain,
+            _btcToUSDOracleAddrOfGivenChain,
             _wBTCToBTCOracleAddrOfGivenChain
         )
     {}

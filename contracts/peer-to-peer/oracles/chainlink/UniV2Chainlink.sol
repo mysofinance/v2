@@ -36,8 +36,8 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             _tokenAddrs,
             _oracleAddrs,
             _wethAddrOfGivenChain,
-            _btcToUSDOracleAddrOfGivenChain,
             _wBTCAddrOfGivenChain,
+            _btcToUSDOracleAddrOfGivenChain,
             _wBTCToBTCOracleAddrOfGivenChain
         )
     {

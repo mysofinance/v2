@@ -32,8 +32,8 @@ contract OlympusOracle is IOracle, BaseOracle {
             _tokenAddrs,
             _oracleAddrs,
             _wethAddrOfGivenChain,
+            _wBTCAddrOfGivenChain,
             _btcToUSDOracleAddrOfGivenChain,
-            wBTCAddrOfGivenChain,
             _wBTCToBTCOracleAddrOfGivenChain
         )
     {}
