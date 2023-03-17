@@ -74,4 +74,6 @@ library Errors {
     error AlreadyConvertedForCurrenPeriod();
     error OutsideConversionTimeWindow();
     error OutsideRepaymentTimeWindow();
+    error NoDefault();
+    error LoanIsFullyRepaid();
 }

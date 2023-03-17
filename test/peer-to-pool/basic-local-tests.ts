@@ -792,7 +792,7 @@ describe('Basic Local Tests', function () {
       expect(preBalLoanProp.sub(postBalLoanProp)).to.be.equal(totalConvertible)
     })
 
-    it('Should handle repayments correctly (1/3)', async function () {
+    it('Should handle repayments correctly (1/4)', async function () {
       const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } = await setupTest()
 
       // arranger creates loan proposal
@@ -908,7 +908,7 @@ describe('Basic Local Tests', function () {
       expect(postRepayLoanTermsState.repaymentSchedule[0].repaid).to.be.true
     })
 
-    it('Should handle repayments correctly (2/3)', async function () {
+    it('Should handle repayments correctly (2/4)', async function () {
       const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } = await setupTest()
 
       // arranger creates loan proposal
@@ -978,7 +978,7 @@ describe('Basic Local Tests', function () {
       expect(preDaoTokenDaoBal).to.be.equal(postDaoTokenDaoBal)
     })
 
-    it('Should handle repayments correctly (3/3)', async function () {
+    it('Should handle repayments correctly (3/4)', async function () {
       const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } = await setupTest()
 
       // arranger creates loan proposal
@@ -1038,6 +1038,84 @@ describe('Basic Local Tests', function () {
 
       // reverts if borrower tries to repay after repayment window
       await expect(loanProposal.connect(daoTreasury).repay(0)).to.be.revertedWithCustomError(loanProposal, 'OutsideRepaymentTimeWindow')
+    })
+
+    it('Should handle repayments correctly (4/4)', async function () {
+      const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } = await setupTest()
+
+      // arranger creates loan proposal
+      const relArrangerFee = BASE.mul(50).div(10000)
+      const lenderGracePeriod = ONE_DAY
+      const loanProposal = await createLoanProposal(loanProposalFactory, arranger, fundingPool.address, daoToken.address, relArrangerFee, lenderGracePeriod)
+
+      // revert if any user wants to update loan status
+      await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
+
+      // add some loan terms
+      const loanTerms = await getDummyLoanTerms(daoTreasury.address, daoToken.address, usdc.address)
+      await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+
+      // add lender subscriptions
+      await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
+
+      // dao accepts
+      await loanProposal.connect(daoTreasury).acceptLoanTerms()
+
+      // move forward past unsubscription grace period
+      let blocknum = await ethers.provider.getBlockNumber()
+      let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      await ethers.provider.send('evm_mine', [timestamp+60])
+      let gracePeriod = await loanProposal.lenderGracePeriod()
+      blocknum = await ethers.provider.getBlockNumber()
+      timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      await ethers.provider.send('evm_mine', [timestamp+Number(gracePeriod.toString())])
+
+      // get final amounts
+      let lockedInLoanTerms = await loanProposal.loanTerms()
+      let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+      let loanTokenDecimals = await usdc.decimals()
+      let [ finalLoanTerms, arrangerFee, finalLoanAmount, finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+
+      // dao finalizes loan terms and sends collateral
+      let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
+      await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
+      await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+
+      // execute loan
+      await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
+
+      // check pre balance
+      let preLoanPropBal = await daoToken.balanceOf(loanProposal.address)
+      let preDaoBal = await daoToken.balanceOf(daoTreasury.address)
+
+      // consecutively make all repayments
+      for (let i=0;i<finalLoanTerms.repaymentSchedule.length;i++) {
+        // revert if any user tries to mark loan as defaulted
+        await expect(loanProposal.markAsDefaulted()).to.be.revertedWithCustomError(loanProposal, 'NoDefault')
+
+        // move forward to next repayment date
+        let repaymentDate = finalLoanTerms.repaymentSchedule[i].dueTimestamp + finalLoanTerms.repaymentSchedule[i].conversionGracePeriod
+        await ethers.provider.send('evm_mine', [repaymentDate])
+        
+        // determine due repayment amount
+        let repaymentAmountDue = finalLoanTerms.repaymentSchedule[i].loanTokenDue
+        // mint and approve
+        await usdc.mint(daoTreasury.address, repaymentAmountDue)
+        await usdc.connect(daoTreasury).approve(loanProposal.address, repaymentAmountDue)
+        // repay
+        await loanProposal.connect(daoTreasury).repay(0)
+      }
+
+      // revert if any user tries to mark loan as defaulted
+      await expect(loanProposal.markAsDefaulted()).to.be.revertedWithCustomError(loanProposal, 'LoanIsFullyRepaid')
+      
+      // check post balance
+      let postLoanPropBal = await daoToken.balanceOf(loanProposal.address)
+      let postDaoBal = await daoToken.balanceOf(daoTreasury.address)
+
+      // check that after final repayment all collateral was returned to borrower (assuming no conversions)
+      expect(postLoanPropBal).to.be.equal(0)
+      expect(postDaoBal.sub(preDaoBal)).to.be.equal(preLoanPropBal)
     })
   })
 })

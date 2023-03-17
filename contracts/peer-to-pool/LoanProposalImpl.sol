@@ -356,7 +356,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
 
     function markAsDefaulted() external {
         if (status != DataTypes.LoanStatus.LOAN_DEPLOYED) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = currentRepaymentIdx;
         // this will check if loan has been fully repaid yet in this instance
@@ -368,7 +368,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             status = DataTypes.LoanStatus.DEFAULTED;
         } else {
-            revert();
+            revert Errors.NoDefault();
         }
     }
 
@@ -499,7 +499,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     function checkRepaymentIdx(uint256 repaymentIdx) internal view {
         // currentRepaymentIdx == _loanTerms.repaymentSchedule.length on full repay,
         if (repaymentIdx == _loanTerms.repaymentSchedule.length) {
-            revert();
+            revert Errors.LoanIsFullyRepaid();
         }
     }
 
