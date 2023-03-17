@@ -5,12 +5,13 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "../Errors.sol";
 
-contract LoanProposalImpl is Initializable, ILoanProposalImpl {
+contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     using SafeERC20 for IERC20Metadata;
 
     DataTypes.LoanStatus public status;
@@ -93,6 +94,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         _loanTerms = newLoanTerms;
         status = DataTypes.LoanStatus.IN_NEGOTIATION;
+
+        emit LoanTermsProposed(fundingPool, newLoanTerms);
     }
 
     function acceptLoanTerms() external {
@@ -113,6 +116,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         loanTermsLockedTime = block.timestamp;
         status = DataTypes.LoanStatus.BORROWER_ACCEPTED;
+
+        emit LoanTermsAccepted(fundingPool);
     }
 
     function finalizeLoanTermsAndTransferColl(
@@ -197,6 +202,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidSendAmount();
         }
+
+        emit LoanTermsAndTransferCollFinalized(fundingPool);
     }
 
     function rollback() external {
@@ -223,6 +230,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         } else {
             revert Errors.InvalidRollBackRequest();
         }
+
+        emit Rollback(fundingPool);
     }
 
     function updateStatusToDeployed() external {
@@ -233,6 +242,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         status = DataTypes.LoanStatus.LOAN_DEPLOYED;
+
+        emit LoanDeployed(fundingPool);
     }
 
     function exerciseConversion() external {
@@ -267,6 +278,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         totalConvertedSubscriptionsPerIdx[repaymentIdx] += lenderContribution;
         lenderExercisedConversion[msg.sender][repaymentIdx] = true;
         IERC20Metadata(collToken).safeTransfer(msg.sender, conversionAmount);
+
+        emit ConversionExercised(fundingPool);
     }
 
     function repay() external {
@@ -322,6 +335,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 collTokenLeftUnconverted
             );
         }
+
+        emit Repay(fundingPool);
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
@@ -352,6 +367,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             lenderContribution) / subscriptionsEntitledToRepayment;
         lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
         IERC20Metadata(loanToken).safeTransfer(msg.sender, claimAmount);
+
+        emit ClaimRepayment(fundingPool);
     }
 
     function markAsDefaulted() external {
@@ -370,6 +387,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         } else {
             revert();
         }
+
+        emit LoanDefaulted(fundingPool);
     }
 
     function claimDefaultProceeds() external {
@@ -427,6 +446,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             msg.sender,
             defaultClaimProRataShare
         );
+
+        emit ClaimDefaultProceeded(fundingPool);
     }
 
     function loanTerms() external view returns (DataTypes.LoanTerms memory) {

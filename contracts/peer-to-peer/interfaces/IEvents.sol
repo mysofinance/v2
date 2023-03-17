@@ -5,6 +5,12 @@ pragma solidity 0.8.19;
 import {DataTypes} from "../DataTypes.sol";
 
 interface IEvents {
+    event VaultCreated(address indexed vaultAddr);
+    event CollateralUnlocked(
+        address indexed collToken,
+        uint256[] loanIds,
+        bool autoWithdraw
+    );
     event Received(address, uint);
 
     event Borrow(

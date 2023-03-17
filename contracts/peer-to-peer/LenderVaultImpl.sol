@@ -14,8 +14,9 @@ import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {Ownable} from "../Ownable.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 
-contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
+contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
     using SafeERC20 for IERC20Metadata;
 
     address public addressRegistry;
@@ -83,6 +84,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                 currentCollTokenBalance - lockedAmounts[collToken]
             );
         }
+
+        emit CollateralUnlocked(collToken, _loanIds, autoWithdraw);
     }
 
     function updateLoanInfo(

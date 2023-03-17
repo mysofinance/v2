@@ -5,13 +5,14 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Constants} from "../Constants.sol";
 import {IFundingPool} from "./interfaces/IFundingPool.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "../Errors.sol";
 
-contract FundingPool is IFundingPool {
+contract FundingPool is IEvents, IFundingPool {
     using SafeERC20 for IERC20Metadata;
 
     address public immutable loanProposalFactory;
@@ -76,6 +77,8 @@ contract FundingPool is IFundingPool {
         earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
             Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
+
+        emit Subscribed(loanProposal, amount);
     }
 
     function unsubscribe(address loanProposal, uint256 amount) external {
@@ -99,6 +102,8 @@ contract FundingPool is IFundingPool {
         totalSubscribed[loanProposal] -= amount;
         subscribedBalanceOf[loanProposal][msg.sender] -= amount;
         earliestUnsubscribe[loanProposal][msg.sender] = 0;
+
+        emit Unsubscribed(loanProposal, amount);
     }
 
     function executeLoanProposal(address loanProposal) external {
@@ -137,5 +142,7 @@ contract FundingPool is IFundingPool {
             ILoanProposalFactory(loanProposalFactory).owner(),
             protocolFeeShare
         );
+
+        emit LoanProposalExecuted(loanProposal);
     }
 }
