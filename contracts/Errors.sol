@@ -40,4 +40,16 @@ library Errors {
     error TooSmallLoanAmount();
     error DeadlinePassed();
     error WithdrawEntered();
+    error EmptyRepaymentSchedule();
+    error FirstDueDateTooClose();
+    error DueDatesTooClose();
+    error GracePeriodsTooShort();
+    error InvalidRepaidStatus();
+    error UnsubscribeGracePeriodTooShort();
+    error UnregisteredLoanProposal();
+    error NotInSubscribtionPhase();
+    error InsufficientBalance();
+    error SubscriptionAmountTooHigh();
+    error BeforeEarliestUnsubscribe();
+    error TotalSubscribedNotTargetInRange();
 }
