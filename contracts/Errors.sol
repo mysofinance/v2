@@ -16,10 +16,10 @@ library Errors {
     error InvalidBTCOracle();
     error InvalidAddress();
     error InvalidArrayLength();
-    error InvalidChainQuote();
-    error InvalidSignature();
-    error InvalidChainQuoteProof();
-    error MissingChainQuote();
+    error InvalidQuote();
+    error InvalidOffChainSignature();
+    error InvalidOffChainMerkleProof();
+    error UnknownOnChainQuote();
     error NeitherTokenIsGOHM();
     error NoLpTokens();
     error IncorrectGaugeForLpToken();
@@ -49,7 +49,8 @@ library Errors {
     error DeadlinePassed();
     error WithdrawEntered();
     error DuplicateAddresses();
-    error DuplicateChainQuote();
+    error OnChainQuoteAlreadyAdded();
+    error OffChainQuoteHasBeenInvalidated();
     error Uninitialized();
     error EmptyRepaymentSchedule();
     error FirstDueDateTooClose();

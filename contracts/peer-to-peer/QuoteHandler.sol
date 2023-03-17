@@ -35,7 +35,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.InvalidSender();
         }
         if (!isValidOnChainQuote(onChainQuote)) {
-            revert Errors.InvalidChainQuote();
+            revert Errors.InvalidQuote();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(
@@ -49,7 +49,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert Errors.DuplicateChainQuote();
+            revert Errors.OnChainQuoteAlreadyAdded();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = true;
         emit OnChainQuoteAdded(lenderVault, onChainQuote, onChainQuoteHash);
@@ -70,7 +70,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.InvalidSender();
         }
         if (!isValidOnChainQuote(newOnChainQuote)) {
-            revert Errors.InvalidChainQuote();
+            revert Errors.InvalidQuote();
         }
         if (
             !IAddressRegistry(_addressRegistry).isWhitelistedToken(
@@ -84,7 +84,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(oldOnChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert Errors.MissingChainQuote();
+            revert Errors.UnknownOnChainQuote();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
@@ -105,7 +105,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         }
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert Errors.MissingChainQuote();
+            revert Errors.UnknownOnChainQuote();
         }
         isOnChainQuote[lenderVault][onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
@@ -147,7 +147,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         );
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
-            revert Errors.MissingChainQuote();
+            revert Errors.UnknownOnChainQuote();
         }
         if (onChainQuote.generalQuoteInfo.isSingleUse) {
             isOnChainQuote[lenderVault][onChainQuoteHash] = false;
@@ -167,15 +167,15 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             lenderVault,
             offChainQuote.generalQuoteInfo
         );
-        if (offChainQuote.nonce > offChainQuoteNonce[lenderVault]) {
-            revert Errors.InvalidChainQuote();
-        }
-        if (offChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
-            revert Errors.InvalidChainQuote();
+        if (
+            offChainQuote.nonce > offChainQuoteNonce[lenderVault] ||
+            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
+        ) {
+            revert Errors.InvalidQuote();
         }
         bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
-            revert Errors.DuplicateChainQuote();
+            revert Errors.OffChainQuoteHasBeenInvalidated();
         }
         if (
             !areValidSignatures(
@@ -186,7 +186,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 offChainQuote.s
             )
         ) {
-            revert Errors.InvalidSignature();
+            revert Errors.InvalidOffChainSignature();
         }
 
         bytes32 leaf = keccak256(
@@ -202,7 +202,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             )
         );
         if (!MerkleProof.verify(proof, offChainQuote.quoteTuplesRoot, leaf)) {
-            revert Errors.InvalidChainQuoteProof();
+            revert Errors.InvalidOffChainMerkleProof();
         }
         if (offChainQuote.generalQuoteInfo.isSingleUse) {
             offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
@@ -293,7 +293,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.NonWhitelistedToken();
         }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
-            revert Errors.InvalidChainQuote();
+            revert Errors.InvalidQuote();
         }
         if (
             generalQuoteInfo.borrower != address(0) &&

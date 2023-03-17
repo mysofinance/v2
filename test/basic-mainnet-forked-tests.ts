@@ -8,8 +8,7 @@ import {
   aavePoolAbi,
   crvRewardsDistributorAbi,
   chainlinkAggregatorAbi,
-  gohmAbi,
-  uniV2Abi
+  gohmAbi
 } from './abi'
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers'
 
@@ -527,7 +526,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidChainQuote')
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote collToken, loanToken', async function () {
@@ -716,7 +715,7 @@ describe('Basic Forked Mainnet Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidChainQuote')
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       newOnChainQuote.generalQuoteInfo.loanToken = usdc.address
 
@@ -736,7 +735,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'MissingChainQuote')
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnknownOnChainQuote')
 
       onChainQuote.generalQuoteInfo.loanToken = usdc.address
 
