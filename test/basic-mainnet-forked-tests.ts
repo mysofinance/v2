@@ -443,8 +443,8 @@ describe('Basic Forked Mainnet Tests', function () {
       await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
 
       // whitelist gauge contract
-      await expect(addressRegistry.connect(lender).toggleCollTokenHandler(crvGaugeAddress, true)).to.be.reverted
-      await addressRegistry.connect(team).toggleCollTokenHandler(crvGaugeAddress, true)
+      await expect(addressRegistry.connect(lender).toggleCompartmentImpl(crvGaugeAddress, true)).to.be.reverted
+      await addressRegistry.connect(team).toggleCompartmentImpl(crvGaugeAddress, true)
 
       // borrower approves borrower gateway
       await crvLPInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
