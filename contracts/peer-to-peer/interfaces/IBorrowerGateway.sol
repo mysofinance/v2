@@ -58,11 +58,13 @@ interface IBorrowerGateway {
 
     /**
      * @notice function returns address registry
+     * @return address of registry
      */
     function addressRegistry() external view returns (address);
 
     /**
      * @notice function returns protocol fee
+     * @return protocol fee in BASE
      */
     function protocolFee() external view returns (uint256);
 }
