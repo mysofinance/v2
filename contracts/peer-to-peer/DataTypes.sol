@@ -60,11 +60,17 @@ library DataTypes {
     }
 
     struct BorrowTransferInstructions {
+        // amount of collateral sent
         uint256 collSendAmount;
+        // includes protocol fee and native token transfer fee
         uint256 expectedTransferFee;
+        // deadline to prevent stale transactions
         uint256 deadline;
+        // slippage protection if oracle price is too loose
         uint256 minLoanAmount;
+        // e.g., for one-click leverage
         address callbackAddr;
+        // any data needed by callback
         bytes callbackData;
     }
 }
