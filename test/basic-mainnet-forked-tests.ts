@@ -200,7 +200,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -209,8 +209,10 @@ describe('Basic Forked Mainnet Tests', function () {
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-        [true, true],
-        weth.address
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr,
       )
       await chainlinkBasicImplementation.deployed()
 

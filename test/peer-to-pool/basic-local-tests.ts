@@ -38,7 +38,8 @@ describe('Basic Local Tests', function () {
     const LoanProposalFactory = await ethers.getContractFactory('LoanProposalFactory')
     const loanProposalFactory = await LoanProposalFactory.connect(team).deploy(loanProposalImpl.address)
     await loanProposalFactory.deployed()
-    await expect(loanProposalFactory.connect(lender1).setArrangerFeeSplit(BASE.mul(20).div(100))).to.be.reverted
+    await expect(loanProposalFactory.connect(lender1).setArrangerFeeSplit(BASE.mul(20).div(100))).to.be.revertedWithCustomError(loanProposalFactory, "InvalidSender")
+    await expect(loanProposalFactory.connect(team).setArrangerFeeSplit(BASE.mul(80).div(100))).to.be.revertedWithCustomError(loanProposalFactory, "InvalidFee")
     await loanProposalFactory.connect(team).setArrangerFeeSplit(BASE.mul(20).div(100))
 
     const FundingPool = await ethers.getContractFactory('FundingPool')
@@ -175,7 +176,8 @@ describe('Basic Local Tests', function () {
         await usdc.connect(lender1).approve(fundingPool.address, MAX_UINT256)
         let preBalLender = await usdc.balanceOf(lender1.address)
         let addAmount = preBalLender
-        await expect(fundingPool.connect(lender1).deposit(addAmount.add(1), 0)).to.be.revertedWith
+        await expect(fundingPool.connect(lender1).deposit(addAmount.add(1), 0)).to.be.reverted
+        await expect(fundingPool.connect(lender1).deposit(addAmount, 10)).to.be.revertedWithCustomError(fundingPool, "InvalidSendAmount")
         await fundingPool.connect(lender1).deposit(addAmount, 0)
         expect(await fundingPool.balanceOf(lender1.address)).to.be.equal(await usdc.balanceOf(fundingPool.address))
         expect(await fundingPool.balanceOf(lender1.address)).to.be.equal(addAmount)
@@ -219,6 +221,7 @@ describe('Basic Local Tests', function () {
         await ethers.provider.send('evm_mine', [timestamp+60])
         let preBal = await fundingPool.balanceOf(lender2.address)
         let preSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+        await expect(fundingPool.connect(lender2).unsubscribe(loanProposal.address,subscriptionAmount.add(1))).to.be.revertedWithCustomError(fundingPool, "UnsubscriptionAmountTooLarge")
         await fundingPool.connect(lender2).unsubscribe(loanProposal.address,subscriptionAmount)
         let postBal = await fundingPool.balanceOf(lender2.address)
         let postSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
@@ -266,9 +269,12 @@ describe('Basic Local Tests', function () {
         let lenderUnsubscribeGracePeriod = await loanProposal.lenderGracePeriod()
         await ethers.provider.send('evm_mine', [timestamp+Number(lenderUnsubscribeGracePeriod.toString())])
 
+        // unsubscribe when not in unsubscription phase
+        await expect(fundingPool.connect(lender2).unsubscribe(loanProposal.address,subscriptionAmount)).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
+        
         // reverts if unauthorized sender tries to finalize loan terms and convert relative to absolute terms
         await expect(loanProposal.connect(lender1).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
-
+        
         // get final amounts
         let lockedInLoanTerms = await loanProposal.loanTerms()
         let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
@@ -292,8 +298,8 @@ describe('Basic Local Tests', function () {
       })
     })
 
-    /*
-    it('...', async function () {
+    
+    it('misc pool tests', async function () {
       const { fundingPool, loanProposalFactory, usdc, daoToken, lender1, lender2, lender3, arranger, daoTreasury, team } = await setupTest()
 
       // lenders deposit
@@ -378,25 +384,33 @@ describe('Basic Local Tests', function () {
       // revert if not enough subscriptions and below target loan amount
       await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(loanProposal, 'TotalSubscribedTooLow')
       
+      // subscription needs to be valid proposal address
+      await expect(fundingPool.connect(lender1).subscribe(lender2.address, ONE_USDC.mul(40000))).to.be.revertedWithCustomError(fundingPool, "UnregisteredLoanProposal")
+
       // lenders subscribe
       await fundingPool.connect(lender1).subscribe(loanProposal.address, ONE_USDC.mul(40000))
       await fundingPool.connect(lender2).subscribe(loanProposal.address, ONE_USDC.mul(20000))
       await fundingPool.connect(lender3).subscribe(loanProposal.address, ONE_USDC.mul(20000))
-      // await fundingPool.connect(lender3).unsubscribe(loanProposal.address, ONE_USDC.mul(10000))
+
+      // proposal should not be executable
+      await expect(fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)).to.be.revertedWithCustomError(fundingPool, "ProposalNotReadyForExecution")
 
       // revert if unauthorized user tries to accept
       await expect(loanProposal.connect(lender1).acceptLoanTerms()).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
       await loanProposal.connect(daoTreasury).acceptLoanTerms()
 
-      // lenders can still unsubscribe
-      await fundingPool.connect(lender3).unsubscribe(loanProposal.address, ONE_USDC.mul(10000))
+      // lenders need to unsubscribe from valid proposal address
+      await expect(fundingPool.connect(lender3).unsubscribe(lender1.address, ONE_USDC.mul(10000))).to.be.revertedWithCustomError(fundingPool, "UnregisteredLoanProposal")
+
+      // lenders can't unsubscribe before cool down period
+      await expect(fundingPool.connect(lender3).unsubscribe(loanProposal.address, ONE_USDC.mul(10000))).to.be.revertedWithCustomError(fundingPool, "BeforeEarliestUnsubscribe")
 
       // move forward
       const loanTermsLockedTime = await loanProposal.loanTermsLockedTime()
       const newTimestamp = loanTermsLockedTime.add(ONE_DAY.add(1))
       await ethers.provider.send('evm_mine', [Number(newTimestamp.toString())])
 
-      // lenders can't unsubscribe anymore
+      // lenders can't subscribe anymore
       await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, ONE_USDC.mul(40000))).to.be.reverted
       await expect(fundingPool.connect(lender2).subscribe(loanProposal.address, ONE_USDC.mul(20000))).to.be.reverted
 
@@ -452,6 +466,7 @@ describe('Basic Local Tests', function () {
       const preLoanTokenBalFundingPool = await usdc.balanceOf(fundingPool.address)
       const preLoanTokenBalArranger = await usdc.balanceOf(arranger.address)
       const preLoanTokenBalTeam = await usdc.balanceOf(team.address)
+      await expect(fundingPool.connect(daoTreasury).executeLoanProposal(lender1.address)).to.be.revertedWithCustomError(fundingPool, "UnregisteredLoanProposal")
       await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
       const postLoanTokenBalDaoTreasury = await usdc.balanceOf(daoTreasury.address)
       const postLoanTokenBalFundingPool = await usdc.balanceOf(fundingPool.address)
@@ -467,6 +482,6 @@ describe('Basic Local Tests', function () {
 
 
       // todo: add case where loan never gets finalized and lenders reclaim their subscription amounts
-    })*/
+    })
   })
 })
