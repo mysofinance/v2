@@ -449,13 +449,13 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         return _loanTerms;
     }
 
-    function inUnsubscriptionPhase() external view returns (bool) {
+    function canUnsubscribe() external view returns (bool) {
         return
-            inSubscriptionPhase() ||
+            canSubscribe() ||
             dynamicData.status == DataTypes.LoanStatus.ROLLBACK;
     }
 
-    function inSubscriptionPhase() public view returns (bool) {
+    function canSubscribe() public view returns (bool) {
         return
             (dynamicData.status != DataTypes.LoanStatus.WITHOUT_LOAN_TERMS &&
                 dynamicData.loanTermsLockedTime == 0) ||

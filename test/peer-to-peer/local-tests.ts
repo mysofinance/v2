@@ -136,7 +136,6 @@ async function generateOffChainQuote({
   )
   const quoteTuplesRoot = quoteTuplesTree.root
   const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
-  console.log('chainId:', chainId)
   let offChainQuote = {
     generalQuoteInfo: {
       borrower: borrower.address,
@@ -186,7 +185,7 @@ async function generateOffChainQuote({
   return { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash }
 }
 
-describe('Basic Local Tests', function () {
+describe('Peer-to-Peer: Local Tests', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -395,8 +394,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -508,8 +505,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -554,8 +549,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -600,8 +593,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -658,8 +649,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -710,8 +699,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
