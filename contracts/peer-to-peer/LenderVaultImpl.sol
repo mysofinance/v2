@@ -50,24 +50,25 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
 
         for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
-            DataTypes.Loan storage loan = _loans[_loanIds[i]];
+            DataTypes.Loan storage _loan = _loans[_loanIds[i]];
 
-            if (loan.collToken != collToken) {
+            if (_loan.collToken != collToken) {
                 revert Errors.InconsistentUnlockTokenAddresses();
             }
-            if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
-                if (loan.collTokenCompartmentAddr != address(0)) {
-                    IBaseCompartment(loan.collTokenCompartmentAddr)
-                        .unlockCollToVault(loan.collToken);
-                } else {
-                    tmp =
-                        loan.initCollAmount -
-                        (loan.initCollAmount * loan.amountRepaidSoFar) /
-                        loan.initRepayAmount;
-                    totalUnlockableColl += tmp;
-                }
+            if (_loan.collUnlocked || block.timestamp < _loan.expiry) {
+                revert Errors.InvalidCollUnlock();
             }
-            loan.collUnlocked = true;
+            if (_loan.collTokenCompartmentAddr != address(0)) {
+                IBaseCompartment(_loan.collTokenCompartmentAddr)
+                    .unlockCollToVault(_loan.collToken);
+            } else {
+                tmp =
+                    _loan.initCollAmount -
+                    (_loan.initCollAmount * _loan.amountRepaidSoFar) /
+                    _loan.initRepayAmount;
+                totalUnlockableColl += tmp;
+            }
+            _loan.collUnlocked = true;
             unchecked {
                 i++;
             }
@@ -89,28 +90,19 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
     }
 
     function updateLoanInfo(
-        DataTypes.Loan memory loan,
+        DataTypes.Loan memory _loan,
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount,
-        bool isRepay
+        uint256 collAmount
     ) external {
         senderCheckGateway();
-        if (isRepay) {
-            loan.amountRepaidSoFar += repayAmount;
-        }
+        _loan.amountRepaidSoFar += repayAmount;
 
         // only update lockedAmounts when no compartment
-        if (loan.collTokenCompartmentAddr == address(0)) {
-            if (isRepay) {
-                lockedAmounts[loan.collToken] -= collAmount;
-            } else {
-                lockedAmounts[loan.collToken] += collAmount;
-            }
+        if (_loan.collTokenCompartmentAddr == address(0)) {
+            lockedAmounts[_loan.collToken] -= collAmount;
         }
-        if (isRepay || loan.collTokenCompartmentAddr != address(0)) {
-            _loans[loanId] = loan;
-        }
+        _loans[loanId] = _loan;
     }
 
     function processQuote(
@@ -121,7 +113,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
     )
         external
         returns (
-            DataTypes.Loan memory loan,
+            DataTypes.Loan memory _loan,
             uint256 loanId,
             uint256 upfrontFee,
             address collReceiver
@@ -155,36 +147,36 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
             revert Errors.TooSmallLoanAmount();
         }
 
-        loan.borrower = borrower;
-        loan.loanToken = generalQuoteInfo.loanToken;
-        loan.collToken = generalQuoteInfo.collToken;
-        loan.initCollAmount = toUint128(
+        _loan.borrower = borrower;
+        _loan.loanToken = generalQuoteInfo.loanToken;
+        _loan.collToken = generalQuoteInfo.collToken;
+        _loan.initCollAmount = toUint128(
             borrowInstructions.collSendAmount -
                 upfrontFee -
                 borrowInstructions.expectedTransferFee
         );
-        loan.initLoanAmount = toUint128(loanAmount);
-        loan.initRepayAmount = toUint128(repayAmount);
-        loan.expiry = uint40(block.timestamp + quoteTuple.tenor);
-        loan.earliestRepay = uint40(
+        _loan.initLoanAmount = toUint128(loanAmount);
+        _loan.initRepayAmount = toUint128(repayAmount);
+        _loan.expiry = uint40(block.timestamp + quoteTuple.tenor);
+        _loan.earliestRepay = uint40(
             block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
-        if (loan.expiry <= loan.earliestRepay) {
+        if (_loan.expiry <= _loan.earliestRepay) {
             revert Errors.ExpiresBeforeRepayAllowed();
         }
 
         if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {
             collReceiver = address(this);
-            lockedAmounts[loan.collToken] += loan.initCollAmount;
+            lockedAmounts[_loan.collToken] += _loan.initCollAmount;
         } else {
             collReceiver = createCollCompartment(
                 generalQuoteInfo.borrowerCompartmentImplementation,
                 _loans.length
             );
-            loan.collTokenCompartmentAddr = collReceiver;
+            _loan.collTokenCompartmentAddr = collReceiver;
         }
         loanId = _loans.length;
-        _loans.push(loan);
+        _loans.push(_loan);
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -265,33 +257,34 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         isSigner[signer] = false;
     }
 
-    function loans(
+    function loan(
         uint256 loanId
-    ) external view returns (DataTypes.Loan memory loan) {
+    ) external view returns (DataTypes.Loan memory _loan) {
         uint256 loanLen = _loans.length;
         if (loanLen == 0 || loanId > loanLen - 1) {
             revert Errors.InvalidArrayIndex();
         }
-        loan = _loans[loanId];
+        _loan = _loans[loanId];
     }
 
     function validateRepayInfo(
         address borrower,
-        DataTypes.Loan memory loan,
+        DataTypes.Loan memory _loan,
         DataTypes.LoanRepayInstructions memory loanRepayInstructions
     ) external view {
-        if (borrower != loan.borrower) {
+        if (borrower != _loan.borrower) {
             revert Errors.InvalidBorrower();
         }
         if (
-            block.timestamp < loan.earliestRepay ||
-            block.timestamp >= loan.expiry
+            block.timestamp < _loan.earliestRepay ||
+            block.timestamp >= _loan.expiry
         ) {
             revert Errors.OutsideValidRepayWindow();
         }
+        // checks repayAmount <= remaining loan balance
         if (
             loanRepayInstructions.targetRepayAmount >
-            loan.initRepayAmount - loan.amountRepaidSoFar
+            _loan.initRepayAmount - _loan.amountRepaidSoFar
         ) {
             revert Errors.InvalidRepayAmount();
         }
