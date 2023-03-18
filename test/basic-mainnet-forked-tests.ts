@@ -989,6 +989,28 @@ describe('Basic Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            { ...borrowInstructions, expectedTransferFee: BigNumber.from(0).add(1) },
+            onChainQuote,
+            quoteTupleIdx
+          )
+      ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -1814,20 +1836,6 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowerCollBalPost = await collInstance.balanceOf(borrower.address)
       const compartmentCollBalPost = await collInstance.balanceOf(collTokenCompartmentAddr)
 
-      // const borrowerCollBalDiffActual = borrowerCollBalPre.sub(borrowerCollBalPost)
-      // const borrowerCollBalDiffExpected = borrowerCollBalPre.sub(collSendAmount)
-      // const borrowerCollBalDiffComparison = Math.abs(
-      //   Number(
-      //     borrowerCollBalDiffActual
-      //       .sub(borrowerCollBalDiffExpected)
-      //       .mul(PRECISION)
-      //       .div(borrowerCollBalDiffActual)
-      //       .div(ONE_UNI)
-      //       .toString()
-      //   )
-      // )
-      // expect(borrowerCollBalDiffComparison).to.be.lessThan(0.01)
-      // the swap leverage means this test is not meaningful... need to compare to balancer swap amount expected for loan amount
       expect(borrowerLoanBalPost.sub(borrowerLoanBalPre)).to.equal(0) // borrower: no weth change as all swapped for uni
       expect(compartmentCollBalPost).to.equal(collSendAmount)
       expect(borrowerVotesPreDelegation).to.equal(0)
@@ -1840,6 +1848,36 @@ describe('Basic Forked Mainnet Tests', function () {
         ['bytes32', 'uint256', 'uint256'],
         [poolId, minSwapReceiveRepay, deadline]
       )
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
+            expectedTransferFee: BigNumber.from(0).add(1)
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
       // partial repay
       await expect(
@@ -1950,6 +1988,7 @@ describe('Basic Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -2047,6 +2086,7 @@ describe('Basic Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)

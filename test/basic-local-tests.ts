@@ -287,7 +287,10 @@ describe('Basic Local Tests', function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // check that only owner can propose new owner
-      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -353,7 +356,7 @@ describe('Basic Local Tests', function () {
       // allow for transfer of vault ownership
       await lenderVault.connect(lender).proposeNewOwner(borrower.address)
       // only new proposed owner can claim vault
-      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
       await lenderVault.connect(borrower).claimOwnership()
     })
   })
@@ -423,6 +426,19 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidBorrower')
+
+      // if deadline passed, reverts
+      await expect(
+        borrowerGateway
+          .connect(team)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            { ...borrowInstructions, deadline: 10 },
+            offChainQuote,
+            selectedQuoteTuple,
+            proof
+          )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'DeadlinePassed')
 
       // if quote tuple that's not part of tree, reverts
       const unregisteredQuoteTuple = {
