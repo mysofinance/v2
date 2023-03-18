@@ -744,7 +744,7 @@ describe('Basic Local Tests', function () {
       await expect(loanProposal.connect(lender2).exerciseConversion()).to.be.revertedWithCustomError(loanProposal, 'OutsideConversionTimeWindow')
     })
 
-    it('Should handle conversions correctly (1/2)', async function () {
+    it('Should handle conversions correctly (2/2)', async function () {
       const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } = await setupTest()
 
       // arranger creates loan proposal
@@ -1154,7 +1154,7 @@ describe('Basic Local Tests', function () {
       expect(postDaoBal.sub(preDaoBal)).to.be.equal(preLoanPropBal)
     })
 
-    it('Should handle default claims correctly (3/4)', async function () {
+    it('Should handle default claims correctly', async function () {
       const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } = await setupTest()
 
       // arranger creates loan proposal
@@ -1210,12 +1210,42 @@ describe('Basic Local Tests', function () {
       // execute loan
       await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
 
+      // revert if user tries to claim default proceed and not marked as defaulted
+      await expect(loanProposal.connect(lender1).claimDefaultProceeds()).to.be.revertedWithCustomError(loanProposal, 'InvalidActionForCurrentStatus')
+      
       // revert if any user tries to mark as defaulted before loan is deployed
       await expect(loanProposal.connect(anyUser).markAsDefaulted()).to.be.revertedWithCustomError(loanProposal, 'NoDefault')
 
       // move forward to repayment cutoff time
       let repaymentCutoffTime = finalLoanTerms.repaymentSchedule[0].dueTimestamp + finalLoanTerms.repaymentSchedule[0].conversionGracePeriod + finalLoanTerms.repaymentSchedule[0].repaymentGracePeriod
       await ethers.provider.send('evm_mine', [repaymentCutoffTime])
+
+      // revert if user tries to claim default proceed and not marked as defaulted
+      await expect(loanProposal.connect(lender1).claimDefaultProceeds()).to.be.revertedWithCustomError(loanProposal, 'InvalidActionForCurrentStatus')
+
+      // anyone can mark as defaulted
+      await loanProposal.connect(anyUser).markAsDefaulted()
+
+      // revert if trying to mark as defaulted again
+      await expect(loanProposal.connect(anyUser).markAsDefaulted()).to.be.revertedWithCustomError(loanProposal, 'InvalidActionForCurrentStatus')
+
+      // revert if unentiled user tries to claim default proceeds
+      await expect(loanProposal.connect(anyUser).claimDefaultProceeds()).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
+
+      // claim default proceeds
+      let totalBal = await daoToken.balanceOf(loanProposal.address)
+      let subscribedBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address)
+      let expectedDefaultProceeds = totalBal.mul(subscribedBalOf).div(totalSubscribed)
+      let preLenderBal = await daoToken.balanceOf(lender1.address)
+      let preLoanPropBal = await daoToken.balanceOf(loanProposal.address)
+      await loanProposal.connect(lender1).claimDefaultProceeds()
+      let postLenderBal = await daoToken.balanceOf(lender1.address)
+      let postLoanPropBal = await daoToken.balanceOf(loanProposal.address)
+      expect(postLenderBal.sub(preLenderBal)).to.be.equal(expectedDefaultProceeds)
+      expect(preLoanPropBal.sub(postLoanPropBal)).to.be.equal(postLenderBal.sub(preLenderBal))
+
+      // revert if lenders tries to claim twice
+      await expect(loanProposal.connect(lender1).claimDefaultProceeds()).to.be.revertedWithCustomError(loanProposal, 'AlreadyClaimed')
     })
   })
 })

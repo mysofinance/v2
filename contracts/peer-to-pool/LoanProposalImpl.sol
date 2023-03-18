@@ -85,7 +85,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         _loanTerms = newLoanTerms;
         dynamicData.status = DataTypes.LoanStatus.IN_NEGOTIATION;
 
-        emit LoanTermsProposed(fundingPool, newLoanTerms);
+        emit LoanTermsProposed(newLoanTerms);
     }
 
     function acceptLoanTerms() external {
@@ -108,7 +108,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         dynamicData.loanTermsLockedTime = block.timestamp;
         dynamicData.status = DataTypes.LoanStatus.BORROWER_ACCEPTED;
 
-        emit LoanTermsAccepted(fundingPool);
+        emit LoanTermsAccepted();
     }
 
     function finalizeLoanTermsAndTransferColl(
@@ -198,7 +198,6 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         }
 
         emit LoanTermsAndTransferCollFinalized(
-            fundingPool,
             _finalLoanAmount,
             _finalCollAmountReservedForDefault,
             _finalCollAmountReservedForConversions,
@@ -211,7 +210,6 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         if (dynamicData.status != DataTypes.LoanStatus.BORROWER_ACCEPTED) {
             revert Errors.InvalidActionForCurrentStatus();
         }
-        address fundingPool = staticData.fundingPool;
         uint256 totalSubscribed = IFundingPool(staticData.fundingPool)
             .totalSubscribed(address(this));
         uint256 _timeUntilLendersCanUnsubscribe = timeUntilLendersCanUnsubscribe();
@@ -232,7 +230,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.InvalidRollBackRequest();
         }
 
-        emit Rollback(fundingPool);
+        emit Rollback();
     }
 
     function updateStatusToDeployed() external {
@@ -245,7 +243,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         }
         dynamicData.status = DataTypes.LoanStatus.LOAN_DEPLOYED;
 
-        emit LoanDeployed(fundingPool);
+        emit LoanDeployed();
     }
 
     function exerciseConversion() external {
@@ -285,12 +283,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             conversionAmount
         );
 
-        emit ConversionExercised(
-            fundingPool,
-            msg.sender,
-            repaymentIdx,
-            conversionAmount
-        );
+        emit ConversionExercised(msg.sender, repaymentIdx, conversionAmount);
     }
 
     function repay(uint256 expectedTransferFee) external {
@@ -350,7 +343,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             : collTokenLeftUnconverted;
         IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
 
-        emit Repay(fundingPool, remainingLoanTokenDue, collSendAmount);
+        emit Repay(remainingLoanTokenDue, collSendAmount);
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
@@ -385,7 +378,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             claimAmount
         );
 
-        emit ClaimRepayment(fundingPool, msg.sender, claimAmount);
+        emit ClaimRepayment(msg.sender, claimAmount);
     }
 
     function markAsDefaulted() external {
@@ -402,21 +395,21 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.NoDefault();
         }
         dynamicData.status = DataTypes.LoanStatus.DEFAULTED;
-        emit LoanDefaulted(staticData.fundingPool);
+        emit LoanDefaulted();
     }
 
     function claimDefaultProceeds() external {
         if (dynamicData.status != DataTypes.LoanStatus.DEFAULTED) {
-            revert();
+            revert Errors.InvalidActionForCurrentStatus();
         }
         address fundingPool = staticData.fundingPool;
         uint256 lenderContribution = IFundingPool(fundingPool)
             .subscribedBalanceOf(address(this), msg.sender);
         if (lenderContribution == 0) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (lenderClaimedCollateralOnDefault[msg.sender]) {
-            revert();
+            revert Errors.AlreadyClaimed();
         }
         uint256 lastPeriodIdx = dynamicData.currentRepaymentIdx;
         address collToken = staticData.collToken;
@@ -452,7 +445,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
 
         IERC20Metadata(collToken).safeTransfer(msg.sender, totalCollTokenClaim);
 
-        emit DefaultProceedsClaimed(fundingPool, msg.sender);
+        emit DefaultProceedsClaimed(msg.sender);
     }
 
     function loanTerms() external view returns (DataTypes.LoanTerms memory) {
