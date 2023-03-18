@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
-import { collTokenAbi, gmxRewarRouterAbi } from './helpers/abi'
+import { collTokenAbi, gmxRewardRouterAbi } from './helpers/abi'
 import { createOnChainRequest } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
@@ -17,7 +17,7 @@ const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 
-describe('Basic Forked Arbitrum Tests', function () {
+describe('Peer-to-Peer: Arbitrum Tests', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -132,7 +132,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     const glpManagerAddress = '0x3963FfC9dff443c2A94f21b129D429891E32ec18' // GLP Manager
     const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
 
-    const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewarRouterAbi, borrower.provider)
+    const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewardRouterAbi, borrower.provider)
 
     // mint GLP token
     await weth.connect(borrower).approve(glpManagerAddress, MAX_UINT256)
@@ -322,10 +322,6 @@ describe('Basic Forked Arbitrum Tests', function () {
       dexSwapTokenOut,
       poolFee
     )
-
-    console.log('uni v3 finalTotalPledgeAmount:', finalTotalPledgeAmount)
-    console.log('uni v3 finalFlashBorrowAmount:', finalFlashBorrowAmount)
-
     // check balance pre borrow
     const borrowerWethBalPre = await weth.balanceOf(borrower.address)
     const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
@@ -334,10 +330,8 @@ describe('Basic Forked Arbitrum Tests', function () {
 
     // borrower approves and executes quote
     const collSendAmountBn = fromReadableAmount(initCollUnits + minSwapReceive, dexSwapTokenOut.decimals)
-    console.log('collSendAmountBn', collSendAmountBn)
     const slippage = 0.01
     const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
-    console.log('minSwapReceive', minSwapReceive)
     const quoteTupleIdx = 0
     await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
     const expectedTransferFee = 0
@@ -423,7 +417,7 @@ describe('Basic Forked Arbitrum Tests', function () {
     const glpManagerAddress = '0x3963FfC9dff443c2A94f21b129D429891E32ec18' // GLP Manager
     const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
 
-    const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewarRouterAbi, borrower.provider)
+    const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewardRouterAbi, borrower.provider)
 
     // mint GLP token
     await weth.connect(borrower).approve(glpManagerAddress, MAX_UINT256)
@@ -474,16 +468,10 @@ describe('Basic Forked Arbitrum Tests', function () {
       dexSwapTokenOut,
       poolFee
     )
-
-    console.log('uni v3 finalTotalPledgeAmount:', finalTotalPledgeAmount)
-    console.log('uni v3 finalFlashBorrowAmount:', finalFlashBorrowAmount)
-
     // borrower approves and executes quote
     const collSendAmountBn = fromReadableAmount(initCollUnits + minSwapReceive, dexSwapTokenOut.decimals)
-    console.log('collSendAmountBn', collSendAmountBn)
     const slippage = 0.01
     const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
-    console.log('minSwapReceive', minSwapReceive)
     const quoteTupleIdx = 0
     await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
     const expectedTransferFee = 0

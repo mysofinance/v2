@@ -16,7 +16,7 @@ const YEAR_IN_SECONDS = 31_536_000
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 
-describe('Basic Forked Mainnet Tests', function () {
+describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -236,9 +236,6 @@ describe('Basic Forked Mainnet Tests', function () {
         poolFee
       )
 
-      console.log('uni v3 finalTotalPledgeAmount:', finalTotalPledgeAmount)
-      console.log('uni v3 finalFlashBorrowAmount:', finalFlashBorrowAmount)
-
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
@@ -250,10 +247,8 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       const collSendAmountBn = fromReadableAmount(initCollUnits + minSwapReceive, dexSwapTokenOut.decimals)
-      console.log('collSendAmountBn', collSendAmountBn)
       const slippage = 0.01
       const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
-      console.log('minSwapReceive', minSwapReceive)
       const quoteTupleIdx = 0
       const expectedTransferFee = 0
       const deadline = MAX_UINT128

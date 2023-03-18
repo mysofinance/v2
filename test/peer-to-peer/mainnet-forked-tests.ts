@@ -38,7 +38,7 @@ function getLoopingSendAmount(
   return collTokenReceivedFromDex + collTokenFromBorrower
 }
 
-describe('Basic Forked Mainnet Tests', function () {
+describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -958,8 +958,6 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ethers.BigNumber.from(Math.floor(collSendAmountNumber * PRECISION))
         .mul(ONE_WETH)
         .div(PRECISION)
-      console.log('sendAmountNumber to max. lever up: ', collSendAmountNumber)
-      console.log('sendAmount to max. lever up: ', collSendAmount)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -973,7 +971,6 @@ describe('Basic Forked Mainnet Tests', function () {
       const quoteTupleIdx = 0
       const slippageTolerance = BASE.mul(30).div(10000)
       const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
-      console.log('minSwapReceive: ', minSwapReceive)
       const deadline = MAX_UINT128
 
       const callbackAddr = balancerV2Looping.address
@@ -1231,11 +1228,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // check balance pre repay
       const borrowerUsdcBalancePre = await usdc.balanceOf(borrower.address)
-      console.log('check if borrower has enough balance to repay...')
-      console.log('borrowerUsdcBalancePre: ', borrowerUsdcBalancePre)
-      console.log('repayAmount: ', repayAmount)
       if (repayAmount.gt(borrowerUsdcBalancePre)) {
-        console.log('transfer some funds to borrower...')
         await usdc.connect(lender).transfer(borrower.address, repayAmount.sub(borrowerUsdcBalancePre))
       }
 
@@ -2733,8 +2726,6 @@ describe('Basic Forked Mainnet Tests', function () {
         .div(10 ** 9)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
-      console.log(collTokenPriceInLoanToken.toString())
-
       expect(borrowerGohmBalPre.sub(borrowerGohmBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
       expect(Math.abs(Number(vaultGohmBalPost.sub(vaultGohmBalPre).sub(collSendAmount).toString()))).to.equal(0)
@@ -2872,8 +2863,6 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_USDC).div(loanTokenPriceRaw)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
-
-      console.log(collTokenPriceInLoanToken.toString())
 
       expect(borrowerUniV2WethUsdcBalPre.sub(borrowerUniV2WethUsdcBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl.div(1000))

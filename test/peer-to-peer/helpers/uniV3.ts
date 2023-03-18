@@ -117,8 +117,6 @@ export async function getOptimCollSendAndFlashBorrowAmount(
   let y = Math.round(getLoanAmount(x, transferFee, loanPerColl) * PRECISION) / PRECISION
   let totalPledged = x
   let totalBorrowedAndSwapped = y
-  console.log('i, totalPledged, totalBorrowedAndSwapped')
-  console.log(0, totalPledged, totalBorrowedAndSwapped)
 
   const epsilon = 1 / PRECISION
   for (var i = 0; i < 100; i++) {
@@ -132,7 +130,6 @@ export async function getOptimCollSendAndFlashBorrowAmount(
 
     totalPledged += x
     totalBorrowedAndSwapped += y
-    console.log(i + 1, totalPledged, totalBorrowedAndSwapped)
 
     if (x < epsilon) {
       break
