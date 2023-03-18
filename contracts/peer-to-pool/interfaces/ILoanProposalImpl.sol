@@ -106,6 +106,17 @@ interface ILoanProposalImpl {
         uint256 repaymentIdx
     ) external view returns (uint256);
 
+    /**
+     * @notice Returns core dynamic data for given loan proposal
+     * @return arrangerFee The arranger fee, which initially is expressed in relative terms (i.e., 100% = BASE) and once the proposal gets finalized is in absolute terms (e.g., 1000 USDC)
+     * @return finalLoanAmount The final loan amount, which initially is zero and gets set once the proposal gets finalized
+     * @return finalCollAmountReservedForDefault The final collateral amount reserved for default case, which initially is zero and gets set once the proposal gets finalized.
+     * @return finalCollAmountReservedForConversions The final collateral amount reserved for lender conversions, which initially is zero and gets set once the proposal gets finalized
+     * @return loanTermsLockedTime The timestamp when loan terms got locked in, which initially is zero and gets set once the proposal gets finalized
+     * @return currentRepaymentIdx The current repayment index, which gets incremented on every repay
+     * @return status The current loan proposal status.
+     * @dev Note that finalCollAmountReservedForDefault is a lower bound for the collateral amount that lenders can claim in case of a default. This means that in case all lenders converted and the borrower defaults then this amount will be distributed as default recovery value on a pro-rata basis to lenders. In the other case where no lenders converted then finalCollAmountReservedForDefault plus finalCollAmountReservedForConversions will be available as default recovery value for lenders, hence finalCollAmountReservedForDefault is a lower bound for a lender's default recovery value.
+     */
     function dynamicData()
         external
         view
@@ -119,6 +130,13 @@ interface ILoanProposalImpl {
             DataTypes.LoanStatus status
         );
 
+    /**
+     * @notice Returns core static data for given loan proposal
+     * @return fundingPool The address of the funding pool from which lenders can subscribe, and from which -upon acceptance- the final loan amount gets sourced
+     * @return collToken The address of the collateral token to be provided by the borrower
+     * @return arranger The address of the arranger of the proposal
+     * @return lenderGracePeriod The lender grace period until which lenders can unsubscribe after a loan proposal got accepted by the borrower
+     */
     function staticData()
         external
         view
@@ -139,13 +157,13 @@ interface ILoanProposalImpl {
      * @notice Returns flag indicating whether lenders can currently unsubscribe from loan proposal
      * @return Flag indicating whether lenders can currently unsubscribe from loan proposal
      */
-    function inUnsubscriptionPhase() external view returns (bool);
+    function canUnsubscribe() external view returns (bool);
 
     /**
      * @notice Returns flag indicating whether lenders can currently subscribe to loan proposal
      * @return Flag indicating whether lenders can currently subscribe to loan proposal
      */
-    function inSubscriptionPhase() external view returns (bool);
+    function canSubscribe() external view returns (bool);
 
     /**
      * @notice Returns indicative final loan terms

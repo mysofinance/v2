@@ -9,8 +9,8 @@ import {
   crvRewardsDistributorAbi,
   chainlinkAggregatorAbi,
   gohmAbi
-} from './abi'
-import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers'
+} from './helpers/abi'
+import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers/misc'
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)

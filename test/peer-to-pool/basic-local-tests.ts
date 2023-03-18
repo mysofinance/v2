@@ -1,6 +1,6 @@
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
-import { getLoanTermsTemplate, getRepaymentScheduleTemplate, createLoanProposal, getDummyLoanTerms, addSubscriptionsToLoanProposal } from '../helpers/misc'
+import { getLoanTermsTemplate, getRepaymentScheduleTemplate, createLoanProposal, getDummyLoanTerms, addSubscriptionsToLoanProposal } from './helpers/misc'
 import { ADDRESS_ZERO } from '@uniswap/v3-sdk'
 
 const BASE = ethers.BigNumber.from(10).pow(18)

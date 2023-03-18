@@ -1,8 +1,8 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
-import { collTokenAbi, gmxRewarRouterAbi } from './abi'
-import { createOnChainRequest } from './helpers'
+import { collTokenAbi, gmxRewarRouterAbi } from './helpers/abi'
+import { createOnChainRequest } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
