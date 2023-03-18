@@ -381,7 +381,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     )
 
     // check repay
-    const loan = await lenderVault.loans(0)
+    const loan = await lenderVault.loan(0)
     const minSwapReceiveLoanToken = 0
     const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
       ['uint256', 'uint256', 'uint24'],
