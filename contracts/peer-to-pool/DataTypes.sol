@@ -19,6 +19,23 @@ library DataTypes {
         Repayment[] repaymentSchedule;
     }
 
+    struct StaticLoanProposalData {
+        address fundingPool;
+        address collToken;
+        address arranger;
+        uint256 lenderGracePeriod;
+    }
+
+    struct DynamicLoanProposalData {
+        uint256 arrangerFee;
+        uint256 finalLoanAmount;
+        uint256 finalCollAmountReservedForDefault;
+        uint256 finalCollAmountReservedForConversions;
+        uint256 loanTermsLockedTime;
+        uint256 currentRepaymentIdx;
+        DataTypes.LoanStatus status;
+    }
+
     enum LoanStatus {
         WITHOUT_LOAN_TERMS,
         IN_NEGOTIATION,
