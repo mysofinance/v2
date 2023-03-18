@@ -1299,6 +1299,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance.div(coeffRepay))
         expect(collTokenCompartmentCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVReward)
 
+        // unlock before expiry should revert
+        await expect(
+          lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], false)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
+
         await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
         // check crv reward for compartment address
@@ -1328,6 +1333,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const lenderVaultRewardTokenBalancePreUnlock = rewardTokenAddress
           ? await rewardTokenInstance.balanceOf(lenderVault.address)
           : BigNumber.from(0)
+        await expect(
+          lenderVault.connect(lender).unlockCollateral(lender.address, [loanId], false)
+        ).to.be.revertedWithCustomError(lenderVault, 'InconsistentUnlockTokenAddresses')
         await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], false)
         const compartmentRewardTokenBalancePostUnlock = rewardTokenAddress
           ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
@@ -1687,6 +1695,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const lenderCollBalPost = await collInstance.balanceOf(lender.address)
 
       expect(lenderCollBalPost).to.equal(borrowerUNIBalPre.div(coeffRepay))
+
+      await expect(lenderVault.connect(lender).withdraw(collTokenAddress, MAX_UINT128)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidWithdrawAmount'
+      )
     })
 
     it('Should delegate voting correctly with borrow and partial repayment with callback', async () => {

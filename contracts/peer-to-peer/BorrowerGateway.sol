@@ -149,13 +149,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
             revert Errors.UnregisteredVault();
         }
-        if (
-            uint256(loanRepayInstructions.targetRepayAmount) +
-                loanRepayInstructions.expectedTransferFee <
-            loanRepayInstructions.targetRepayAmount
-        ) {
-            revert Errors.InsufficientSendAmount();
-        }
+
         DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loans(
             loanRepayInstructions.targetLoanId
         );
@@ -178,8 +172,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             loan,
             loanRepayInstructions.targetRepayAmount,
             loanRepayInstructions.targetLoanId,
-            reclaimCollAmount,
-            true
+            reclaimCollAmount
         );
 
         emit Repay(
@@ -243,6 +236,8 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             (loan.expiry - block.timestamp)) /
             (Constants.BASE * Constants.YEAR_IN_SECONDS);
 
+        // should only happen when tenor >> 1 year
+        // e.g. at 5% MAX_FEE_PER_ANNUM, tenor still needs to be 20 years
         if (borrowInstructions.collSendAmount < protocolFeeAmount) {
             revert Errors.InsufficientSendAmount();
         }

@@ -254,6 +254,8 @@ describe('Peer-to-Peer: Local Tests', function () {
     const lenderVaultAddr = await addressRegistry.registeredVaults(0)
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
 
+    await expect(lenderVault.connect(lender).initialize(lender.address, addressRegistry.address)).to.be.reverted
+
     // deploy test tokens
     const MyERC20 = await ethers.getContractFactory('MyERC20')
 
@@ -375,6 +377,37 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // test add, remove, set min signer functionality
+      await expect(lenderVault.addSigners([lender.address, lender.address])).to.be.revertedWithCustomError(
+        lenderVault,
+        'AlreadySigner'
+      )
+      await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'MustHaveAtLeastOneSigner')
+      await lenderVault.connect(lender).setMinNumOfSigners(4)
+      const minNumSigners = await lenderVault.minNumOfSigners()
+      expect(minNumSigners).to.be.equal(4)
+      await lenderVault.connect(lender).setMinNumOfSigners(1)
+      await lenderVault.connect(lender).addSigners([team.address, borrower.address])
+      // errors in handling signers
+      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidArrayIndex'
+      )
+      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidArrayIndex'
+      )
+      await expect(lenderVault.connect(lender).removeSigner(weth.address, 0)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSignerRemoveInfo'
+      )
+      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 0)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSignerRemoveInfo'
+      )
+      // valid remove
+      await lenderVault.connect(lender).removeSigner(borrower.address, 1)
 
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
         lenderVault,

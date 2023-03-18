@@ -55,17 +55,18 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
             if (loan.collToken != collToken) {
                 revert Errors.InconsistentUnlockTokenAddresses();
             }
-            if (!loan.collUnlocked && block.timestamp >= loan.expiry) {
-                if (loan.collTokenCompartmentAddr != address(0)) {
-                    IBaseCompartment(loan.collTokenCompartmentAddr)
-                        .unlockCollToVault(loan.collToken);
-                } else {
-                    tmp =
-                        loan.initCollAmount -
-                        (loan.initCollAmount * loan.amountRepaidSoFar) /
-                        loan.initRepayAmount;
-                    totalUnlockableColl += tmp;
-                }
+            if (loan.collUnlocked || block.timestamp < loan.expiry) {
+                revert Errors.InvalidCollUnlock();
+            }
+            if (loan.collTokenCompartmentAddr != address(0)) {
+                IBaseCompartment(loan.collTokenCompartmentAddr)
+                    .unlockCollToVault(loan.collToken);
+            } else {
+                tmp =
+                    loan.initCollAmount -
+                    (loan.initCollAmount * loan.amountRepaidSoFar) /
+                    loan.initRepayAmount;
+                totalUnlockableColl += tmp;
             }
             loan.collUnlocked = true;
             unchecked {
@@ -92,25 +93,16 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         DataTypes.Loan memory loan,
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount,
-        bool isRepay
+        uint256 collAmount
     ) external {
         senderCheckGateway();
-        if (isRepay) {
-            loan.amountRepaidSoFar += repayAmount;
-        }
+        loan.amountRepaidSoFar += repayAmount;
 
         // only update lockedAmounts when no compartment
         if (loan.collTokenCompartmentAddr == address(0)) {
-            if (isRepay) {
-                lockedAmounts[loan.collToken] -= collAmount;
-            } else {
-                lockedAmounts[loan.collToken] += collAmount;
-            }
+            lockedAmounts[loan.collToken] -= collAmount;
         }
-        if (isRepay || loan.collTokenCompartmentAddr != address(0)) {
-            _loans[loanId] = loan;
-        }
+        _loans[loanId] = loan;
     }
 
     function processQuote(
@@ -289,6 +281,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         ) {
             revert Errors.OutsideValidRepayWindow();
         }
+        // checks repayAmount <= remaining loan balance
         if (
             loanRepayInstructions.targetRepayAmount >
             loan.initRepayAmount - loan.amountRepaidSoFar
