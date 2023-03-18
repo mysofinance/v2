@@ -15,7 +15,7 @@ contract VoteCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
 
     function delegate(address _delegatee) external {
-        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loans(loanIdx);
+        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(loanIdx);
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }

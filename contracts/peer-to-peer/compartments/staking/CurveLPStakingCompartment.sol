@@ -24,7 +24,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
 
     function stake(uint256 gaugeIndex) external {
-        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loans(loanIdx);
+        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(loanIdx);
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }

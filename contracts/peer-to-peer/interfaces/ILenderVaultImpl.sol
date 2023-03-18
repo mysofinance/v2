@@ -15,7 +15,7 @@ interface ILenderVaultImpl {
 
     /**
      * @notice function to unlock defaulted collateral
-     * @dev only loans with same collateral token cna be unlocked in one call
+     * @dev only loans with same collateral token can be unlocked in one call
      * function will revert if mismatch in coll token to a loan.collToken.
      * note: a vault owner may not want to autowithdraw collateral if he also uses
      * the token as loans
@@ -55,7 +55,7 @@ interface ILenderVaultImpl {
      * @return loan loan information after processing the quote
      * @return loanId index of loans in the loans array
      * @return upfrontFee upfront fee in coll token
-     * @return collReceiver reciever of the collateral (e.g., vault or compartment)
+     * @return collReceiver receiver of the collateral (e.g., vault or compartment)
      */
     function processQuote(
         address borrower,
@@ -135,12 +135,12 @@ interface ILenderVaultImpl {
     function removeSigner(address signer, uint256 signerIdx) external;
 
     /**
-     * @notice function to retrieve loans array in a vault
+     * @notice function to retrieve loan from loans array in vault
      * @dev this function reverts on invalid index
-     * @param index index of loans
+     * @param index index of loan
      * @return loan loan stored at that index in vault
      */
-    function loans(
+    function loan(
         uint256 index
     ) external view returns (DataTypes.Loan memory loan);
 

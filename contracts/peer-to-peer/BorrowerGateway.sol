@@ -150,7 +150,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             revert Errors.UnregisteredVault();
         }
 
-        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loans(
+        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
             loanRepayInstructions.targetLoanId
         );
 
