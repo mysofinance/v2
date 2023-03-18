@@ -257,7 +257,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
-        checkRepaymentIdx(repaymentIdx);
+        checkCurrRepaymentIdx(repaymentIdx);
         if (lenderExercisedConversion[msg.sender][repaymentIdx]) {
             revert Errors.AlreadyConverted();
         }
@@ -294,7 +294,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx++;
-        checkRepaymentIdx(repaymentIdx);
+        checkCurrRepaymentIdx(repaymentIdx);
         // must be after when the period of this loan when lenders can convert,
         // but before default period for this period
         uint256 currConversionCutoffTime = _loanTerms
@@ -387,11 +387,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         }
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
         // this will check if loan has been fully repaid yet in this instance
-        checkRepaymentIdx(repaymentIdx);
-        if (
-            _loanTerms.repaymentSchedule[repaymentIdx].repaid ||
-            block.timestamp <= getRepaymentCutoffTime(repaymentIdx)
-        ) {
+        checkCurrRepaymentIdx(repaymentIdx);
+        if (block.timestamp <= getRepaymentCutoffTime(repaymentIdx)) {
             revert Errors.NoDefault();
         }
         dynamicData.status = DataTypes.LoanStatus.DEFAULTED;
@@ -514,8 +511,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         );
     }
 
-    function checkRepaymentIdx(uint256 repaymentIdx) internal view {
-        // currentRepaymentIdx == _loanTerms.repaymentSchedule.length on full repay,
+    function checkCurrRepaymentIdx(uint256 repaymentIdx) internal view {
+        // currentRepaymentIdx increments on every repay; iff full repay then currentRepaymentIdx == _loanTerms.repaymentSchedule.length
         if (repaymentIdx == _loanTerms.repaymentSchedule.length) {
             revert Errors.LoanIsFullyRepaid();
         }

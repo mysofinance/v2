@@ -123,7 +123,29 @@ describe('Basic Local Tests', function () {
       repaymentSchedule[1].conversionGracePeriod = 1
       repaymentSchedule[1].repaymentGracePeriod = 1
       loanTerms.repaymentSchedule = repaymentSchedule
-      // revert when grace periods too short
+      // revert when conversionGracePeriod too short
+      await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'InvalidRepaymentSchedule')
+
+      repaymentSchedule[0].dueTimestamp = firstDueDate
+      repaymentSchedule[0].conversionGracePeriod = ONE_DAY
+      repaymentSchedule[0].repaymentGracePeriod = 1
+      nextDueDate = repaymentSchedule[0].dueTimestamp.add(repaymentSchedule[0].conversionGracePeriod).add(repaymentSchedule[0].repaymentGracePeriod)
+      repaymentSchedule[1].dueTimestamp = nextDueDate.add(ONE_DAY)
+      repaymentSchedule[1].conversionGracePeriod = ONE_DAY
+      repaymentSchedule[1].repaymentGracePeriod = 1
+      loanTerms.repaymentSchedule = repaymentSchedule
+      // revert when repaymentGracePeriod too short
+      await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'InvalidRepaymentSchedule')
+
+      repaymentSchedule[1].dueTimestamp = firstDueDate
+      repaymentSchedule[1].conversionGracePeriod = ONE_DAY
+      repaymentSchedule[1].repaymentGracePeriod = ONE_DAY
+      nextDueDate = repaymentSchedule[1].dueTimestamp.add(repaymentSchedule[1].conversionGracePeriod).add(repaymentSchedule[1].repaymentGracePeriod)
+      repaymentSchedule[0].dueTimestamp = nextDueDate.add(ONE_DAY)
+      repaymentSchedule[0].conversionGracePeriod = ONE_DAY
+      repaymentSchedule[0].repaymentGracePeriod = ONE_DAY
+      loanTerms.repaymentSchedule = repaymentSchedule
+      // revert if non-ascending due time stamps
       await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(loanProposal, 'InvalidRepaymentSchedule')
 
       repaymentSchedule[0].dueTimestamp = firstDueDate
@@ -942,6 +964,9 @@ describe('Basic Local Tests', function () {
       let remainingEntitledSubscriptions = totalSubscribed.sub(totalConvertedSubscriptionsOfPeriod)
       let expectedRepaymentClaim = leftRepaymentAmountDue.mul(subscriptionBalOf).div(remainingEntitledSubscriptions)
       expect(postBal.sub(preBal)).to.be.equal(expectedRepaymentClaim)
+
+      // revert if lender tries to claim twice
+      await expect(loanProposal.connect(lender2).claimRepayment(0)).to.be.revertedWithCustomError(loanProposal, 'AlreadyClaimed')
     })
 
     it('Should handle repayments correctly (2/4)', async function () {
