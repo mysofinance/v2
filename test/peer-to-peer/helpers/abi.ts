@@ -230,7 +230,7 @@ const crvRewardsDistributorAbi = [
   }
 ]
 
-const gmxRewarRouterAbi = [
+const gmxRewardRouterAbi = [
   {
     inputs: [
       { internalType: 'address', name: '_token', type: 'address' },
@@ -330,7 +330,7 @@ export {
   collTokenAbi,
   aavePoolAbi,
   crvRewardsDistributorAbi,
-  gmxRewarRouterAbi,
+  gmxRewardRouterAbi,
   chainlinkAggregatorAbi,
   gohmAbi,
   uniV2Abi

@@ -1,5 +1,5 @@
 import { ethers } from 'hardhat'
-import { LoanProposalFactory, LoanProposal, FundingPool, MyERC20 } from '../../typechain-types'
+import { LoanProposalFactory, LoanProposal, FundingPool, MyERC20 } from '../../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { BigNumber } from 'ethers'
 

@@ -9,8 +9,8 @@ import {
   crvRewardsDistributorAbi,
   chainlinkAggregatorAbi,
   gohmAbi
-} from './abi'
-import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers'
+} from './helpers/abi'
+import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers/misc'
 
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
@@ -38,7 +38,7 @@ function getLoopingSendAmount(
   return collTokenReceivedFromDex + collTokenFromBorrower
 }
 
-describe('Basic Forked Mainnet Tests', function () {
+describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -958,8 +958,6 @@ describe('Basic Forked Mainnet Tests', function () {
       const collSendAmount = ethers.BigNumber.from(Math.floor(collSendAmountNumber * PRECISION))
         .mul(ONE_WETH)
         .div(PRECISION)
-      console.log('sendAmountNumber to max. lever up: ', collSendAmountNumber)
-      console.log('sendAmount to max. lever up: ', collSendAmount)
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -973,7 +971,6 @@ describe('Basic Forked Mainnet Tests', function () {
       const quoteTupleIdx = 0
       const slippageTolerance = BASE.mul(30).div(10000)
       const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
-      console.log('minSwapReceive: ', minSwapReceive)
       const deadline = MAX_UINT128
 
       const callbackAddr = balancerV2Looping.address
@@ -989,6 +986,28 @@ describe('Basic Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            { ...borrowInstructions, expectedTransferFee: BigNumber.from(0).add(1) },
+            onChainQuote,
+            quoteTupleIdx
+          )
+      ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -1209,11 +1228,7 @@ describe('Basic Forked Mainnet Tests', function () {
 
       // check balance pre repay
       const borrowerUsdcBalancePre = await usdc.balanceOf(borrower.address)
-      console.log('check if borrower has enough balance to repay...')
-      console.log('borrowerUsdcBalancePre: ', borrowerUsdcBalancePre)
-      console.log('repayAmount: ', repayAmount)
       if (repayAmount.gt(borrowerUsdcBalancePre)) {
-        console.log('transfer some funds to borrower...')
         await usdc.connect(lender).transfer(borrower.address, repayAmount.sub(borrowerUsdcBalancePre))
       }
 
@@ -1814,20 +1829,6 @@ describe('Basic Forked Mainnet Tests', function () {
       const borrowerCollBalPost = await collInstance.balanceOf(borrower.address)
       const compartmentCollBalPost = await collInstance.balanceOf(collTokenCompartmentAddr)
 
-      // const borrowerCollBalDiffActual = borrowerCollBalPre.sub(borrowerCollBalPost)
-      // const borrowerCollBalDiffExpected = borrowerCollBalPre.sub(collSendAmount)
-      // const borrowerCollBalDiffComparison = Math.abs(
-      //   Number(
-      //     borrowerCollBalDiffActual
-      //       .sub(borrowerCollBalDiffExpected)
-      //       .mul(PRECISION)
-      //       .div(borrowerCollBalDiffActual)
-      //       .div(ONE_UNI)
-      //       .toString()
-      //   )
-      // )
-      // expect(borrowerCollBalDiffComparison).to.be.lessThan(0.01)
-      // the swap leverage means this test is not meaningful... need to compare to balancer swap amount expected for loan amount
       expect(borrowerLoanBalPost.sub(borrowerLoanBalPre)).to.equal(0) // borrower: no weth change as all swapped for uni
       expect(compartmentCollBalPost).to.equal(collSendAmount)
       expect(borrowerVotesPreDelegation).to.equal(0)
@@ -1840,6 +1841,36 @@ describe('Basic Forked Mainnet Tests', function () {
         ['bytes32', 'uint256', 'uint256'],
         [poolId, minSwapReceiveRepay, deadline]
       )
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
+
+      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
+            expectedTransferFee: BigNumber.from(0).add(1)
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
       // partial repay
       await expect(
@@ -1950,6 +1981,7 @@ describe('Basic Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -2047,6 +2079,7 @@ describe('Basic Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -2693,8 +2726,6 @@ describe('Basic Forked Mainnet Tests', function () {
         .div(10 ** 9)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
-      console.log(collTokenPriceInLoanToken.toString())
-
       expect(borrowerGohmBalPre.sub(borrowerGohmBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
       expect(Math.abs(Number(vaultGohmBalPost.sub(vaultGohmBalPre).sub(collSendAmount).toString()))).to.equal(0)
@@ -2832,8 +2863,6 @@ describe('Basic Forked Mainnet Tests', function () {
 
       const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_USDC).div(loanTokenPriceRaw)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
-
-      console.log(collTokenPriceInLoanToken.toString())
 
       expect(borrowerUniV2WethUsdcBalPre.sub(borrowerUniV2WethUsdcBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl.div(1000))

@@ -60,7 +60,7 @@ contract FundingPool is IEvents, IFundingPool {
         ) {
             revert Errors.UnregisteredLoanProposal();
         }
-        if (!ILoanProposalImpl(loanProposal).inSubscriptionPhase()) {
+        if (!ILoanProposalImpl(loanProposal).canSubscribe()) {
             revert Errors.NotInSubscriptionPhase();
         }
         if (amount > balanceOf[msg.sender]) {
@@ -89,7 +89,7 @@ contract FundingPool is IEvents, IFundingPool {
         ) {
             revert Errors.UnregisteredLoanProposal();
         }
-        if (!ILoanProposalImpl(loanProposal).inUnsubscriptionPhase()) {
+        if (!ILoanProposalImpl(loanProposal).canUnsubscribe()) {
             revert Errors.NotInUnsubscriptionPhase();
         }
         if (amount > subscribedBalanceOf[loanProposal][msg.sender]) {

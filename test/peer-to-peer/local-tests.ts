@@ -136,7 +136,6 @@ async function generateOffChainQuote({
   )
   const quoteTuplesRoot = quoteTuplesTree.root
   const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
-  console.log('chainId:', chainId)
   let offChainQuote = {
     generalQuoteInfo: {
       borrower: borrower.address,
@@ -186,7 +185,7 @@ async function generateOffChainQuote({
   return { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash }
 }
 
-describe('Basic Local Tests', function () {
+describe('Peer-to-Peer: Local Tests', function () {
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -287,7 +286,10 @@ describe('Basic Local Tests', function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // check that only owner can propose new owner
-      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -353,7 +355,7 @@ describe('Basic Local Tests', function () {
       // allow for transfer of vault ownership
       await lenderVault.connect(lender).proposeNewOwner(borrower.address)
       // only new proposed owner can claim vault
-      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, "InvalidSender")
+      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
       await lenderVault.connect(borrower).claimOwnership()
     })
   })
@@ -392,8 +394,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -423,6 +423,19 @@ describe('Basic Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidBorrower')
+
+      // if deadline passed, reverts
+      await expect(
+        borrowerGateway
+          .connect(team)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            { ...borrowInstructions, deadline: 10 },
+            offChainQuote,
+            selectedQuoteTuple,
+            proof
+          )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'DeadlinePassed')
 
       // if quote tuple that's not part of tree, reverts
       const unregisteredQuoteTuple = {
@@ -492,8 +505,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -538,8 +549,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -584,8 +593,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -642,8 +649,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -694,8 +699,6 @@ describe('Basic Local Tests', function () {
       const quoteTupleIdx = 0
       const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      console.log('Value:', selectedQuoteTuple)
-      console.log('Proof:', proof)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
