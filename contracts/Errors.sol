@@ -55,8 +55,6 @@ library Errors {
     error EmptyRepaymentSchedule();
     error FirstDueDateTooClose();
     error DueDatesTooClose();
-    error GracePeriodsTooShort();
-    error InvalidRepaidStatus();
     error UnsubscribeGracePeriodTooShort();
     error UnregisteredLoanProposal();
     error NotInSubscriptionPhase();
@@ -71,7 +69,6 @@ library Errors {
     error ProposalNotReadyForExecution();
     error UnsubscriptionAmountTooLarge();
     error InvalidNewLoanTerms();
-    error AlreadyConvertedForCurrenPeriod();
     error OutsideConversionTimeWindow();
     error OutsideRepaymentTimeWindow();
     error NoDefault();
@@ -79,4 +76,5 @@ library Errors {
     error RepaymentIdxTooLarge();
     error AlreadyClaimed();
     error AlreadyConverted();
+    error InvalidRepaymentSchedule();
 }

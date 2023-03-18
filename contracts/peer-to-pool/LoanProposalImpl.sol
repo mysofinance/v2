@@ -16,8 +16,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
 
     mapping(uint256 => uint256) public totalConvertedSubscriptionsPerIdx; // denominated in loan Token
     mapping(uint256 => uint256) public collTokenConverted;
-    DataTypes.DynamicLoanProposalInfo public dynamicData;
-    DataTypes.StaticLoanProposalInfo public staticData;
+    DataTypes.DynamicLoanProposalData public dynamicData;
+    DataTypes.StaticLoanProposalData public staticData;
     uint256 internal totalSubscriptionsThatClaimedOnDefault;
     mapping(address => mapping(uint256 => bool))
         internal lenderExercisedConversion;
@@ -38,11 +38,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         uint256 _arrangerFee,
         uint256 _lenderGracePeriod
     ) external initializer {
-        if (
-            _fundingPool == address(0) ||
-            _collToken == address(0) ||
-            _arranger == address(0)
-        ) {
+        if (_fundingPool == address(0) || _collToken == address(0)) {
             revert Errors.InvalidAddress();
         }
         if (_arrangerFee == 0) {
@@ -193,9 +189,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
                 _finalCollAmountReservedForConversions +
                 expectedTransferFee
         );
-        uint256 postBal = IERC20Metadata(collToken).balanceOf(address(this));
         if (
-            postBal - preBal !=
+            IERC20Metadata(collToken).balanceOf(address(this)) - preBal !=
             _finalCollAmountReservedForDefault +
                 _finalCollAmountReservedForConversions
         ) {
@@ -217,9 +212,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         address fundingPool = staticData.fundingPool;
-        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
-            address(this)
-        );
+        uint256 totalSubscribed = IFundingPool(staticData.fundingPool)
+            .totalSubscribed(address(this));
         uint256 _timeUntilLendersCanUnsubscribe = timeUntilLendersCanUnsubscribe();
         if (
             (msg.sender == _loanTerms.borrower &&
@@ -230,10 +224,10 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             dynamicData.status = DataTypes.LoanStatus.ROLLBACK;
             address collToken = staticData.collToken;
             // transfer any previously provided collToken back to borrower
-            uint256 collTokenBal = IERC20Metadata(collToken).balanceOf(
-                address(this)
+            IERC20Metadata(collToken).safeTransfer(
+                msg.sender,
+                IERC20Metadata(collToken).balanceOf(address(this))
             );
-            IERC20Metadata(collToken).safeTransfer(msg.sender, collTokenBal);
         } else {
             revert Errors.InvalidRollBackRequest();
         }
@@ -267,7 +261,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
         checkRepaymentIdx(repaymentIdx);
         if (lenderExercisedConversion[msg.sender][repaymentIdx]) {
-            revert Errors.AlreadyConvertedForCurrenPeriod();
+            revert Errors.AlreadyConverted();
         }
         // must be after when the period of this loan is due, but before borrower can repay
         if (
@@ -341,8 +335,10 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             address(this),
             remainingLoanTokenDue + expectedTransferFee
         );
-        uint256 postBal = IERC20Metadata(loanToken).balanceOf(address(this));
-        if (postBal - preBal != remainingLoanTokenDue) {
+        if (
+            IERC20Metadata(loanToken).balanceOf(address(this)) - preBal !=
+            remainingLoanTokenDue
+        ) {
             revert Errors.InvalidSendAmount();
         }
         // if final repayment, send all remaining coll token back to borrower
@@ -354,11 +350,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             : collTokenLeftUnconverted;
         IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
 
-        emit Repay(
-            fundingPool,
-            remainingLoanTokenDue,
-            collTokenLeftUnconverted
-        );
+        emit Repay(fundingPool, remainingLoanTokenDue, collSendAmount);
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
@@ -375,13 +367,12 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.RepaymentIdxTooLarge();
         }
         // note: users can claim as soon as repaid, no need to check getRepaymentCutoffTime(...)
-        if (lenderClaimedRepayment[msg.sender][repaymentIdx]) {
+        if (
+            lenderClaimedRepayment[msg.sender][repaymentIdx] ||
+            lenderExercisedConversion[msg.sender][repaymentIdx]
+        ) {
             revert Errors.AlreadyClaimed();
         }
-        if (lenderExercisedConversion[msg.sender][repaymentIdx]) {
-            revert Errors.AlreadyConverted();
-        }
-        address loanToken = IFundingPool(fundingPool).depositToken();
         // repaid amount for that period split over those who didn't convert in that period
         uint256 subscriptionsEntitledToRepayment = (IFundingPool(fundingPool)
             .totalSubscribed(address(this)) -
@@ -389,7 +380,10 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         uint256 claimAmount = (loanTokenRepaid[repaymentIdx] *
             lenderContribution) / subscriptionsEntitledToRepayment;
         lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
-        IERC20Metadata(loanToken).safeTransfer(msg.sender, claimAmount);
+        IERC20Metadata(IFundingPool(fundingPool).depositToken()).safeTransfer(
+            msg.sender,
+            claimAmount
+        );
 
         emit ClaimRepayment(fundingPool, msg.sender, claimAmount);
     }
@@ -401,16 +395,13 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
         // this will check if loan has been fully repaid yet in this instance
         checkRepaymentIdx(repaymentIdx);
-        uint256 currRepaymentCutoffDate = getRepaymentCutoffTime(repaymentIdx);
         if (
-            block.timestamp > currRepaymentCutoffDate &&
-            !_loanTerms.repaymentSchedule[repaymentIdx].repaid
+            _loanTerms.repaymentSchedule[repaymentIdx].repaid ||
+            block.timestamp <= getRepaymentCutoffTime(repaymentIdx)
         ) {
-            dynamicData.status = DataTypes.LoanStatus.DEFAULTED;
-        } else {
             revert Errors.NoDefault();
         }
-
+        dynamicData.status = DataTypes.LoanStatus.DEFAULTED;
         emit LoanDefaulted(staticData.fundingPool);
     }
 
@@ -429,48 +420,37 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         }
         uint256 lastPeriodIdx = dynamicData.currentRepaymentIdx;
         address collToken = staticData.collToken;
-        uint256 collTokenBal = IERC20Metadata(collToken).balanceOf(
-            address(this)
-        );
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
         );
         uint256 stillToBeConvertedCollTokens = _loanTerms
             .repaymentSchedule[lastPeriodIdx]
             .collTokenDueIfConverted - collTokenConverted[lastPeriodIdx];
-        uint256 defaultClaimProRataShare;
 
         // if only some lenders converted, then split 'stillToBeConvertedCollTokens'
         // fairly among lenders who didn't already convert in default period to not
         // put them at an unfair disadvantage
         uint256 totalUnconvertedSubscriptionsFromLastIdx = totalSubscribed -
             totalConvertedSubscriptionsPerIdx[lastPeriodIdx];
-        uint256 stillToBeConvertedCollTokenShare;
+        uint256 totalCollTokenClaim;
         if (!lenderExercisedConversion[msg.sender][lastPeriodIdx]) {
-            stillToBeConvertedCollTokenShare =
+            totalCollTokenClaim =
                 (stillToBeConvertedCollTokens * lenderContribution) /
                 totalUnconvertedSubscriptionsFromLastIdx;
-            collTokenConverted[
-                lastPeriodIdx
-            ] += stillToBeConvertedCollTokenShare;
+            collTokenConverted[lastPeriodIdx] += totalCollTokenClaim;
             totalConvertedSubscriptionsPerIdx[
                 lastPeriodIdx
             ] += lenderContribution;
         }
         // determine pro-rata share on remaining non-conversion related collToken balance
-        uint256 remainingDefaultClaimShare = ((collTokenBal -
-            stillToBeConvertedCollTokens) * lenderContribution) /
+        totalCollTokenClaim +=
+            ((IERC20Metadata(collToken).balanceOf(address(this)) -
+                stillToBeConvertedCollTokens) * lenderContribution) /
             (totalSubscribed - totalSubscriptionsThatClaimedOnDefault);
         lenderClaimedCollateralOnDefault[msg.sender] = true;
         totalSubscriptionsThatClaimedOnDefault += lenderContribution;
-        defaultClaimProRataShare =
-            stillToBeConvertedCollTokenShare +
-            remainingDefaultClaimShare;
 
-        IERC20Metadata(collToken).safeTransfer(
-            msg.sender,
-            defaultClaimProRataShare
-        );
+        IERC20Metadata(collToken).safeTransfer(msg.sender, totalCollTokenClaim);
 
         emit DefaultProceedsClaimed(fundingPool, msg.sender);
     }
@@ -485,16 +465,11 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             dynamicData.status == DataTypes.LoanStatus.ROLLBACK;
     }
 
-    function isReadyToExecute() external view returns (bool) {
-        return dynamicData.status == DataTypes.LoanStatus.READY_TO_EXECUTE;
-    }
-
     function inSubscriptionPhase() public view returns (bool) {
-        DataTypes.LoanStatus status = dynamicData.status;
         return
-            status == DataTypes.LoanStatus.IN_NEGOTIATION ||
-            (status == DataTypes.LoanStatus.BORROWER_ACCEPTED &&
-                block.timestamp < timeUntilLendersCanUnsubscribe());
+            (dynamicData.status != DataTypes.LoanStatus.WITHOUT_LOAN_TERMS &&
+                dynamicData.loanTermsLockedTime == 0) ||
+            block.timestamp < timeUntilLendersCanUnsubscribe();
     }
 
     function getAbsoluteLoanTerms(
@@ -508,7 +483,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     {
         uint256 _arrangerFee = (dynamicData.arrangerFee * totalSubscribed) /
             Constants.BASE;
-        uint256 _finalLoanAmount = totalSubscribed - _arrangerFee;
+        uint256 _finalLoanAmount = toUint128(totalSubscribed - _arrangerFee);
         uint256 _finalCollAmountReservedForDefault = (_finalLoanAmount *
             _tmpLoanTerms.collPerLoanToken) / (10 ** loanTokenDecimals);
         // note: convert relative terms into absolute values, i.e.:
@@ -574,22 +549,16 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         for (uint i = 0; i < repaymentSchedule.length; ) {
             currPeriodStart = repaymentSchedule[i].dueTimestamp;
             if (
-                currPeriodStart <= prevPeriodEnd ||
-                currPeriodStart - prevPeriodEnd <
-                Constants.MIN_TIME_BETWEEN_DUE_DATES
+                (currPeriodStart <= prevPeriodEnd ||
+                    currPeriodStart - prevPeriodEnd <
+                    Constants.MIN_TIME_BETWEEN_DUE_DATES) ||
+                (repaymentSchedule[i].conversionGracePeriod <
+                    Constants.MIN_CONVERSION_GRACE_PERIOD ||
+                    repaymentSchedule[i].repaymentGracePeriod <
+                    Constants.MIN_REPAYMENT_GRACE_PERIOD) ||
+                repaymentSchedule[i].repaid
             ) {
-                revert Errors.DueDatesTooClose(); // overlapping intervals or too short time between due dates
-            }
-            if (
-                repaymentSchedule[i].conversionGracePeriod <
-                Constants.MIN_CONVERSION_GRACE_PERIOD ||
-                repaymentSchedule[i].repaymentGracePeriod <
-                Constants.MIN_REPAYMENT_GRACE_PERIOD
-            ) {
-                revert Errors.GracePeriodsTooShort();
-            }
-            if (repaymentSchedule[i].repaid) {
-                revert Errors.InvalidRepaidStatus();
+                revert Errors.InvalidRepaymentSchedule();
             }
             prevPeriodEnd =
                 currPeriodStart +
