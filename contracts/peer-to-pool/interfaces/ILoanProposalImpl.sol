@@ -142,12 +142,6 @@ interface ILoanProposalImpl {
     function inUnsubscriptionPhase() external view returns (bool);
 
     /**
-     * @notice Returns flag indicating whether loan proposal is ready to be executed
-     * @return Flag indicating whether loan proposal is ready to be executed
-     */
-    function isReadyToExecute() external view returns (bool);
-
-    /**
      * @notice Returns flag indicating whether lenders can currently subscribe to loan proposal
      * @return Flag indicating whether lenders can currently subscribe to loan proposal
      */

@@ -19,14 +19,14 @@ library DataTypes {
         Repayment[] repaymentSchedule;
     }
 
-    struct StaticLoanProposalInfo {
+    struct StaticLoanProposalData {
         address fundingPool;
         address collToken;
         address arranger;
         uint256 lenderGracePeriod;
     }
 
-    struct DynamicLoanProposalInfo {
+    struct DynamicLoanProposalData {
         uint256 arrangerFee;
         uint256 finalLoanAmount;
         uint256 finalCollAmountReservedForDefault;
