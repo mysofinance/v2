@@ -54,7 +54,7 @@ interface IQuoteHandler {
      * @dev function can only be called by vault owner
      * this function invalidates one specific quote
      * @param lenderVault address of the vault
-     * @param offChainQuoteHash hash of the quote to be invalidated
+     * @param offChainQuoteHash hash of the off chain quote to be invalidated
      */
     function invalidateOffChainQuote(
         address lenderVault,
@@ -62,7 +62,7 @@ interface IQuoteHandler {
     ) external;
 
     /**
-     * @notice function performs checks on quote
+     * @notice function performs checks on quote and, if valid, updates quotehandler's state
      * @dev function can only be called by borrowerGateway
      * @param borrower address of borrower
      * @param lenderVault address of the vault
@@ -75,7 +75,7 @@ interface IQuoteHandler {
     ) external;
 
     /**
-     * @notice function performs checks on quote
+     * @notice function performs checks on quote and, if valid, updates quotehandler's state
      * @dev function can only be called by borrowerGateway
      * @param borrower address of borrower
      * @param lenderVault address of the vault
@@ -119,7 +119,7 @@ interface IQuoteHandler {
      * @notice function returns if hash is for an on chain quote
      * @param lenderVault address of vault
      * @param hashToCheck hash of the on chain quote
-     * @return true if invalidated, else false
+     * @return true if hash belongs to a valid on-chain quote, else false
      */
     function isOnChainQuote(
         address lenderVault,

@@ -41,7 +41,7 @@ library Errors {
     error OverflowUint128();
     error InconsistentUnlockTokenAddresses();
     error ExpiresBeforeRepayAllowed();
-    error MustHaveAtLeastOneSigner();
+    error InvalidNewMinNumOfSigners();
     error AlreadySigner();
     error InvalidArrayIndex();
     error InvalidSignerRemoveInfo();
