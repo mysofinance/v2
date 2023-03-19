@@ -51,10 +51,10 @@ interface ILoanProposalImpl {
     function rollback() external;
 
     /**
-     * @notice Updates the status of the loan proposal to 'LOAN_DEPLOYED'
+     * @notice Checks and updates the status of the loan proposal from 'READY_TO_EXECUTE' to 'LOAN_DEPLOYED'
      * @dev Can only be called by funding pool in conjunction with executing the loan proposal and settling amounts, i.e., sending loan amount to borrower and fees
      */
-    function updateStatusToDeployed() external;
+    function checkAndupdateStatus() external;
 
     /**
      * @notice Allows lenders to exercise their conversion right for given repayment period

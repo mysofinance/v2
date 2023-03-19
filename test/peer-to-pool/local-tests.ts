@@ -57,6 +57,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     const fundingPool = await FundingPool.deploy(loanProposalFactory.address, usdc.address)
     await fundingPool.deployed()
 
+    // reverts if trying to initialize base contract
+    await expect(loanProposalImpl.initialize(arranger.address, fundingPool.address, daoToken.address, 1, ONE_DAY)).to.be.revertedWith('Initializable: contract is already initialized')
+
     return {
       fundingPool,
       loanProposalFactory,
@@ -361,7 +364,19 @@ describe('Peer-to-Pool: Local Tests', function () {
     await expect(
       fundingPool.connect(lender1).subscribe(loanProposal.address, depositedBalance.add(1))
     ).to.be.revertedWithCustomError(fundingPool, 'InsufficientBalance')
+
+    // check valid subscribe works
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
+
+    // revert when trying to propose new loan terms with max loan amount smaller than already subscribed
+    const prevMaxLoanAmount = loanTerms.maxLoanAmount
+    loanTerms.maxLoanAmount = ethers.BigNumber.from(1)
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'InvalidNewLoanTerms'
+    )
+    loanTerms.maxLoanAmount = prevMaxLoanAmount
+
     // revert when unsubscribing during cool down period
     await expect(
       fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionAmount)
@@ -375,6 +390,11 @@ describe('Peer-to-Pool: Local Tests', function () {
     await expect(
       fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionAmount.add(1))
     ).to.be.revertedWithCustomError(fundingPool, 'UnsubscriptionAmountTooLarge')
+
+    // reverts when trying unsubscribe from invalid / unknown loan proposal address
+    await expect(fundingPool.connect(lender2).unsubscribe(ADDRESS_ZERO, subscriptionAmount)).to.be.revertedWithCustomError(fundingPool, 'UnregisteredLoanProposal')
+
+    // check valid unsubscribe works
     await fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionAmount)
     let postBal = await fundingPool.balanceOf(lender2.address)
     let postSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
@@ -637,7 +657,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -647,7 +667,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -656,7 +676,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -665,7 +685,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await loanProposal.connect(daoTreasury).acceptLoanTerms()
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -699,7 +719,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -723,10 +743,16 @@ describe('Peer-to-Pool: Local Tests', function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     await ethers.provider.send('evm_mine', [timestamp + Number(staticData.lenderGracePeriod.toString())])
 
+    // revert when trying to execute loan proposal with unregistered / unknown loan proposal address
+    await expect(fundingPool.connect(daoTreasury).executeLoanProposal(team.address)).to.be.revertedWithCustomError(
+      fundingPool,
+      'UnregisteredLoanProposal'
+    )
+    
     // revert when trying to execute loan proposal before being ready to execute
     await expect(fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)).to.be.revertedWithCustomError(
-      fundingPool,
-      'ProposalNotReadyForExecution'
+      loanProposal,
+      'InvalidActionForCurrentStatus'
     )
 
     // get final amounts
@@ -805,7 +831,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -815,7 +841,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -824,7 +850,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -833,7 +859,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await loanProposal.connect(daoTreasury).acceptLoanTerms()
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -867,7 +893,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -893,8 +919,8 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // revert when trying to execute loan proposal before being ready to execute
     await expect(fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)).to.be.revertedWithCustomError(
-      fundingPool,
-      'ProposalNotReadyForExecution'
+      loanProposal,
+      'InvalidActionForCurrentStatus'
     )
 
     // get final amounts
@@ -988,7 +1014,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -1119,7 +1145,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -1206,7 +1232,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -1399,7 +1425,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -1498,7 +1524,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -1597,7 +1623,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
@@ -1704,7 +1730,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).updateStatusToDeployed()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )

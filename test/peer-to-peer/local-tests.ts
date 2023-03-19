@@ -223,27 +223,27 @@ describe('Peer-to-Peer: Local Tests', function () {
     // initialize address registry
     await expect(
       addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
-    ).to.be.reverted
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
     await expect(addressRegistry.connect(team).initialize(ZERO_ADDRESS, borrowerGateway.address, quoteHandler.address)).to.be
-      .reverted
+      .revertedWithCustomError(addressRegistry, 'InvalidAddress')
     await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, ZERO_ADDRESS, quoteHandler.address)).to
-      .be.reverted
+      .be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
     await expect(addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, ZERO_ADDRESS))
-      .to.be.reverted
+      .to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
     await expect(
       addressRegistry.connect(team).initialize(lenderVaultFactory.address, lenderVaultFactory.address, quoteHandler.address)
-    ).to.be.reverted
+    ).to.be.revertedWithCustomError(addressRegistry, 'DuplicateAddresses')
     await expect(
       addressRegistry
         .connect(team)
         .initialize(lenderVaultFactory.address, borrowerGateway.address, lenderVaultFactory.address)
-    ).to.be.reverted
+    ).to.be.revertedWithCustomError(addressRegistry, 'DuplicateAddresses')
     await expect(
       addressRegistry.connect(team).initialize(lenderVaultFactory.address, quoteHandler.address, quoteHandler.address)
-    ).to.be.reverted
+    ).to.be.revertedWithCustomError(addressRegistry, 'DuplicateAddresses')
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
-    await expect(addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)).to.be.reverted
-    await expect(addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)).to.be.reverted
+    await expect(addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)).to.be.revertedWithCustomError(addressRegistry, 'AlreadyInitialized')
+    await expect(addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
@@ -254,7 +254,8 @@ describe('Peer-to-Peer: Local Tests', function () {
     const lenderVaultAddr = await addressRegistry.registeredVaults(0)
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
 
-    await expect(lenderVault.connect(lender).initialize(lender.address, addressRegistry.address)).to.be.reverted
+    // reverts if trying to initialize base contract
+    await expect(lenderVault.connect(lender).initialize(lender.address, addressRegistry.address)).to.be.revertedWith('Initializable: contract is already initialized')
 
     // deploy test tokens
     const MyERC20 = await ethers.getContractFactory('MyERC20')

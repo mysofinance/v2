@@ -67,7 +67,6 @@ library Errors {
     error InvalidActionForCurrentStatus();
     error TotalSubscribedNotTargetInRange();
     error InvalidRollBackRequest();
-    error ProposalNotReadyForExecution();
     error UnsubscriptionAmountTooLarge();
     error InvalidNewLoanTerms();
     error OutsideConversionTimeWindow();
