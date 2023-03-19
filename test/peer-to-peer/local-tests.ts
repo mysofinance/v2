@@ -220,6 +220,12 @@ describe('Peer-to-Peer: Local Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
+    // reverts if user tries to create vault before initialized because address registry doesn't have lender vault factory set yet
+    await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+
+    // reverts if trying to toggle tokens before address registry is initialized
+    await expect(addressRegistry.connect(team).toggleTokens([team.address], true)).to.be.revertedWithCustomError(addressRegistry, 'Uninitialized')
+
     // initialize address registry
     await expect(
       addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
@@ -253,7 +259,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     await lenderVaultFactory.connect(lender).createVault()
     const lenderVaultAddr = await addressRegistry.registeredVaults(0)
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
-
+    
     // reverts if trying to initialize base contract
     await expect(lenderVault.connect(lender).initialize(lender.address, addressRegistry.address)).to.be.revertedWith('Initializable: contract is already initialized')
 
@@ -280,8 +286,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       .to.be.revertedWithCustomError(addressRegistry,"InvalidAddress")
     expect(await addressRegistry.isWhitelistedToken(ZERO_ADDRESS)).to.be.false
 
-    //test lenderVault check works
-    await expect(addressRegistry.connect(team).addLenderVault(lenderVaultAddr)).to.be.reverted
+    // reverts if trying to manually add lenderVault
+    await expect(addressRegistry.connect(team).addLenderVault(lenderVaultAddr)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
     return { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault }
   }
