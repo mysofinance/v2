@@ -233,7 +233,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         emit Rollback();
     }
 
-    function updateStatusToDeployed() external {
+    function checkAndupdateStatus() external {
         address fundingPool = staticData.fundingPool;
         if (msg.sender != fundingPool) {
             revert Errors.InvalidSender();

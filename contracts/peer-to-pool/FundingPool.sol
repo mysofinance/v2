@@ -122,15 +122,12 @@ contract FundingPool is IEvents, IFundingPool {
             ,
             ,
             ,
-            DataTypes.LoanStatus status
+
         ) = ILoanProposalImpl(loanProposal).dynamicData();
-        if (status != DataTypes.LoanStatus.READY_TO_EXECUTE) {
-            revert Errors.ProposalNotReadyForExecution();
-        }
         DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();
         totalSubscribedIsDeployed[loanProposal] = true;
-        ILoanProposalImpl(loanProposal).updateStatusToDeployed();
+        ILoanProposalImpl(loanProposal).checkAndupdateStatus();
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
             finalLoanAmount
