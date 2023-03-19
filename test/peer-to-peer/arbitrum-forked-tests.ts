@@ -120,7 +120,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const { borrowerGateway, lender, borrower, quoteHandler, team, usdc, weth, lenderVault, addressRegistry } =
       await setupTest()
 
-    // create curve staking implementation
+    // create glp staking implementation
     const GlpStakingCompartmentImplementation = await ethers.getContractFactory('GLPStakingCompartment')
     await GlpStakingCompartmentImplementation.connect(team)
     const glpStakingCompartmentImplementation = await GlpStakingCompartmentImplementation.deploy()
