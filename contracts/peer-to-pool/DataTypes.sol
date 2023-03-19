@@ -31,7 +31,7 @@ library DataTypes {
     }
 
     struct StaticLoanProposalData {
-        // Funding pool address that is associated with given loan proposal and form loan liquidity can be sourced
+        // Funding pool address that is associated with given loan proposal and from which loan liquidity can be sourced
         address fundingPool;
         // Address of collateral token to be used for given loan proposal
         address collToken;

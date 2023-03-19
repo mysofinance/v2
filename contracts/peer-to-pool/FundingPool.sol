@@ -122,7 +122,7 @@ contract FundingPool is IEvents, IFundingPool {
             ,
             ,
             ,
-            DataTypes.LoanStatus status
+
         ) = ILoanProposalImpl(loanProposal).dynamicData();
         DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
             .loanTerms();
