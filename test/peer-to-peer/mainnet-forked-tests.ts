@@ -145,20 +145,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
     await gohm.connect(gohmHolder).transfer(team.address, '100000000000000000000')
 
-    // prepare UniV2 Weth/Usdc balances
-    const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
-    const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
-    const uniV2WethUsdc = await ethers.getContractAt('IWETH', UNIV2_WETH_USDC_ADDRESS)
-    await ethers.provider.send('hardhat_setBalance', [UNIV2_WETH_USDC_HOLDER, '0x56BC75E2D63100000'])
-    await hre.network.provider.request({
-      method: 'hardhat_impersonateAccount',
-      params: [UNIV2_WETH_USDC_HOLDER]
-    })
-
-    const univ2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
-
-    await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
-
     const wbtc = '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'
     const btcToUSDChainlinkAddr = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c'
     const wBTCToBTCChainlinkAddr = '0xfdfd9c85ad200c506cf9e21f1fd8dd01932fbb23'
@@ -187,7 +173,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       paxg,
       ldo,
       gohm,
-      uniV2WethUsdc,
       wbtc,
       btcToUSDChainlinkAddr,
       wBTCToBTCChainlinkAddr,
@@ -230,6 +215,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address, true)).to.be.reverted
 
       await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+
+      // lender vault getter fails if no loans
+      await expect(lenderVault.loan(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1066,6 +1054,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const curveLPStakingCompartmentImplementation = await CurveLPStakingCompartmentImplementation.deploy()
       await curveLPStakingCompartmentImplementation.deployed()
 
+      await addressRegistry.connect(team).toggleCompartmentImpl(curveLPStakingCompartmentImplementation.address, true)
+
       // increase borrower CRV balance
       const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
       const gaugeControllerAddress = '0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB'
@@ -1273,6 +1263,25 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const compartmentRewardTokenBalancePre = rewardTokenAddress
           ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
           : BigNumber.from(0)
+
+        // too large target repay amount should fail
+        await expect(
+          borrowerGateway.connect(borrower).repay(
+            {
+              targetLoanId: loanId,
+              targetRepayAmount: MAX_UINT128,
+              expectedTransferFee: 0
+            },
+            lenderVault.address,
+            callbackAddr,
+            callbackData
+          )
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
+
+        await expect(
+          lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount)
+        ).to.be.revertedWithCustomError(lenderVault, 'UnregisteredGateway')
+
         // partial repay
         await expect(
           borrowerGateway.connect(borrower).repay(
@@ -1305,6 +1314,19 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
 
         await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+        await expect(
+          borrowerGateway.connect(borrower).repay(
+            {
+              targetLoanId: loanId,
+              targetRepayAmount: partialRepayAmount,
+              expectedTransferFee: 0
+            },
+            lenderVault.address,
+            callbackAddr,
+            callbackData
+          )
+        ).to.be.revertedWithCustomError(lenderVault, 'OutsideValidRepayWindow')
 
         // check crv reward for compartment address
         const totalGaugeRewardCRVPost = await crvGaugeInstance.claimable_tokens(collTokenCompartmentAddr)
@@ -1439,6 +1461,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
       await aaveStakingCompartmentImplementation.deployed()
 
+      await addressRegistry.connect(team).toggleCompartmentImpl(aaveStakingCompartmentImplementation.address, true)
+
       // increase borrower aWETH balance
       const locallyCollBalance = ethers.BigNumber.from(10).pow(18)
       const collTokenAddress = '0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8' // aave WETH
@@ -1478,6 +1502,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
+      const badCompartmentOnChainQuote = await createOnChainRequest({
+        lender,
+        collToken: collTokenAddress,
+        loanToken: usdc.address,
+        borrowerCompartmentImplementation: team.address,
+        lenderVault,
+        quoteHandler,
+        loanPerCollUnit: ONE_USDC.mul(1000)
+      })
+
       // borrow with on chain quote
       const collSendAmount = BigNumber.from(10).pow(18)
       const expectedTransferFee = 0
@@ -1492,6 +1526,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badCompartmentOnChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(lenderVault, 'NonWhitelistedCompartment')
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -1561,6 +1601,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await VotingCompartmentImplementation.connect(team)
       const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
       await votingCompartmentImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleCompartmentImpl(votingCompartmentImplementation.address, true)
 
       // increase borrower UNI balance
       const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
@@ -1720,6 +1762,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await VotingCompartmentImplementation.connect(team)
       const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
       await votingCompartmentImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleCompartmentImpl(votingCompartmentImplementation.address, true)
 
       // increase borrower UNI balance
       const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
@@ -2227,6 +2271,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           .repay({ ...repayBody, expectedTransferFee: BASE }, lenderVault.address, callbackAddr, callbackData)
       ).to.be.reverted
 
+      await expect(
+        borrowerGateway.connect(team).repay(repayBody, lenderVault.address, callbackAddr, callbackData)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidBorrower')
+
       await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
         .to.emit(borrowerGateway, 'Repay')
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
@@ -2365,6 +2413,52 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      const badBorrowInstructionsTransferFee = {
+        collSendAmount,
+        expectedTransferFee: collSendAmount.mul(2),
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const badBorrowInstructionsBelowMinLoan = {
+        collSendAmount: collSendAmount.div(1000),
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const badBorrowInstructionsTooSmallLoanAmount = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: MAX_UINT128,
+        callbackAddr,
+        callbackData
+      }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, badBorrowInstructionsTransferFee, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(lenderVault, 'InsufficientSendAmount')
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, badBorrowInstructionsBelowMinLoan, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidSendAmount')
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, badBorrowInstructionsTooSmallLoanAmount, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(lenderVault, 'TooSmallLoanAmount')
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -2753,7 +2847,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrower,
         usdc,
         weth,
-        uniV2WethUsdc,
         team,
         lenderVault,
         addressRegistry,
@@ -2761,6 +2854,20 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         btcToUSDChainlinkAddr,
         wBTCToBTCChainlinkAddr
       } = await setupTest()
+
+      // prepare UniV2 Weth/Usdc balances
+      const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+      const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
+      const uniV2WethUsdc = await ethers.getContractAt('IWETH', UNIV2_WETH_USDC_ADDRESS)
+      await ethers.provider.send('hardhat_setBalance', [UNIV2_WETH_USDC_HOLDER, '0x56BC75E2D63100000'])
+      await hre.network.provider.request({
+        method: 'hardhat_impersonateAccount',
+        params: [UNIV2_WETH_USDC_HOLDER]
+      })
+
+      const univ2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
+
+      await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'

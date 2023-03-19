@@ -3,10 +3,11 @@
 pragma solidity 0.8.19;
 
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 import {Ownable} from "../Ownable.sol";
 import {Errors} from "../Errors.sol";
 
-contract AddressRegistry is Ownable, IAddressRegistry {
+contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     bool internal isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
@@ -57,18 +58,29 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     ) external {
         checkSenderAndIsInitialized();
         for (uint i = 0; i < tokens.length; ) {
-            if (tokens[i] != address(0)) {
-                isWhitelistedToken[tokens[i]] = whitelistStatus;
+            if (tokens[i] == address(0)) {
+                revert Errors.InvalidAddress();
             }
+            isWhitelistedToken[tokens[i]] = whitelistStatus;
             unchecked {
                 i++;
             }
         }
+        emit WhitelistAddressToggled(
+            tokens,
+            whitelistStatus,
+            IEvents.EventToggleType.TOKEN
+        );
     }
 
     function toggleCallbackAddr(address addr, bool whitelistStatus) external {
         checkSenderAndIsInitialized();
         isWhitelistedCallbackAddr[addr] = whitelistStatus;
+        prepareToggleEvent(
+            addr,
+            whitelistStatus,
+            IEvents.EventToggleType.CALLBACK
+        );
     }
 
     function toggleCompartmentImpl(
@@ -77,11 +89,21 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     ) external {
         checkSenderAndIsInitialized();
         isWhitelistedCompartmentImpl[addr] = whitelistStatus;
+        prepareToggleEvent(
+            addr,
+            whitelistStatus,
+            IEvents.EventToggleType.COMPARTMENT
+        );
     }
 
     function toggleOracle(address addr, bool whitelistStatus) external {
         checkSenderAndIsInitialized();
         isWhitelistedOracle[addr] = whitelistStatus;
+        prepareToggleEvent(
+            addr,
+            whitelistStatus,
+            IEvents.EventToggleType.ORACLE
+        );
     }
 
     function addLenderVault(address addr) external {
@@ -105,6 +127,20 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         returns (address)
     {
         return _owner;
+    }
+
+    function prepareToggleEvent(
+        address toggledAddr,
+        bool whitelistStatus,
+        IEvents.EventToggleType toggleType
+    ) internal {
+        address[] memory addressToggled = new address[](1);
+        addressToggled[0] = toggledAddr;
+        emit WhitelistAddressToggled(
+            addressToggled,
+            whitelistStatus,
+            toggleType
+        );
     }
 
     function checkSenderAndIsInitialized() internal view {

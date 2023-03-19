@@ -5,13 +5,29 @@ pragma solidity 0.8.19;
 import {DataTypes} from "../DataTypes.sol";
 
 interface IEvents {
+    enum EventToggleType {
+        CALLBACK,
+        COMPARTMENT,
+        ORACLE,
+        TOKEN
+    }
+
+    event AddedSigners(address[] _signers);
+
+    event MinNumberOfSignersSet(uint256 numSigners);
+
+    event RemovedSigner(
+        address signerRemoved,
+        uint256 signerIdx,
+        address signerMovedFromEnd
+    );
+
     event CollateralUnlocked(
         address indexed vaultOwner,
         address indexed collToken,
         uint256[] loanIds,
         bool autoWithdraw
     );
-    event Received(address, uint);
 
     event Borrow(
         address indexed vaultAddr,
@@ -50,5 +66,11 @@ interface IEvents {
     event OffChainQuoteInvalidated(
         address lenderVault,
         bytes32 offChainQuoteHash
+    );
+
+    event WhitelistAddressToggled(
+        address[] indexed addressToggled,
+        bool whitelistStatus,
+        EventToggleType toggleType
     );
 }

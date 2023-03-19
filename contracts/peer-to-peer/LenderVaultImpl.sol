@@ -222,10 +222,11 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
 
     function setMinNumOfSigners(uint256 _minNumOfSigners) external {
         senderCheckOwner();
-        if (_minNumOfSigners == 0) {
-            revert Errors.MustHaveAtLeastOneSigner();
+        if (_minNumOfSigners == 0 || _minNumOfSigners == minNumOfSigners) {
+            revert Errors.InvalidNewMinNumOfSigners();
         }
         minNumOfSigners = _minNumOfSigners;
+        emit MinNumberOfSignersSet(_minNumOfSigners);
     }
 
     function addSigners(address[] calldata _signers) external {
@@ -240,6 +241,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
                 i++;
             }
         }
+        emit AddedSigners(_signers);
     }
 
     function removeSigner(address signer, uint256 signerIdx) external {
@@ -252,9 +254,11 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         if (!isSigner[signer] || signer != signers[signerIdx]) {
             revert Errors.InvalidSignerRemoveInfo();
         }
-        signers[signerIdx] = signers[signersLen - 1];
+        address signerMovedFromEnd = signers[signersLen - 1];
+        signers[signerIdx] = signerMovedFromEnd;
         signers.pop();
         isSigner[signer] = false;
+        emit RemovedSigner(signer, signerIdx, signerMovedFromEnd);
     }
 
     function loan(
@@ -304,7 +308,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         uint256 loanId
     ) internal returns (address collCompartment) {
         if (
-            IAddressRegistry(addressRegistry).isWhitelistedCompartmentImpl(
+            !IAddressRegistry(addressRegistry).isWhitelistedCompartmentImpl(
                 borrowerCompartmentImplementation
             )
         ) {
