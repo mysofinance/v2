@@ -3,10 +3,11 @@
 pragma solidity 0.8.19;
 
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {IEvents} from "./interfaces/IEvents.sol";
 import {Ownable} from "../Ownable.sol";
 import {Errors} from "../Errors.sol";
 
-contract AddressRegistry is Ownable, IAddressRegistry {
+contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     bool internal isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
@@ -64,11 +65,17 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 i++;
             }
         }
+        emit WhitelistTokens(tokens, whitelistStatus);
     }
 
     function toggleCallbackAddr(address addr, bool whitelistStatus) external {
         checkSenderAndIsInitialized();
         isWhitelistedCallbackAddr[addr] = whitelistStatus;
+        emit WhitelistAddressToggled(
+            addr,
+            whitelistStatus,
+            IEvents.EventToggleType.CALLBACK
+        );
     }
 
     function toggleCompartmentImpl(
@@ -77,11 +84,21 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     ) external {
         checkSenderAndIsInitialized();
         isWhitelistedCompartmentImpl[addr] = whitelistStatus;
+        emit WhitelistAddressToggled(
+            addr,
+            whitelistStatus,
+            IEvents.EventToggleType.COMPARTMENT
+        );
     }
 
     function toggleOracle(address addr, bool whitelistStatus) external {
         checkSenderAndIsInitialized();
         isWhitelistedOracle[addr] = whitelistStatus;
+        emit WhitelistAddressToggled(
+            addr,
+            whitelistStatus,
+            IEvents.EventToggleType.ORACLE
+        );
     }
 
     function addLenderVault(address addr) external {

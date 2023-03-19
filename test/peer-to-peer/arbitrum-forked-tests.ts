@@ -126,6 +126,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const glpStakingCompartmentImplementation = await GlpStakingCompartmentImplementation.deploy()
     await glpStakingCompartmentImplementation.deployed()
 
+    await addressRegistry.connect(team).toggleCompartmentImpl(glpStakingCompartmentImplementation.address, true)
+
     // increase borrower GLP balance
     const collTokenAddress = '0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf' // GLP
     const rewardRouterAddress = '0xB95DB5B167D75e6d04227CfFFA61069348d271F5' // GMX: Reward Router V2

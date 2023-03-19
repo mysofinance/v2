@@ -8,16 +8,31 @@ abstract contract Ownable {
     address internal _owner;
     address internal _newOwner;
 
+    event NewOwnerProposed(
+        address indexed emitter,
+        address owner,
+        address newOwner
+    );
+
+    event ClaimedOwnership(
+        address indexed emitter,
+        address owner,
+        address oldOwner
+    );
+
     function proposeNewOwner(address _newOwnerProposal) external {
         senderCheckOwner();
         _newOwner = _newOwnerProposal;
+        emit NewOwnerProposed(address(this), _owner, _newOwnerProposal);
     }
 
     function claimOwnership() external {
         if (msg.sender != _newOwner) {
             revert Errors.InvalidSender();
         }
+        address _oldOwner = _owner;
         _owner = _newOwner;
+        emit ClaimedOwnership(address(this), _owner, _oldOwner);
     }
 
     // note: needs to be explicitly overriden by inheriting contracts
