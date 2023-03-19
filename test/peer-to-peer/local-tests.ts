@@ -272,9 +272,11 @@ describe('Peer-to-Peer: Local Tests', function () {
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).toggleTokens([weth.address], true)).to.be.reverted
+    await expect(addressRegistry.connect(lender).toggleTokens([weth.address], true))
+      .to.be.revertedWithCustomError(addressRegistry,"InvalidSender")
     await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
-    await addressRegistry.connect(team).toggleTokens([ZERO_ADDRESS], true)
+    await expect(addressRegistry.connect(team).toggleTokens([ZERO_ADDRESS], true))
+      .to.be.revertedWithCustomError(addressRegistry,"InvalidAddress")
     expect(await addressRegistry.isWhitelistedToken(ZERO_ADDRESS)).to.be.false
 
     //test lenderVault check works
@@ -383,7 +385,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault,
         'AlreadySigner'
       )
-      await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'MustHaveAtLeastOneSigner')
+      await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       await lenderVault.connect(lender).setMinNumOfSigners(4)
       const minNumSigners = await lenderVault.minNumOfSigners()
       expect(minNumSigners).to.be.equal(4)

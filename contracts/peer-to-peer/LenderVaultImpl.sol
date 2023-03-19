@@ -222,8 +222,8 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
 
     function setMinNumOfSigners(uint256 _minNumOfSigners) external {
         senderCheckOwner();
-        if (_minNumOfSigners == 0) {
-            revert Errors.MustHaveAtLeastOneSigner();
+        if (_minNumOfSigners == 0 || _minNumOfSigners == minNumOfSigners) {
+            revert Errors.InvalidNewMinNumOfSigners();
         }
         minNumOfSigners = _minNumOfSigners;
         emit MinNumberOfSignersSet(_minNumOfSigners);

@@ -58,20 +58,25 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     ) external {
         checkSenderAndIsInitialized();
         for (uint i = 0; i < tokens.length; ) {
-            if (tokens[i] != address(0)) {
-                isWhitelistedToken[tokens[i]] = whitelistStatus;
+            if (tokens[i] == address(0)) {
+                revert Errors.InvalidAddress();
             }
+            isWhitelistedToken[tokens[i]] = whitelistStatus;
             unchecked {
                 i++;
             }
         }
-        emit WhitelistTokens(tokens, whitelistStatus);
+        emit WhitelistAddressToggled(
+            tokens,
+            whitelistStatus,
+            IEvents.EventToggleType.TOKEN
+        );
     }
 
     function toggleCallbackAddr(address addr, bool whitelistStatus) external {
         checkSenderAndIsInitialized();
         isWhitelistedCallbackAddr[addr] = whitelistStatus;
-        emit WhitelistAddressToggled(
+        prepareToggleEvent(
             addr,
             whitelistStatus,
             IEvents.EventToggleType.CALLBACK
@@ -84,7 +89,7 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     ) external {
         checkSenderAndIsInitialized();
         isWhitelistedCompartmentImpl[addr] = whitelistStatus;
-        emit WhitelistAddressToggled(
+        prepareToggleEvent(
             addr,
             whitelistStatus,
             IEvents.EventToggleType.COMPARTMENT
@@ -94,7 +99,7 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     function toggleOracle(address addr, bool whitelistStatus) external {
         checkSenderAndIsInitialized();
         isWhitelistedOracle[addr] = whitelistStatus;
-        emit WhitelistAddressToggled(
+        prepareToggleEvent(
             addr,
             whitelistStatus,
             IEvents.EventToggleType.ORACLE
@@ -122,6 +127,20 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
         returns (address)
     {
         return _owner;
+    }
+
+    function prepareToggleEvent(
+        address toggledAddr,
+        bool whitelistStatus,
+        IEvents.EventToggleType toggleType
+    ) internal {
+        address[] memory addressToggled = new address[](1);
+        addressToggled[0] = toggledAddr;
+        emit WhitelistAddressToggled(
+            addressToggled,
+            whitelistStatus,
+            toggleType
+        );
     }
 
     function checkSenderAndIsInitialized() internal view {

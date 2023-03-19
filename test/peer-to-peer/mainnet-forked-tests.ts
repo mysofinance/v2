@@ -145,20 +145,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
     await gohm.connect(gohmHolder).transfer(team.address, '100000000000000000000')
 
-    // prepare UniV2 Weth/Usdc balances
-    const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
-    const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
-    const uniV2WethUsdc = await ethers.getContractAt('IWETH', UNIV2_WETH_USDC_ADDRESS)
-    await ethers.provider.send('hardhat_setBalance', [UNIV2_WETH_USDC_HOLDER, '0x56BC75E2D63100000'])
-    await hre.network.provider.request({
-      method: 'hardhat_impersonateAccount',
-      params: [UNIV2_WETH_USDC_HOLDER]
-    })
-
-    const univ2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
-
-    await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
-
     const wbtc = '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'
     const btcToUSDChainlinkAddr = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c'
     const wBTCToBTCChainlinkAddr = '0xfdfd9c85ad200c506cf9e21f1fd8dd01932fbb23'
@@ -187,7 +173,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       paxg,
       ldo,
       gohm,
-      uniV2WethUsdc,
       wbtc,
       btcToUSDChainlinkAddr,
       wBTCToBTCChainlinkAddr,
@@ -1279,11 +1264,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
           : BigNumber.from(0)
 
+        // too large target repay amount should fail
         await expect(
           borrowerGateway.connect(borrower).repay(
             {
               targetLoanId: loanId,
-              targetRepayAmount: partialRepayAmount.mul(10),
+              targetRepayAmount: MAX_UINT128,
               expectedTransferFee: 0
             },
             lenderVault.address,
@@ -2861,7 +2847,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrower,
         usdc,
         weth,
-        uniV2WethUsdc,
         team,
         lenderVault,
         addressRegistry,
@@ -2869,6 +2854,20 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         btcToUSDChainlinkAddr,
         wBTCToBTCChainlinkAddr
       } = await setupTest()
+
+      // prepare UniV2 Weth/Usdc balances
+    const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+    const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
+    const uniV2WethUsdc = await ethers.getContractAt('IWETH', UNIV2_WETH_USDC_ADDRESS)
+    await ethers.provider.send('hardhat_setBalance', [UNIV2_WETH_USDC_HOLDER, '0x56BC75E2D63100000'])
+    await hre.network.provider.request({
+      method: 'hardhat_impersonateAccount',
+      params: [UNIV2_WETH_USDC_HOLDER]
+    })
+
+    const univ2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
+
+    await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'

@@ -8,7 +8,8 @@ interface IEvents {
     enum EventToggleType {
         CALLBACK,
         COMPARTMENT,
-        ORACLE
+        ORACLE,
+        TOKEN
     }
 
     event AddedSigners(address[] _signers);
@@ -67,10 +68,8 @@ interface IEvents {
         bytes32 offChainQuoteHash
     );
 
-    event WhitelistTokens(address[] tokenAddrs, bool whitelistStatus);
-
     event WhitelistAddressToggled(
-        address indexed addressToggled,
+        address[] indexed addressToggled,
         bool whitelistStatus,
         EventToggleType toggleType
     );

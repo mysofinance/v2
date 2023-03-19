@@ -32,11 +32,12 @@ library DataTypes {
         // loan amount per one unit of collateral if no oracle
         // LTV in terms of the constant BASE (10 ** 18) if using oracle
         uint256 loanPerCollUnitOrLtv;
-        // interest rate percentage in BASE (can be negative!)
+        // interest rate percentage in BASE (can be negative but not smaller than -BASE (=-100%))
+        // also interestRatePCTInBase is not annualized
         int256 interestRatePctInBase;
         // fee percentage,in BASE, which will be paid in upfront in collateral
         uint256 upfrontFeePctInBase;
-        // length of the loan
+        // length of the loan in seconds
         uint256 tenor;
     }
 
@@ -49,14 +50,14 @@ library DataTypes {
         address loanToken;
         // address of oracle (optional)
         address oracleAddr;
-        // min loan amount prevent griefing attacks or
+        // min loan amount (in loan token) prevent griefing attacks or
         // amounts lender feels isn't worth unlocking on default
         uint256 minLoan;
-        // max loan amount if lender wants a cap
+        // max loan amount (in loan token) if lender wants a cap
         uint256 maxLoan;
         // timestamp after which quote automatically invalidates
         uint256 validUntil;
-        // time that loan cannot be exercised
+        // time, in seconds, that loan cannot be exercised
         uint256 earliestRepayTenor;
         // address of compartment implementation (optional)
         address borrowerCompartmentImplementation;
@@ -70,18 +71,20 @@ library DataTypes {
         GeneralQuoteInfo generalQuoteInfo;
         // array of quote parameters
         QuoteTuple[] quoteTuples;
-        // provides more distinguishabilty of quotes
+        // provides more distinguishability of quotes to reduce
+        // likelihood of collisions w.r.t. quote creations and invalidations
         bytes32 salt;
     }
 
     struct OffChainQuote {
         // general quote info
         GeneralQuoteInfo generalQuoteInfo;
-        // root of the merkle tree
+        // root of the merkle tree, where the merkle tree encodes all QuoteTuples the lender accepts
         bytes32 quoteTuplesRoot;
-        // provides more distinguishabilty of quotes
+        // provides more distinguishability of quotes to reduce
+        // likelihood of collisions w.r.t. quote creations and invalidations
         bytes32 salt;
-        // nonce allows for mass lender invalidation
+        // for invalidating multiple parallel quotes in one click
         uint256 nonce;
         // chain id to prevent replay attacks
         uint256 chainId;
@@ -94,9 +97,10 @@ library DataTypes {
     struct LoanRepayInstructions {
         // loan id being repaid
         uint256 targetLoanId;
-        // repay amount after transfer fees
+        // repay amount after transfer fees in loan token
         uint128 targetRepayAmount;
-        // expected transfer fees in loan token
+        // expected transfer fees in loan token (=0 for tokens without transfer fee)
+        // note: amount that borrower sends is targetRepayAmount + expectedTransferFee
         uint128 expectedTransferFee;
     }
 
