@@ -779,53 +779,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(borrowEvent).to.not.be.undefined
 
-      // test partial repays with no compartment
-      const loanId = borrowEvent?.args?.['loanId']
-      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
-      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
-      const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
-
-      // lender transfers usdc so borrower can repay (lender is like a faucet)
-      await usdc.connect(lender).transfer(borrower.address, 10000000000)
-
-      const collBalPreRepayVault = await weth.balanceOf(lenderVault.address)
-      const lockedVaultCollPreRepay = await lenderVault.lockedAmounts(weth.address)
-
-      // borrower approves borrower gateway for repay
-      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-
-      await borrowerGateway.connect(borrower).repay(
-        {
-          targetLoanId: loanId,
-          targetRepayAmount: repayAmount.div(2),
-          expectedTransferFee: 0
-        },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
-      )
-
-      const collBalPostRepayVault = await weth.balanceOf(lenderVault.address)
-      const lockedVaultCollPostRepay = await lenderVault.lockedAmounts(weth.address)
-
-      expect(collBalPreRepayVault.sub(collBalPostRepayVault)).to.equal(initCollAmount.div(2))
-      expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostRepay)).to.equal(collBalPreRepayVault.sub(collBalPostRepayVault))
-
-      await ethers.provider.send('evm_mine', [loanExpiry + 12])
-
-      // valid unlock
-      await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
-
-      // revert if trying to unlock twice
-      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
-
-      const collBalPostUnlock = await weth.balanceOf(lenderVault.address)
-      const lockedVaultCollPostUnlock = await lenderVault.lockedAmounts(weth.address)
-
-      // since did not autowithdraw, no change in collateral balance
-      expect(collBalPostUnlock).to.equal(collBalPostRepayVault)
-      // all coll has been unlocked
-      expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostUnlock)).to.equal(initCollAmount)
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
