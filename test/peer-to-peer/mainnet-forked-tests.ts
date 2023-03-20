@@ -81,7 +81,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
     // create a vault
     await lenderVaultFactory.connect(lender).createVault()
-    const lenderVaultAddr = await addressRegistry.registeredVaults(0)
+    const lenderVaultAddrs = await addressRegistry.registeredVaults()
+    const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
 
     // prepare USDC balances
@@ -812,7 +813,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
+      // valid unlock
       await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
+
+      // revert if trying to unlock twice
+      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
 
       const collBalPostUnlock = await weth.balanceOf(lenderVault.address)
       const lockedVaultCollPostUnlock = await lenderVault.lockedAmounts(weth.address)

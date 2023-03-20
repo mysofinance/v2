@@ -33,6 +33,7 @@ interface IEvents {
         address indexed vaultAddr,
         address indexed borrower,
         DataTypes.Loan loan,
+        uint256 upfrontFee,
         uint256 loanId,
         address callbackAddr,
         bytes callbackData

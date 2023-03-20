@@ -59,7 +59,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
 
     // create a vault
     await lenderVaultFactory.connect(lender).createVault()
-    const lenderVaultAddr = await addressRegistry.registeredVaults(0)
+    const lenderVaultAddrs = await addressRegistry.registeredVaults()
+    const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
 
     // prepare USDC balances

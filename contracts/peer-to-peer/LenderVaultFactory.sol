@@ -19,7 +19,8 @@ contract LenderVaultFactory is IEvents, ILenderVaultFactory {
 
     function createVault() external returns (address newLenderVaultAddr) {
         uint256 numRegisteredVaults = IAddressRegistry(addressRegistry)
-            .registeredVaultLength();
+            .registeredVaults()
+            .length;
         bytes32 salt = keccak256(
             abi.encodePacked(lenderVaultImpl, msg.sender, numRegisteredVaults)
         );
