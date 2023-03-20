@@ -97,8 +97,6 @@ The following DeFi integrations are incorporated:
 ## Documentation
 Documentation of the v1 repo can be found in [docs](/docs) and in the [whitepaper](https://figshare.com/articles/preprint/MYSO_v1_Core_A_Trust-Minimized_Protocol_for_Zero-Liquidation_Loans/21581328).
 
-Todo:v1.2 doc links
-
 ## Test Files
 ```
 test
@@ -126,12 +124,12 @@ File                                                     |  % Stmts | % Branch |
   Constants.sol                                          |      100 |      100 |      100 |      100 |                |
   Errors.sol                                             |      100 |      100 |      100 |      100 |                |
   Ownable.sol                                            |      100 |      100 |      100 |      100 |                |
- contracts\peer-to-peer\                                 |    99.09 |    90.45 |      100 |    96.23 |                |
-  AddressRegistry.sol                                    |      100 |    91.67 |      100 |    95.45 |        114,117 |
-  BorrowerGateway.sol                                    |      100 |    88.89 |      100 |    98.48 |            242 |
+ contracts\peer-to-peer\                                 |     99.1 |     94.5 |      100 |    97.57 |                |
+  AddressRegistry.sol                                    |      100 |      100 |      100 |      100 |                |
+  BorrowerGateway.sol                                    |      100 |    88.89 |      100 |    98.48 |            244 |
   DataTypes.sol                                          |      100 |      100 |      100 |      100 |                |
   LenderVaultFactory.sol                                 |      100 |      100 |      100 |      100 |                |
-  LenderVaultImpl.sol                                    |      100 |    82.86 |      100 |    93.89 |... 357,379,388 |
+  LenderVaultImpl.sol                                    |      100 |    93.06 |      100 |    96.24 |... 360,382,391 |
   QuoteHandler.sol                                       |     97.4 |    96.67 |      100 |    97.56 |    241,245,283 |
  contracts\peer-to-peer\callbacks\                       |      100 |      100 |      100 |      100 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
@@ -164,8 +162,8 @@ File                                                     |  % Stmts | % Branch |
   AggregatorV3Interface.sol                              |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\oracles\                         |    88.24 |    56.67 |       75 |       75 |                |
   BaseOracle.sol                                         |    88.24 |    56.67 |       75 |       75 |... 109,112,127 |
- contracts\peer-to-peer\oracles\chainlink\               |    95.74 |    40.91 |      100 |    76.92 |                |
-  ChainlinkBasic.sol                                     |      100 |       50 |      100 |    91.67 |             45 |
+ contracts\peer-to-peer\oracles\chainlink\               |    95.74 |    43.18 |      100 |    78.02 |                |
+  ChainlinkBasic.sol                                     |      100 |      100 |      100 |      100 |                |
   OlympusOracle.sol                                      |      100 |       50 |      100 |    78.95 |    46,55,84,85 |
   UniV2Chainlink.sol                                     |    93.75 |    38.24 |      100 |    73.33 |... 169,201,235 |
  contracts\peer-to-pool\                                 |      100 |    96.27 |      100 |    98.88 |                |
@@ -185,6 +183,6 @@ File                                                     |  % Stmts | % Branch |
   MyERC20.sol                                            |      100 |      100 |      100 |      100 |                |
   MyMaliciousERC20.sol                                   |    71.43 |      100 |       50 |       80 |          28,45 |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |     96.9 |    85.65 |    96.18 |    93.33 |                |
+All files                                                |     96.9 |    87.71 |    96.21 |    93.99 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```

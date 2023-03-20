@@ -567,6 +567,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
+      // borrower executes valid off chain quote
       await borrowerGateway
         .connect(borrower)
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
@@ -589,6 +590,55 @@ describe('Peer-to-Peer: Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidBorrower')
+    })
+
+    it('Should handle off-chain quote nonce correctly', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender produces quote
+      const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        borrower,
+        weth,
+        usdc
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 0
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // borrower executes valid off chain quote
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+
+      // lender increments off chain quote nonce to invalidate older quotes
+      await quoteHandler.connect(lender).incrementOffChainQuoteNonce(lenderVault.address)
+
+      // reverts if nonce is outdated
+      await expect(borrowerGateway
+      .connect(borrower)
+      .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
@@ -628,6 +678,10 @@ describe('Peer-to-Peer: Local Tests', function () {
         callbackData
       }
 
+      // move forward past valid until timestamp
+      await ethers.provider.send('evm_mine', [Number(offChainQuote.generalQuoteInfo.validUntil.toString()) + 1])
+
+      // reverts if trying to borrow with outdated quote
       await expect(
         borrowerGateway
           .connect(borrower)
