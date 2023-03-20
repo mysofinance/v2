@@ -232,6 +232,9 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
     function addSigners(address[] calldata _signers) external {
         senderCheckOwner();
         for (uint256 i = 0; i < _signers.length; ) {
+            if (_signers[i] == address(0)) {
+                revert Errors.InvalidAddress();
+            }
             if (isSigner[_signers[i]]) {
                 revert Errors.AlreadySigner();
             }
