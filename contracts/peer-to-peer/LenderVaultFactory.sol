@@ -18,7 +18,11 @@ contract LenderVaultFactory is IEvents, ILenderVaultFactory {
     }
 
     function createVault() external returns (address newLenderVaultAddr) {
-        bytes32 salt = keccak256(abi.encodePacked(lenderVaultImpl, msg.sender));
+        uint256 numRegisteredVaults = IAddressRegistry(addressRegistry)
+            .registeredVaultLength();
+        bytes32 salt = keccak256(
+            abi.encodePacked(lenderVaultImpl, msg.sender, numRegisteredVaults)
+        );
         newLenderVaultAddr = Clones.cloneDeterministic(lenderVaultImpl, salt);
         ILenderVaultImpl(newLenderVaultAddr).initialize(
             msg.sender,

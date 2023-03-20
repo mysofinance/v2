@@ -107,14 +107,9 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     }
 
     function addLenderVault(address addr) external {
+        // catches case where address registry is uninitialized (lenderVaultFactory == 0)
         if (msg.sender != lenderVaultFactory) {
             revert Errors.InvalidSender();
-        }
-        if (!isInitialized) {
-            revert Errors.Uninitialized();
-        }
-        if (isRegisteredVault[addr]) {
-            revert Errors.AlreadyRegisteredVault();
         }
         isRegisteredVault[addr] = true;
         registeredVaults.push(addr);
@@ -127,6 +122,10 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
         returns (address)
     {
         return _owner;
+    }
+
+    function registeredVaultLength() external view returns (uint256) {
+        return registeredVaults.length;
     }
 
     function prepareToggleEvent(

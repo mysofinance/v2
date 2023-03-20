@@ -77,5 +77,7 @@ interface IAddressRegistry {
         address oracleAddr
     ) external view returns (bool);
 
+    function registeredVaultLength() external view returns (uint256);
+
     function owner() external view returns (address);
 }

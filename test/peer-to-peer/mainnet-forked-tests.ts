@@ -777,6 +777,50 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       expect(borrowEvent).to.not.be.undefined
+
+      // test partial repays with no compartment
+      const loanId = borrowEvent?.args?.['loanId']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+
+      // lender transfers usdc so borrower can repay (lender is like a faucet)
+      await usdc.connect(lender).transfer(borrower.address, 10000000000)
+
+      const collBalPreRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPreRepay = await lenderVault.lockedAmounts(weth.address)
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.div(2),
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
+      )
+
+      const collBalPostRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostRepay = await lenderVault.lockedAmounts(weth.address)
+
+      expect(collBalPreRepayVault.sub(collBalPostRepayVault)).to.equal(initCollAmount.div(2))
+      expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostRepay)).to.equal(collBalPreRepayVault.sub(collBalPostRepayVault))
+
+      await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
+
+      const collBalPostUnlock = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostUnlock = await lenderVault.lockedAmounts(weth.address)
+
+      // since did not autowithdraw, no change in collateral balance
+      expect(collBalPostUnlock).to.equal(collBalPostRepayVault)
+      // all coll has been unlocked
+      expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostUnlock)).to.equal(initCollAmount)
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
@@ -1374,7 +1418,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(lenderVaultCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVPostReward)
         if (compartmentRewardTokenBalancePost.gt(0) && lenderVaultRewardTokenBalancePostUnlock.gt(0)) {
           expect(compartmentRewardTokenBalancePostUnlock).to.be.equal(0)
-          /**todo: write check on partial repay reward to vault */
         }
       }
 
@@ -2296,6 +2339,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         paxg,
         weth,
         wbtc,
+        ldo,
         btcToUSDChainlinkAddr,
         wBTCToBTCChainlinkAddr,
         team,
@@ -2386,11 +2430,28 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      let badOnChainQuoteAddrNotInOracle = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: ldo.address,
+          loanToken: usdc.address,
+          oracleAddr: chainlinkBasicImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address, ldo.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
       )
+      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, badOnChainQuoteAddrNotInOracle)
 
       // check balance pre borrow
       const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
@@ -2440,6 +2501,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badOnChainQuoteAddrNotInOracle, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(chainlinkBasicImplementation, 'InvalidOraclePair')
 
       await expect(
         borrowerGateway
