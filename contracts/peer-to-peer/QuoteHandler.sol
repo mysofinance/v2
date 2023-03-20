@@ -168,7 +168,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             offChainQuote.generalQuoteInfo
         );
         if (
-            offChainQuote.nonce > offChainQuoteNonce[lenderVault] ||
+            offChainQuote.nonce < offChainQuoteNonce[lenderVault] ||
             offChainQuote.generalQuoteInfo.validUntil < block.timestamp
         ) {
             revert Errors.InvalidQuote();

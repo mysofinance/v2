@@ -81,7 +81,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
     // create a vault
     await lenderVaultFactory.connect(lender).createVault()
-    const lenderVaultAddr = await addressRegistry.registeredVaults(0)
+    const lenderVaultAddrs = await addressRegistry.registeredVaults()
+    const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
 
     // prepare USDC balances
@@ -777,6 +778,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       expect(borrowEvent).to.not.be.undefined
+
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
@@ -1374,7 +1376,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(lenderVaultCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVPostReward)
         if (compartmentRewardTokenBalancePost.gt(0) && lenderVaultRewardTokenBalancePostUnlock.gt(0)) {
           expect(compartmentRewardTokenBalancePostUnlock).to.be.equal(0)
-          /**todo: write check on partial repay reward to vault */
         }
       }
 
@@ -2296,6 +2297,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         paxg,
         weth,
         wbtc,
+        ldo,
         btcToUSDChainlinkAddr,
         wBTCToBTCChainlinkAddr,
         team,
@@ -2386,11 +2388,28 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      let badOnChainQuoteAddrNotInOracle = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: ldo.address,
+          loanToken: usdc.address,
+          oracleAddr: chainlinkBasicImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address, ldo.address], true)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
       )
+      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, badOnChainQuoteAddrNotInOracle)
 
       // check balance pre borrow
       const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
@@ -2440,6 +2459,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badOnChainQuoteAddrNotInOracle, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(chainlinkBasicImplementation, 'InvalidOraclePair')
 
       await expect(
         borrowerGateway

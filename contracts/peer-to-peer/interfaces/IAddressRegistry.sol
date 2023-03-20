@@ -57,25 +57,75 @@ interface IAddressRegistry {
      */
     function toggleOracle(address addr, bool whitelistStatus) external;
 
+    /**
+     * @notice Returns the address of the vault factory
+     * @return Address of the vault factory contract
+     */
     function lenderVaultFactory() external view returns (address);
 
+    /**
+     * @notice Returns the address of the borrower gateway
+     * @return Address of the borrower gateway contract
+     */
     function borrowerGateway() external view returns (address);
 
+    /**
+     * @notice Returns the address of the quote handler
+     * @return Address of the quote handler contract
+     */
     function quoteHandler() external view returns (address);
 
+    /**
+     * @notice Returns boolean flag indicating whether given address is a registered vault
+     * @param addr Address to check if it is a registered vault
+     * @return Boolean flag indicating whether given address is a registered vault
+     */
     function isRegisteredVault(address addr) external view returns (bool);
 
+    /**
+     * @notice Returns boolean flag indicating whether given address is a whitelisted token
+     * @param addr Address to check if it is a whitelisted token
+     * @return Boolean flag indicating whether given address is a whitelisted token
+     */
     function isWhitelistedToken(address addr) external view returns (bool);
 
+    /**
+     * @notice Returns boolean flag indicating whether given address is a whitelisted callback contract
+     * @param addr Address to check if it is a whitelisted callback contract
+     * @return Boolean flag indicating whether given address is a whitelisted callback contract
+     */
     function isWhitelistedCallbackAddr(
         address addr
     ) external view returns (bool);
 
-    function isWhitelistedCompartmentImpl(address) external view returns (bool);
-
-    function isWhitelistedOracle(
-        address oracleAddr
+    /**
+     * @notice Returns boolean flag indicating whether given address is a whitelisted compartment implementation contract
+     * @param addr Address to check if it is a whitelisted compartment implementation contract
+     * @return Boolean flag indicating whether given address is a whitelisted compartment implementation contract
+     */
+    function isWhitelistedCompartmentImpl(
+        address addr
     ) external view returns (bool);
 
+    /**
+     * @notice Returns boolean flag indicating whether given address is a whitelisted oracle contract
+     * @param addr Address to check if it is a whitelisted oracle contract
+     * @return Boolean flag indicating whether given address is a whitelisted oracle contract
+     */
+    function isWhitelistedOracle(address addr) external view returns (bool);
+
+    /**
+     * @notice Returns an array of registered vault addresses
+     * @return vaultAddrs The array of registered vault addresses
+     */
+    function registeredVaults()
+        external
+        view
+        returns (address[] memory vaultAddrs);
+
+    /**
+     * @notice Returns address of the owner
+     * @return Address of the owner
+     */
     function owner() external view returns (address);
 }

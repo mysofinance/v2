@@ -101,7 +101,8 @@ async function generateOffChainQuote({
   usdc,
   offChainQuoteBodyInfo = {},
   generalQuoteInfo = {},
-  customSignature = {}
+  customSignature = {},
+  earliestRepayTenor = 0
 }: {
   lenderVault: LenderVaultImpl
   lender: SignerWithAddress
@@ -111,6 +112,7 @@ async function generateOffChainQuote({
   offChainQuoteBodyInfo?: any
   generalQuoteInfo?: any
   customSignature?: any
+  earliestRepayTenor?: any
 }) {
   // lenderVault owner gives quote
   const blocknum = await ethers.provider.getBlockNumber()
@@ -145,7 +147,7 @@ async function generateOffChainQuote({
       minLoan: ONE_USDC.mul(1000),
       maxLoan: MAX_UINT256,
       validUntil: timestamp + 60,
-      earliestRepayTenor: 0,
+      earliestRepayTenor: earliestRepayTenor,
       borrowerCompartmentImplementation: ZERO_ADDRESS,
       isSingleUse: false,
       ...generalQuoteInfo
@@ -257,7 +259,8 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // create a vault
     await lenderVaultFactory.connect(lender).createVault()
-    const lenderVaultAddr = await addressRegistry.registeredVaults(0)
+    const lenderVaultAddrs = await addressRegistry.registeredVaults()
+    const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
     
     // reverts if trying to initialize base contract
@@ -373,10 +376,67 @@ describe('Peer-to-Peer: Local Tests', function () {
 
   describe('Borrow Gateway', function () {
     it('Should not proccess with bigger fee than max fee', async function () {
-      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
-      await expect(borrowerGateway.connect(lender).setNewProtocolFee(0)).to.be.reverted
-      await expect(borrowerGateway.connect(team).setNewProtocolFee(BASE)).to.be.reverted
+      await expect(borrowerGateway.connect(lender).setNewProtocolFee(0)).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSender')
+      await expect(borrowerGateway.connect(team).setNewProtocolFee(BASE)).to.be.revertedWithCustomError(borrowerGateway, 'InvalidFee')
+
+      // set max protocol fee p.a.
+      await borrowerGateway.connect(team).setNewProtocolFee(BASE.mul(5).div(100))
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote with very long tenor, which leads to protocol fee being larger than pledge
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false
+        },
+        quoteTuples: [{
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(365).mul(20)
+        }],
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // reverts if trying to borrow with quote where protocol fee would exceed pledge amount
+      await expect(borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
     })
   })
 
@@ -392,8 +452,13 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault,
         'AlreadySigner'
       )
+      await expect(lenderVault.addSigners([ZERO_ADDRESS])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
       await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       await lenderVault.connect(lender).setMinNumOfSigners(4)
+      await expect(lenderVault.setMinNumOfSigners(4)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       const minNumSigners = await lenderVault.minNumOfSigners()
       expect(minNumSigners).to.be.equal(4)
       await lenderVault.connect(lender).setMinNumOfSigners(1)
@@ -502,6 +567,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
+      // borrower executes valid off chain quote
       await borrowerGateway
         .connect(borrower)
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
@@ -524,6 +590,55 @@ describe('Peer-to-Peer: Local Tests', function () {
           .connect(team)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidBorrower')
+    })
+
+    it('Should handle off-chain quote nonce correctly', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender produces quote
+      const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        borrower,
+        weth,
+        usdc
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 0
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // borrower executes valid off chain quote
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+
+      // lender increments off chain quote nonce to invalidate older quotes
+      await quoteHandler.connect(lender).incrementOffChainQuoteNonce(lenderVault.address)
+
+      // reverts if nonce is outdated
+      await expect(borrowerGateway
+      .connect(borrower)
+      .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
@@ -563,6 +678,10 @@ describe('Peer-to-Peer: Local Tests', function () {
         callbackData
       }
 
+      // move forward past valid until timestamp
+      await ethers.provider.send('evm_mine', [Number(offChainQuote.generalQuoteInfo.validUntil.toString()) + 1])
+
+      // reverts if trying to borrow with outdated quote
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -668,6 +787,53 @@ describe('Peer-to-Peer: Local Tests', function () {
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'OffChainQuoteHasBeenInvalidated')
+    })
+
+    it('Should validate off-chain earliest repay correctly', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // generate offchain quote where earliest repay is after loan expiry/tenor
+      const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        borrower,
+        weth,
+        usdc,
+        generalQuoteInfo: {
+          isSingleUse: true
+        },
+        earliestRepayTenor: ONE_DAY.mul(360)
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 0
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // reverts if trying to borrow with offchain quote that would lead to a loan that cannot be repaid as earliest repay is after expiry
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(lenderVault, 'ExpiresBeforeRepayAllowed')
     })
 
     it('Should validate off-chain MerkleProof correctly', async function () {
@@ -818,7 +984,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           minLoan: ONE_USDC.mul(1000),
           maxLoan: MAX_UINT256,
           validUntil: timestamp + 60,
-          earliestRepayTenor: 0,
+          earliestRepayTenor: ONE_DAY,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
           isSingleUse: false
         },
@@ -863,6 +1029,20 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+
+      // revert if trying to repay before earliest repay
+      const loanId = 0
+      const loanInfo = await lenderVault.loan(loanId)
+      await expect(borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: loanInfo.initRepayAmount,
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
+      )).to.be.revertedWithCustomError(lenderVault, 'OutsideValidRepayWindow')
     })
 
     it('Should process on-chain single use quote correctly', async function () {
@@ -896,9 +1076,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
           minLoan: ONE_USDC.mul(1000),
-          maxLoan: MAX_UINT256,
+          maxLoan: ONE_USDC.mul(2000),
           validUntil: timestamp + 60,
-          earliestRepayTenor: 0,
+          earliestRepayTenor: ONE_DAY.mul(360),
           borrowerCompartmentImplementation: ZERO_ADDRESS,
           isSingleUse: true
         },
@@ -906,6 +1086,16 @@ describe('Peer-to-Peer: Local Tests', function () {
         salt: ZERO_BYTES32
       }
 
+      // reverts if trying to add quote where earliest repay is after loan expiry
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'InvalidQuote'
+      )
+
+      // set earliest repay back to value that is consistent with tenors
+      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+
+      // add valid onchain quote
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -974,10 +1164,29 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       onChainQuote.generalQuoteInfo.collToken = weth.address
 
-      borrowerGateway
+      // revert if coll send amount would result in loan larger than lender specified max loan amount
+      borrowInstructions.collSendAmount = ONE_WETH.mul(10)
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidSendAmount')
+
+      // update coll send amount back to smaller valid amount
+      borrowInstructions.collSendAmount = ONE_WETH
+
+      // execute valid borrow
+      await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
 
+      // retrieve valid loan info
+      const loan = await lenderVault.loan(0)
+
+      // revert if trying to retrieve non-existent loan
+      await expect(lenderVault.loan(1)).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
+
+      // revert if trying to execute same single-use quote again
       await expect(
         borrowerGateway
           .connect(borrower)

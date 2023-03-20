@@ -73,6 +73,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             lenderVault,
             loan.borrower,
             loan,
+            upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData
@@ -134,6 +135,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             lenderVault,
             loan.borrower,
             loan,
+            upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData

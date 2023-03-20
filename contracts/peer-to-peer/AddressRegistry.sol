@@ -17,7 +17,7 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     mapping(address => bool) public isWhitelistedCallbackAddr;
     mapping(address => bool) public isWhitelistedCompartmentImpl;
     mapping(address => bool) public isWhitelistedOracle;
-    address[] public registeredVaults;
+    address[] internal _registeredVaults;
 
     constructor() {
         _owner = msg.sender;
@@ -107,17 +107,16 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
     }
 
     function addLenderVault(address addr) external {
+        // catches case where address registry is uninitialized (lenderVaultFactory == address(0))
         if (msg.sender != lenderVaultFactory) {
             revert Errors.InvalidSender();
         }
-        if (!isInitialized) {
-            revert Errors.Uninitialized();
-        }
-        if (isRegisteredVault[addr]) {
-            revert Errors.AlreadyRegisteredVault();
-        }
         isRegisteredVault[addr] = true;
-        registeredVaults.push(addr);
+        _registeredVaults.push(addr);
+    }
+
+    function registeredVaults() external view returns (address[] memory) {
+        return _registeredVaults;
     }
 
     function owner()
