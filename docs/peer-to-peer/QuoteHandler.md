@@ -397,6 +397,25 @@ event OnChainQuoteInvalidated(address lenderVault, bytes32 onChainQuoteHash)
 | lenderVault  | address | undefined |
 | onChainQuoteHash  | bytes32 | undefined |
 
+### QuoteProcessed
+
+```solidity
+event QuoteProcessed(address borrower, DataTypes.Loan loan, uint256 loanId, address collReceiver)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| borrower  | address | undefined |
+| loan  | DataTypes.Loan | undefined |
+| loanId  | uint256 | undefined |
+| collReceiver  | address | undefined |
+
 ### RemovedSigner
 
 ```solidity
@@ -450,6 +469,23 @@ event WhitelistAddressToggled(address[] indexed addressToggled, bool whitelistSt
 | addressToggled `indexed` | address[] | undefined |
 | whitelistStatus  | bool | undefined |
 | toggleType  | enum IEvents.EventToggleType | undefined |
+
+### Withdraw
+
+```solidity
+event Withdraw(address indexed tokenAddr, uint256 withdrawAmount)
+```
+
+
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| tokenAddr `indexed` | address | undefined |
+| withdrawAmount  | uint256 | undefined |
 
 
 

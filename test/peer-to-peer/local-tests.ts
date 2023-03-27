@@ -87,6 +87,11 @@ const payloanScheme = [
     type: 'uint256'
   },
   {
+    internalType: 'address',
+    name: 'vaultAddr',
+    type: 'address'
+  },
+  {
     internalType: 'uint256',
     name: 'chainId',
     type: 'uint256'
@@ -155,7 +160,6 @@ async function generateOffChainQuote({
     quoteTuplesRoot: quoteTuplesRoot,
     salt: ZERO_BYTES32,
     nonce: 0,
-    chainId: chainId,
     v: [0],
     r: [ZERO_BYTES32],
     s: [ZERO_BYTES32],
@@ -167,7 +171,8 @@ async function generateOffChainQuote({
     offChainQuote.quoteTuplesRoot,
     offChainQuote.salt,
     offChainQuote.nonce,
-    offChainQuote.chainId
+    lenderVault.address,
+    chainId
   ])
 
   const payloadHash = ethers.utils.keccak256(payload)
@@ -1093,7 +1098,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
 
       // set earliest repay back to value that is consistent with tenors
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+      onChainQuote.generalQuoteInfo.earliestRepayTenor = ethers.BigNumber.from(0)
 
       // add valid onchain quote
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
