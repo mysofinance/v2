@@ -16,7 +16,7 @@ abstract contract BaseOracle {
     // tokenAddr => chainlink oracle addr
     // oracles will be eth or usd based
     mapping(address => address) public oracleAddrs;
-    bool public isUSDBased;
+    bool public immutable isUSDBased;
 
     constructor(
         address[] memory _tokenAddrs,
@@ -86,13 +86,23 @@ abstract contract BaseOracle {
         } else if (oracleAddr == wBTCAddrOfGivenChain) {
             answer = getBTCPrice();
         } else {
-            (, answer, , , ) = AggregatorV3Interface(oracleAddr)
-                .latestRoundData();
+            // compiler will complain if only answer has no identifier, so use oracleAnswer var
+            (
+                uint80 roundId,
+                int256 oracleAnswer,
+                ,
+                uint256 updatedAt,
+                uint80 answeredInRound
+            ) = AggregatorV3Interface(oracleAddr).latestRoundData();
+            checkChainlinkAnswer(
+                roundId,
+                oracleAnswer,
+                updatedAt,
+                answeredInRound
+            );
+            answer = oracleAnswer;
         }
         tokenPriceRaw = uint256(answer);
-        if (tokenPriceRaw < 1) {
-            revert Errors.InvalidOracleAnswer();
-        }
     }
 
     /**
@@ -103,13 +113,31 @@ abstract contract BaseOracle {
      * @return answer price of wbtch in USD which has 8 oracle decimals
      */
     function getBTCPrice() internal view returns (int256 answer) {
-        (, int256 BTCUSDAnswer, , , ) = AggregatorV3Interface(
-            btcToUSDOracleAddrOfGivenChain
-        ).latestRoundData();
-        (, int256 wBTCBTCAnswer, , , ) = AggregatorV3Interface(
-            wBTCToBTCOracleAddrOfGivenChain
-        ).latestRoundData();
-        answer = (wBTCBTCAnswer * BTCUSDAnswer) / (10 ** 8);
+        (
+            uint80 roundId,
+            int256 btcUSDAnswer,
+            ,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = AggregatorV3Interface(btcToUSDOracleAddrOfGivenChain)
+                .latestRoundData();
+        checkChainlinkAnswer(roundId, btcUSDAnswer, updatedAt, answeredInRound);
+        int256 wBTCBTCAnswer;
+        (
+            roundId,
+            wBTCBTCAnswer,
+            ,
+            updatedAt,
+            answeredInRound
+        ) = AggregatorV3Interface(wBTCToBTCOracleAddrOfGivenChain)
+            .latestRoundData();
+        checkChainlinkAnswer(
+            roundId,
+            wBTCBTCAnswer,
+            updatedAt,
+            answeredInRound
+        );
+        answer = (wBTCBTCAnswer * btcUSDAnswer) / (10 ** 8);
     }
 
     /**
@@ -125,6 +153,24 @@ abstract contract BaseOracle {
                 collToken == wBTCAddrOfGivenChain) && !isUSDBased
         ) {
             revert Errors.InvalidBTCOracle();
+        }
+    }
+
+    /**
+     * @dev helper function to check if oracle price is valid
+     * @param roundId round id of latest round
+     * @param answer answer of latest round
+     * @param updatedAt timestamp of latest round
+     * @param answeredInRound round id last answered
+     */
+    function checkChainlinkAnswer(
+        uint80 roundId,
+        int256 answer,
+        uint256 updatedAt,
+        uint80 answeredInRound
+    ) internal pure {
+        if (updatedAt == 0 || answeredInRound < roundId || answer < 1) {
+            revert Errors.InvalidOracleAnswer();
         }
     }
 }
