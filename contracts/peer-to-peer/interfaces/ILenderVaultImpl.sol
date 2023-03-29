@@ -165,11 +165,15 @@ interface ILenderVaultImpl {
     /**
      * @notice function to return unlocked token balances
      * @param tokens array of token addresses
-     * @return balances the unlocked token balances of the tokens
+     * @return balances the vault balances of the token addresses
+     * @return _lockedAmounts the vault locked amounts of the token addresses
      */
-    function getUnlockedTokenBalances(
+    function getTokenBalancesAndLockedAmounts(
         address[] memory tokens
-    ) external view returns (uint256[] memory balances);
+    )
+        external
+        view
+        returns (uint256[] memory balances, uint256[] memory _lockedAmounts);
 
     /**
      * @notice function to return address of registry

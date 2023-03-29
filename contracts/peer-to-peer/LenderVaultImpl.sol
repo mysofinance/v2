@@ -306,13 +306,18 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         return _owner;
     }
 
-    function getUnlockedTokenBalances(
+    function getTokenBalancesAndLockedAmounts(
         address[] memory tokens
-    ) external view returns (uint256[] memory balances) {
+    )
+        external
+        view
+        returns (uint256[] memory balances, uint256[] memory _lockedAmounts)
+    {
         if (tokens.length == 0) {
             revert Errors.InvalidArrayLength();
         }
         balances = new uint256[](tokens.length);
+        _lockedAmounts = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
             if (
                 tokens[i] == address(0) ||
@@ -320,9 +325,8 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
             ) {
                 revert Errors.InvalidAddress();
             }
-            balances[i] =
-                IERC20Metadata(tokens[i]).balanceOf(address(this)) -
-                lockedAmounts[tokens[i]];
+            balances[i] = IERC20Metadata(tokens[i]).balanceOf(address(this));
+            _lockedAmounts[i] = lockedAmounts[tokens[i]];
         }
     }
 

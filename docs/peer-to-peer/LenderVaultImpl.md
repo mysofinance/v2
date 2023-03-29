@@ -54,10 +54,10 @@ function claimOwnership() external nonpayable
 
 
 
-### getUnlockedTokenBalances
+### getTokenBalancesAndLockedAmounts
 
 ```solidity
-function getUnlockedTokenBalances(address[] tokens) external view returns (uint256[] balances)
+function getTokenBalancesAndLockedAmounts(address[] tokens) external view returns (uint256[] balances, uint256[] _lockedAmounts)
 ```
 
 function to return unlocked token balances
@@ -74,7 +74,8 @@ function to return unlocked token balances
 
 | Name | Type | Description |
 |---|---|---|
-| balances | uint256[] | the unlocked token balances of the tokens |
+| balances | uint256[] | the vault balances of the token addresses |
+| _lockedAmounts | uint256[] | the vault locked amounts of the token addresses |
 
 ### initialize
 
