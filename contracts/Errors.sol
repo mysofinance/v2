@@ -77,4 +77,5 @@ library Errors {
     error AlreadyClaimed();
     error AlreadyConverted();
     error InvalidRepaymentSchedule();
+    error WaitForLoanTermsCoolOffPeriod();
 }

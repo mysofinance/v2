@@ -826,6 +826,17 @@ error UnsubscriptionAmountTooLarge()
 
 
 
+### WaitForLoanTermsCoolOffPeriod
+
+```solidity
+error WaitForLoanTermsCoolOffPeriod()
+```
+
+
+
+
+
+
 ### WithdrawEntered
 
 ```solidity

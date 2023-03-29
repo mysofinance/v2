@@ -18,6 +18,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     mapping(uint256 => uint256) public collTokenConverted;
     DataTypes.DynamicLoanProposalData public dynamicData;
     DataTypes.StaticLoanProposalData public staticData;
+    uint256 internal lastLoanTermsUpdateTime;
     uint256 internal totalSubscriptionsThatClaimedOnDefault;
     mapping(address => mapping(uint256 => bool))
         internal lenderExercisedConversion;
@@ -41,7 +42,10 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         if (_fundingPool == address(0) || _collToken == address(0)) {
             revert Errors.InvalidAddress();
         }
-        if (_arrangerFee == 0) {
+        if (
+            _arrangerFee < Constants.MIN_ARRANGER_FEE ||
+            _arrangerFee > Constants.MAX_ARRANGER_FEE
+        ) {
             revert Errors.InvalidFee();
         }
         if (
@@ -69,6 +73,12 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
+        if (
+            block.timestamp - lastLoanTermsUpdateTime <
+            Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD
+        ) {
+            revert Errors.WaitForLoanTermsCoolOffPeriod();
+        }
         address fundingPool = staticData.fundingPool;
         repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
@@ -84,6 +94,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         }
         _loanTerms = newLoanTerms;
         dynamicData.status = DataTypes.LoanStatus.IN_NEGOTIATION;
+        lastLoanTermsUpdateTime = block.timestamp;
 
         emit LoanTermsProposed(newLoanTerms);
     }
@@ -94,6 +105,12 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         }
         if (dynamicData.status != DataTypes.LoanStatus.IN_NEGOTIATION) {
             revert Errors.InvalidActionForCurrentStatus();
+        }
+        if (
+            block.timestamp - lastLoanTermsUpdateTime <
+            Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD
+        ) {
+            revert Errors.WaitForLoanTermsCoolOffPeriod();
         }
         address fundingPool = staticData.fundingPool;
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
@@ -223,7 +240,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             address collToken = staticData.collToken;
             // transfer any previously provided collToken back to borrower
             IERC20Metadata(collToken).safeTransfer(
-                msg.sender,
+                _loanTerms.borrower,
                 IERC20Metadata(collToken).balanceOf(address(this))
             );
         } else {

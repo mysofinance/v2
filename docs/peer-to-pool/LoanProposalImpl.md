@@ -810,4 +810,15 @@ error UnsubscribeGracePeriodTooShort()
 
 
 
+### WaitForLoanTermsCoolOffPeriod
+
+```solidity
+error WaitForLoanTermsCoolOffPeriod()
+```
+
+
+
+
+
+
 
