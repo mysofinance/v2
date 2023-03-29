@@ -306,6 +306,26 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         return _owner;
     }
 
+    function getUnlockedTokenBalances(
+        address[] memory tokens
+    ) external view returns (uint256[] memory balances) {
+        if (tokens.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        balances = new uint256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (
+                tokens[i] == address(0) ||
+                !IAddressRegistry(addressRegistry).isWhitelistedToken(tokens[i])
+            ) {
+                revert Errors.InvalidAddress();
+            }
+            balances[i] =
+                IERC20Metadata(tokens[i]).balanceOf(address(this)) -
+                lockedAmounts[tokens[i]];
+        }
+    }
+
     function createCollCompartment(
         address borrowerCompartmentImplementation,
         uint256 loanId

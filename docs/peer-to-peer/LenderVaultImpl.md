@@ -54,6 +54,28 @@ function claimOwnership() external nonpayable
 
 
 
+### getUnlockedTokenBalances
+
+```solidity
+function getUnlockedTokenBalances(address[] tokens) external view returns (uint256[] balances)
+```
+
+function to return unlocked token balances
+
+
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| tokens | address[] | array of token addresses |
+
+#### Returns
+
+| Name | Type | Description |
+|---|---|---|
+| balances | uint256[] | the unlocked token balances of the tokens |
+
 ### initialize
 
 ```solidity
@@ -755,6 +777,17 @@ error InvalidAddress()
 
 ```solidity
 error InvalidArrayIndex()
+```
+
+
+
+
+
+
+### InvalidArrayLength
+
+```solidity
+error InvalidArrayLength()
 ```
 
 

@@ -163,6 +163,15 @@ interface ILenderVaultImpl {
     function owner() external view returns (address);
 
     /**
+     * @notice function to return unlocked token balances
+     * @param tokens array of token addresses
+     * @return balances the unlocked token balances of the tokens
+     */
+    function getUnlockedTokenBalances(
+        address[] memory tokens
+    ) external view returns (uint256[] memory balances);
+
+    /**
      * @notice function to return address of registry
      * @return registry address
      */
