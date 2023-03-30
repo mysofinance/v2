@@ -18,7 +18,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 // constants
 const MIN_ARRANGER_FEE = BASE.mul(5).div(10000) // 5bps
 const MAX_ARRANGER_FEE = BASE.mul(5).div(10) // 50%
-const MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY
+const MIN_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY
 const LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 60*60
 const MIN_TIME_BETWEEN_DUE_DATES = ONE_DAY.mul(7)
 const MIN_CONVERSION_GRACE_PERIOD = ONE_DAY
@@ -26,7 +26,7 @@ const MIN_REPAYMENT_GRACE_PERIOD = ONE_DAY
 const MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD = ONE_DAY.mul(5)
 
 // test loan proposal constants
-const LENDER_UNSUBSCRIBE_GRACE_PERIOD = MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD
+const LENDER_UNSUBSCRIBE_GRACE_PERIOD = MIN_UNSUBSCRIBE_GRACE_PERIOD
 const CONVERSION_GRACE_PERIOD = MIN_CONVERSION_GRACE_PERIOD
 const REPAYMENT_GRACE_PERIOD = MIN_REPAYMENT_GRACE_PERIOD
 const REL_ARRANGER_FEE = BASE.mul(50).div(10000)
@@ -116,41 +116,41 @@ describe('Peer-to-Pool: Local Tests', function () {
     await expect(
       loanProposalFactory
         .connect(arranger)
-        .createLoanProposal(ADDRESS_ZERO, daoToken.address, BASE.mul(10).div(100), MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
+        .createLoanProposal(ADDRESS_ZERO, daoToken.address, BASE.mul(10).div(100), MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
     await expect(
       loanProposalFactory
         .connect(arranger)
-        .createLoanProposal(fundingPool.address, ADDRESS_ZERO, BASE.mul(10).div(100), MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
+        .createLoanProposal(fundingPool.address, ADDRESS_ZERO, BASE.mul(10).div(100), MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
     // revert on too small arranger fee
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, 0, MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, 0, MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE.sub(1), MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE.sub(1), MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MAX_ARRANGER_FEE.add(1), MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MAX_ARRANGER_FEE.add(1), MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
     // revert on too short unsubscribe grace period
     await expect(
       loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, 0, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD.sub(1), MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_UNSUBSCRIBE_GRACE_PERIOD.sub(1), MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD.sub(1), MIN_REPAYMENT_GRACE_PERIOD)
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD.sub(1), MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD.sub(1))
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MIN_REPAYMENT_GRACE_PERIOD.sub(1))
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_CONVERSION_GRACE_PERIOD).add(1))
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_UNSUBSCRIBE_GRACE_PERIOD, MIN_CONVERSION_GRACE_PERIOD, MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_CONVERSION_GRACE_PERIOD).add(1))
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD, MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_REPAYMENT_GRACE_PERIOD).add(1), MIN_REPAYMENT_GRACE_PERIOD)
+      loanProposalFactory.connect(arranger).createLoanProposal(fundingPool.address, daoToken.address, MIN_ARRANGER_FEE, MIN_UNSUBSCRIBE_GRACE_PERIOD, MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_REPAYMENT_GRACE_PERIOD).add(1), MIN_REPAYMENT_GRACE_PERIOD)
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
   })
 
@@ -170,7 +170,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(staticData.fundingPool).to.equal(fundingPool.address)
     expect(staticData.collToken).to.equal(daoToken.address)
     expect(staticData.arranger).to.equal(arranger.address)
-    expect(staticData.lenderGracePeriod).to.equal(LENDER_UNSUBSCRIBE_GRACE_PERIOD)
+    expect(staticData.unsubscribeGracePeriod).to.equal(LENDER_UNSUBSCRIBE_GRACE_PERIOD)
     expect(staticData.conversionGracePeriod).to.equal(CONVERSION_GRACE_PERIOD)
     expect(staticData.repaymentGracePeriod).to.equal(REPAYMENT_GRACE_PERIOD)
     const dynamicData = await loanProposal.dynamicData()
@@ -191,14 +191,18 @@ describe('Peer-to-Pool: Local Tests', function () {
       'EmptyRepaymentSchedule'
     )
     
+    // define example repayment and conversion amounts
+    const relLoanTokenDue1 = BASE.mul(5).div(100) // e.g., 5% of loan amount to be repaid in 1st period
+    const relLoanTokenDue2 = BASE.add(relLoanTokenDue1) // e.g., 105% of loan amount to be repaid in 2nd period
+    const relCollTokenDueIfConverted1 = ONE_WETH.div(2000000000) // e.g., can convert owed repayment amount at 1 WETH per 2000 USDC in 1st period
+    const relCollTokenDueIfConverted2 = ONE_WETH.div(3000000000) // e.g., can convert owed repayment amount at 1 WETH per 3000 USDC in 2nd period
+
     // set first due date too close
     let blocknum = await ethers.provider.getBlockNumber()
     let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    let firstRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, ethers.BigNumber.from(timestamp))
-    let nextDueDate = firstRepaymentScheduleEntry.dueTimestamp
-      .add(CONVERSION_GRACE_PERIOD)
-      .add(REPAYMENT_GRACE_PERIOD)
-    let secondRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, nextDueDate)
+    let firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, ethers.BigNumber.from(timestamp))
+    let nextDueDate = firstRepaymentScheduleEntry.dueTimestamp.add(MIN_TIME_BETWEEN_DUE_DATES)
+    let secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
     let repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
     loanTerms.repaymentSchedule = repaymentSchedule
     // revert on too close first due date
@@ -211,45 +215,69 @@ describe('Peer-to-Pool: Local Tests', function () {
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     let firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
-    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, firstDueDate)
-    nextDueDate = firstRepaymentScheduleEntry.dueTimestamp
-      .add(CONVERSION_GRACE_PERIOD)
-      .add(REPAYMENT_GRACE_PERIOD)
-    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, nextDueDate)
+    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
+    nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES).sub(1)
+    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
     repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
     loanTerms.repaymentSchedule = repaymentSchedule
     // revert on too close due timestamps
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'InvalidRepaymentSchedule'
+      'InvalidDueDates'
     )
     
     // set non ascending repayment schedule entries
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
-    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, firstDueDate)
-    nextDueDate = firstRepaymentScheduleEntry.dueTimestamp
-    .add(CONVERSION_GRACE_PERIOD)
-    .add(REPAYMENT_GRACE_PERIOD).add(MIN_TIME_BETWEEN_DUE_DATES)
-    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, nextDueDate)
+    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
+    nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
+    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
     repaymentSchedule = [secondRepaymentScheduleEntry, firstRepaymentScheduleEntry]
     loanTerms.repaymentSchedule = repaymentSchedule
     // revert if non-ascending due time stamps
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'InvalidRepaymentSchedule'
+      'InvalidDueDates'
+    )
+    
+    // set repayment value to zero
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
+    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(0, relCollTokenDueIfConverted1, firstDueDate)
+    nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
+    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
+    repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
+    loanTerms.repaymentSchedule = repaymentSchedule
+    // revert if repayment amount is zero
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'RepaymentOrConversionAmountIsZero'
+    )
+
+    // set conversion value to zero
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
+    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, 0, firstDueDate)
+    nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
+    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
+    repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
+    loanTerms.repaymentSchedule = repaymentSchedule
+    // revert if conversion amount is zero
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'RepaymentOrConversionAmountIsZero'
     )
     
     // set valid repayment schedule
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
-    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, firstDueDate)
-    nextDueDate = firstRepaymentScheduleEntry.dueTimestamp
-    .add(CONVERSION_GRACE_PERIOD)
-    .add(REPAYMENT_GRACE_PERIOD).add(MIN_TIME_BETWEEN_DUE_DATES)
-    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(0, 0, nextDueDate)
+    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
+    nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
+    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
     repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
     loanTerms.repaymentSchedule = repaymentSchedule
     // now should pass
@@ -476,7 +504,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // move forward post lender unsubscribe grace period
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    let lenderUnsubscribeGracePeriod = staticData.lenderGracePeriod
+    let lenderUnsubscribeGracePeriod = staticData.unsubscribeGracePeriod
     await ethers.provider.send('evm_mine', [timestamp + Number(lenderUnsubscribeGracePeriod.toString())])
 
     // unsubscribe when not in unsubscription phase
@@ -503,7 +531,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     ] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
 
-    // reverts if non-borrower tries to rollback during lender grace period
+    // reverts if non-borrower tries to rollback during unsubscribe grace period
     await expect(loanProposal.connect(lender1).rollback()).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidRollBackRequest'

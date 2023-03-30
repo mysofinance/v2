@@ -25,7 +25,7 @@ contract LoanProposalFactory is Ownable, IEvents, ILoanProposalFactory {
         address _fundingPool,
         address _collToken,
         uint256 _arrangerFee,
-        uint256 _lenderGracePeriod,
+        uint256 _unsubscribeGracePeriod,
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external {
@@ -43,7 +43,7 @@ contract LoanProposalFactory is Ownable, IEvents, ILoanProposalFactory {
             _fundingPool,
             _collToken,
             _arrangerFee,
-            _lenderGracePeriod,
+            _unsubscribeGracePeriod,
             _conversionGracePeriod,
             _repaymentGracePeriod
         );
@@ -54,7 +54,7 @@ contract LoanProposalFactory is Ownable, IEvents, ILoanProposalFactory {
             msg.sender,
             _collToken,
             _arrangerFee,
-            _lenderGracePeriod
+            _unsubscribeGracePeriod
         );
     }
 

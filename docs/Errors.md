@@ -298,6 +298,17 @@ error InvalidDelegatee()
 
 
 
+### InvalidDueDates
+
+```solidity
+error InvalidDueDates()
+```
+
+
+
+
+
+
 ### InvalidFee
 
 ```solidity
@@ -434,17 +445,6 @@ error InvalidQuote()
 
 ```solidity
 error InvalidRepayAmount()
-```
-
-
-
-
-
-
-### InvalidRepaymentSchedule
-
-```solidity
-error InvalidRepaymentSchedule()
 ```
 
 
@@ -709,6 +709,17 @@ error OverflowUint128()
 
 ```solidity
 error RepaymentIdxTooLarge()
+```
+
+
+
+
+
+
+### RepaymentOrConversionAmountIsZero
+
+```solidity
+error RepaymentOrConversionAmountIsZero()
 ```
 
 

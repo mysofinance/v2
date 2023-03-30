@@ -37,7 +37,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         address _fundingPool,
         address _collToken,
         uint256 _arrangerFee,
-        uint256 _lenderGracePeriod,
+        uint256 _unsubscribeGracePeriod,
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external initializer {
@@ -51,8 +51,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             revert Errors.InvalidFee();
         }
         if (
-            _lenderGracePeriod <
-            Constants.MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD ||
+            _unsubscribeGracePeriod < Constants.MIN_UNSUBSCRIBE_GRACE_PERIOD ||
             _conversionGracePeriod < Constants.MIN_CONVERSION_GRACE_PERIOD ||
             _repaymentGracePeriod < Constants.MIN_REPAYMENT_GRACE_PERIOD ||
             _conversionGracePeriod + _repaymentGracePeriod >
@@ -63,7 +62,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         staticData.fundingPool = _fundingPool;
         staticData.collToken = _collToken;
         staticData.arranger = _arranger;
-        staticData.lenderGracePeriod = _lenderGracePeriod;
+        staticData.unsubscribeGracePeriod = _unsubscribeGracePeriod;
         staticData.conversionGracePeriod = _conversionGracePeriod;
         staticData.repaymentGracePeriod = _repaymentGracePeriod;
         dynamicData.arrangerFee = _arrangerFee;
@@ -543,7 +542,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     }
 
     function timeUntilLendersCanUnsubscribe() internal view returns (uint256) {
-        return dynamicData.loanTermsLockedTime + staticData.lenderGracePeriod;
+        return
+            dynamicData.loanTermsLockedTime + staticData.unsubscribeGracePeriod;
     }
 
     function repaymentScheduleCheck(
@@ -558,23 +558,24 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         ) {
             revert Errors.FirstDueDateTooClose();
         }
-        uint256 prevPeriodEnd;
-        uint256 currPeriodStart;
-        uint256 conversionGracePeriod = staticData.conversionGracePeriod;
-        uint256 repaymentGracePeriod = staticData.repaymentGracePeriod;
+        uint256 prevDueDate;
+        uint256 currDueDate;
         for (uint i = 0; i < repaymentSchedule.length; ) {
-            currPeriodStart = repaymentSchedule[i].dueTimestamp;
             if (
-                (currPeriodStart <= prevPeriodEnd ||
-                    currPeriodStart - prevPeriodEnd <
+                repaymentSchedule[i].loanTokenDue == 0 ||
+                repaymentSchedule[i].collTokenDueIfConverted == 0
+            ) {
+                revert Errors.RepaymentOrConversionAmountIsZero();
+            }
+            currDueDate = repaymentSchedule[i].dueTimestamp;
+            if (
+                (currDueDate <= prevDueDate ||
+                    currDueDate - prevDueDate <
                     Constants.MIN_TIME_BETWEEN_DUE_DATES)
             ) {
-                revert Errors.InvalidRepaymentSchedule();
+                revert Errors.InvalidDueDates();
             }
-            prevPeriodEnd =
-                currPeriodStart +
-                conversionGracePeriod +
-                repaymentGracePeriod;
+            prevDueDate = currDueDate;
             unchecked {
                 i++;
             }

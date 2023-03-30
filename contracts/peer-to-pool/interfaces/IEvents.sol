@@ -12,7 +12,7 @@ interface IEvents {
         address indexed sender,
         address collToken,
         uint256 arrangerFee,
-        uint256 lenderGracePeriod
+        uint256 unsubscribeGracePeriod
     );
     event Subscribed(address indexed loanProposalAddr, uint256 amount);
     event Unsubscribed(address indexed loanProposalAddr, uint256 amount);

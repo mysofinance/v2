@@ -76,6 +76,7 @@ library Errors {
     error RepaymentIdxTooLarge();
     error AlreadyClaimed();
     error AlreadyConverted();
-    error InvalidRepaymentSchedule();
+    error InvalidDueDates();
+    error RepaymentOrConversionAmountIsZero();
     error WaitForLoanTermsCoolOffPeriod();
 }

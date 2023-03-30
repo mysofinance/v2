@@ -296,7 +296,7 @@ event LoanDeployed()
 ### LoanProposalCreated
 
 ```solidity
-event LoanProposalCreated(address indexed loanProposalAddr, address indexed fundingPool, address indexed sender, address collToken, uint256 arrangerFee, uint256 lenderGracePeriod)
+event LoanProposalCreated(address indexed loanProposalAddr, address indexed fundingPool, address indexed sender, address collToken, uint256 arrangerFee, uint256 unsubscribeGracePeriod)
 ```
 
 
@@ -312,7 +312,7 @@ event LoanProposalCreated(address indexed loanProposalAddr, address indexed fund
 | sender `indexed` | address | undefined |
 | collToken  | address | undefined |
 | arrangerFee  | uint256 | undefined |
-| lenderGracePeriod  | uint256 | undefined |
+| unsubscribeGracePeriod  | uint256 | undefined |
 
 ### LoanProposalExecuted
 

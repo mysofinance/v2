@@ -5,7 +5,7 @@ library DataTypes {
     struct Repayment {
         // The loan token amount due for given period; initially, expressed in relative terms (100%=BASE), once finalized in absolute terms (in loan token)
         uint128 loanTokenDue;
-        // The coll token amount that can be converted for given period; initially, expressed in relative terms w.r.t. loanTokenDue (100%=BASE), once finalized in absolute terms (in loan token)
+        // The coll token amount that can be converted for given period; initially, expressed in relative terms w.r.t. loanTokenDue (e.g., convert every 1 loanToken for 8 collToken), once finalized in absolute terms (in coll token)
         uint128 collTokenDueIfConverted;
         // Timestamp when repayment is due
         uint40 dueTimestamp;
@@ -33,11 +33,11 @@ library DataTypes {
         address collToken;
         // Address of arranger who can manage the loan proposal contract
         address arranger;
-        // Lender grace period (in seconds), i.e., after acceptance by borrower lenders can unsubscribe and remove liquidity for this duration before being locked-in
-        uint256 lenderGracePeriod;
-        // Grace period during which lenders can convert, i.e., between [dueTimeStamp, dueTimeStamp+conversionGracePeriod]
+        // Unsubscribe grace period (in seconds), i.e., after acceptance by borrower lenders can unsubscribe and remove liquidity for this duration before being locked-in
+        uint256 unsubscribeGracePeriod;
+        // Conversion grace period (in seconds), i.e., lenders can exercise their conversion right between [dueTimeStamp, dueTimeStamp+conversionGracePeriod]
         uint256 conversionGracePeriod;
-        // Grace period during which the borrower can repay, i.e., between [dueTimeStamp+conversionGracePeriod, dueTimeStamp+conversionGracePeriod+repaymentGracePeriod]
+        // Repayment grace period (in seconds), i.e., borrowers can repay between [dueTimeStamp+conversionGracePeriod, dueTimeStamp+conversionGracePeriod+repaymentGracePeriod]
         uint256 repaymentGracePeriod;
     }
 

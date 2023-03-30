@@ -68,9 +68,9 @@ export const getDummyLoanTerms = async (daoTreasuryAddr:string) => {
   return loanTerms
 }
 
-export const createLoanProposal = async (loanProposalFactory : LoanProposalFactory, arranger : SignerWithAddress, fundingPoolAddr : string, daoTokenAddr : string, relArrangerFee : BigNumber, lenderGracePeriod : BigNumber, conversionGracePeriod: BigNumber, repaymentGracePeriod: BigNumber) => {
+export const createLoanProposal = async (loanProposalFactory : LoanProposalFactory, arranger : SignerWithAddress, fundingPoolAddr : string, daoTokenAddr : string, relArrangerFee : BigNumber, unsubscribeGracePeriod : BigNumber, conversionGracePeriod: BigNumber, repaymentGracePeriod: BigNumber) => {
     // arranger creates loan proposal
-    await loanProposalFactory.connect(arranger).createLoanProposal(fundingPoolAddr, daoTokenAddr, relArrangerFee, lenderGracePeriod, conversionGracePeriod, repaymentGracePeriod)
+    await loanProposalFactory.connect(arranger).createLoanProposal(fundingPoolAddr, daoTokenAddr, relArrangerFee, unsubscribeGracePeriod, conversionGracePeriod, repaymentGracePeriod)
     const loanProposalAddr = await loanProposalFactory.loanProposals(0)
     const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
     const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
