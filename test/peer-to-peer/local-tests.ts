@@ -13,7 +13,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
-const payloanScheme = [
+const payloadScheme = [
   {
     components: [
       {
@@ -166,7 +166,7 @@ async function generateOffChainQuote({
     ...offChainQuoteBodyInfo
   }
 
-  const payload = ethers.utils.defaultAbiCoder.encode(payloanScheme as any, [
+  const payload = ethers.utils.defaultAbiCoder.encode(payloadScheme as any, [
     offChainQuote.generalQuoteInfo,
     offChainQuote.quoteTuplesRoot,
     offChainQuote.salt,
