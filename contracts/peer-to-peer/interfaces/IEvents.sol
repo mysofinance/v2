@@ -82,5 +82,5 @@ interface IEvents {
         address collReceiver
     );
 
-    event Withdraw(address indexed tokenAddr, uint256 withdrawAmount);
+    event Withdrew(address indexed tokenAddr, uint256 withdrawAmount);
 }
