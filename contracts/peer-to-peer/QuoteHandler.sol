@@ -173,7 +173,10 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         ) {
             revert Errors.InvalidQuote();
         }
-        bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
+        bytes32 offChainQuoteHash = hashOffChainQuote(
+            offChainQuote,
+            lenderVault
+        );
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
             revert Errors.OffChainQuoteHasBeenInvalidated();
         }
@@ -253,7 +256,8 @@ contract QuoteHandler is IQuoteHandler, IEvents {
     }
 
     function hashOffChainQuote(
-        DataTypes.OffChainQuote memory offChainQuote
+        DataTypes.OffChainQuote memory offChainQuote,
+        address lenderVault
     ) internal view returns (bytes32 quoteHash) {
         quoteHash = keccak256(
             abi.encode(
@@ -261,6 +265,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 offChainQuote.quoteTuplesRoot,
                 offChainQuote.salt,
                 offChainQuote.nonce,
+                lenderVault,
                 block.chainid
             )
         );

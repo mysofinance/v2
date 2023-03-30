@@ -46,8 +46,15 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         uint256[] calldata _loanIds,
         bool autoWithdraw
     ) external {
+        // if autoWithdraw is true, only owner can call this function
+        if (autoWithdraw && msg.sender != _owner) {
+            revert Errors.InvalidSender();
+        }
+        // if empty array is passed, revert
+        if (_loanIds.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
         uint256 totalUnlockableColl;
-
         for (uint256 i = 0; i < _loanIds.length; ) {
             uint256 tmp = 0;
             DataTypes.Loan storage _loan = _loans[_loanIds[i]];
@@ -75,7 +82,8 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
 
         lockedAmounts[collToken] -= totalUnlockableColl;
-        // if collToken is not used by vault as loan token too
+        // if collToken is not used by vault as loan token, then 
+        // vault owner may have wanted to leave unlocked coll in vault
         if (autoWithdraw) {
             uint256 currentCollTokenBalance = IERC20Metadata(collToken)
                 .balanceOf(address(this));
@@ -177,6 +185,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
         loanId = _loans.length;
         _loans.push(_loan);
+        emit QuoteProcessed(borrower, _loan, loanId, collReceiver);
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -191,6 +200,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
         IERC20Metadata(token).safeTransfer(_owner, amount);
         withdrawEntered = false;
+        emit Withdrew(token, amount);
     }
 
     function transferTo(
@@ -373,7 +383,10 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         uint256 vaultLoanTokenBal = IERC20(generalQuoteInfo.loanToken)
             .balanceOf(address(this));
         // check if loan is too big for vault
-        if (loanAmount > vaultLoanTokenBal) {
+        if (
+            loanAmount >
+            vaultLoanTokenBal - lockedAmounts[generalQuoteInfo.loanToken]
+        ) {
             revert Errors.InsufficientVaultFunds();
         }
         int256 _interestRateFactor = int256(Constants.BASE) +
