@@ -82,7 +82,8 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
 
         lockedAmounts[collToken] -= totalUnlockableColl;
-        // if collToken is not used by vault as loan token too
+        // if collToken is not used by vault as loan token, then 
+        // vault owner may have wanted to leave unlocked coll in vault
         if (autoWithdraw) {
             uint256 currentCollTokenBalance = IERC20Metadata(collToken)
                 .balanceOf(address(this));
@@ -199,7 +200,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
         IERC20Metadata(token).safeTransfer(_owner, amount);
         withdrawEntered = false;
-        emit Withdraw(token, amount);
+        emit Withdrew(token, amount);
     }
 
     function transferTo(
