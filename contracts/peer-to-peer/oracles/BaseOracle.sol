@@ -26,9 +26,6 @@ abstract contract BaseOracle {
         address _btcToUSDOracleAddrOfGivenChain,
         address _wBTCToBTCOracleAddrOfGivenChain
     ) {
-        if (_wethAddrOfGivenChain == address(0)) {
-            revert Errors.InvalidAddress();
-        }
         wethAddrOfGivenChain = _wethAddrOfGivenChain;
         isUSDBased = _wethAddrOfGivenChain == address(0);
         wBTCAddrOfGivenChain = _wBTCAddrOfGivenChain;

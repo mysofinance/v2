@@ -2286,6 +2286,19 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   })
 
   describe('Testing chainlink oracles', function () {
+    const aaveEthChainlinkAddr = '0x6df09e975c830ecae5bd4ed9d90f3a95a4f88012'
+    const linkEthChainlinkAddr = '0xdc530d9457755926550b59e8eccdae7624181557'
+    const crvEthChainlinkAddr = '0x8a12be339b0cd1829b91adc01977caa5e9ac121e'
+    const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
+    const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
+    const ldoEthChainlinkAddr ='0x4e844125952d32acdf339be976c98e22f6f318db'
+
+
+    const aaveUsdChainlinkAddr = '0x547a514d5e3769680ce22b2361c10ea13619e8a9'
+    const crvUsdChainlinkAddr = '0xcd627aa160a6fa45eb793d19ef54f5062f20f33f'
+    const linkUsdChainlinkAddr = '0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c'
+    const usdcUsdChainlinkAddr = '0x8fffffd4afb6115b954bd326cbe7b4ba576818f6'
+    const ethUsdChainlinkAddr = '0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419'
     it('Should process onChain quote with eth-based oracle address (non-weth)', async function () {
       const {
         addressRegistry,
@@ -2305,8 +2318,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       } = await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-      const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       /****deploy errors on base oracles****/
       await expect(
@@ -2527,8 +2538,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       } = await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
@@ -2640,7 +2649,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       } = await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
 
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
@@ -2757,7 +2765,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       } = await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
       const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
@@ -2895,7 +2902,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
       /****deploy error uni oracle****/
       await expect(
@@ -3015,6 +3021,144 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         Math.abs(Number(vaultUniV2WethUsdcBalPost.sub(vaultUniV2WethUsdcBalPre).sub(collSendAmount).toString()))
       ).to.equal(0)
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl.div(1000))).to.equal(0)
+    })
+
+    it('Should process chainlink eth-based oracle prices correctly', async function () {
+      const {
+        addressRegistry,
+        lender,
+        borrower,
+        usdc,
+        paxg,
+        weth,
+        wbtc,
+        ldo,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr,
+        team
+      } = await setupTest()
+
+      // deploy chainlinkOracleContract
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+
+      const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
+      const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
+      const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
+      /****correct deploy****/
+      const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+        [usdc.address, paxg.address, ldo.address, aaveAddr, crvAddr, linkAddr],
+        [usdcEthChainlinkAddr, paxgEthChainlinkAddr, ldoEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr, linkEthChainlinkAddr],
+        weth.address,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
+      )
+      await chainlinkBasicImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+
+      // prices on 2-16-2023
+      const aaveCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
+      const crvCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
+      const linkCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
+      const ldoCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, usdc.address) // ldo was 2.50-3$ that day
+      const paxgCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, usdc.address) // paxg was 1800-1830$ that day
+      const wethCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
+
+      const wethCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, paxg.address) // weth was 1650-1700$ and paxg was 1800-1830$ that day
+      const aaveCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, paxg.address) // aave was 85-90$ and paxg was 1800-1830$ that day
+      
+      const wethCollLdoLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, ldo.address) // weth was 1650-1700$ and ldo was 2.50-3$ that day
+      
+      const paxgCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, weth.address) // paxg was 1800-1830$ and weth was 1650-1700$ that day
+      const aaveCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
+      const ldoCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, weth.address) // ldo was 2.50-3$ and weth was 1650-1700$ that day
+
+      // in terms of USDC
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(aaveCollUSDCLoanPrice, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(crvCollUSDCLoanPrice, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(linkCollUSDCLoanPrice, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(ldoCollUSDCLoanPrice, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(paxgCollUSDCLoanPrice, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wethCollUSDCLoanPrice, 6)))/100)
+
+      // in terms of PAXG
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wethCollPaxgLoanPrice, 18)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(aaveCollPaxgLoanPrice, 18)))/100)
+
+      // in terms of LDO
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wethCollLdoLoanPrice, 18)))/100)
+
+      // in terms of WETH
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(paxgCollWethLoanPrice, 18)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(aaveCollWethLoanPrice, 18)))/100)
+      console.log(Math.round(10000*Number(ethers.utils.formatUnits(ldoCollWethLoanPrice, 18)))/10000)
+
+      const chainlinkBasicUSDImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+        [usdc.address, aaveAddr, crvAddr, linkAddr, weth.address],
+        [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr],
+        ZERO_ADDR,
+        wbtc,
+        btcToUSDChainlinkAddr,
+        wBTCToBTCChainlinkAddr
+      )
+      await chainlinkBasicUSDImplementation.deployed()
+
+      await addressRegistry.connect(team).toggleOracle(chainlinkBasicUSDImplementation.address, true)
+
+      // prices on 2-16-2023
+      const aaveCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
+      const crvCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
+      const linkCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
+      const wethCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
+      
+      const aaveCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, linkAddr) // aave was 85-90$ and link was 7-7.50$ that day
+      const wethCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, linkAddr) // weth was 1650-1700$ and link was 7-7.50$ that day
+      const crvCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, linkAddr) // crv was 1.10-1.20$ and link was 7-7.50$ that day
+      const usdcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, linkAddr) // usdc was 1$ and link was 7-7.50$ that day
+      
+      const aaveCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
+      const crvCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, weth.address) // crv was 1.10-1.20$ and weth was 1650-1700$ that day
+      const usdcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, weth.address) // usdc was 1$ and weth was 1650-1700$ that day
+      
+      // in terms of USDC
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(aaveCollUSDCLoanPriceUSD, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(crvCollUSDCLoanPriceUSD, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(linkCollUSDCLoanPriceUSD, 6)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wethCollUSDCLoanPriceUSD, 6)))/100)
+
+      // in terms of LINK
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(aaveCollLinkLoanPriceUSD, 18)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wethCollLinkLoanPriceUSD, 18)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(crvCollLinkLoanPriceUSD, 18)))/100)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(usdcCollLinkLoanPriceUSD, 18)))/100)
+
+      // in terms of WETH
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(aaveCollWethLoanPriceUSD, 18)))/100)
+      console.log(Math.round(10000*Number(ethers.utils.formatUnits(crvCollWethLoanPriceUSD, 18)))/10000)
+      console.log(Math.round(10000*Number(ethers.utils.formatUnits(usdcCollWethLoanPriceUSD, 18)))/10000)
+
+      // btc testing
+      const wbtcCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, usdc.address) // btc was 23600-24900$ that day
+      const wbtcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, linkAddr) // btc was 23600-24900$ and link was 7-7.50$ that day
+      const wbtcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, weth.address) // btc was 23600-24900$ and weth was 1650-1700$ that day
+
+      const aaveCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, wbtc) // aave was 85-90$ and btc was 23600-24900$ that day
+      const wethCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, wbtc) // weth was 1650-1700$ and btc was 23600-24900$ that day
+
+      // in terms of USDC
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wbtcCollUSDCLoanPriceUSD,6)))/100)
+
+      // in terms of LINK
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wbtcCollLinkLoanPriceUSD,18)))/100)
+
+      // in terms of WETH
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wbtcCollWethLoanPriceUSD,18)))/100)
+
+      // in terms of WBTC
+      console.log(Math.round(10000*Number(ethers.utils.formatUnits(aaveCollWbtcLoanPriceUSD,8)))/10000)
+      console.log(Math.round(100*Number(ethers.utils.formatUnits(wethCollWbtcLoanPriceUSD,8)))/100)
+
     })
   })
 })
