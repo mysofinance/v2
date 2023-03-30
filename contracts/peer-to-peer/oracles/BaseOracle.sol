@@ -26,9 +26,6 @@ abstract contract BaseOracle {
         address _btcToUSDOracleAddrOfGivenChain,
         address _wBTCToBTCOracleAddrOfGivenChain
     ) {
-        if (_wethAddrOfGivenChain == address(0)) {
-            revert Errors.InvalidAddress();
-        }
         wethAddrOfGivenChain = _wethAddrOfGivenChain;
         isUSDBased = _wethAddrOfGivenChain == address(0);
         wBTCAddrOfGivenChain = _wBTCAddrOfGivenChain;
@@ -80,39 +77,35 @@ abstract contract BaseOracle {
     function getPriceOfToken(
         address oracleAddr
     ) internal view returns (uint256 tokenPriceRaw) {
-        int256 answer;
         if (oracleAddr == wethAddrOfGivenChain) {
-            answer = 10 ** 18;
+            tokenPriceRaw = 10 ** 18;
         } else if (oracleAddr == wBTCAddrOfGivenChain) {
-            answer = getBTCPrice();
+            tokenPriceRaw = getBTCPrice();
         } else {
-            // compiler will complain if only answer has no identifier, so use oracleAnswer var
             (
                 uint80 roundId,
-                int256 oracleAnswer,
+                int256 answer,
                 ,
                 uint256 updatedAt,
                 uint80 answeredInRound
             ) = AggregatorV3Interface(oracleAddr).latestRoundData();
-            checkChainlinkAnswer(
+            tokenPriceRaw = checkChainlinkAnswerAndCastToUint256(
                 roundId,
-                oracleAnswer,
+                answer,
                 updatedAt,
                 answeredInRound
             );
-            answer = oracleAnswer;
         }
-        tokenPriceRaw = uint256(answer);
     }
 
     /**
      * @dev this functon first retrieves btc price in USD
      * the wbtc price is retreived denominated in btc
-     * wbtc/usd (wbtc/btc * btc/usd)/(10**8)
+     * wbtc/usd = (wbtc/btc * btc/usd)/(10**8)
      * denominator accounts for 8 decimals of btc
-     * @return answer price of wbtch in USD which has 8 oracle decimals
+     * @return answer price of wbtc in USD which has 8 oracle decimals
      */
-    function getBTCPrice() internal view returns (int256 answer) {
+    function getBTCPrice() internal view returns (uint256 answer) {
         (
             uint80 roundId,
             int256 btcUSDAnswer,
@@ -121,7 +114,12 @@ abstract contract BaseOracle {
             uint80 answeredInRound
         ) = AggregatorV3Interface(btcToUSDOracleAddrOfGivenChain)
                 .latestRoundData();
-        checkChainlinkAnswer(roundId, btcUSDAnswer, updatedAt, answeredInRound);
+        uint256 uBtcUSDAnswer = checkChainlinkAnswerAndCastToUint256(
+            roundId,
+            btcUSDAnswer,
+            updatedAt,
+            answeredInRound
+        );
         int256 wBTCBTCAnswer;
         (
             roundId,
@@ -131,13 +129,13 @@ abstract contract BaseOracle {
             answeredInRound
         ) = AggregatorV3Interface(wBTCToBTCOracleAddrOfGivenChain)
             .latestRoundData();
-        checkChainlinkAnswer(
+        uint256 uWBTCBTCAnswer = checkChainlinkAnswerAndCastToUint256(
             roundId,
             wBTCBTCAnswer,
             updatedAt,
             answeredInRound
         );
-        answer = (wBTCBTCAnswer * btcUSDAnswer) / (10 ** 8);
+        answer = (uWBTCBTCAnswer * uBtcUSDAnswer) / (10 ** 8);
     }
 
     /**
@@ -162,15 +160,17 @@ abstract contract BaseOracle {
      * @param answer answer of latest round
      * @param updatedAt timestamp of latest round
      * @param answeredInRound round id last answered
+     * @return checkedAnswer checked and cast answer
      */
-    function checkChainlinkAnswer(
+    function checkChainlinkAnswerAndCastToUint256(
         uint80 roundId,
         int256 answer,
         uint256 updatedAt,
         uint80 answeredInRound
-    ) internal pure {
+    ) internal pure returns (uint256 checkedAnswer) {
         if (updatedAt == 0 || answeredInRound < roundId || answer < 1) {
             revert Errors.InvalidOracleAnswer();
         }
+        checkedAnswer = uint256(answer);
     }
 }
