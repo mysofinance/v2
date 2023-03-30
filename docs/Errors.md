@@ -342,10 +342,10 @@ error InvalidGracePeriod()
 
 
 
-### InvalidNewLoanTerms
+### InvalidMinOrMaxLoanAmount
 
 ```solidity
-error InvalidNewLoanTerms()
+error InvalidMinOrMaxLoanAmount()
 ```
 
 
@@ -544,6 +544,17 @@ error NegativeRepaymentAmount()
 
 ```solidity
 error NeitherTokenIsGOHM()
+```
+
+
+
+
+
+
+### NewMaxLoanAmountBelowCurrentSubscriptions
+
+```solidity
+error NewMaxLoanAmountBelowCurrentSubscriptions()
 ```
 
 

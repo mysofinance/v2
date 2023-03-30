@@ -682,10 +682,10 @@ error InvalidGracePeriod()
 
 
 
-### InvalidNewLoanTerms
+### InvalidMinOrMaxLoanAmount
 
 ```solidity
-error InvalidNewLoanTerms()
+error InvalidMinOrMaxLoanAmount()
 ```
 
 
@@ -730,6 +730,17 @@ error InvalidSender()
 
 ```solidity
 error LoanIsFullyRepaid()
+```
+
+
+
+
+
+
+### NewMaxLoanAmountBelowCurrentSubscriptions
+
+```solidity
+error NewMaxLoanAmountBelowCurrentSubscriptions()
 ```
 
 

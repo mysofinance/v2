@@ -87,6 +87,12 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         ) {
             revert Errors.WaitForLoanTermsCoolOffPeriod();
         }
+        if (
+            newLoanTerms.minLoanAmount == 0 ||
+            newLoanTerms.minLoanAmount >= newLoanTerms.maxLoanAmount
+        ) {
+            revert Errors.InvalidMinOrMaxLoanAmount();
+        }
         address fundingPool = staticData.fundingPool;
         repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
@@ -98,7 +104,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             IERC20Metadata(IFundingPool(fundingPool).depositToken()).decimals()
         );
         if (_finalLoanAmount > newLoanTerms.maxLoanAmount) {
-            revert Errors.InvalidNewLoanTerms();
+            revert Errors.NewMaxLoanAmountBelowCurrentSubscriptions();
         }
         _loanTerms = newLoanTerms;
         dynamicData.status = DataTypes.LoanStatus.IN_NEGOTIATION;

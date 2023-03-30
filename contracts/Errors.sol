@@ -68,7 +68,8 @@ library Errors {
     error TotalSubscribedNotTargetInRange();
     error InvalidRollBackRequest();
     error UnsubscriptionAmountTooLarge();
-    error InvalidNewLoanTerms();
+    error InvalidMinOrMaxLoanAmount();
+    error NewMaxLoanAmountBelowCurrentSubscriptions();
     error OutsideConversionTimeWindow();
     error OutsideRepaymentTimeWindow();
     error NoDefault();

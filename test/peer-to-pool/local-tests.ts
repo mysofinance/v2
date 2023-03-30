@@ -185,6 +185,35 @@ describe('Peer-to-Pool: Local Tests', function () {
       'InvalidSender'
     )
 
+    // revert on zero min/max loan amount
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'InvalidMinOrMaxLoanAmount'
+    )
+    // set valid min loan amount
+    loanTerms.minLoanAmount = ONE_USDC.mul(1000000)
+    // revert if max loan amount still zero
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'InvalidMinOrMaxLoanAmount'
+    )
+    loanTerms.maxLoanAmount = loanTerms.minLoanAmount
+    // revert if same min and max loan amount
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'InvalidMinOrMaxLoanAmount'
+    )
+    loanTerms.minLoanAmount = loanTerms.maxLoanAmount.add(1)
+    // revert if min loan amount less than max loan amount
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'InvalidMinOrMaxLoanAmount'
+    )
+
+    // set valid min and max loan amounts
+    loanTerms.minLoanAmount = ONE_USDC.mul(1000000)
+    loanTerms.maxLoanAmount = ONE_USDC.mul(10000000)
+
     // revert on empty repayment schedule
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
@@ -411,12 +440,21 @@ describe('Peer-to-Pool: Local Tests', function () {
     // check valid subscribe works
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
 
-    // revert when trying to propose new loan terms with max loan amount smaller than already subscribed
+    // revert when trying to propose new loan terms with max loan amount smaller than prospective loan amount based on current subscriptions
     const prevMaxLoanAmount = loanTerms.maxLoanAmount
-    loanTerms.maxLoanAmount = ethers.BigNumber.from(1)
+    const currTotalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    const loanTokenDecimals = await usdc.decimals()
+    let [
+      ,
+      ,
+      prospectiveFinalLoanAmount,
+      ,
+      
+    ] = await loanProposal.getAbsoluteLoanTerms(loanTerms, currTotalSubscribed, loanTokenDecimals)
+    loanTerms.maxLoanAmount = prospectiveFinalLoanAmount.sub(1)
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'InvalidNewLoanTerms'
+      'NewMaxLoanAmountBelowCurrentSubscriptions'
     )
     loanTerms.maxLoanAmount = prevMaxLoanAmount
 
@@ -521,11 +559,10 @@ describe('Peer-to-Pool: Local Tests', function () {
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
-    let loanTokenDecimals = await usdc.decimals()
     let [
-      finalLoanTerms,
-      arrangerFee,
-      finalLoanAmount,
+      ,
+      ,
+      ,
       finalCollAmountReservedForDefault,
       finalCollAmountReservedForConversions
     ] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
