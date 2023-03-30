@@ -9,23 +9,19 @@ library DataTypes {
         uint128 collTokenDueIfConverted;
         // Timestamp when repayment is due
         uint40 dueTimestamp;
-        // Grace period during which lenders can convert, i.e., between [dueTimeStamp, dueTimeStamp+conversionGracePeriod]
-        uint40 conversionGracePeriod;
-        // Grace period during which the borrower can repay, i.e., between [dueTimeStamp+conversionGracePeriod, dueTimeStamp+conversionGracePeriod+repaymentGracePeriod]
-        uint40 repaymentGracePeriod;
         // Flag whether given period is considered repaid
         bool repaid;
     }
 
     struct LoanTerms {
-        // Borrower who can accept given loan proposal
-        address borrower;
         // Min loan amount (in loan token) that the borrower intends to borrow
         uint128 minLoanAmount;
         // Max loan amount (in loan token) that the borrower intends to borrow
         uint128 maxLoanAmount;
         // The number of collateral tokens the borrower pledges per loan token borrowed as collateral for default case
         uint128 collPerLoanToken;
+        // Borrower who can accept given loan proposal
+        address borrower;
         // Array of scheduled repayments
         Repayment[] repaymentSchedule;
     }
@@ -39,6 +35,10 @@ library DataTypes {
         address arranger;
         // Lender grace period (in seconds), i.e., after acceptance by borrower lenders can unsubscribe and remove liquidity for this duration before being locked-in
         uint256 lenderGracePeriod;
+        // Grace period during which lenders can convert, i.e., between [dueTimeStamp, dueTimeStamp+conversionGracePeriod]
+        uint256 conversionGracePeriod;
+        // Grace period during which the borrower can repay, i.e., between [dueTimeStamp+conversionGracePeriod, dueTimeStamp+conversionGracePeriod+repaymentGracePeriod]
+        uint256 repaymentGracePeriod;
     }
 
     struct DynamicLoanProposalData {

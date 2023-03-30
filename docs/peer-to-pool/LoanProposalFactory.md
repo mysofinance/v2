@@ -41,7 +41,7 @@ function claimOwnership() external nonpayable
 ### createLoanProposal
 
 ```solidity
-function createLoanProposal(address _fundingPool, address _collToken, uint256 _arrangerFee, uint256 _lenderGracePeriod) external nonpayable
+function createLoanProposal(address _fundingPool, address _collToken, uint256 _arrangerFee, uint256 _lenderGracePeriod, uint256 _conversionGracePeriod, uint256 _repaymentGracePeriod) external nonpayable
 ```
 
 Creates a new loan proposal
@@ -56,6 +56,8 @@ Creates a new loan proposal
 | _collToken | address | The address of collateral token to be provided by borrower |
 | _arrangerFee | uint256 | The relative arranger fee (where 100% = BASE) |
 | _lenderGracePeriod | uint256 | If a lender subscribes to a loan and it gets accepted by the borrower, then the lender can still unsubscribe for _lenderGracePeriod before otherwise being locked in and funding the given loan proposal |
+| _conversionGracePeriod | uint256 | The grace period during which lenders can convert |
+| _repaymentGracePeriod | uint256 | The grace period during which borrowers can repay |
 
 ### isLoanProposal
 

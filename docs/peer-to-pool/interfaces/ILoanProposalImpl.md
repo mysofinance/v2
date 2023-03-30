@@ -196,7 +196,7 @@ function getAbsoluteLoanTerms(DataTypes.LoanTerms _tmpLoanTerms, uint256 totalSu
 ### initialize
 
 ```solidity
-function initialize(address _arranger, address _fundingPool, address _collToken, uint256 _arrangerFee, uint256 _lenderGracePeriod) external nonpayable
+function initialize(address _arranger, address _fundingPool, address _collToken, uint256 _arrangerFee, uint256 _lenderGracePeriod, uint256 _conversionGracePeriod, uint256 _repaymentGracePeriod) external nonpayable
 ```
 
 Initializes loan proposal
@@ -212,6 +212,8 @@ Initializes loan proposal
 | _collToken | address | Address of collateral token to be used in loan |
 | _arrangerFee | uint256 | Arranger fee in percent (where 100% = BASE) |
 | _lenderGracePeriod | uint256 | If lenders subscribe and proposal gets they can still unsubscribe from the deal for this time period before being locked-in |
+| _conversionGracePeriod | uint256 | The grace period during which lenders can convert |
+| _repaymentGracePeriod | uint256 | The grace period during which borrowers can repay |
 
 ### loanTerms
 
@@ -287,7 +289,7 @@ Rolls back the loan proposal
 ### staticData
 
 ```solidity
-function staticData() external view returns (address fundingPool, address collToken, address arranger, uint256 lenderGracePeriod)
+function staticData() external view returns (address fundingPool, address collToken, address arranger, uint256 lenderGracePeriod, uint256 conversionGracePeriod, uint256 repaymentGracePeriod)
 ```
 
 Returns core static data for given loan proposal
@@ -303,6 +305,8 @@ Returns core static data for given loan proposal
 | collToken | address | The address of the collateral token to be provided by the borrower |
 | arranger | address | The address of the arranger of the proposal |
 | lenderGracePeriod | uint256 | The lender grace period until which lenders can unsubscribe after a loan proposal got accepted by the borrower |
+| conversionGracePeriod | uint256 | The grace period during which lenders can convert, i.e., between [dueTimeStamp, dueTimeStamp+conversionGracePeriod] |
+| repaymentGracePeriod | uint256 | The grace period during which borrowers can repay, i.e., between [dueTimeStamp+conversionGracePeriod, dueTimeStamp+conversionGracePeriod+repaymentGracePeriod] |
 
 ### totalConvertedSubscriptionsPerIdx
 

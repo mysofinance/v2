@@ -56,7 +56,7 @@ library Errors {
     error EmptyRepaymentSchedule();
     error FirstDueDateTooClose();
     error DueDatesTooClose();
-    error UnsubscribeGracePeriodTooShort();
+    error InvalidGracePeriod();
     error UnregisteredLoanProposal();
     error NotInSubscriptionPhase();
     error NotInUnsubscriptionPhase();

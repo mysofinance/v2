@@ -320,6 +320,17 @@ error InvalidGaugeIndex()
 
 
 
+### InvalidGracePeriod
+
+```solidity
+error InvalidGracePeriod()
+```
+
+
+
+
+
+
 ### InvalidNewLoanTerms
 
 ```solidity
@@ -797,17 +808,6 @@ error UnregisteredLoanProposal()
 
 ```solidity
 error UnregisteredVault()
-```
-
-
-
-
-
-
-### UnsubscribeGracePeriodTooShort
-
-```solidity
-error UnsubscribeGracePeriodTooShort()
 ```
 
 
