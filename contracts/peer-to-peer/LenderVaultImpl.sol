@@ -318,7 +318,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
         balances = new uint256[](tokens.length);
         _lockedAmounts = new uint256[](tokens.length);
-        for (uint256 i = 0; i < tokens.length; i++) {
+        for (uint256 i = 0; i < tokens.length; ) {
             if (
                 tokens[i] == address(0) ||
                 !IAddressRegistry(addressRegistry).isWhitelistedToken(tokens[i])
@@ -327,6 +327,9 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
             }
             balances[i] = IERC20Metadata(tokens[i]).balanceOf(address(this));
             _lockedAmounts[i] = lockedAmounts[tokens[i]];
+            unchecked {
+                ++i;
+            }
         }
     }
 
