@@ -10,14 +10,18 @@ interface ILoanProposalImpl {
      * @param _fundingPool Address of the funding pool to be used to source liquidity, if successful
      * @param _collToken Address of collateral token to be used in loan
      * @param _arrangerFee Arranger fee in percent (where 100% = BASE)
-     * @param _lenderGracePeriod If lenders subscribe and proposal gets they can still unsubscribe from the deal for this time period before being locked-in
+     * @param _unsubscribeGracePeriod The unsubscribe grace period, i.e., after a loan gets accepted by the borrower lenders can still unsubscribe for this time period before being locked-in
+     * @param _conversionGracePeriod The grace period during which lenders can convert
+     * @param _repaymentGracePeriod The grace period during which borrowers can repay
      */
     function initialize(
         address _arranger,
         address _fundingPool,
         address _collToken,
         uint256 _arrangerFee,
-        uint256 _lenderGracePeriod
+        uint256 _unsubscribeGracePeriod,
+        uint256 _conversionGracePeriod,
+        uint256 _repaymentGracePeriod
     ) external;
 
     /**
@@ -46,7 +50,7 @@ interface ILoanProposalImpl {
 
     /**
      * @notice Rolls back the loan proposal
-     * @dev Can be called by borrower during the lender grace period or by anyone in case the total subscribed fell below the minLoanAmount
+     * @dev Can be called by borrower during the unsubscribe grace period or by anyone in case the total subscribed fell below the minLoanAmount
      */
     function rollback() external;
 
@@ -135,7 +139,9 @@ interface ILoanProposalImpl {
      * @return fundingPool The address of the funding pool from which lenders can subscribe, and from which -upon acceptance- the final loan amount gets sourced
      * @return collToken The address of the collateral token to be provided by the borrower
      * @return arranger The address of the arranger of the proposal
-     * @return lenderGracePeriod The lender grace period until which lenders can unsubscribe after a loan proposal got accepted by the borrower
+     * @return unsubscribeGracePeriod Unsubscribe grace period until which lenders can unsubscribe after a loan proposal got accepted by the borrower
+     * @return conversionGracePeriod Conversion grace period during which lenders can convert, i.e., between [dueTimeStamp, dueTimeStamp+conversionGracePeriod]
+     * @return repaymentGracePeriod Repayment grace period during which borrowers can repay, i.e., between [dueTimeStamp+conversionGracePeriod, dueTimeStamp+conversionGracePeriod+repaymentGracePeriod]
      */
     function staticData()
         external
@@ -144,7 +150,9 @@ interface ILoanProposalImpl {
             address fundingPool,
             address collToken,
             address arranger,
-            uint256 lenderGracePeriod
+            uint256 unsubscribeGracePeriod,
+            uint256 conversionGracePeriod,
+            uint256 repaymentGracePeriod
         );
 
     /**

@@ -132,7 +132,8 @@ contract FundingPool is IEvents, IFundingPool {
             loanTerms.borrower,
             finalLoanAmount
         );
-        (, , address arranger, ) = ILoanProposalImpl(loanProposal).staticData();
+        (, , address arranger, , , ) = ILoanProposalImpl(loanProposal)
+            .staticData();
         uint256 protocolFeeShare = (arrangerFee *
             ILoanProposalFactory(loanProposalFactory).arrangerFeeSplit()) /
             Constants.BASE;

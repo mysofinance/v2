@@ -18,6 +18,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     mapping(uint256 => uint256) public collTokenConverted;
     DataTypes.DynamicLoanProposalData public dynamicData;
     DataTypes.StaticLoanProposalData public staticData;
+    uint256 internal lastLoanTermsUpdateTime;
     uint256 internal totalSubscriptionsThatClaimedOnDefault;
     mapping(address => mapping(uint256 => bool))
         internal lenderExercisedConversion;
@@ -36,23 +37,34 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         address _fundingPool,
         address _collToken,
         uint256 _arrangerFee,
-        uint256 _lenderGracePeriod
+        uint256 _unsubscribeGracePeriod,
+        uint256 _conversionGracePeriod,
+        uint256 _repaymentGracePeriod
     ) external initializer {
         if (_fundingPool == address(0) || _collToken == address(0)) {
             revert Errors.InvalidAddress();
         }
-        if (_arrangerFee == 0) {
+        if (
+            _arrangerFee < Constants.MIN_ARRANGER_FEE ||
+            _arrangerFee > Constants.MAX_ARRANGER_FEE
+        ) {
             revert Errors.InvalidFee();
         }
         if (
-            _lenderGracePeriod < Constants.MIN_LENDER_UNSUBSCRIBE_GRACE_PERIOD
+            _unsubscribeGracePeriod < Constants.MIN_UNSUBSCRIBE_GRACE_PERIOD ||
+            _conversionGracePeriod < Constants.MIN_CONVERSION_GRACE_PERIOD ||
+            _repaymentGracePeriod < Constants.MIN_REPAYMENT_GRACE_PERIOD ||
+            _conversionGracePeriod + _repaymentGracePeriod >
+            Constants.MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD
         ) {
-            revert Errors.UnsubscribeGracePeriodTooShort();
+            revert Errors.InvalidGracePeriod();
         }
         staticData.fundingPool = _fundingPool;
         staticData.collToken = _collToken;
         staticData.arranger = _arranger;
-        staticData.lenderGracePeriod = _lenderGracePeriod;
+        staticData.unsubscribeGracePeriod = _unsubscribeGracePeriod;
+        staticData.conversionGracePeriod = _conversionGracePeriod;
+        staticData.repaymentGracePeriod = _repaymentGracePeriod;
         dynamicData.arrangerFee = _arrangerFee;
     }
 
@@ -69,6 +81,18 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
+        if (
+            block.timestamp - lastLoanTermsUpdateTime <
+            Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD
+        ) {
+            revert Errors.WaitForLoanTermsCoolOffPeriod();
+        }
+        if (
+            newLoanTerms.minLoanAmount == 0 ||
+            newLoanTerms.minLoanAmount >= newLoanTerms.maxLoanAmount
+        ) {
+            revert Errors.InvalidMinOrMaxLoanAmount();
+        }
         address fundingPool = staticData.fundingPool;
         repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
@@ -80,10 +104,11 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             IERC20Metadata(IFundingPool(fundingPool).depositToken()).decimals()
         );
         if (_finalLoanAmount > newLoanTerms.maxLoanAmount) {
-            revert Errors.InvalidNewLoanTerms();
+            revert Errors.NewMaxLoanAmountBelowCurrentSubscriptions();
         }
         _loanTerms = newLoanTerms;
         dynamicData.status = DataTypes.LoanStatus.IN_NEGOTIATION;
+        lastLoanTermsUpdateTime = block.timestamp;
 
         emit LoanTermsProposed(newLoanTerms);
     }
@@ -94,6 +119,12 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         }
         if (dynamicData.status != DataTypes.LoanStatus.IN_NEGOTIATION) {
             revert Errors.InvalidActionForCurrentStatus();
+        }
+        if (
+            block.timestamp - lastLoanTermsUpdateTime <
+            Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD
+        ) {
+            revert Errors.WaitForLoanTermsCoolOffPeriod();
         }
         address fundingPool = staticData.fundingPool;
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
@@ -223,7 +254,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             address collToken = staticData.collToken;
             // transfer any previously provided collToken back to borrower
             IERC20Metadata(collToken).safeTransfer(
-                msg.sender,
+                _loanTerms.borrower,
                 IERC20Metadata(collToken).balanceOf(address(this))
             );
         } else {
@@ -267,7 +298,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp ||
             block.timestamp >
             _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-                _loanTerms.repaymentSchedule[repaymentIdx].conversionGracePeriod
+                staticData.conversionGracePeriod
         ) {
             revert Errors.OutsideConversionTimeWindow();
         }
@@ -299,10 +330,9 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         // but before default period for this period
         uint256 currConversionCutoffTime = _loanTerms
             .repaymentSchedule[repaymentIdx]
-            .dueTimestamp +
-            _loanTerms.repaymentSchedule[repaymentIdx].conversionGracePeriod;
+            .dueTimestamp + staticData.conversionGracePeriod;
         uint256 currRepaymentCutoffTime = currConversionCutoffTime +
-            _loanTerms.repaymentSchedule[repaymentIdx].repaymentGracePeriod;
+            staticData.repaymentGracePeriod;
         if (
             (block.timestamp < currConversionCutoffTime) ||
             (block.timestamp > currRepaymentCutoffTime)
@@ -321,7 +351,6 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             .loanTokenDue * collTokenLeftUnconverted) /
             collTokenDueIfAllConverted;
         loanTokenRepaid[repaymentIdx] = remainingLoanTokenDue;
-        _loanTerms.repaymentSchedule[repaymentIdx].repaid = true;
         uint256 preBal = IERC20Metadata(loanToken).balanceOf(address(this));
         IERC20Metadata(loanToken).safeTransferFrom(
             msg.sender,
@@ -353,9 +382,9 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         if (lenderContribution == 0) {
             revert Errors.InvalidSender();
         }
-        // iff there's a repay, currentRepaymentIdx (initially 0) gets incremented;
+        // the currentRepaymentIdx (initially 0) only ever gets incremented on repay;
         // hence any `repaymentIdx` smaller than `currentRepaymentIdx` will always
-        // map to a valid repayment claim; no need to check `repaymentSchedule[repaymentIdx].repaid`
+        // map to a valid repayment claim
         if (repaymentIdx >= dynamicData.currentRepaymentIdx) {
             revert Errors.RepaymentIdxTooLarge();
         }
@@ -512,14 +541,16 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     }
 
     function checkCurrRepaymentIdx(uint256 repaymentIdx) internal view {
-        // currentRepaymentIdx increments on every repay; iff full repay then currentRepaymentIdx == _loanTerms.repaymentSchedule.length
+        // currentRepaymentIdx increments on every repay;
+        // if and only if loan was fully repaid, then currentRepaymentIdx == _loanTerms.repaymentSchedule.length
         if (repaymentIdx == _loanTerms.repaymentSchedule.length) {
             revert Errors.LoanIsFullyRepaid();
         }
     }
 
     function timeUntilLendersCanUnsubscribe() internal view returns (uint256) {
-        return dynamicData.loanTermsLockedTime + staticData.lenderGracePeriod;
+        return
+            dynamicData.loanTermsLockedTime + staticData.unsubscribeGracePeriod;
     }
 
     function repaymentScheduleCheck(
@@ -534,26 +565,22 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         ) {
             revert Errors.FirstDueDateTooClose();
         }
-        uint256 prevPeriodEnd;
-        uint256 currPeriodStart;
+        uint256 prevDueDate;
+        uint256 currDueDate;
         for (uint i = 0; i < repaymentSchedule.length; ) {
-            currPeriodStart = repaymentSchedule[i].dueTimestamp;
             if (
-                (currPeriodStart <= prevPeriodEnd ||
-                    currPeriodStart - prevPeriodEnd <
-                    Constants.MIN_TIME_BETWEEN_DUE_DATES) ||
-                (repaymentSchedule[i].conversionGracePeriod <
-                    Constants.MIN_CONVERSION_GRACE_PERIOD ||
-                    repaymentSchedule[i].repaymentGracePeriod <
-                    Constants.MIN_REPAYMENT_GRACE_PERIOD) ||
-                repaymentSchedule[i].repaid
+                repaymentSchedule[i].loanTokenDue == 0 ||
+                repaymentSchedule[i].collTokenDueIfConverted == 0
             ) {
-                revert Errors.InvalidRepaymentSchedule();
+                revert Errors.RepaymentOrConversionAmountIsZero();
             }
-            prevPeriodEnd =
-                currPeriodStart +
-                repaymentSchedule[i].conversionGracePeriod +
-                repaymentSchedule[i].repaymentGracePeriod;
+            currDueDate = repaymentSchedule[i].dueTimestamp;
+            if (
+                currDueDate < prevDueDate + Constants.MIN_TIME_BETWEEN_DUE_DATES
+            ) {
+                revert Errors.InvalidDueDates();
+            }
+            prevDueDate = currDueDate;
             unchecked {
                 i++;
             }
@@ -565,8 +592,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     ) internal view returns (uint256 repaymentCutoffTime) {
         repaymentCutoffTime =
             _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-            _loanTerms.repaymentSchedule[repaymentIdx].conversionGracePeriod +
-            _loanTerms.repaymentSchedule[repaymentIdx].repaymentGracePeriod;
+            staticData.conversionGracePeriod +
+            staticData.repaymentGracePeriod;
     }
 
     function toUint128(uint256 x) internal pure returns (uint128 y) {
