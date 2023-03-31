@@ -35,7 +35,7 @@ contract ChainlinkBasic is BaseOracle, IOracle {
         address collToken,
         address loanToken
     ) external view returns (uint256 collTokenPriceInLoanToken) {
-        validBTCCheck(loanToken, collToken);
+        validBtcCheck(loanToken, collToken);
         (
             bool isValid,
             address loanTokenOracleAddr,

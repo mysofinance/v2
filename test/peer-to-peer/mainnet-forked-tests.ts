@@ -183,6 +183,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     }
   }
 
+  let snapshotId: any
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot')
+  })
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId])
+  })
+
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
       const {
@@ -778,6 +786,85 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       expect(borrowEvent).to.not.be.undefined
+    })
+
+    it('Should handle unlocking collateral correctly', async function () {
+      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+        await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrow'
+      })
+
+      expect(borrowEvent).to.not.be.undefined
 
       // test partial repays with no compartment
       const loanId = borrowEvent?.args?.['loanId']
@@ -790,6 +877,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const collBalPreRepayVault = await weth.balanceOf(lenderVault.address)
       const lockedVaultCollPreRepay = await lenderVault.lockedAmounts(weth.address)
+      const tokenBalanceAndLockedAmountsPreRepay = await lenderVault
+        .connect(lender)
+        .getTokenBalancesAndLockedAmounts([weth.address])
+      expect(tokenBalanceAndLockedAmountsPreRepay._lockedAmounts[0]).to.equal(lockedVaultCollPreRepay)
 
       // borrower approves borrower gateway for repay
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -824,10 +915,90 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const collBalPostUnlock = await weth.balanceOf(lenderVault.address)
       const lockedVaultCollPostUnlock = await lenderVault.lockedAmounts(weth.address)
 
+      await expect(lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidArrayLength'
+      )
+      await expect(lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([ZERO_ADDR])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+      await expect(
+        lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([borrower.address])
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+
+      const tokenBalanceAndLockedAmountsPostRepay = await lenderVault
+        .connect(lender)
+        .getTokenBalancesAndLockedAmounts([weth.address])
+      expect(tokenBalanceAndLockedAmountsPostRepay._lockedAmounts[0]).to.equal(0)
+
       // since did not autowithdraw, no change in collateral balance
       expect(collBalPostUnlock).to.equal(collBalPostRepayVault)
       // all coll has been unlocked
       expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostUnlock)).to.equal(initCollAmount)
+    })
+
+    it('Should validate correctly the wrong deleteOnChainQuote', async function () {
+      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      await expect(
+        quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+      await expect(
+        quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
+      onChainQuote.generalQuoteInfo.loanToken = weth.address
+      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+
+      onChainQuote.generalQuoteInfo.loanToken = usdc.address
+
+      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteDeleted'
+      )
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
@@ -2000,19 +2171,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const compartmentCollBalPostRepay = await collInstance.balanceOf(collTokenCompartmentAddr)
       const borrowerLoanBalPostRepay = await weth.balanceOf(borrower.address)
 
-      await expect(lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([])).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidArrayLength'
-      )
-      await expect(lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([ZERO_ADDR])).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidAddress'
-      )
-      await expect(
-        lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([borrower.address])
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
-      await lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([collTokenAddress])
-
       expect(borrowerCollBalPostRepay).to.equal(borrowerCollBalPost) // coll swapped out for loan, no change in coll
       expect(borrowerLoanBalPostRepay).to.be.greaterThan(partialRepayAmount)
       expect(compartmentCollBalPostRepay).to.equal(compartmentCollBalPost.div(coeffRepay))
@@ -2390,7 +2548,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
@@ -2400,7 +2558,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
@@ -2410,7 +2568,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
@@ -2420,7 +2578,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
@@ -2430,7 +2588,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
@@ -2440,7 +2598,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
 
       /****correct deploy****/
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
@@ -3006,8 +3164,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         .mul(index)
         .div(loanTokenPriceRaw)
         .div(10 ** 9)
-      // 2-16-2023 price was between 2840 and 2930 GOHM per USDC
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(collTokenPriceInLoanToken, 6))) / 100)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
       expect(borrowerGohmBalPre.sub(borrowerGohmBalPost)).to.equal(collSendAmount)
@@ -3134,8 +3290,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         .mul(10 ** 9)
         .div(loanTokenPriceRawPreIndex)
         .div(index)
-      // 2-16-2023 price was between 2840 and 2930 GOHM per USDC, so this is inverse of that
-      console.log(Math.round(100000 * Number(ethers.utils.formatUnits(collTokenPriceInLoanToken, 18))) / 100000)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
       expect(borrowerGohmBalPost.sub(borrowerGohmBalPre)).to.equal(maxLoanPerColl.mul(10000))
@@ -3188,7 +3342,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
       await expect(
         UniV2OracleImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
@@ -3199,7 +3353,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidArrayLength')
       /****deploy correctly****/
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
@@ -3351,7 +3505,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const collTokenPriceRaw = totalEthValueOfLpPool.mul(BigNumber.from(10).pow(18)).div(totalSupply)
 
       const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_USDC).div(loanTokenPriceRaw)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(collTokenPriceInLoanToken, 6))) / 100)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
       expect(borrowerUniV2WethUsdcBalPre.sub(borrowerUniV2WethUsdcBalPost)).to.equal(collSendAmount)
@@ -3493,8 +3646,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const loanTokenPriceRaw = totalEthValueOfLpPool.mul(BigNumber.from(10).pow(18)).div(totalSupply)
 
       const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_WETH).div(loanTokenPriceRaw)
-      // large number as only around 0.5 lp tokens exist for pool between 85 million - 90 million $ in value
-      console.log(Math.round(1000000000 * Number(ethers.utils.formatUnits(collTokenPriceInLoanToken, 18))) / 1000000000)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
       expect(borrowerUniV2WethUsdcBalPost.sub(borrowerUniV2WethUsdcBalPre)).to.equal(maxLoanPerColl.mul(10000))
@@ -3505,194 +3656,307 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount)).to.equal(0)
     })
 
-    it('Should process chainlink eth-based oracle prices correctly', async function () {
-      const { addressRegistry, usdc, paxg, weth, wbtc, ldo, gohm, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
-        await setupTest()
+    describe('Should handle getPrice correctly', async function () {
+      it('Should process chainlink oracle prices correctly', async function () {
+        const { addressRegistry, usdc, paxg, weth, wbtc, ldo, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
+          await setupTest()
 
-      // deploy chainlinkOracleContract
-      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+        // deploy chainlinkOracleContract
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
-      const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
-      const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
-      const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
-      /****correct deploy****/
-      const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
-        [usdc.address, paxg.address, ldo.address, aaveAddr, crvAddr, linkAddr],
-        [
-          usdcEthChainlinkAddr,
-          paxgEthChainlinkAddr,
-          ldoEthChainlinkAddr,
-          aaveEthChainlinkAddr,
-          crvEthChainlinkAddr,
-          linkEthChainlinkAddr
-        ],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      )
-      await chainlinkBasicImplementation.deployed()
+        const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
+        const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
+        const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
+        /****correct deploy****/
+        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, paxg.address, ldo.address, aaveAddr, crvAddr, linkAddr],
+          [
+            usdcEthChainlinkAddr,
+            paxgEthChainlinkAddr,
+            ldoEthChainlinkAddr,
+            aaveEthChainlinkAddr,
+            crvEthChainlinkAddr,
+            linkEthChainlinkAddr
+          ],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
 
-      await expect(chainlinkBasicImplementation.getPrice(wbtc, usdc.address)).to.be.revertedWithCustomError(
-        chainlinkBasicImplementation,
-        'InvalidBTCOracle'
-      )
+        await expect(chainlinkBasicImplementation.getPrice(wbtc, usdc.address)).to.be.revertedWithCustomError(
+          chainlinkBasicImplementation,
+          'InvalidBTCOracle'
+        )
 
-      await expect(chainlinkBasicImplementation.getPrice(usdc.address, wbtc)).to.be.revertedWithCustomError(
-        chainlinkBasicImplementation,
-        'InvalidBTCOracle'
-      )
+        await expect(chainlinkBasicImplementation.getPrice(usdc.address, wbtc)).to.be.revertedWithCustomError(
+          chainlinkBasicImplementation,
+          'InvalidBTCOracle'
+        )
 
-      // prices on 2-16-2023
-      const aaveCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
-      const crvCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
-      const linkCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
-      const ldoCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, usdc.address) // ldo was 2.50-3$ that day
-      const paxgCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, usdc.address) // paxg was 1800-1830$ that day
-      const wethCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
+        // prices on 2-16-2023
+        const aaveCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
+        const crvCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
+        const linkCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
+        const ldoCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, usdc.address) // ldo was 2.50-3$ that day
+        const paxgCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, usdc.address) // paxg was 1800-1830$ that day
+        const wethCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
 
-      const wethCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, paxg.address) // weth was 1650-1700$ and paxg was 1800-1830$ that day
-      const aaveCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, paxg.address) // aave was 85-90$ and paxg was 1800-1830$ that day
+        const wethCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, paxg.address) // weth was 1650-1700$ and paxg was 1800-1830$ that day
+        const aaveCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, paxg.address) // aave was 85-90$ and paxg was 1800-1830$ that day
 
-      const wethCollLdoLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, ldo.address) // weth was 1650-1700$ and ldo was 2.50-3$ that day
+        const wethCollLdoLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, ldo.address) // weth was 1650-1700$ and ldo was 2.50-3$ that day
 
-      const paxgCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, weth.address) // paxg was 1800-1830$ and weth was 1650-1700$ that day
-      const aaveCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
-      const ldoCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, weth.address) // ldo was 2.50-3$ and weth was 1650-1700$ that day
+        const paxgCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, weth.address) // paxg was 1800-1830$ and weth was 1650-1700$ that day
+        const aaveCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
+        const ldoCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, weth.address) // ldo was 2.50-3$ and weth was 1650-1700$ that day
 
-      // in terms of USDC
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPrice, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPrice, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPrice, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(ldoCollUSDCLoanPrice, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollUSDCLoanPrice, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPrice, 6))) / 100)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPrice, 6))) / 100).to.be.within(85, 90)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPrice, 6))) / 100).to.be.within(1.1, 1.2)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPrice, 6))) / 100).to.be.within(7, 7.5)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(ldoCollUSDCLoanPrice, 6))) / 100).to.be.within(2.5, 3)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollUSDCLoanPrice, 6))) / 100).to.be.within(1800, 1830)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPrice, 6))) / 100).to.be.within(1650, 1700)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollPaxgLoanPrice, 18))) / 100).to.be.within(0.9, 1)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollPaxgLoanPrice, 18))) / 100).to.be.within(0.04, 0.06)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLdoLoanPrice, 18))) / 100).to.be.within(600, 605)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollWethLoanPrice, 18))) / 100).to.be.within(1, 1.1)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPrice, 18))) / 100).to.be.within(0.04, 0.06)
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(ldoCollWethLoanPrice, 18))) / 10000).to.be.within(
+          0.001,
+          0.002
+        )
 
-      // in terms of PAXG
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollPaxgLoanPrice, 18))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollPaxgLoanPrice, 18))) / 100)
+        // toggle to show logs
+        const showLogs = false
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(ldoCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPrice, 6))) / 100)
 
-      // in terms of LDO
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLdoLoanPrice, 18))) / 100)
+          // in terms of PAXG
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollPaxgLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollPaxgLoanPrice, 18))) / 100)
 
-      // in terms of WETH
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollWethLoanPrice, 18))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPrice, 18))) / 100)
-      console.log(Math.round(10000 * Number(ethers.utils.formatUnits(ldoCollWethLoanPrice, 18))) / 10000)
+          // in terms of LDO
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLdoLoanPrice, 18))) / 100)
 
-      const chainlinkBasicUSDImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
-        [usdc.address, aaveAddr, crvAddr, linkAddr, weth.address],
-        [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr],
-        ZERO_ADDR,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      )
-      await chainlinkBasicUSDImplementation.deployed()
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(ldoCollWethLoanPrice, 18))) / 10000)
+        }
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicUSDImplementation.address, true)
+        const chainlinkBasicUSDImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, aaveAddr, crvAddr, linkAddr, weth.address],
+          [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr],
+          ZERO_ADDR,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await chainlinkBasicUSDImplementation.deployed()
 
-      // prices on 2-16-2023
-      const aaveCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
-      const crvCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
-      const linkCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
-      const wethCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
+        await addressRegistry.connect(team).toggleOracle(chainlinkBasicUSDImplementation.address, true)
 
-      const aaveCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, linkAddr) // aave was 85-90$ and link was 7-7.50$ that day
-      const wethCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, linkAddr) // weth was 1650-1700$ and link was 7-7.50$ that day
-      const crvCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, linkAddr) // crv was 1.10-1.20$ and link was 7-7.50$ that day
-      const usdcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, linkAddr) // usdc was 1$ and link was 7-7.50$ that day
+        // prices on 2-16-2023
+        const aaveCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
+        const crvCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
+        const linkCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
+        const wethCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
 
-      const aaveCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
-      const crvCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, weth.address) // crv was 1.10-1.20$ and weth was 1650-1700$ that day
-      const usdcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, weth.address) // usdc was 1$ and weth was 1650-1700$ that day
+        const aaveCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, linkAddr) // aave was 85-90$ and link was 7-7.50$ that day
+        const wethCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, linkAddr) // weth was 1650-1700$ and link was 7-7.50$ that day
+        const crvCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, linkAddr) // crv was 1.10-1.20$ and link was 7-7.50$ that day
+        const usdcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, linkAddr) // usdc was 1$ and link was 7-7.50$ that day
 
-      // in terms of USDC
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPriceUSD, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPriceUSD, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPriceUSD, 6))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPriceUSD, 6))) / 100)
+        const aaveCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
+        const crvCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, weth.address) // crv was 1.10-1.20$ and weth was 1650-1700$ that day
+        const usdcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, weth.address) // usdc was 1$ and weth was 1650-1700$ that day
 
-      // in terms of LINK
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollLinkLoanPriceUSD, 18))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLinkLoanPriceUSD, 18))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollLinkLoanPriceUSD, 18))) / 100)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(usdcCollLinkLoanPriceUSD, 18))) / 100)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(85, 90)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(1.1, 1.2)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(7, 7.5)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(
+          1650,
+          1700
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollLinkLoanPriceUSD, 18))) / 100).to.be.within(12, 13)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLinkLoanPriceUSD, 18))) / 100).to.be.within(230, 235)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(crvCollLinkLoanPriceUSD, 18))) / 100).to.be.within(
+          0.13,
+          0.16
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(usdcCollLinkLoanPriceUSD, 18))) / 100).to.be.within(
+          0.13,
+          0.16
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPriceUSD, 18))) / 100).to.be.within(
+          0.04,
+          0.06
+        )
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(crvCollWethLoanPriceUSD, 18))) / 10000).to.be.within(
+          0.0006,
+          0.0008
+        )
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(usdcCollWethLoanPriceUSD, 18))) / 10000).to.be.within(
+          0.0005,
+          0.0007
+        )
 
-      // in terms of WETH
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPriceUSD, 18))) / 100)
-      console.log(Math.round(10000 * Number(ethers.utils.formatUnits(crvCollWethLoanPriceUSD, 18))) / 10000)
-      console.log(Math.round(10000 * Number(ethers.utils.formatUnits(usdcCollWethLoanPriceUSD, 18))) / 10000)
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPriceUSD, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPriceUSD, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPriceUSD, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPriceUSD, 6))) / 100)
 
-      // btc testing
-      const wbtcCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, usdc.address) // btc was 23600-24900$ that day
-      const wbtcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, linkAddr) // btc was 23600-24900$ and link was 7-7.50$ that day
-      const wbtcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, weth.address) // btc was 23600-24900$ and weth was 1650-1700$ that day
+          // in terms of LINK
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollLinkLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLinkLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollLinkLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(usdcCollLinkLoanPriceUSD, 18))) / 100)
 
-      const aaveCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, wbtc) // aave was 85-90$ and btc was 23600-24900$ that day
-      const wethCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, wbtc) // weth was 1650-1700$ and btc was 23600-24900$ that day
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(crvCollWethLoanPriceUSD, 18))) / 10000)
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(usdcCollWethLoanPriceUSD, 18))) / 10000)
+        }
 
-      // in terms of USDC
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollUSDCLoanPriceUSD, 6))) / 100)
+        // btc testing
+        const wbtcCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, usdc.address) // btc was 23600-24900$ that day
+        const wbtcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, linkAddr) // btc was 23600-24900$ and link was 7-7.50$ that day
+        const wbtcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, weth.address) // btc was 23600-24900$ and weth was 1650-1700$ that day
 
-      // in terms of LINK
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollLinkLoanPriceUSD, 18))) / 100)
+        const aaveCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, wbtc) // aave was 85-90$ and btc was 23600-24900$ that day
+        const wethCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, wbtc) // weth was 1650-1700$ and btc was 23600-24900$ that day
 
-      // in terms of WETH
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollWethLoanPriceUSD, 18))) / 100)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(
+          23600,
+          24900
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollLinkLoanPriceUSD, 18))) / 100).to.be.within(
+          3390,
+          4000
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollWethLoanPriceUSD, 18))) / 100).to.be.within(14, 15)
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(aaveCollWbtcLoanPriceUSD, 8))) / 10000).to.be.within(
+          0.003,
+          0.004
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollWbtcLoanPriceUSD, 8))) / 100).to.be.within(
+          0.06,
+          0.08
+        )
 
-      // in terms of WBTC
-      console.log(Math.round(10000 * Number(ethers.utils.formatUnits(aaveCollWbtcLoanPriceUSD, 8))) / 10000)
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollWbtcLoanPriceUSD, 8))) / 100)
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollUSDCLoanPriceUSD, 6))) / 100)
 
-      const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
-      const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
-        [usdc.address, linkAddr, aaveAddr, crvAddr],
-        [usdcEthChainlinkAddr, linkEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      )
-      await olympusOracleImplementation.deployed()
+          // in terms of LINK
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollLinkLoanPriceUSD, 18))) / 100)
 
-      await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address, true)
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollWethLoanPriceUSD, 18))) / 100)
 
-      const gOhmCollUSDCLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, usdc.address)
-      const gOhmCollLinkLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, linkAddr)
-      const gOhmCollAaveLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, aaveAddr)
-      const gOhmCollCrvLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, crvAddr)
-      const gOhmCollWethLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, weth.address)
+          // in terms of WBTC
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(aaveCollWbtcLoanPriceUSD, 8))) / 10000)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollWbtcLoanPriceUSD, 8))) / 100)
+        }
+      })
 
-      // in terms of USDC
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollUSDCLoanPrice, 6))) / 100) // gohm was 2840-2930$ that day
-      // in terms of LINK
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollLinkLoanPrice, 18))) / 100) // gohm was 2840-2930$ and link was 7-7.50$ that day
-      // in terms of AAVE
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollAaveLoanPrice, 18))) / 100) // gohm was 2840-2930$ and aave was 85-90$ that day
-      // in terms of CRV
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollCrvLoanPrice, 18))) / 100) // gohm was 2840-2930$ and crv was 1.10-1.20$ that day
-      // in terms of WETH
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollWethLoanPrice, 18))) / 100) // gohm was 2840-2930$ and weth was 1650-1700$ that day
+      it('Should process olympus oracle prices correctly', async function () {
+        const { addressRegistry, usdc, weth, wbtc, gohm, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
+          await setupTest()
 
-      const usdcCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(usdc.address, gohm.address)
-      const linkCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(linkAddr, gohm.address)
-      const aaveCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(aaveAddr, gohm.address)
-      const crvCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(crvAddr, gohm.address)
-      const wethCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(weth.address, gohm.address)
+        const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
+        const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
+        const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
 
-      // in terms of USDC
-      console.log(Math.round(100000 * Number(ethers.utils.formatUnits(usdcCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and usdc was 1$ that day
-      // in terms of LINK
-      console.log(Math.round(100000 * Number(ethers.utils.formatUnits(linkCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and link was 7-7.50$ that day
-      // in terms of AAVE
-      console.log(Math.round(1000 * Number(ethers.utils.formatUnits(aaveCollGOhmLoanPrice, 18))) / 1000) // gohm was 2840-2930$ and aave was 85-90$ that day
-      // in terms of CRV
-      console.log(Math.round(100000 * Number(ethers.utils.formatUnits(crvCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and crv was 1.10-1.20$ that day
-      // in terms of WETH
-      console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollGOhmLoanPrice, 18))) / 100) // gohm was 2840-2930$ and weth was 1650-1700$ that day
+        const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
+        const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
+          [usdc.address, linkAddr, aaveAddr, crvAddr],
+          [usdcEthChainlinkAddr, linkEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await olympusOracleImplementation.deployed()
+
+        await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address, true)
+
+        const gOhmCollUSDCLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, usdc.address)
+        const gOhmCollLinkLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, linkAddr)
+        const gOhmCollAaveLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, aaveAddr)
+        const gOhmCollCrvLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, crvAddr)
+        const gOhmCollWethLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, weth.address)
+
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollUSDCLoanPrice, 6))) / 100).to.be.within(2840, 2930)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollLinkLoanPrice, 18))) / 100).to.be.within(390, 400)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollAaveLoanPrice, 18))) / 100).to.be.within(30, 35)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollCrvLoanPrice, 18))) / 100).to.be.within(2550, 2575)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollWethLoanPrice, 18))) / 100).to.be.within(1.7, 1.8)
+
+        // toggle to show logs
+        const showLogs = false
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollUSDCLoanPrice, 6))) / 100) // gohm was 2840-2930$ that day
+          // in terms of LINK
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollLinkLoanPrice, 18))) / 100) // gohm was 2840-2930$ and link was 7-7.50$ that day
+          // in terms of AAVE
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollAaveLoanPrice, 18))) / 100) // gohm was 2840-2930$ and aave was 85-90$ that day
+          // in terms of CRV
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollCrvLoanPrice, 18))) / 100) // gohm was 2840-2930$ and crv was 1.10-1.20$ that day
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollWethLoanPrice, 18))) / 100) // gohm was 2840-2930$ and weth was 1650-1700$ that day
+        }
+
+        const usdcCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(usdc.address, gohm.address)
+        const linkCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(linkAddr, gohm.address)
+        const aaveCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(aaveAddr, gohm.address)
+        const crvCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(crvAddr, gohm.address)
+        const wethCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(weth.address, gohm.address)
+
+        expect(Math.round(100000 * Number(ethers.utils.formatUnits(usdcCollGOhmLoanPrice, 18))) / 100000).to.be.within(
+          0.0003,
+          0.0004
+        )
+        expect(Math.round(100000 * Number(ethers.utils.formatUnits(linkCollGOhmLoanPrice, 18))) / 100000).to.be.within(
+          0.0025,
+          0.003
+        )
+        expect(Math.round(1000 * Number(ethers.utils.formatUnits(aaveCollGOhmLoanPrice, 18))) / 1000).to.be.within(
+          0.03,
+          0.04
+        )
+        expect(Math.round(100000 * Number(ethers.utils.formatUnits(crvCollGOhmLoanPrice, 18))) / 100000).to.be.within(
+          0.0003,
+          0.0004
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollGOhmLoanPrice, 18))) / 100).to.be.within(0.55, 0.6)
+
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100000 * Number(ethers.utils.formatUnits(usdcCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and usdc was 1$ that day
+          // in terms of LINK
+          console.log(Math.round(100000 * Number(ethers.utils.formatUnits(linkCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and link was 7-7.50$ that day
+          // in terms of AAVE
+          console.log(Math.round(1000 * Number(ethers.utils.formatUnits(aaveCollGOhmLoanPrice, 18))) / 1000) // gohm was 2840-2930$ and aave was 85-90$ that day
+          // in terms of CRV
+          console.log(Math.round(100000 * Number(ethers.utils.formatUnits(crvCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and crv was 1.10-1.20$ that day
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollGOhmLoanPrice, 18))) / 100) // gohm was 2840-2930$ and weth was 1650-1700$ that day
+        }
+      })
     })
   })
 })

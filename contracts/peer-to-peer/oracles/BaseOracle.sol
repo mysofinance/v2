@@ -10,9 +10,9 @@ import {Errors} from "../../Errors.sol";
 abstract contract BaseOracle {
     address internal immutable wethAddrOfGivenChain;
     // since arbitrum and eth support BTC/USD and wBTC/BTC only use USD oracles
-    address internal immutable wBTCAddrOfGivenChain;
-    address internal immutable btcToUSDOracleAddrOfGivenChain;
-    address internal immutable wBTCToBTCOracleAddrOfGivenChain;
+    address internal immutable wBtcAddrOfGivenChain;
+    address internal immutable btcToUsdOracleAddrOfGivenChain;
+    address internal immutable wBtcToBtcOracleAddrOfGivenChain;
     // tokenAddr => chainlink oracle addr
     // oracles will be eth or usd based
     mapping(address => address) public oracleAddrs;
@@ -22,22 +22,21 @@ abstract contract BaseOracle {
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address _wethAddrOfGivenChain,
-        address _wBTCAddrOfGivenChain,
-        address _btcToUSDOracleAddrOfGivenChain,
-        address _wBTCToBTCOracleAddrOfGivenChain
+        address _wBtcAddrOfGivenChain,
+        address _btcToUsdOracleAddrOfGivenChain,
+        address _wBtcToBtcOracleAddrOfGivenChain
     ) {
         wethAddrOfGivenChain = _wethAddrOfGivenChain;
         isUSDBased = _wethAddrOfGivenChain == address(0);
-        wBTCAddrOfGivenChain = _wBTCAddrOfGivenChain;
-        btcToUSDOracleAddrOfGivenChain = _btcToUSDOracleAddrOfGivenChain;
-        wBTCToBTCOracleAddrOfGivenChain = _wBTCToBTCOracleAddrOfGivenChain;
+        wBtcAddrOfGivenChain = _wBtcAddrOfGivenChain;
+        btcToUsdOracleAddrOfGivenChain = _btcToUsdOracleAddrOfGivenChain;
+        wBtcToBtcOracleAddrOfGivenChain = _wBtcToBtcOracleAddrOfGivenChain;
         // if you use eth oracles with weth, will just return weth address
         // for usd-based oracle weth/usd oracle addr will need to be passed in like others
-        if (!isUSDBased) {
-            oracleAddrs[_wethAddrOfGivenChain] = _wethAddrOfGivenChain;
-        }
         if (isUSDBased) {
-            oracleAddrs[_wBTCAddrOfGivenChain] = _wBTCAddrOfGivenChain;
+            oracleAddrs[_wBtcAddrOfGivenChain] = _wBtcAddrOfGivenChain;
+        } else {
+            oracleAddrs[_wethAddrOfGivenChain] = _wethAddrOfGivenChain;
         }
         if (
             _tokenAddrs.length == 0 || _tokenAddrs.length != _oracleAddrs.length
@@ -79,8 +78,8 @@ abstract contract BaseOracle {
     ) internal view returns (uint256 tokenPriceRaw) {
         if (oracleAddr == wethAddrOfGivenChain) {
             tokenPriceRaw = 10 ** 18;
-        } else if (oracleAddr == wBTCAddrOfGivenChain) {
-            tokenPriceRaw = getBTCPrice();
+        } else if (oracleAddr == wBtcAddrOfGivenChain) {
+            tokenPriceRaw = getWbtcPrice();
         } else {
             (
                 uint80 roundId,
@@ -105,14 +104,14 @@ abstract contract BaseOracle {
      * denominator accounts for 8 decimals of btc
      * @return answer price of wbtc in USD which has 8 oracle decimals
      */
-    function getBTCPrice() internal view returns (uint256 answer) {
+    function getWbtcPrice() internal view returns (uint256 answer) {
         (
             uint80 roundId,
             int256 btcUSDAnswer,
             ,
             uint256 updatedAt,
             uint80 answeredInRound
-        ) = AggregatorV3Interface(btcToUSDOracleAddrOfGivenChain)
+        ) = AggregatorV3Interface(btcToUsdOracleAddrOfGivenChain)
                 .latestRoundData();
         uint256 uBtcUSDAnswer = checkChainlinkAnswerAndCastToUint256(
             roundId,
@@ -120,22 +119,22 @@ abstract contract BaseOracle {
             updatedAt,
             answeredInRound
         );
-        int256 wBTCBTCAnswer;
+        int256 wBtcBtcAnswer;
         (
             roundId,
-            wBTCBTCAnswer,
+            wBtcBtcAnswer,
             ,
             updatedAt,
             answeredInRound
-        ) = AggregatorV3Interface(wBTCToBTCOracleAddrOfGivenChain)
+        ) = AggregatorV3Interface(wBtcToBtcOracleAddrOfGivenChain)
             .latestRoundData();
-        uint256 uWBTCBTCAnswer = checkChainlinkAnswerAndCastToUint256(
+        uint256 uWbtcBtcAnswer = checkChainlinkAnswerAndCastToUint256(
             roundId,
-            wBTCBTCAnswer,
+            wBtcBtcAnswer,
             updatedAt,
             answeredInRound
         );
-        answer = (uWBTCBTCAnswer * uBtcUSDAnswer) / (10 ** 8);
+        answer = (uWbtcBtcAnswer * uBtcUSDAnswer) / (10 ** 8);
     }
 
     /**
@@ -145,10 +144,10 @@ abstract contract BaseOracle {
      * @param collToken address of coll token
      * @param loanToken address of loan token
      */
-    function validBTCCheck(address collToken, address loanToken) internal view {
+    function validBtcCheck(address collToken, address loanToken) internal view {
         if (
-            (loanToken == wBTCAddrOfGivenChain ||
-                collToken == wBTCAddrOfGivenChain) && !isUSDBased
+            (loanToken == wBtcAddrOfGivenChain ||
+                collToken == wBtcAddrOfGivenChain) && !isUSDBased
         ) {
             revert Errors.InvalidBTCOracle();
         }

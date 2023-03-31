@@ -185,7 +185,7 @@ const collTokenAbi = [
     outputs: [{ internalType: 'uint8', name: '', type: 'uint8' }],
     payable: false,
     stateMutability: 'view',
-    type: 'function' 
+    type: 'function'
   }
 ]
 
