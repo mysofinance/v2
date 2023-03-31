@@ -96,7 +96,8 @@ export const getTotalEthValue = async (
   provider: SignerWithAddress,
   token0OracleAddr: string,
   token1OracleAddr: string,
-  wethAddr: string
+  wethAddr: string,
+  isColl: boolean
 ): Promise<BigNumber> => {
   const uniV2Instance = new ethers.Contract(lpTokenAddr, uniV2Abi, provider)
   const token0 = await uniV2Instance.token0()
@@ -126,5 +127,9 @@ export const getTotalEthValue = async (
   }
   const token1EthValue = answer.mul(reserve1).div(BigNumber.from(10).pow(decimals1))
 
-  return token0EthValue.gt(token1EthValue) ? token1EthValue.mul(2) : token0EthValue.mul(2)
+  if (isColl) {
+    return token0EthValue.gt(token1EthValue) ? token1EthValue.mul(2) : token0EthValue.mul(2)
+  } else {
+    return token0EthValue.gt(token1EthValue) ? token0EthValue.mul(2) : token1EthValue.mul(2)
+  }
 }

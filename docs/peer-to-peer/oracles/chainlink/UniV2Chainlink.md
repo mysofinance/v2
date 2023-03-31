@@ -6,7 +6,7 @@
 
 
 
-*supports oracles which have one token which is a 50/50 LP token compatible with v2v3 or v3 interfaces*
+*supports oracles which have one token which is a 50/50 LP token compatible with v2v3 or v3 interfaces should only be utilized with eth based oracles, not usd-based oracles*
 
 ## Methods
 
