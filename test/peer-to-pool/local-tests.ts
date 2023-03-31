@@ -9,13 +9,18 @@ import {
 } from './helpers/misc'
 import { ADDRESS_ZERO } from '@uniswap/v3-sdk'
 
+// test config vars
+let snapshotId : String // use snapshot id to reset state before each test
+
+// general constants
+const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 
-// constants
+// deployment parameterization constants
 const MIN_ARRANGER_FEE = BASE.mul(5).div(10000) // 5bps
 const MAX_ARRANGER_FEE = BASE.mul(5).div(10) // 50%
 const MIN_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY
@@ -32,6 +37,15 @@ const REPAYMENT_GRACE_PERIOD = MIN_REPAYMENT_GRACE_PERIOD
 const REL_ARRANGER_FEE = BASE.mul(50).div(10000)
 
 describe('Peer-to-Pool: Local Tests', function () {
+  
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot');
+  })
+
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId]);
+  })
+
   async function setupTest() {
     const [lender0, lender1, lender2, lender3, arranger, daoTreasury, team, anyUser] = await ethers.getSigners()
 
