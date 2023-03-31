@@ -4,6 +4,11 @@ import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { LenderVaultImpl, MyERC20 } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
+// test config vars
+let snapshotId : String // use snapshot id to reset state before each test
+
+// constants
+const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
@@ -193,6 +198,15 @@ async function generateOffChainQuote({
 }
 
 describe('Peer-to-Peer: Local Tests', function () {
+  
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot');
+  })
+
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId]);
+  })
+
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
