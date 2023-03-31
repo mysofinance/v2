@@ -11,6 +11,7 @@ import {Errors} from "../../../Errors.sol";
 
 /**
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
+ * should only be utilized with eth based oracles, not usd-based oracles
  */
 contract OlympusOracle is IOracle, BaseOracle {
     address internal constant GOHM_ADDR =
