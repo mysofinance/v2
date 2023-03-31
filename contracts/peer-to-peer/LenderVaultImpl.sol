@@ -400,7 +400,10 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         uint256 vaultLoanTokenBal = IERC20(generalQuoteInfo.loanToken)
             .balanceOf(address(this));
         // check if loan is too big for vault
-        if (loanAmount > vaultLoanTokenBal) {
+        if (
+            loanAmount >
+            vaultLoanTokenBal - lockedAmounts[generalQuoteInfo.loanToken]
+        ) {
             revert Errors.InsufficientVaultFunds();
         }
         int256 _interestRateFactor = int256(Constants.BASE) +
