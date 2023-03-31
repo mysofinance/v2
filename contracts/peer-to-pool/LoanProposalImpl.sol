@@ -382,7 +382,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
         if (lenderContribution == 0) {
             revert Errors.InvalidSender();
         }
-        // iff there's a repay, currentRepaymentIdx (initially 0) gets incremented;
+        // the currentRepaymentIdx (initially 0) only ever gets incremented on repay;
         // hence any `repaymentIdx` smaller than `currentRepaymentIdx` will always
         // map to a valid repayment claim
         if (repaymentIdx >= dynamicData.currentRepaymentIdx) {
@@ -541,7 +541,8 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
     }
 
     function checkCurrRepaymentIdx(uint256 repaymentIdx) internal view {
-        // currentRepaymentIdx increments on every repay; iff full repay then currentRepaymentIdx == _loanTerms.repaymentSchedule.length
+        // currentRepaymentIdx increments on every repay;
+        // if and only if loan was fully repaid, then currentRepaymentIdx == _loanTerms.repaymentSchedule.length
         if (repaymentIdx == _loanTerms.repaymentSchedule.length) {
             revert Errors.LoanIsFullyRepaid();
         }
@@ -575,9 +576,7 @@ contract LoanProposalImpl is Initializable, IEvents, ILoanProposalImpl {
             }
             currDueDate = repaymentSchedule[i].dueTimestamp;
             if (
-                (currDueDate <= prevDueDate ||
-                    currDueDate - prevDueDate <
-                    Constants.MIN_TIME_BETWEEN_DUE_DATES)
+                currDueDate < prevDueDate + Constants.MIN_TIME_BETWEEN_DUE_DATES
             ) {
                 revert Errors.InvalidDueDates();
             }
