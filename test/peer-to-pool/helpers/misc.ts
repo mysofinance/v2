@@ -23,16 +23,20 @@ export const getLoanTermsTemplate = () => {
   return loanTerms
 }
 
-export const getRepaymentScheduleEntry = (loanTokenDue: BigNumber | Number, collTokenDueIfConverted: BigNumber | Number, dueTimestamp: BigNumber | Number) => {
+export const getRepaymentScheduleEntry = (
+  loanTokenDue: BigNumber | Number,
+  collTokenDueIfConverted: BigNumber | Number,
+  dueTimestamp: BigNumber | Number
+) => {
   const repaymentSchedule = {
-      loanTokenDue: loanTokenDue,
-      collTokenDueIfConverted: collTokenDueIfConverted,
-      dueTimestamp: dueTimestamp
-    }
+    loanTokenDue: loanTokenDue,
+    collTokenDueIfConverted: collTokenDueIfConverted,
+    dueTimestamp: dueTimestamp
+  }
   return repaymentSchedule
 }
 
-export const getDummyLoanTerms = async (daoTreasuryAddr:string) => {
+export const getDummyLoanTerms = async (daoTreasuryAddr: string) => {
   const blocknum = await ethers.provider.getBlockNumber()
   const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
   const firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY.mul(365))
@@ -68,28 +72,53 @@ export const getDummyLoanTerms = async (daoTreasuryAddr:string) => {
   return loanTerms
 }
 
-export const createLoanProposal = async (loanProposalFactory : LoanProposalFactory, arranger : SignerWithAddress, fundingPoolAddr : string, daoTokenAddr : string, relArrangerFee : BigNumber, unsubscribeGracePeriod : BigNumber, conversionGracePeriod: BigNumber, repaymentGracePeriod: BigNumber) => {
-    // arranger creates loan proposal
-    await loanProposalFactory.connect(arranger).createLoanProposal(fundingPoolAddr, daoTokenAddr, relArrangerFee, unsubscribeGracePeriod, conversionGracePeriod, repaymentGracePeriod)
-    const loanProposalAddr = await loanProposalFactory.loanProposals(0)
-    const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
-    const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
-    return loanProposal
+export const createLoanProposal = async (
+  loanProposalFactory: LoanProposalFactory,
+  arranger: SignerWithAddress,
+  fundingPoolAddr: string,
+  daoTokenAddr: string,
+  relArrangerFee: BigNumber,
+  unsubscribeGracePeriod: BigNumber,
+  conversionGracePeriod: BigNumber,
+  repaymentGracePeriod: BigNumber
+) => {
+  // arranger creates loan proposal
+  await loanProposalFactory
+    .connect(arranger)
+    .createLoanProposal(
+      fundingPoolAddr,
+      daoTokenAddr,
+      relArrangerFee,
+      unsubscribeGracePeriod,
+      conversionGracePeriod,
+      repaymentGracePeriod
+    )
+  const loanProposalAddr = await loanProposalFactory.loanProposals(0)
+  const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
+  const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
+  return loanProposal
 }
 
-export const addSubscriptionsToLoanProposal = async (lender1: SignerWithAddress, lender2: SignerWithAddress, lender3: SignerWithAddress, fundingToken: MyERC20, fundingPool: FundingPool, loanProposal :LoanProposal) => {
+export const addSubscriptionsToLoanProposal = async (
+  lender1: SignerWithAddress,
+  lender2: SignerWithAddress,
+  lender3: SignerWithAddress,
+  fundingToken: MyERC20,
+  fundingPool: FundingPool,
+  loanProposal: LoanProposal
+) => {
   // 3 lenders each contribute 1/3 of maxLoanAmount
   const loanTerms = await loanProposal.loanTerms()
-  const subscriptionAmount = (loanTerms.maxLoanAmount).div(3)
+  const subscriptionAmount = loanTerms.maxLoanAmount.div(3)
   await fundingToken.connect(lender1).approve(fundingPool.address, subscriptionAmount)
   await fundingPool.connect(lender1).deposit(subscriptionAmount, 0)
-  await fundingPool.connect(lender1).subscribe(loanProposal.address,subscriptionAmount)
+  await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionAmount)
 
   await fundingToken.connect(lender2).approve(fundingPool.address, subscriptionAmount)
   await fundingPool.connect(lender2).deposit(subscriptionAmount, 0)
-  await fundingPool.connect(lender2).subscribe(loanProposal.address,subscriptionAmount)
+  await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
 
   await fundingToken.connect(lender3).approve(fundingPool.address, subscriptionAmount)
   await fundingPool.connect(lender3).deposit(subscriptionAmount, 0)
-  await fundingPool.connect(lender3).subscribe(loanProposal.address,subscriptionAmount)
+  await fundingPool.connect(lender3).subscribe(loanProposal.address, subscriptionAmount)
 }
