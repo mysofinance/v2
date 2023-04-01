@@ -6,8 +6,11 @@ require('hardhat-contract-sizer')
 require('dotenv').config()
 require('solidity-coverage')
 
-const INFURA_API_KEY = '764119145a6a4d09a1cf8f8c7a2c7b46' // todo: replace with env before resubmitting
-const ALCHEMY_API_KEY = 'QLXkHVq78U_cbV-q0TMWTH8-QmK2Zp3y' // todo: replace with env before resubmitting
+export const INFURA_API_KEY = '764119145a6a4d09a1cf8f8c7a2c7b46' // todo: replace with env before resubmitting
+export const ALCHEMY_API_KEY = 'QLXkHVq78U_cbV-q0TMWTH8-QmK2Zp3y' // todo: replace with env before resubmitting
+export const MAINNET_BLOCK_NUMBER = 16640270 // 2023-02-16
+export const ARBITRUM_BLOCK_NUMBER = 63771760 // 2023-02-23
+export const ARBITRUM_CHAIN_ID = 31336
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? '000000000000000000000000000000000000000000000000000000000000dead' // todo: replace with env before resubmitting
 
 console.log(`Using hardhat config with GOERLI_URL=${ALCHEMY_API_KEY} and PRIVATE_KEY=${PRIVATE_KEY}`) // todo: remove before resubmitting
@@ -16,15 +19,15 @@ const forkMainnet = {
   chainId: 1,
   forking: {
     url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-    blockNumber: 16640270 // 2023-02-16
+    blockNumber: MAINNET_BLOCK_NUMBER // 2023-02-16
   }
 }
 
 const forkArbitrum = {
-  chainId: 31336,
+  chainId: ARBITRUM_CHAIN_ID,
   forking: {
     url: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-    blockNumber: 63771760 // 2023-02-23
+    blockNumber: ARBITRUM_BLOCK_NUMBER // 2023-02-23
   }
 }
 

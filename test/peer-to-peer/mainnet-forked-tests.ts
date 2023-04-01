@@ -1,6 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
+import { INFURA_API_KEY, MAINNET_BLOCK_NUMBER } from '../../hardhat.config'
 import {
   balancerV2VaultAbi,
   balancerV2PoolAbi,
@@ -13,8 +14,7 @@ import {
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers/misc'
 
 // test config constants & vars
-const INFURA_API_KEY = '764119145a6a4d09a1cf8f8c7a2c7b46' // todo: replace with env before resubmitting
-const BLOCK_NUMBER = 16640270 // todo: replace with env before resubmitting
+const BLOCK_NUMBER = MAINNET_BLOCK_NUMBER // todo: replace with env before resubmitting
 let snapshotId : String // use snapshot id to reset state before each test
 
 // constants
@@ -2540,6 +2540,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
     const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
     const ldoEthChainlinkAddr = '0x4e844125952d32acdf339be976c98e22f6f318db'
+    const usdtEthChainlinkAddr = '0xee9f2375b4bdf6387aa8265dd4fb8f16512a1d46'
 
     const aaveUsdChainlinkAddr = '0x547a514d5e3769680ce22b2361c10ea13619e8a9'
     const crvUsdChainlinkAddr = '0xcd627aa160a6fa45eb793d19ef54f5062f20f33f'
@@ -3983,6 +3984,72 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           console.log(Math.round(100000 * Number(ethers.utils.formatUnits(crvCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and crv was 1.10-1.20$ that day
           // in terms of WETH
           console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollGOhmLoanPrice, 18))) / 100) // gohm was 2840-2930$ and weth was 1650-1700$ that day
+        }
+      })
+
+      it('Should process uni v2 oracle prices correctly', async function () {
+        const { addressRegistry, usdc, weth, wbtc, gohm, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
+          await setupTest()
+
+        const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
+        const usdtAddr = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+
+        // uni v2 Addrs
+        const uniV2WethWiseAddr = '0x21b8065d10f73EE2e260e5B47D3344d3Ced7596E'
+        const uniV2WethUsdtAddr = '0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60'
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // uni v2 contracts
+        const uniV2WethWiseInstance = await ethers.getContractAt('IUniV2', uniV2WethWiseAddr)
+        const uniV2WethUsdtInstance = await ethers.getContractAt('IUniV2', uniV2WethUsdtAddr)
+        const uniV2PaxgUsdcInstance = await ethers.getContractAt('IUniV2', uniV2PaxgUsdcAddr)
+        const uniV2WethUsdcInstance = await ethers.getContractAt('IUniV2', uniV2WethUsdcAddr)
+
+        // uni v2 reserves, token slots and supply
+        const uniV2WethUsdtReservesInfo = await uniV2WethUsdtInstance.getReserves()
+        const uniV2WethUsdtToken0 = await uniV2WethUsdtInstance.token0()
+        const uniV2WethUsdtToken1 = await uniV2WethUsdtInstance.token1()
+        const uniV2WethUsdtSupply = await uniV2WethUsdtInstance.totalSupply()
+        const uniV2PaxgUsdcReservesInfo = await uniV2PaxgUsdcInstance.getReserves()
+        const uniV2PaxgUsdcToken0 = await uniV2PaxgUsdcInstance.token0()
+        const uniV2PaxgUsdcToken1 = await uniV2PaxgUsdcInstance.token1()
+        const uniV2PaxgUsdcSupply = await uniV2PaxgUsdcInstance.totalSupply()
+        const uniV2WethUsdcReservesInfo = await uniV2WethUsdcInstance.getReserves()
+        const uniV2WethUsdcToken0 = await uniV2WethUsdcInstance.token0()
+        const uniV2WethUsdcToken1 = await uniV2WethUsdcInstance.token1()
+        const uniV2WethUsdcSupply = await uniV2WethUsdcInstance.totalSupply()
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address, usdtAddr],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2WethWiseAddr, uniV2WethUsdtAddr, uniV2PaxgUsdcAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await uniV2OracleImplementation.deployed()
+  
+        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+
+        const uniV2WethWiseCollUSDCLoanPrice = await expect(uniV2OracleImplementation.getPrice(uniV2WethWiseAddr, usdc.address)).to.be.revertedWithCustomError(uniV2OracleImplementation, 'InvalidOraclePair')
+        const usdcColluniV2WethWiseLoanPrice = await expect(uniV2OracleImplementation.getPrice(usdc.address, uniV2WethWiseAddr)).to.be.revertedWithCustomError(uniV2OracleImplementation, 'InvalidOraclePair')
+        const gohmColluniV2WethUsdtLoanPrice = await expect(uniV2OracleImplementation.getPrice(gohm.address, uniV2WethUsdtAddr)).to.be.revertedWithCustomError(uniV2OracleImplementation, 'InvalidOraclePair')
+        
+        const uniV2WethUsdtCollUSDCLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, usdc.address)
+        const uniV2PaxgUsdcCollUSDCLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, usdc.address)
+        const uniV2WethUsdcCollUSDCLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, usdc.address)
+
+
+        // toggle to show logs
+        const showLogs = true
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUSDCLoanPrice, 6))) / 100) // gohm was 2840-2930$ that day
         }
       })
     })

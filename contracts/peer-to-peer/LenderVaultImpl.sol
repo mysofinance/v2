@@ -82,7 +82,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
 
         lockedAmounts[collToken] -= totalUnlockableColl;
-        // if collToken is not used by vault as loan token, then 
+        // if collToken is not used by vault as loan token, then
         // vault owner may have wanted to leave unlocked coll in vault
         if (autoWithdraw) {
             uint256 currentCollTokenBalance = IERC20Metadata(collToken)
@@ -409,7 +409,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
         uint256 vaultLoanTokenBal = IERC20(generalQuoteInfo.loanToken)
             .balanceOf(address(this));
-        // check if loan is too big for vault
+        // check if loan is too big for vault excluding locked funds
         if (
             loanAmount >
             vaultLoanTokenBal - lockedAmounts[generalQuoteInfo.loanToken]

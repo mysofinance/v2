@@ -1,15 +1,15 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
+import { ALCHEMY_API_KEY, ARBITRUM_BLOCK_NUMBER, ARBITRUM_CHAIN_ID } from '../../hardhat.config'
 import { collTokenAbi, gmxRewardRouterAbi } from './helpers/abi'
 import { createOnChainRequest } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
 // test config constants & vars
-const ALCHEMY_API_KEY = 'QLXkHVq78U_cbV-q0TMWTH8-QmK2Zp3y' // todo: replace with env before final resubmission
-const BLOCK_NUMBER = 63771760 // todo: replace with env before resubmitting
-const CHAIN_ID = 31336 // todo: replace with env before resubmitting
+const BLOCK_NUMBER = ARBITRUM_BLOCK_NUMBER
+const CHAIN_ID = ARBITRUM_CHAIN_ID
 let snapshotId : String // use snapshot id to reset state before each test
 
 // constants
