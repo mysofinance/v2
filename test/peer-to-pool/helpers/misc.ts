@@ -12,11 +12,9 @@ const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 
 export const getLoanTermsTemplate = () => {
-  const repaymentSchedule = getRepaymentScheduleTemplate()
+  const repaymentSchedule = getRepaymentScheduleEntry(0, 0, 0)
   const loanTerms = {
     borrower: ZERO_ADDR,
-    collToken: ZERO_ADDR,
-    loanToken: ZERO_ADDR,
     minLoanAmount: ZERO,
     maxLoanAmount: ZERO,
     collPerLoanToken: ZERO,
@@ -25,18 +23,16 @@ export const getLoanTermsTemplate = () => {
   return loanTerms
 }
 
-export const getRepaymentScheduleTemplate = () => {
+export const getRepaymentScheduleEntry = (loanTokenDue: BigNumber | Number, collTokenDueIfConverted: BigNumber | Number, dueTimestamp: BigNumber | Number) => {
   const repaymentSchedule = {
-      loanTokenDue: ZERO,
-      collTokenDueIfConverted: ZERO,
-      dueTimestamp: ZERO,
-      conversionGracePeriod: ZERO,
-      repaymentGracePeriod: ZERO
+      loanTokenDue: loanTokenDue,
+      collTokenDueIfConverted: collTokenDueIfConverted,
+      dueTimestamp: dueTimestamp
     }
   return repaymentSchedule
 }
 
-export const getDummyLoanTerms = async (daoTreasuryAddr:string, daoTokenAddr:string, loanTokenAddr:string) => {
+export const getDummyLoanTerms = async (daoTreasuryAddr:string) => {
   const blocknum = await ethers.provider.getBlockNumber()
   const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
   const firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY.mul(365))
@@ -44,36 +40,26 @@ export const getDummyLoanTerms = async (daoTreasuryAddr:string, daoTokenAddr:str
     {
       loanTokenDue: BASE.mul(25).div(100), // 25%, i.e., in relative terms to final loan amount (once known)
       collTokenDueIfConverted: ONE_WETH.mul(90).div(100), // 0.9 DAO token per lent loan token, i.e., in relative terms (same as above)
-      dueTimestamp: firstDueDate,
-      conversionGracePeriod: ONE_DAY,
-      repaymentGracePeriod: ONE_DAY
+      dueTimestamp: firstDueDate
     },
     {
       loanTokenDue: BASE.mul(25).div(100),
       collTokenDueIfConverted: ONE_WETH.mul(80).div(100),
-      dueTimestamp: firstDueDate.add(ONE_DAY.mul(90)),
-      conversionGracePeriod: ONE_DAY,
-      repaymentGracePeriod: ONE_DAY
+      dueTimestamp: firstDueDate.add(ONE_DAY.mul(90))
     },
     {
       loanTokenDue: BASE.mul(25).div(100),
       collTokenDueIfConverted: ONE_WETH.mul(70).div(100),
-      dueTimestamp: firstDueDate.add(ONE_DAY.mul(180)),
-      conversionGracePeriod: ONE_DAY,
-      repaymentGracePeriod: ONE_DAY
+      dueTimestamp: firstDueDate.add(ONE_DAY.mul(180))
     },
     {
       loanTokenDue: BASE.mul(25).div(100),
       collTokenDueIfConverted: ONE_WETH.mul(60).div(100),
-      dueTimestamp: firstDueDate.add(ONE_DAY.mul(270)),
-      conversionGracePeriod: ONE_DAY,
-      repaymentGracePeriod: ONE_DAY
+      dueTimestamp: firstDueDate.add(ONE_DAY.mul(270))
     }
   ]
   const loanTerms = {
     borrower: daoTreasuryAddr,
-    collToken: daoTokenAddr,
-    loanToken: loanTokenAddr,
     minLoanAmount: ONE_USDC.mul(10000),
     maxLoanAmount: ONE_USDC.mul(500000),
     collPerLoanToken: ONE_WETH.mul(2),
@@ -82,9 +68,9 @@ export const getDummyLoanTerms = async (daoTreasuryAddr:string, daoTokenAddr:str
   return loanTerms
 }
 
-export const createLoanProposal = async (loanProposalFactory : LoanProposalFactory, arranger : SignerWithAddress, fundingPoolAddr : string, daoTokenAddr : string, relArrangerFee : BigNumber, lenderGracePeriod : BigNumber) => {
+export const createLoanProposal = async (loanProposalFactory : LoanProposalFactory, arranger : SignerWithAddress, fundingPoolAddr : string, daoTokenAddr : string, relArrangerFee : BigNumber, unsubscribeGracePeriod : BigNumber, conversionGracePeriod: BigNumber, repaymentGracePeriod: BigNumber) => {
     // arranger creates loan proposal
-    await loanProposalFactory.connect(arranger).createLoanProposal(fundingPoolAddr, daoTokenAddr, relArrangerFee, lenderGracePeriod)
+    await loanProposalFactory.connect(arranger).createLoanProposal(fundingPoolAddr, daoTokenAddr, relArrangerFee, unsubscribeGracePeriod, conversionGracePeriod, repaymentGracePeriod)
     const loanProposalAddr = await loanProposalFactory.loanProposals(0)
     const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
     const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)

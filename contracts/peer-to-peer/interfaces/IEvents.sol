@@ -74,4 +74,13 @@ interface IEvents {
         bool whitelistStatus,
         EventToggleType toggleType
     );
+
+    event QuoteProcessed(
+        address borrower,
+        DataTypes.Loan loan,
+        uint256 loanId,
+        address collReceiver
+    );
+
+    event Withdrew(address indexed tokenAddr, uint256 withdrawAmount);
 }

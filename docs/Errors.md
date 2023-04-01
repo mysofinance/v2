@@ -298,6 +298,17 @@ error InvalidDelegatee()
 
 
 
+### InvalidDueDates
+
+```solidity
+error InvalidDueDates()
+```
+
+
+
+
+
+
 ### InvalidFee
 
 ```solidity
@@ -320,10 +331,21 @@ error InvalidGaugeIndex()
 
 
 
-### InvalidNewLoanTerms
+### InvalidGracePeriod
 
 ```solidity
-error InvalidNewLoanTerms()
+error InvalidGracePeriod()
+```
+
+
+
+
+
+
+### InvalidMinOrMaxLoanAmount
+
+```solidity
+error InvalidMinOrMaxLoanAmount()
 ```
 
 
@@ -430,17 +452,6 @@ error InvalidRepayAmount()
 
 
 
-### InvalidRepaymentSchedule
-
-```solidity
-error InvalidRepaymentSchedule()
-```
-
-
-
-
-
-
 ### InvalidRollBackRequest
 
 ```solidity
@@ -533,6 +544,17 @@ error NegativeRepaymentAmount()
 
 ```solidity
 error NeitherTokenIsGOHM()
+```
+
+
+
+
+
+
+### NewMaxLoanAmountBelowCurrentSubscriptions
+
+```solidity
+error NewMaxLoanAmountBelowCurrentSubscriptions()
 ```
 
 
@@ -705,6 +727,17 @@ error RepaymentIdxTooLarge()
 
 
 
+### RepaymentOrConversionAmountIsZero
+
+```solidity
+error RepaymentOrConversionAmountIsZero()
+```
+
+
+
+
+
+
 ### SubscriptionAmountTooHigh
 
 ```solidity
@@ -804,10 +837,10 @@ error UnregisteredVault()
 
 
 
-### UnsubscribeGracePeriodTooShort
+### UnsubscriptionAmountTooLarge
 
 ```solidity
-error UnsubscribeGracePeriodTooShort()
+error UnsubscriptionAmountTooLarge()
 ```
 
 
@@ -815,10 +848,10 @@ error UnsubscribeGracePeriodTooShort()
 
 
 
-### UnsubscriptionAmountTooLarge
+### WaitForLoanTermsCoolOffPeriod
 
 ```solidity
-error UnsubscriptionAmountTooLarge()
+error WaitForLoanTermsCoolOffPeriod()
 ```
 
 

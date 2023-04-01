@@ -30,7 +30,7 @@ Returns the arranger fee split between the arranger and the protocol (e.g. 10% =
 ### createLoanProposal
 
 ```solidity
-function createLoanProposal(address _fundingPool, address _collToken, uint256 _arrangerFee, uint256 _lenderGracePeriod) external nonpayable
+function createLoanProposal(address _fundingPool, address _collToken, uint256 _arrangerFee, uint256 _unsubscribeGracePeriod, uint256 _conversionGracePeriod, uint256 _repaymentGracePeriod) external nonpayable
 ```
 
 Creates a new loan proposal
@@ -44,7 +44,9 @@ Creates a new loan proposal
 | _fundingPool | address | The address of the funding pool from which lenders are allowed to subscribe, and -if loan proposal is successful- from where loan amount is sourced |
 | _collToken | address | The address of collateral token to be provided by borrower |
 | _arrangerFee | uint256 | The relative arranger fee (where 100% = BASE) |
-| _lenderGracePeriod | uint256 | If a lender subscribes to a loan and it gets accepted by the borrower, then the lender can still unsubscribe for _lenderGracePeriod before otherwise being locked in and funding the given loan proposal |
+| _unsubscribeGracePeriod | uint256 | The unsubscribe grace period, i.e., after a loan gets accepted by the borrower lenders can still unsubscribe for this time period before being locked-in |
+| _conversionGracePeriod | uint256 | The grace period during which lenders can convert |
+| _repaymentGracePeriod | uint256 | The grace period during which borrowers can repay |
 
 ### isLoanProposal
 

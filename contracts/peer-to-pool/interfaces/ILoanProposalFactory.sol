@@ -8,13 +8,17 @@ interface ILoanProposalFactory {
      * @param _fundingPool The address of the funding pool from which lenders are allowed to subscribe, and -if loan proposal is successful- from where loan amount is sourced
      * @param _collToken The address of collateral token to be provided by borrower
      * @param _arrangerFee The relative arranger fee (where 100% = BASE)
-     * @param _lenderGracePeriod If a lender subscribes to a loan and it gets accepted by the borrower, then the lender can still unsubscribe for _lenderGracePeriod before otherwise being locked in and funding the given loan proposal
+     * @param _unsubscribeGracePeriod The unsubscribe grace period, i.e., after a loan gets accepted by the borrower lenders can still unsubscribe for this time period before being locked-in
+     * @param _conversionGracePeriod The grace period during which lenders can convert
+     * @param _repaymentGracePeriod The grace period during which borrowers can repay
      */
     function createLoanProposal(
         address _fundingPool,
         address _collToken,
         uint256 _arrangerFee,
-        uint256 _lenderGracePeriod
+        uint256 _unsubscribeGracePeriod,
+        uint256 _conversionGracePeriod,
+        uint256 _repaymentGracePeriod
     ) external;
 
     /**

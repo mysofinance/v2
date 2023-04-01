@@ -3,6 +3,12 @@ import { ethers } from 'hardhat'
 import { getOutGivenIn, fromReadableAmount, toReadableAmount, getOptimCollSendAndFlashBorrowAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
+// test config constants & vars
+const INFURA_API_KEY = '764119145a6a4d09a1cf8f8c7a2c7b46' // todo: replace with env before resubmitting
+const BLOCK_NUMBER = 16640270 // todo: replace with env before resubmitting
+let snapshotId : String // use snapshot id to reset state before each test
+
+// constants
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
@@ -178,6 +184,29 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
   }
 
   describe('On-Chain Quote Testing', function () {
+
+    before(async function () {
+      await hre.network.provider.request({
+        method: "hardhat_reset",
+        params: [
+          {
+            forking: {
+              jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
+              blockNumber: BLOCK_NUMBER,
+            },
+          },
+        ],
+      })
+    })
+
+    beforeEach(async () => {
+      snapshotId = await hre.network.provider.send('evm_snapshot');
+    })
+  
+    afterEach(async () => {
+      await hre.network.provider.send('evm_revert', [snapshotId]);
+    })
+
     it('Uni V3 Looping Test', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault, uniV3Looping } = await setupTest()
 

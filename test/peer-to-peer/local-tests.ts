@@ -4,6 +4,11 @@ import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { LenderVaultImpl, MyERC20 } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
+// test config vars
+let snapshotId : String // use snapshot id to reset state before each test
+
+// constants
+const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
@@ -13,7 +18,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
-const payloanScheme = [
+const payloadScheme = [
   {
     components: [
       {
@@ -87,6 +92,11 @@ const payloanScheme = [
     type: 'uint256'
   },
   {
+    internalType: 'address',
+    name: 'vaultAddr',
+    type: 'address'
+  },
+  {
     internalType: 'uint256',
     name: 'chainId',
     type: 'uint256'
@@ -155,19 +165,19 @@ async function generateOffChainQuote({
     quoteTuplesRoot: quoteTuplesRoot,
     salt: ZERO_BYTES32,
     nonce: 0,
-    chainId: chainId,
     v: [0],
     r: [ZERO_BYTES32],
     s: [ZERO_BYTES32],
     ...offChainQuoteBodyInfo
   }
 
-  const payload = ethers.utils.defaultAbiCoder.encode(payloanScheme as any, [
+  const payload = ethers.utils.defaultAbiCoder.encode(payloadScheme as any, [
     offChainQuote.generalQuoteInfo,
     offChainQuote.quoteTuplesRoot,
     offChainQuote.salt,
     offChainQuote.nonce,
-    offChainQuote.chainId
+    lenderVault.address,
+    chainId
   ])
 
   const payloadHash = ethers.utils.keccak256(payload)
@@ -188,6 +198,15 @@ async function generateOffChainQuote({
 }
 
 describe('Peer-to-Peer: Local Tests', function () {
+  
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot');
+  })
+
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId]);
+  })
+
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -1125,7 +1144,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       // set earliest repay back to value that is consistent with tenors
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+      onChainQuote.generalQuoteInfo.earliestRepayTenor = ethers.BigNumber.from(0)
 
       // add valid onchain quote
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
