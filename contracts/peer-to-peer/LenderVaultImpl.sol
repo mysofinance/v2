@@ -46,8 +46,8 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         uint256[] calldata _loanIds,
         bool autoWithdraw
     ) external {
-        // if autoWithdraw is true, only owner can call this function
-        if (autoWithdraw && msg.sender != _owner) {
+        // only owner can call this function
+        if (msg.sender != _owner) {
             revert Errors.InvalidSender();
         }
         // if empty array is passed, revert

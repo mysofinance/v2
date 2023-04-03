@@ -930,6 +930,17 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
+      // only owner can unlock
+      await expect(
+        lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId], false)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // cannot pass empty loan array to bypass valid token check
+      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [], false)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidArrayLength'
+      )
+
       // valid unlock
       await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
 
