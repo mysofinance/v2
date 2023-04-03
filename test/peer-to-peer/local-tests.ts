@@ -5,7 +5,7 @@ import { LenderVaultImpl, MyERC20 } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 
 // test config vars
-let snapshotId : String // use snapshot id to reset state before each test
+let snapshotId: String // use snapshot id to reset state before each test
 
 // constants
 const hre = require('hardhat')
@@ -198,13 +198,12 @@ async function generateOffChainQuote({
 }
 
 describe('Peer-to-Peer: Local Tests', function () {
-  
   beforeEach(async () => {
-    snapshotId = await hre.network.provider.send('evm_snapshot');
+    snapshotId = await hre.network.provider.send('evm_snapshot')
   })
 
   afterEach(async () => {
-    await hre.network.provider.send('evm_revert', [snapshotId]);
+    await hre.network.provider.send('evm_revert', [snapshotId])
   })
 
   async function setupTest() {

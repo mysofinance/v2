@@ -133,3 +133,44 @@ export const getTotalEthValue = async (
     return token0EthValue.gt(token1EthValue) ? token0EthValue.mul(2) : token1EthValue.mul(2)
   }
 }
+
+export const getExactLpTokenPriceInEth = async (
+  lpTokenAddr: string,
+  provider: SignerWithAddress,
+  oracleAddrs: Record<string, string>,
+  wethAddr: string
+): Promise<BigNumber> => {
+  const uniV2Instance = new ethers.Contract(lpTokenAddr, uniV2Abi, provider)
+  const totalSupply = await uniV2Instance.totalSupply()
+  const lpTokenDecimals = await uniV2Instance.decimals()
+  const token0 = await uniV2Instance.token0()
+  const token1 = await uniV2Instance.token1()
+  const token0Instance = new ethers.Contract(token0, collTokenAbi, provider.provider)
+  const token1Instance = new ethers.Contract(token1, collTokenAbi, provider.provider)
+  let answer: BigNumber
+  const reserveData = await uniV2Instance.getReserves()
+  const reserve0 = reserveData._reserve0
+  const reserve1 = reserveData._reserve1
+  const decimals0 = await token0Instance.decimals()
+  const decimals1 = await token1Instance.decimals()
+  if (token0 == wethAddr) {
+    answer = BASE
+  } else {
+    const token0OracleInstance = new ethers.Contract(oracleAddrs[token0], chainlinkAggregatorAbi, provider.provider)
+    const token0OracleData = await token0OracleInstance.latestRoundData()
+    answer = token0OracleData.answer
+  }
+  const token0EthValue = answer.mul(reserve0).div(BigNumber.from(10).pow(decimals0))
+  if (token1 == wethAddr) {
+    answer = BASE
+  } else {
+    const token1OracleInstance = new ethers.Contract(oracleAddrs[token1], chainlinkAggregatorAbi, provider.provider)
+    const token1OracleData = await token1OracleInstance.latestRoundData()
+    answer = token1OracleData.answer
+  }
+  const token1EthValue = answer.mul(reserve1).div(BigNumber.from(10).pow(decimals1))
+
+  const totalExactEthValue = token0EthValue.add(token1EthValue)
+
+  return totalExactEthValue.mul(BigNumber.from(10).pow(lpTokenDecimals)).div(totalSupply)
+}

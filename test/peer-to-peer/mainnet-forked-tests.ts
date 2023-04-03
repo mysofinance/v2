@@ -11,11 +11,17 @@ import {
   chainlinkAggregatorAbi,
   gohmAbi
 } from './helpers/abi'
-import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers/misc'
+import {
+  createOnChainRequest,
+  transferFeeHelper,
+  calcLoanBalanceDelta,
+  getTotalEthValue,
+  getExactLpTokenPriceInEth
+} from './helpers/misc'
 
 // test config constants & vars
 const BLOCK_NUMBER = MAINNET_BLOCK_NUMBER
-let snapshotId : String // use snapshot id to reset state before each test
+let snapshotId: String // use snapshot id to reset state before each test
 
 // constants
 const hre = require('hardhat')
@@ -188,27 +194,27 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       balancerV2Looping
     }
   }
-  
+
   before(async function () {
     await hre.network.provider.request({
-      method: "hardhat_reset",
+      method: 'hardhat_reset',
       params: [
         {
           forking: {
             jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-            blockNumber: BLOCK_NUMBER,
-          },
-        },
-      ],
+            blockNumber: BLOCK_NUMBER
+          }
+        }
+      ]
     })
   })
 
   beforeEach(async () => {
-    snapshotId = await hre.network.provider.send('evm_snapshot');
+    snapshotId = await hre.network.provider.send('evm_snapshot')
   })
 
   afterEach(async () => {
-    await hre.network.provider.send('evm_revert', [snapshotId]);
+    await hre.network.provider.send('evm_revert', [snapshotId])
   })
 
   describe('On-Chain Quote Testing', function () {
@@ -3047,7 +3053,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           btcToUSDChainlinkAddr,
           wBTCToBTCChainlinkAddr
         )
-      ).to.be.revertedWithCustomError(OlympusOracleImplementation,'InvalidAddress')
+      ).to.be.revertedWithCustomError(OlympusOracleImplementation, 'InvalidAddress')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
@@ -3579,7 +3585,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // deploy chainlinkOracleContract
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
       await expect(
-          UniV2OracleImplementation.connect(team).deploy(
+        UniV2OracleImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcUsdChainlinkAddr],
           [uniV2WethUsdc.address],
@@ -4004,8 +4010,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const { addressRegistry, usdc, weth, wbtc, gohm, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
           await setupTest()
 
-        const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
         const usdtAddr = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdtAddr]: usdtEthChainlinkAddr,
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
 
         // uni v2 Addrs
         const uniV2WethWiseAddr = '0x21b8065d10f73EE2e260e5B47D3344d3Ced7596E'
@@ -4013,28 +4024,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60'
         const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
 
-        // uni v2 contracts
-        const uniV2WethWiseInstance = await ethers.getContractAt('IUniV2', uniV2WethWiseAddr)
-        const uniV2WethUsdtInstance = await ethers.getContractAt('IUniV2', uniV2WethUsdtAddr)
-        const uniV2PaxgUsdcInstance = await ethers.getContractAt('IUniV2', uniV2PaxgUsdcAddr)
-        const uniV2WethUsdcInstance = await ethers.getContractAt('IUniV2', uniV2WethUsdcAddr)
-
-        // uni v2 reserves, token slots and supply
-        const uniV2WethUsdtReservesInfo = await uniV2WethUsdtInstance.getReserves()
-        const uniV2WethUsdtToken0 = await uniV2WethUsdtInstance.token0()
-        const uniV2WethUsdtToken1 = await uniV2WethUsdtInstance.token1()
-        const uniV2WethUsdtSupply = await uniV2WethUsdtInstance.totalSupply()
-        const uniV2PaxgUsdcReservesInfo = await uniV2PaxgUsdcInstance.getReserves()
-        const uniV2PaxgUsdcToken0 = await uniV2PaxgUsdcInstance.token0()
-        const uniV2PaxgUsdcToken1 = await uniV2PaxgUsdcInstance.token1()
-        const uniV2PaxgUsdcSupply = await uniV2PaxgUsdcInstance.totalSupply()
-        const uniV2WethUsdcReservesInfo = await uniV2WethUsdcInstance.getReserves()
-        const uniV2WethUsdcToken0 = await uniV2WethUsdcInstance.token0()
-        const uniV2WethUsdcToken1 = await uniV2WethUsdcInstance.token1()
-        const uniV2WethUsdcSupply = await uniV2WethUsdcInstance.totalSupply()
-
         // deploy oracle contract for uni v2 oracles
         const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address, usdtAddr],
@@ -4046,23 +4038,335 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           wBTCToBTCChainlinkAddr
         )
         await uniV2OracleImplementation.deployed()
-  
+
+        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, paxg.address, usdtAddr],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await chainlinkBasicImplementation.deployed()
+
         await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
 
-        const uniV2WethWiseCollUSDCLoanPrice = await expect(uniV2OracleImplementation.getPrice(uniV2WethWiseAddr, usdc.address)).to.be.revertedWithCustomError(uniV2OracleImplementation, 'InvalidOraclePair')
-        const usdcColluniV2WethWiseLoanPrice = await expect(uniV2OracleImplementation.getPrice(usdc.address, uniV2WethWiseAddr)).to.be.revertedWithCustomError(uniV2OracleImplementation, 'InvalidOraclePair')
-        const gohmColluniV2WethUsdtLoanPrice = await expect(uniV2OracleImplementation.getPrice(gohm.address, uniV2WethUsdtAddr)).to.be.revertedWithCustomError(uniV2OracleImplementation, 'InvalidOraclePair')
-        
-        const uniV2WethUsdtCollUSDCLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, usdc.address)
-        const uniV2PaxgUsdcCollUSDCLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, usdc.address)
-        const uniV2WethUsdcCollUSDCLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, usdc.address)
+        await expect(uniV2OracleImplementation.getPrice(uniV2WethWiseAddr, usdc.address)).to.be.revertedWithCustomError(
+          uniV2OracleImplementation,
+          'InvalidOraclePair'
+        )
+        await expect(uniV2OracleImplementation.getPrice(usdc.address, uniV2WethWiseAddr)).to.be.revertedWithCustomError(
+          uniV2OracleImplementation,
+          'InvalidOraclePair'
+        )
+        await expect(uniV2OracleImplementation.getPrice(gohm.address, uniV2WethUsdtAddr)).to.be.revertedWithCustomError(
+          uniV2OracleImplementation,
+          'InvalidOraclePair'
+        )
 
+        // get prices from uni v2 oracles with Lp token as collateral token
+        const uniV2WethUsdtCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, usdc.address)
+        const uniV2PaxgUsdcCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, usdc.address)
+        const uniV2WethUsdcCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, usdc.address)
+        const uniV2WethUsdtCollUsdtLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, usdtAddr)
+        const uniV2WethUsdcCollUsdtLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, usdtAddr)
+        const uniV2PaxgUsdcCollUsdtLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, usdtAddr)
+        const uniV2WethUsdtCollPaxgLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, paxg.address)
+        const uniV2WethUsdcCollPaxgLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, paxg.address)
+        const uniV2PaxgUsdcCollPaxgLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, paxg.address)
+        const uniV2WethUsdtCollWethLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, weth.address)
+        const uniV2WethUsdcCollWethLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, weth.address)
+        const uniV2PaxgUsdcCollWethLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, weth.address)
+
+        // get prices from uni v2 oracles with Lp token as loan token
+        const usdcColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(usdc.address, uniV2WethUsdtAddr)
+        const usdcColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdc.address, uniV2PaxgUsdcAddr)
+        const usdcColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdc.address, uniV2WethUsdcAddr)
+        const usdtColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(usdtAddr, uniV2WethUsdtAddr)
+        const usdtColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdtAddr, uniV2WethUsdcAddr)
+        const usdtColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdtAddr, uniV2PaxgUsdcAddr)
+        const paxgColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(paxg.address, uniV2WethUsdtAddr)
+        const paxgColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(paxg.address, uniV2WethUsdcAddr)
+        const paxgColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(paxg.address, uniV2PaxgUsdcAddr)
+        const wethColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2WethUsdtAddr)
+        const wethColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2WethUsdcAddr)
+        const wethColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2PaxgUsdcAddr)
+
+        //get prices from uni v2 oracles with Lp token as collateral token and loan token
+        const uniV2WethUsdtCollUniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdtAddr,
+          uniV2WethUsdcAddr
+        )
+        const uniV2WethUsdtCollUniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdtAddr,
+          uniV2PaxgUsdcAddr
+        )
+        const uniV2WethUsdcCollUniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2WethUsdtAddr
+        )
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+        const uniV2PaxgUsdcCollUniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2PaxgUsdcAddr,
+          uniV2WethUsdtAddr
+        )
+        const uniV2PaxgUsdcCollUniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2PaxgUsdcAddr,
+          uniV2WethUsdcAddr
+        )
+
+        // get exact prices for all tokens in eth
+        const uniV2WethUsdtExactEthPrice = await getExactLpTokenPriceInEth(
+          uniV2WethUsdtAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+        const uniV2PaxgUsdcExactEthPrice = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+        const uniV2WethUsdcExactEthPrice = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+        const usdcExactEthPrice = await chainlinkBasicImplementation.getPrice(usdc.address, weth.address)
+        const usdtExactEthPrice = await chainlinkBasicImplementation.getPrice(usdtAddr, weth.address)
+        const paxgExactEthPrice = await chainlinkBasicImplementation.getPrice(paxg.address, weth.address)
+        const wethExactEthPrice = BASE
+
+        // get exact prices Lp token as coll and non-lp token as loan
+        const uniV2WethUsdtCollUsdcLoanExactPrice = uniV2WethUsdtExactEthPrice.mul(10 ** 6).div(usdcExactEthPrice)
+        const uniV2PaxgUsdcCollUsdcLoanExactPrice = uniV2PaxgUsdcExactEthPrice.mul(10 ** 6).div(usdcExactEthPrice)
+        const uniV2WethUsdcCollUsdcLoanExactPrice = uniV2WethUsdcExactEthPrice.mul(10 ** 6).div(usdcExactEthPrice)
+        const uniV2WethUsdtCollUsdtLoanExactPrice = uniV2WethUsdtExactEthPrice.mul(10 ** 6).div(usdtExactEthPrice)
+        const uniV2WethUsdcCollUsdtLoanExactPrice = uniV2WethUsdcExactEthPrice.mul(10 ** 6).div(usdtExactEthPrice)
+        const uniV2PaxgUsdcCollUsdtLoanExactPrice = uniV2PaxgUsdcExactEthPrice.mul(10 ** 6).div(usdtExactEthPrice)
+        const uniV2WethUsdtCollPaxgLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(paxgExactEthPrice)
+        const uniV2WethUsdcCollPaxgLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(paxgExactEthPrice)
+        const uniV2PaxgUsdcCollPaxgLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(paxgExactEthPrice)
+        const uniV2WethUsdtCollWethLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(wethExactEthPrice)
+        const uniV2WethUsdcCollWethLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(wethExactEthPrice)
+        const uniV2PaxgUsdcCollWethLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(wethExactEthPrice)
+        //get exact prices non-lp token as coll and Lp token as loan
+        const usdcColluniV2WethUsdtLoanExactPrice = usdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const usdcColluniV2PaxgUsdcLoanExactPrice = usdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const usdcColluniV2WethUsdcLoanExactPrice = usdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const usdtColluniV2WethUsdtLoanExactPrice = usdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const usdtColluniV2WethUsdcLoanExactPrice = usdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const usdtColluniV2PaxgUsdcLoanExactPrice = usdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const paxgColluniV2WethUsdtLoanExactPrice = paxgExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const paxgColluniV2WethUsdcLoanExactPrice = paxgExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const paxgColluniV2PaxgUsdcLoanExactPrice = paxgExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const wethColluniV2WethUsdtLoanExactPrice = wethExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const wethColluniV2WethUsdcLoanExactPrice = wethExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const wethColluniV2PaxgUsdcLoanExactPrice = wethExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdtCollUniV2WethUsdcLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const uniV2WethUsdtCollUniV2PaxgUsdcLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const uniV2PaxgUsdcCollUniV2WethUsdtLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const uniV2PaxgUsdcCollUniV2WethUsdcLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const uniV2WethUsdcCollUniV2WethUsdtLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+
+        // the LP price from uni v2 oracle should always be less than or equal to the exact LP price
+        // Lp tokens are collateral, non-Lp tokens are loan
+        expect(uniV2WethUsdtCollUsdcLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdtCollUsdcLoanExactPrice)
+        expect(uniV2PaxgUsdcCollUsdcLoanPrice).to.be.lessThanOrEqual(uniV2PaxgUsdcCollUsdcLoanExactPrice)
+        expect(uniV2WethUsdcCollUsdcLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdcCollUsdcLoanExactPrice)
+        expect(uniV2WethUsdtCollUsdtLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdtCollUsdtLoanExactPrice)
+        expect(uniV2WethUsdcCollUsdtLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdcCollUsdtLoanExactPrice)
+        expect(uniV2PaxgUsdcCollUsdtLoanPrice).to.be.lessThanOrEqual(uniV2PaxgUsdcCollUsdtLoanExactPrice)
+        expect(uniV2WethUsdtCollPaxgLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdtCollPaxgLoanExactPrice)
+        expect(uniV2WethUsdcCollPaxgLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdcCollPaxgLoanExactPrice)
+        expect(uniV2PaxgUsdcCollPaxgLoanPrice).to.be.lessThanOrEqual(uniV2PaxgUsdcCollPaxgLoanExactPrice)
+        expect(uniV2WethUsdtCollWethLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdtCollWethLoanExactPrice)
+        expect(uniV2WethUsdcCollWethLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdcCollWethLoanExactPrice)
+        expect(uniV2PaxgUsdcCollWethLoanPrice).to.be.lessThanOrEqual(uniV2PaxgUsdcCollWethLoanExactPrice)
+        // non-Lp tokens are collateral, Lp tokens are loan
+        expect(usdcColluniV2WethUsdtLoanPrice).to.be.lessThanOrEqual(usdcColluniV2WethUsdtLoanExactPrice)
+        expect(usdcColluniV2PaxgUsdcLoanPrice).to.be.lessThanOrEqual(usdcColluniV2PaxgUsdcLoanExactPrice)
+        expect(usdcColluniV2WethUsdcLoanPrice).to.be.lessThanOrEqual(usdcColluniV2WethUsdcLoanExactPrice)
+        expect(usdtColluniV2WethUsdtLoanPrice).to.be.lessThanOrEqual(usdtColluniV2WethUsdtLoanExactPrice)
+        expect(usdtColluniV2WethUsdcLoanPrice).to.be.lessThanOrEqual(usdtColluniV2WethUsdcLoanExactPrice)
+        expect(usdtColluniV2PaxgUsdcLoanPrice).to.be.lessThanOrEqual(usdtColluniV2PaxgUsdcLoanExactPrice)
+        expect(paxgColluniV2WethUsdtLoanPrice).to.be.lessThanOrEqual(paxgColluniV2WethUsdtLoanExactPrice)
+        expect(paxgColluniV2WethUsdcLoanPrice).to.be.lessThanOrEqual(paxgColluniV2WethUsdcLoanExactPrice)
+        expect(paxgColluniV2PaxgUsdcLoanPrice).to.be.lessThanOrEqual(paxgColluniV2PaxgUsdcLoanExactPrice)
+        expect(wethColluniV2WethUsdtLoanPrice).to.be.lessThanOrEqual(wethColluniV2WethUsdtLoanExactPrice)
+        expect(wethColluniV2WethUsdcLoanPrice).to.be.lessThanOrEqual(wethColluniV2WethUsdcLoanExactPrice)
+        expect(wethColluniV2PaxgUsdcLoanPrice).to.be.lessThanOrEqual(wethColluniV2PaxgUsdcLoanExactPrice)
+        // Lp tokens are collateral, Lp tokens are loan
+        expect(uniV2WethUsdtCollUniV2WethUsdcLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdtCollUniV2WethUsdcLoanExactPrice)
+        expect(uniV2WethUsdtCollUniV2PaxgUsdcLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdtCollUniV2PaxgUsdcLoanExactPrice)
+        expect(uniV2PaxgUsdcCollUniV2WethUsdtLoanPrice).to.be.lessThanOrEqual(uniV2PaxgUsdcCollUniV2WethUsdtLoanExactPrice)
+        expect(uniV2PaxgUsdcCollUniV2WethUsdcLoanPrice).to.be.lessThanOrEqual(uniV2PaxgUsdcCollUniV2WethUsdcLoanExactPrice)
+        expect(uniV2WethUsdcCollUniV2WethUsdtLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdcCollUniV2WethUsdtLoanExactPrice)
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPrice).to.be.lessThanOrEqual(uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPrice)
 
         // toggle to show logs
-        const showLogs = true
+        const showLogs = false
         if (showLogs) {
+          console.log('Lp tokens as loan')
           // in terms of USDC
-          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUSDCLoanPrice, 6))) / 100) // gohm was 2840-2930$ that day
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdcLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdcLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdcLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdcLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdcLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdcLoanPrice, 6))) / 100)
+          // in terms of USDT
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdtLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdtLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdtLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdtLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdtLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdtLoanPrice, 6))) / 100)
+          // in terms of PAXG
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollPaxgLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollPaxgLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollPaxgLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollPaxgLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollPaxgLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollPaxgLoanPrice, 18))) / 100)
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollWethLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollWethLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollWethLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollWethLoanPrice, 18))) / 100)
+          console.log('Lp tokens as collateral')
+          // in terms of Lp tokens with collateral as USDC
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          // in terms of Lp tokens with collateral as USDT
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          // in terms of Lp tokens with collateral as PAXG
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          // in terms of Lp Tokens with collateral as WETH
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log('Lp tokens as loan and collateral')
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUniV2WethUsdcLoanExactPrice, 18))) /
+              10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUniV2WethUsdcLoanPrice, 18))) / 10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUniV2WethUsdtLoanExactPrice, 18))) /
+              10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUniV2WethUsdtLoanPrice, 18))) / 10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUniV2WethUsdtLoanExactPrice, 18))) /
+              10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUniV2WethUsdtLoanPrice, 18))) / 10 ** 14
+          )
         }
       })
     })
