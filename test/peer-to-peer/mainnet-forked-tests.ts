@@ -4546,7 +4546,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const teamWethBalPreSkew = await weth.balanceOf(team.address)
 
-        /** skew price by borrowing large weth amount **/
+        /** skew price by borrowing large usdc amount **/
         await uniV2RouterInstance
           .connect(team)
           .swapExactTokensForTokens(ONE_WETH.mul(10 ** 10), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
@@ -4621,20 +4621,24 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
 
+        // exact price of uni v2 lp token pre skew
         const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
           uniV2WethUsdcAddr,
           team,
           tokenAddrToEthOracleAddrObj,
           weth.address
         )
+
+        // oracle price of usdc
         const usdcExactEthPrice = await chainlinkBasicImplementation.getPrice(usdc.address, weth.address)
 
+        // oracle price of uni v2 lp token pre skew
         const usdcCollUniV2WethUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
           usdc.address,
           uniV2WethUsdcAddr
         )
 
-        // get exact prices Lp token as coll and non-lp token as loan
+        // get exact prices Lp token as coll and non-lp token as loan (just for logging and comparison)
         const usdcCollUniV2WethUsdcLoanExactPricePreSkew = usdcExactEthPrice
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2WethUsdcExactEthPricePreSkew)
@@ -4651,6 +4655,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(10 ** 14))
 
+        // exact price of uni v2 lp token post skew
         const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
           uniV2WethUsdcAddr,
           team,
@@ -4658,12 +4663,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           weth.address
         )
 
+        // oracle price post skew
         const usdcCollUniV2WethUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
           usdc.address,
           uniV2WethUsdcAddr
         )
 
-        // get exact prices Lp token as coll and non-lp token as loan
+        // get exact prices Lp token as loan and non-lp token as coll (just for logging and comparison)
         const usdcCollUniV2WethUsdcLoanExactPricePostSkew = usdcExactEthPrice
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2WethUsdcExactEthPricePostSkew)
@@ -4751,7 +4757,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const teamWethBalPreSkew = await weth.balanceOf(team.address)
 
-        /** skew price by borrowing large weth amount **/
+        /** skew price by borrowing large usdc amount **/
         await uniV2RouterInstance
           .connect(team)
           .swapExactTokensForTokens(ONE_WETH.mul(10 ** 10), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
@@ -4760,6 +4766,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         expect(teamWethBalPreSkew.sub(teamWethBalPostSkew)).to.be.equal(ONE_WETH.mul(10 ** 10))
 
+        // exact price of uni v2 lp token post skew
         const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
           uniV2WethUsdcAddr,
           team,
@@ -4767,12 +4774,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           weth.address
         )
 
+        // oracle price post skew
         const usdcCollUniV2WethUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
           usdc.address,
           uniV2WethUsdcAddr
         )
 
-        // get exact prices Lp token as coll and non-lp token as loan
+        // get exact prices Lp token as loan and non-lp token as coll (just for logging and comparison)
         const usdcCollUniV2WethUsdcLoanExactPricePostSkew = usdcExactEthPrice
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2WethUsdcExactEthPricePostSkew)
