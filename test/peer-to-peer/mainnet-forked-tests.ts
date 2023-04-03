@@ -4803,6 +4803,376 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           console.log('usdcCollUniV2WethUsdcLoanPricePostSkew', usdcCollUniV2WethUsdcLoanPricePostSkew.toString())
         }
       })
+      it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (1/3 token0 reserve coll token inflated)', async () => {
+        const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+          await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
+
+        // uni v2 Addrs
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await uniV2OracleImplementation.deployed()
+
+        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await chainlinkBasicImplementation.deployed()
+
+        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew = uniV2WethUsdcExactEthPricePreSkew
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPricePreSkew)
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, weth.address], lender.address, MAX_UINT256)
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(10 ** 14))
+
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // should be same as pre-skew
+        const uniV2PaxgUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew = uniV2WethUsdcExactEthPricePostSkew
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPricePostSkew)
+
+        // even though the overall value of the skewed pool has increased, the coll amount per loan token should decrease
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew).to.be.greaterThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+        )
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
+        )
+      })
+      it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (2/3 token1 reserve loan token inflated)', async () => {
+        const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+          await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
+
+        // uni v2 Addrs
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await uniV2OracleImplementation.deployed()
+
+        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await chainlinkBasicImplementation.deployed()
+
+        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew = uniV2WethUsdcExactEthPricePreSkew
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPricePreSkew)
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large paxg amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, paxg.address], lender.address, MAX_UINT256)
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(10 ** 14))
+
+        // will be same as pre-skew
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew = uniV2WethUsdcExactEthPricePostSkew
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPricePostSkew)
+
+        // even though the overall value of the skewed pool has increased, the coll amount per loan token of the lp token pair should decrease
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+        )
+        expect(uniV2PaxgUsdcExactEthPricePostSkew).to.be.greaterThan(uniV2PaxgUsdcExactEthPricePreSkew)
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
+        )
+      })
+      it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (3/3 both pools skewed token0 reserve coll token and token1 reserve loan token inflated)', async () => {
+        const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+          await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
+
+        // uni v2 Addrs
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await uniV2OracleImplementation.deployed()
+
+        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          weth.address,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+        await chainlinkBasicImplementation.deployed()
+
+        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew = uniV2WethUsdcExactEthPricePreSkew
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPricePreSkew)
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, weth.address], lender.address, MAX_UINT256)
+
+        /** skew price by swapping for large paxg amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, paxg.address], lender.address, MAX_UINT256)
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(2).mul(10 ** 14))
+
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew = uniV2WethUsdcExactEthPricePostSkew
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPricePostSkew)
+
+        // even though the overall value of the skewed pools both increased, the coll amount per loan token of the lp token pair should decrease
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+        )
+        expect(uniV2PaxgUsdcExactEthPricePostSkew).to.be.greaterThan(uniV2PaxgUsdcExactEthPricePreSkew)
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
+        )
+
+        const showLogs = false
+        if (showLogs) {
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew.toString()
+          )
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew.toString()
+          )
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+          console.log('uniV2PaxgUsdcExactEthPricePreSkew', uniV2PaxgUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2PaxgUsdcExactEthPricePostSkew', uniV2PaxgUsdcExactEthPricePostSkew.toString())
+        }
+      })
     })
   })
 })
