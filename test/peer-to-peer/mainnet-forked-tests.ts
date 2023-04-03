@@ -4669,7 +4669,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2WethUsdcAddr
         )
 
-        // get exact prices Lp token as loan and non-lp token as coll (just for logging and comparison)
+        // get exact prices Lp token as loan and non-lp token as coll
         const usdcCollUniV2WethUsdcLoanExactPricePostSkew = usdcExactEthPrice
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2WethUsdcExactEthPricePostSkew)
@@ -4677,6 +4677,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // even though the overall value of the skewed pool has increased, the coll token amount per lp token should decrease
         expect(uniV2WethUsdcExactEthPricePostSkew).to.be.greaterThan(uniV2WethUsdcExactEthPricePreSkew)
         expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanPricePreSkew)
+        // additional comparison post skew
+        expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanExactPricePostSkew)
 
         const showLogs = false
         if (showLogs) {
@@ -4780,7 +4782,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2WethUsdcAddr
         )
 
-        // get exact prices Lp token as loan and non-lp token as coll (just for logging and comparison)
+        // get exact prices Lp token as loan and non-lp token as coll
         const usdcCollUniV2WethUsdcLoanExactPricePostSkew = usdcExactEthPrice
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2WethUsdcExactEthPricePostSkew)
@@ -4788,6 +4790,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // even though the overall value of the skewed pool has increased, the coll token amount per lp token should decrease
         expect(uniV2WethUsdcExactEthPricePostSkew).to.be.greaterThan(uniV2WethUsdcExactEthPricePreSkew)
         expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanPricePreSkew)
+        // additional comparison post skew
+        expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanExactPricePostSkew)
 
         const showLogs = false
         if (showLogs) {
