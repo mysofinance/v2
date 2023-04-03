@@ -333,6 +333,35 @@ const uniV2Abi = [
   }
 ]
 
+const uniV2RouterAbi = [
+  {
+    inputs: [
+      { internalType: 'uint256', name: 'amountOut', type: 'uint256' },
+      { internalType: 'uint256', name: 'amountInMax', type: 'uint256' },
+      { internalType: 'address[]', name: 'path', type: 'address[]' },
+      { internalType: 'address', name: 'to', type: 'address' },
+      { internalType: 'uint256', name: 'deadline', type: 'uint256' }
+    ],
+    name: 'swapTokensForExactTokens',
+    outputs: [{ internalType: 'uint256[]', name: 'amounts', type: 'uint256[]' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { internalType: 'uint256', name: 'amountIn', type: 'uint256' },
+      { internalType: 'uint256', name: 'amountOutMin', type: 'uint256' },
+      { internalType: 'address[]', name: 'path', type: 'address[]' },
+      { internalType: 'address', name: 'to', type: 'address' },
+      { internalType: 'uint256', name: 'deadline', type: 'uint256' }
+    ],
+    name: 'swapExactTokensForTokens',
+    outputs: [{ internalType: 'uint256[]', name: 'amounts', type: 'uint256[]' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  }
+]
+
 export {
   balancerV2VaultAbi,
   balancerV2PoolAbi,
@@ -342,5 +371,6 @@ export {
   gmxRewardRouterAbi,
   chainlinkAggregatorAbi,
   gohmAbi,
-  uniV2Abi
+  uniV2Abi,
+  uniV2RouterAbi
 }
