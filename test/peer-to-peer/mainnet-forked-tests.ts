@@ -14,7 +14,7 @@ import {
 import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers/misc'
 
 // test config constants & vars
-const BLOCK_NUMBER = MAINNET_BLOCK_NUMBER // todo: replace with env before resubmitting
+const BLOCK_NUMBER = MAINNET_BLOCK_NUMBER
 let snapshotId : String // use snapshot id to reset state before each test
 
 // constants
@@ -209,14 +209,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
   afterEach(async () => {
     await hre.network.provider.send('evm_revert', [snapshotId]);
-  })
-
-  let snapshotId: any
-  beforeEach(async () => {
-    snapshotId = await hre.network.provider.send('evm_snapshot')
-  })
-  afterEach(async () => {
-    await hre.network.provider.send('evm_revert', [snapshotId])
   })
 
   describe('On-Chain Quote Testing', function () {
@@ -3046,6 +3038,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // deploy chainlinkOracleContract
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
       const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
+      await expect(
+        OlympusOracleImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+          [usdcUsdChainlinkAddr],
+          ZERO_ADDR,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+      ).to.be.revertedWithCustomError(OlympusOracleImplementation,'InvalidAddress')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
@@ -3576,6 +3578,17 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+      await expect(
+          UniV2OracleImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+          [usdcUsdChainlinkAddr],
+          [uniV2WethUsdc.address],
+          ZERO_ADDR,
+          wbtc,
+          btcToUSDChainlinkAddr,
+          wBTCToBTCChainlinkAddr
+        )
+      ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
       /****deploy correctly****/
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],

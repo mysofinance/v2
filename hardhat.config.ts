@@ -19,7 +19,7 @@ const forkMainnet = {
   chainId: 1,
   forking: {
     url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-    blockNumber: MAINNET_BLOCK_NUMBER // 2023-02-16
+    blockNumber: MAINNET_BLOCK_NUMBER
   }
 }
 
@@ -27,7 +27,7 @@ const forkArbitrum = {
   chainId: ARBITRUM_CHAIN_ID,
   forking: {
     url: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-    blockNumber: ARBITRUM_BLOCK_NUMBER // 2023-02-23
+    blockNumber: ARBITRUM_BLOCK_NUMBER
   }
 }
 

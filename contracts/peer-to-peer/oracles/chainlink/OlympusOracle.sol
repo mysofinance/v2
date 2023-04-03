@@ -37,7 +37,11 @@ contract OlympusOracle is IOracle, BaseOracle {
             _btcToUSDOracleAddrOfGivenChain,
             _wBTCToBTCOracleAddrOfGivenChain
         )
-    {}
+    {
+        if (_wethAddrOfGivenChain == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+    }
 
     function getPrice(
         address collToken,

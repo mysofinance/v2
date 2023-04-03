@@ -104,8 +104,6 @@ export const getTotalEthValue = async (
   const token1 = await uniV2Instance.token1()
   const token0Instance = new ethers.Contract(token0, collTokenAbi, provider.provider)
   const token1Instance = new ethers.Contract(token1, collTokenAbi, provider.provider)
-  const token0OracleInstance = new ethers.Contract(token0OracleAddr, chainlinkAggregatorAbi, provider.provider)
-  const token1OracleInstance = new ethers.Contract(token1OracleAddr, chainlinkAggregatorAbi, provider.provider)
   let answer: BigNumber
   const reserveData = await uniV2Instance.getReserves()
   const reserve0 = reserveData._reserve0
@@ -115,6 +113,7 @@ export const getTotalEthValue = async (
   if (token0 == wethAddr) {
     answer = BASE
   } else {
+    const token0OracleInstance = new ethers.Contract(token0OracleAddr, chainlinkAggregatorAbi, provider.provider)
     const token0OracleData = await token0OracleInstance.latestRoundData()
     answer = token0OracleData.answer
   }
@@ -122,6 +121,7 @@ export const getTotalEthValue = async (
   if (token1 == wethAddr) {
     answer = BASE
   } else {
+    const token1OracleInstance = new ethers.Contract(token1OracleAddr, chainlinkAggregatorAbi, provider.provider)
     const token1OracleData = await token1OracleInstance.latestRoundData()
     answer = token1OracleData.answer
   }

@@ -42,6 +42,9 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             _wBTCToBTCOracleAddrOfGivenChain
         )
     {
+        if (_wethAddrOfGivenChain == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         if (_lpAddrs.length == 0) {
             revert Errors.InvalidArrayLength();
         }
@@ -160,8 +163,10 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             );
         } else {
             // loan token was an Lp token
-            loanTokenPriceRaw = uint256(
-                getLpTokenPrice(loanTokenOracleData, loanToken, false)
+            loanTokenPriceRaw = getLpTokenPrice(
+                loanTokenOracleData,
+                loanToken,
+                false
             );
         }
 
@@ -172,8 +177,10 @@ contract UniV2Chainlink is IOracle, BaseOracle {
             );
         } else {
             // coll token was an Lp token
-            collTokenPriceRaw = uint256(
-                getLpTokenPrice(collTokenOracleData, collToken, true)
+            collTokenPriceRaw = getLpTokenPrice(
+                collTokenOracleData,
+                collToken,
+                true
             );
         }
 
@@ -186,7 +193,7 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         OracleData memory lpTokenOracleData,
         address lpTokenAddr,
         bool isColl
-    ) internal view returns (int256 lpTokenPriceInEth) {
+    ) internal view returns (uint256 lpTokenPriceInEth) {
         uint256 unsignedLpTokenPriceInEth = getTotalEthValue(
             lpTokenOracleData,
             lpTokenAddr,
@@ -194,10 +201,9 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         );
         uint256 lpTokenDecimals = IERC20Metadata(lpTokenAddr).decimals();
         uint256 totalLpSupply = IUniV2(lpTokenAddr).totalSupply();
-        lpTokenPriceInEth = int256(
+        lpTokenPriceInEth =
             (unsignedLpTokenPriceInEth * (10 ** lpTokenDecimals)) /
-                totalLpSupply
-        );
+            totalLpSupply;
         if (lpTokenPriceInEth < 1) {
             revert Errors.InvalidOracleAnswer();
         }
