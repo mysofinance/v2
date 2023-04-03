@@ -4447,7 +4447,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by borrowing large weth amount **/
+        /** skew price by swapping for large weth amount **/
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, weth.address], lender.address, MAX_UINT256)
@@ -4546,7 +4546,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const teamWethBalPreSkew = await weth.balanceOf(team.address)
 
-        /** skew price by borrowing large usdc amount **/
+        /** skew price by swapping for large usdc amount **/
         await uniV2RouterInstance
           .connect(team)
           .swapExactTokensForTokens(ONE_WETH.mul(10 ** 10), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
@@ -4646,7 +4646,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by borrowing large weth amount **/
+        /** skew price by swapping for large weth amount **/
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, weth.address], lender.address, MAX_UINT256)
@@ -4757,7 +4757,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const teamWethBalPreSkew = await weth.balanceOf(team.address)
 
-        /** skew price by borrowing large usdc amount **/
+        /** skew price by swapping for large usdc amount **/
         await uniV2RouterInstance
           .connect(team)
           .swapExactTokensForTokens(ONE_WETH.mul(10 ** 10), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
