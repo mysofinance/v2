@@ -25,8 +25,8 @@ contract ChainlinkBasic2Wbtc is ChainlinkBasic2 {
         ChainlinkBasic2(
             _tokenAddrs,
             _oracleAddrs,
-            0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599,
-            1e8
+            0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599, // wbtc address
+            1e8 // 8 decimals for USD based oracles
         )
     {}
 
