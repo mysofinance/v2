@@ -237,7 +237,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
-      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
@@ -2575,8 +2575,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       } = await setupTest()
 
       // deploy chainlinkOracleContract
-      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
-      /****deploy errors on base oracles****/
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+      // deploy errors on base oracles
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy([], [usdcEthChainlinkAddr], weth.address, BASE)
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
@@ -2621,7 +2621,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
 
-      /****correct deploy****/
+      // correct deploy
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
@@ -2806,7 +2806,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       } = await setupTest()
 
       // deploy chainlinkOracleContract
-      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
@@ -2916,7 +2916,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
 
-      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
@@ -3031,7 +3031,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
-      const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle2')
+      const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr]
@@ -3202,7 +3202,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
-      const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle2')
+      const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr]
@@ -3337,8 +3337,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
       // deploy chainlinkOracleContract
-      const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-      /****deploy error uni oracle****/
+      const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+      // deploy error uni oracle
       await expect(
         UniV2OracleImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
@@ -3353,7 +3353,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           []
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidArrayLength')
-      /****deploy correctly****/
+      // deploy correctly
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
@@ -3542,26 +3542,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
-      await expect(
-        UniV2OracleImplementation.connect(team).deploy(
-          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
-          [usdcUsdChainlinkAddr],
-          [uniV2WethUsdc.address],
-          ZERO_ADDR,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
-        )
-      ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
-      /****deploy correctly****/
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        [uniV2WethUsdc.address],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        [uniV2WethUsdc.address]
       )
       await uniV2OracleImplementation.deployed()
 
@@ -3668,12 +3652,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           await setupTest()
 
         // deploy chainlinkOracleContract
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
         const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
         const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
-        /****correct deploy****/
+        // correct deploy
         const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
           [usdc.address, paxg.address, ldo.address, aaveAddr, crvAddr, linkAddr],
           [
@@ -3749,7 +3733,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         }
 
         // deploy chainlinkOracleContract
-        const ChainlinkBasicWbtcUSDImplementation = await ethers.getContractFactory('ChainlinkBasic2Wbtc')
+        const ChainlinkBasicWbtcUSDImplementation = await ethers.getContractFactory('ChainlinkBasicWithWbtc')
         const chainlinkBasicWbtcUSDImplementation = await ChainlinkBasicWbtcUSDImplementation.connect(team).deploy(
           [usdc.address, aaveAddr, crvAddr, linkAddr, weth.address],
           [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr]
@@ -3872,7 +3856,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
         const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
 
-        const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle2')
+        const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
         const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
           [usdc.address, linkAddr, aaveAddr, crvAddr],
           [usdcEthChainlinkAddr, linkEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr]
@@ -3965,8 +3949,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address, usdtAddr],
@@ -4315,8 +4299,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
@@ -4405,8 +4389,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
@@ -4498,8 +4482,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
@@ -4606,8 +4590,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
@@ -4715,8 +4699,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
@@ -4825,8 +4809,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
@@ -4936,8 +4920,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
 
         // deploy oracle contract for uni v2 oracles
-        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink2')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic2')
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
