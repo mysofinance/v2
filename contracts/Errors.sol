@@ -10,6 +10,7 @@ library Errors {
     error InvalidFee();
     error InsufficientSendAmount();
     error InvalidOraclePair();
+    error NoOracle();
     error InvalidOracleAnswer();
     error InvalidOracleDecimals();
     error InvalidOracleVersion();
