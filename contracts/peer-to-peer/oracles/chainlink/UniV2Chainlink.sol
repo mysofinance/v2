@@ -28,18 +28,15 @@ contract UniV2Chainlink is IOracle, BaseOracle {
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _lpAddrs,
-        address _wethAddrOfGivenChain,
-        address _wBTCAddrOfGivenChain,
-        address _btcToUSDOracleAddrOfGivenChain,
-        address _wBTCToBTCOracleAddrOfGivenChain
+        address _wethAddrOfGivenChain
     )
         BaseOracle(
             _tokenAddrs,
             _oracleAddrs,
             _wethAddrOfGivenChain,
-            _wBTCAddrOfGivenChain,
-            _btcToUSDOracleAddrOfGivenChain,
-            _wBTCToBTCOracleAddrOfGivenChain
+            address(0),
+            address(0),
+            address(0)
         )
     {
         if (_wethAddrOfGivenChain == address(0)) {

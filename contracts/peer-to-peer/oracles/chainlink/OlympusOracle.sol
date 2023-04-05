@@ -20,22 +20,18 @@ contract OlympusOracle is IOracle, BaseOracle {
     address internal constant ETH_OHM_ORACLE_ADDR =
         0x9a72298ae3886221820B1c878d12D872087D3a23;
 
-    // solhint-disable no-empty-blocks
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        address _wethAddrOfGivenChain,
-        address _wBTCAddrOfGivenChain,
-        address _btcToUSDOracleAddrOfGivenChain,
-        address _wBTCToBTCOracleAddrOfGivenChain
+        address _wethAddrOfGivenChain
     )
         BaseOracle(
             _tokenAddrs,
             _oracleAddrs,
             _wethAddrOfGivenChain,
-            _wBTCAddrOfGivenChain,
-            _btcToUSDOracleAddrOfGivenChain,
-            _wBTCToBTCOracleAddrOfGivenChain
+            address(0),
+            address(0),
+            address(0)
         )
     {
         if (_wethAddrOfGivenChain == address(0)) {

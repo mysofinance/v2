@@ -3036,22 +3036,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth, gohm is coll)', async function () {
-      const {
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        gohm,
-        weth,
-        ldo,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, ldo, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
@@ -3060,19 +3046,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         OlympusOracleImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcUsdChainlinkAddr],
-          ZERO_ADDR,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          ZERO_ADDR
         )
       ).to.be.revertedWithCustomError(OlympusOracleImplementation, 'InvalidAddress')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        weth.address
       )
       await olympusOracleImplementation.deployed()
 
@@ -3222,21 +3202,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth, gohm is loan)', async function () {
-      const {
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        gohm,
-        weth,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
@@ -3244,10 +3211,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        weth.address
       )
       await olympusOracleImplementation.deployed()
 
@@ -3348,21 +3312,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with uni v2 oracle (usdc-weth, lp is coll)', async function () {
-      const {
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        weth,
-        gohm,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, gohm, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // prepare UniV2 Weth/Usdc balances
       const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
@@ -3386,10 +3337,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcEthChainlinkAddr],
           [ZERO_ADDR],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
       await expect(
@@ -3397,10 +3345,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcEthChainlinkAddr],
           [],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidArrayLength')
       /****deploy correctly****/
@@ -3408,10 +3353,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         [uniV2WethUsdc.address],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        weth.address
       )
       await uniV2OracleImplementation.deployed()
 
@@ -3565,20 +3507,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with uni v2 oracle (usdc-weth, lp is loan)', async function () {
-      const {
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        weth,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // prepare UniV2 Weth/Usdc balances
       const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
@@ -3601,10 +3531,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcUsdChainlinkAddr],
           [uniV2WethUsdc.address],
-          ZERO_ADDR,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          ZERO_ADDR
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
       /****deploy correctly****/
@@ -3612,10 +3539,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         [uniV2WethUsdc.address],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        weth.address
       )
       await uniV2OracleImplementation.deployed()
 
@@ -3933,8 +3857,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process olympus oracle prices correctly', async function () {
-        const { addressRegistry, usdc, weth, wbtc, gohm, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
-          await setupTest()
+        const { addressRegistry, usdc, weth, gohm, team } = await setupTest()
 
         const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
         const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
@@ -3944,10 +3867,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
           [usdc.address, linkAddr, aaveAddr, crvAddr],
           [usdcEthChainlinkAddr, linkEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await olympusOracleImplementation.deployed()
 
@@ -4044,10 +3964,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address, usdtAddr],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2WethWiseAddr, uniV2WethUsdtAddr, uniV2PaxgUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4381,6 +4298,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           )
         }
       })
+
       it('Should process uni v2 oracle price with skew correctly lp token as coll (1/2 token0 reserve inflated)', async () => {
         const { addressRegistry, usdc, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
           await setupTest()
@@ -4400,10 +4318,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4476,7 +4391,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // even though the overall value of the skewed pool has increased, the price of the lp token should decrease
         expect(uniV2WethUsdcCollUsdcLoanExactPricePostSkew).to.be.greaterThan(uniV2WethUsdcCollUsdcLoanExactPricePreSkew)
         expect(uniV2WethUsdcCollUsdcLoanPricePostSkew).to.be.lessThan(uniV2WethUsdcCollUsdcLoanPricePreSkew)
+        expect(uniV2WethUsdcCollUsdcLoanPricePostSkew).to.be.lessThan(uniV2WethUsdcCollUsdcLoanExactPricePreSkew)
+        expect(uniV2WethUsdcCollUsdcLoanPricePostSkew).to.be.lessThan(uniV2WethUsdcCollUsdcLoanExactPricePostSkew)
       })
+
       it('Should process uni v2 oracle price with skew correctly lp token as coll (2/2 token1 reserve inflated)', async () => {
         const { addressRegistry, usdc, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
           await setupTest()
@@ -4496,10 +4414,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4575,7 +4490,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // even though the overall value of the skewed pool has increased, the price of the lp token should decrease
         expect(uniV2WethUsdcCollUsdcLoanExactPricePostSkew).to.be.greaterThan(uniV2WethUsdcCollUsdcLoanExactPricePreSkew)
         expect(uniV2WethUsdcCollUsdcLoanPricePostSkew).to.be.lessThan(uniV2WethUsdcCollUsdcLoanPricePreSkew)
+        expect(uniV2WethUsdcCollUsdcLoanPricePostSkew).to.be.lessThan(uniV2WethUsdcCollUsdcLoanExactPricePreSkew)
+        expect(uniV2WethUsdcCollUsdcLoanPricePostSkew).to.be.lessThan(uniV2WethUsdcCollUsdcLoanExactPricePostSkew)
       })
+
       it('Should process uni v2 oracle price with skew correctly lp token as loan (1/2 token0 reserve inflated)', async () => {
         const { addressRegistry, usdc, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
           await setupTest()
@@ -4595,10 +4513,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4679,6 +4594,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanPricePreSkew)
         // additional comparison post skew
         expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanExactPricePostSkew)
+        expect(usdcCollUniV2WethUsdcLoanExactPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanExactPricePreSkew)
 
         const showLogs = false
         if (showLogs) {
@@ -4690,6 +4606,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           console.log('usdcCollUniV2WethUsdcLoanPricePostSkew', usdcCollUniV2WethUsdcLoanPricePostSkew.toString())
         }
       })
+
       it('Should process uni v2 oracle price with skew correctly lp token as loan (2/2 token1 reserve inflated)', async () => {
         const { addressRegistry, usdc, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
           await setupTest()
@@ -4709,10 +4626,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4792,6 +4706,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanPricePreSkew)
         // additional comparison post skew
         expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanExactPricePostSkew)
+        expect(usdcCollUniV2WethUsdcLoanPricePostSkew).to.be.lessThan(usdcCollUniV2WethUsdcLoanExactPricePreSkew)
 
         const showLogs = false
         if (showLogs) {
@@ -4803,6 +4718,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           console.log('usdcCollUniV2WethUsdcLoanPricePostSkew', usdcCollUniV2WethUsdcLoanPricePostSkew.toString())
         }
       })
+
       it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (1/3 token0 reserve coll token inflated)', async () => {
         const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
           await setupTest()
@@ -4824,10 +4740,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4918,7 +4831,28 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
           uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
         )
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+        )
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
+        )
+
+        const showLogs = false
+        if (showLogs) {
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+          )
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
+          )
+          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew)
+          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew)
+        }
       })
+
       it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (2/3 token1 reserve loan token inflated)', async () => {
         const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
           await setupTest()
@@ -4940,10 +4874,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5035,7 +4966,32 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
           uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
         )
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+        )
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
+        )
+
+        const showLogs = false
+        if (showLogs) {
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+          )
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
+          )
+          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew)
+          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew)
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew)
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew)
+          console.log('uniV2PaxgUsdcExactEthPricePreSkew', uniV2PaxgUsdcExactEthPricePreSkew)
+          console.log('uniV2PaxgUsdcExactEthPricePostSkew', uniV2PaxgUsdcExactEthPricePostSkew)
+        }
       })
+
       it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (3/3 both pools skewed token0 reserve coll token and token1 reserve loan token inflated)', async () => {
         const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
           await setupTest()
@@ -5057,10 +5013,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          weth.address
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5155,6 +5108,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(uniV2PaxgUsdcExactEthPricePostSkew).to.be.greaterThan(uniV2PaxgUsdcExactEthPricePreSkew)
         expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
           uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
+        )
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+        )
+        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
+          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
         )
 
         const showLogs = false
