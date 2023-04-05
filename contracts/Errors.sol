@@ -9,12 +9,10 @@ library Errors {
     error InvalidSender();
     error InvalidFee();
     error InsufficientSendAmount();
-    error InvalidOraclePair();
     error NoOracle();
     error InvalidOracleAnswer();
     error InvalidOracleDecimals();
     error InvalidOracleVersion();
-    error InvalidBTCOracle();
     error InvalidAddress();
     error InvalidArrayLength();
     error InvalidQuote();
