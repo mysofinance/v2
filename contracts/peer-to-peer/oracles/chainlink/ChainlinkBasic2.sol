@@ -66,7 +66,7 @@ contract ChainlinkBasic2 is IOracle {
 
     function getPriceOfToken(
         address token
-    ) internal view returns (uint256 tokenPriceRaw) {
+    ) internal view virtual returns (uint256 tokenPriceRaw) {
         if (token == BASE_CURRENCY) {
             tokenPriceRaw = BASE_CURRENCY_UNIT;
         } else {
