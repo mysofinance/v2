@@ -6,14 +6,16 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
-import {BaseOracle} from "../BaseOracle.sol";
+import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
 
 /**
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
  * should only be utilized with eth based oracles, not usd-based oracles
  */
-contract OlympusOracle is IOracle, BaseOracle {
+contract OlympusOracle is IOracle, ChainlinkBasic {
+    address internal constant OHM_ADDR =
+        0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
     address internal constant GOHM_ADDR =
         0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
     uint256 internal constant SOHM_DECIMALS = 9;
@@ -22,91 +24,40 @@ contract OlympusOracle is IOracle, BaseOracle {
 
     constructor(
         address[] memory _tokenAddrs,
-        address[] memory _oracleAddrs,
-        address _wethAddrOfGivenChain
+        address[] memory _oracleAddrs
     )
-        BaseOracle(
+        ChainlinkBasic(
             _tokenAddrs,
             _oracleAddrs,
-            _wethAddrOfGivenChain,
-            address(0),
-            address(0),
-            address(0)
+            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weth address
+            1e18 // 18 decimals for ETH based oracles
         )
     {
-        if (_wethAddrOfGivenChain == address(0)) {
-            revert Errors.InvalidAddress();
-        }
+        oracleAddrs[OHM_ADDR] = ETH_OHM_ORACLE_ADDR;
     }
 
     function getPrice(
         address collToken,
         address loanToken
-    ) external view returns (uint256 collTokenPriceInLoanToken) {
+    )
+        external
+        view
+        override(ChainlinkBasic, IOracle)
+        returns (uint256 collTokenPriceInLoanToken)
+    {
         if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {
             revert Errors.NeitherTokenIsGOHM();
         }
-        (
-            bool isValid,
-            address loanTokenOracleAddr,
-            address collTokenOracleAddr,
-            bool isColl
-        ) = checkValidOraclePair(collToken, loanToken);
-        if (!isValid) {
-            revert Errors.InvalidOraclePair();
-        }
-        collTokenPriceInLoanToken = calculatePrice(
-            loanTokenOracleAddr,
-            collTokenOracleAddr,
-            loanToken,
-            isColl
-        );
-    }
-
-    function checkValidOraclePair(
-        address collToken,
-        address loanToken
-    )
-        internal
-        view
-        returns (
-            bool isValid,
-            address loanTokenOracleAddr,
-            address collTokenOracleAddr,
-            bool isColl
-        )
-    {
-        // try to see if both have non-zero oracleAddrs
-        if (collToken == GOHM_ADDR) {
-            loanTokenOracleAddr = oracleAddrs[loanToken];
-            collTokenOracleAddr = ETH_OHM_ORACLE_ADDR;
-            isColl = true;
-        } else {
-            loanTokenOracleAddr = ETH_OHM_ORACLE_ADDR;
-            collTokenOracleAddr = oracleAddrs[collToken];
-        }
-        isValid =
-            loanTokenOracleAddr != address(0) &&
-            collTokenOracleAddr != address(0);
-        return (isValid, loanTokenOracleAddr, collTokenOracleAddr, isColl);
-    }
-
-    function calculatePrice(
-        address loanTokenOracleAddr,
-        address collTokenOracleAddr,
-        address loanToken,
-        bool isColl
-    ) internal view returns (uint256 collTokenPriceInLoanToken) {
+        uint256 priceOfCollToken = getPriceOfToken(collToken);
+        uint256 priceOfLoanToken = getPriceOfToken(loanToken);
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        uint256 loanTokenPriceRaw = getPriceOfToken(loanTokenOracleAddr);
-        uint256 collTokenPriceRaw = getPriceOfToken(collTokenOracleAddr);
         uint256 index = IOlympus(GOHM_ADDR).index();
 
-        collTokenPriceInLoanToken = isColl
-            ? (collTokenPriceRaw * (10 ** loanTokenDecimals) * index) /
-                (loanTokenPriceRaw * (10 ** SOHM_DECIMALS))
-            : (collTokenPriceRaw *
+        collTokenPriceInLoanToken = collToken == GOHM_ADDR
+            ? (priceOfCollToken * (10 ** loanTokenDecimals) * index) /
+                (priceOfLoanToken * (10 ** SOHM_DECIMALS))
+            : (priceOfCollToken *
                 (10 ** loanTokenDecimals) *
-                (10 ** SOHM_DECIMALS)) / (loanTokenPriceRaw * index);
+                (10 ** SOHM_DECIMALS)) / (priceOfLoanToken * index);
     }
 }

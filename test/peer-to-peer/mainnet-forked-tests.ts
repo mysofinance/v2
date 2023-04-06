@@ -242,9 +242,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -2557,6 +2555,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     const linkUsdChainlinkAddr = '0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c'
     const usdcUsdChainlinkAddr = '0x8fffffd4afb6115b954bd326cbe7b4ba576818f6'
     const ethUsdChainlinkAddr = '0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419'
+
     it('Should process onChain quote with eth-based oracle address (non-weth)', async function () {
       const {
         addressRegistry,
@@ -2577,25 +2576,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
-      /****deploy errors on base oracles****/
+      // deploy errors on base oracles
       await expect(
-        ChainlinkBasicImplementation.connect(team).deploy(
-          [],
-          [usdcEthChainlinkAddr],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
-        )
+        ChainlinkBasicImplementation.connect(team).deploy([], [usdcEthChainlinkAddr], weth.address, BASE)
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
@@ -2603,9 +2593,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [ZERO_ADDR, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
       await expect(
@@ -2613,9 +2601,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
       await expect(
@@ -2623,9 +2609,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcUsdChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
       await expect(
@@ -2633,20 +2617,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcUsdChainlinkAddr, paxgEthChainlinkAddr],
           ZERO_ADDR,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
 
-      /****correct deploy****/
+      // correct deploy
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -2763,7 +2743,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badOnChainQuoteAddrNotInOracle, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(chainlinkBasicImplementation, 'InvalidOraclePair')
+      ).to.be.revertedWithCustomError(chainlinkBasicImplementation, 'NoOracle')
 
       await expect(
         borrowerGateway
@@ -2831,9 +2811,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -2943,9 +2921,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -3042,17 +3018,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // deploy chainlinkOracleContract
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
       const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
-      await expect(
-        OlympusOracleImplementation.connect(team).deploy(
-          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
-          [usdcUsdChainlinkAddr],
-          ZERO_ADDR
-        )
-      ).to.be.revertedWithCustomError(OlympusOracleImplementation, 'InvalidAddress')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
-        [usdcEthChainlinkAddr],
-        weth.address
+        [usdcEthChainlinkAddr]
       )
       await olympusOracleImplementation.deployed()
 
@@ -3170,7 +3138,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuoteWithNoOracle, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(olympusOracleImplementation, 'InvalidOraclePair')
+      ).to.be.revertedWithCustomError(olympusOracleImplementation, 'NoOracle')
 
       await borrowerGateway
         .connect(borrower)
@@ -3210,8 +3178,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
-        [usdcEthChainlinkAddr],
-        weth.address
+        [usdcEthChainlinkAddr]
       )
       await olympusOracleImplementation.deployed()
 
@@ -3331,29 +3298,26 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
-      /****deploy error uni oracle****/
+      // deploy error uni oracle
       await expect(
         UniV2OracleImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcEthChainlinkAddr],
-          [ZERO_ADDR],
-          weth.address
+          [ZERO_ADDR]
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
       await expect(
         UniV2OracleImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcEthChainlinkAddr],
-          [],
-          weth.address
+          []
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidArrayLength')
-      /****deploy correctly****/
+      // deploy correctly
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        [uniV2WethUsdc.address],
-        weth.address
+        [uniV2WethUsdc.address]
       )
       await uniV2OracleImplementation.deployed()
 
@@ -3470,7 +3434,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuoteWithLoanTokenNoOracle, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(uniV2OracleImplementation, 'InvalidOraclePair')
+      ).to.be.revertedWithCustomError(uniV2OracleImplementation, 'NoOracle')
 
       await borrowerGateway
         .connect(borrower)
@@ -3526,20 +3490,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy chainlinkOracleContract
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
-      await expect(
-        UniV2OracleImplementation.connect(team).deploy(
-          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
-          [usdcUsdChainlinkAddr],
-          [uniV2WethUsdc.address],
-          ZERO_ADDR
-        )
-      ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
-      /****deploy correctly****/
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        [uniV2WethUsdc.address],
-        weth.address
+        [uniV2WethUsdc.address]
       )
       await uniV2OracleImplementation.deployed()
 
@@ -3651,7 +3605,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
         const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
         const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
-        /****correct deploy****/
+        // correct deploy
         const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
           [usdc.address, paxg.address, ldo.address, aaveAddr, crvAddr, linkAddr],
           [
@@ -3663,23 +3617,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             linkEthChainlinkAddr
           ],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
         await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
-
-        await expect(chainlinkBasicImplementation.getPrice(wbtc, usdc.address)).to.be.revertedWithCustomError(
-          chainlinkBasicImplementation,
-          'InvalidBTCOracle'
-        )
-
-        await expect(chainlinkBasicImplementation.getPrice(usdc.address, wbtc)).to.be.revertedWithCustomError(
-          chainlinkBasicImplementation,
-          'InvalidBTCOracle'
-        )
 
         // prices on 2-16-2023
         const aaveCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
@@ -3738,32 +3680,30 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           console.log(Math.round(10000 * Number(ethers.utils.formatUnits(ldoCollWethLoanPrice, 18))) / 10000)
         }
 
-        const chainlinkBasicUSDImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+        // deploy chainlinkOracleContract
+        const ChainlinkBasicWbtcUSDImplementation = await ethers.getContractFactory('ChainlinkBasicWithWbtc')
+        const chainlinkBasicWbtcUSDImplementation = await ChainlinkBasicWbtcUSDImplementation.connect(team).deploy(
           [usdc.address, aaveAddr, crvAddr, linkAddr, weth.address],
-          [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr],
-          ZERO_ADDR,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr]
         )
-        await chainlinkBasicUSDImplementation.deployed()
+        await chainlinkBasicWbtcUSDImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicUSDImplementation.address, true)
+        await addressRegistry.connect(team).toggleOracle(chainlinkBasicWbtcUSDImplementation.address, true)
 
         // prices on 2-16-2023
-        const aaveCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
-        const crvCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
-        const linkCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
-        const wethCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
+        const aaveCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
+        const crvCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
+        const linkCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
+        const wethCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
 
-        const aaveCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, linkAddr) // aave was 85-90$ and link was 7-7.50$ that day
-        const wethCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, linkAddr) // weth was 1650-1700$ and link was 7-7.50$ that day
-        const crvCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, linkAddr) // crv was 1.10-1.20$ and link was 7-7.50$ that day
-        const usdcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, linkAddr) // usdc was 1$ and link was 7-7.50$ that day
+        const aaveCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, linkAddr) // aave was 85-90$ and link was 7-7.50$ that day
+        const wethCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(weth.address, linkAddr) // weth was 1650-1700$ and link was 7-7.50$ that day
+        const crvCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(crvAddr, linkAddr) // crv was 1.10-1.20$ and link was 7-7.50$ that day
+        const usdcCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(usdc.address, linkAddr) // usdc was 1$ and link was 7-7.50$ that day
 
-        const aaveCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
-        const crvCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(crvAddr, weth.address) // crv was 1.10-1.20$ and weth was 1650-1700$ that day
-        const usdcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(usdc.address, weth.address) // usdc was 1$ and weth was 1650-1700$ that day
+        const aaveCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
+        const crvCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(crvAddr, weth.address) // crv was 1.10-1.20$ and weth was 1650-1700$ that day
+        const usdcCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(usdc.address, weth.address) // usdc was 1$ and weth was 1650-1700$ that day
 
         expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(85, 90)
         expect(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(1.1, 1.2)
@@ -3815,12 +3755,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         }
 
         // btc testing
-        const wbtcCollUSDCLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, usdc.address) // btc was 23600-24900$ that day
-        const wbtcCollLinkLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, linkAddr) // btc was 23600-24900$ and link was 7-7.50$ that day
-        const wbtcCollWethLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(wbtc, weth.address) // btc was 23600-24900$ and weth was 1650-1700$ that day
+        const wbtcCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(wbtc, usdc.address) // btc was 23600-24900$ that day
+        const wbtcCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(wbtc, linkAddr) // btc was 23600-24900$ and link was 7-7.50$ that day
+        const wbtcCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(wbtc, weth.address) // btc was 23600-24900$ and weth was 1650-1700$ that day
 
-        const aaveCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(aaveAddr, wbtc) // aave was 85-90$ and btc was 23600-24900$ that day
-        const wethCollWbtcLoanPriceUSD = await chainlinkBasicUSDImplementation.getPrice(weth.address, wbtc) // weth was 1650-1700$ and btc was 23600-24900$ that day
+        const aaveCollWbtcLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, wbtc) // aave was 85-90$ and btc was 23600-24900$ that day
+        const wethCollWbtcLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(weth.address, wbtc) // weth was 1650-1700$ and btc was 23600-24900$ that day
 
         expect(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(
           23600,
@@ -3866,8 +3806,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
         const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
           [usdc.address, linkAddr, aaveAddr, crvAddr],
-          [usdcEthChainlinkAddr, linkEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr],
-          weth.address
+          [usdcEthChainlinkAddr, linkEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr]
         )
         await olympusOracleImplementation.deployed()
 
@@ -3963,8 +3902,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address, usdtAddr],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
-          [uniV2WethUsdcAddr, uniV2WethWiseAddr, uniV2WethUsdtAddr, uniV2PaxgUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr, uniV2WethWiseAddr, uniV2WethUsdtAddr, uniV2PaxgUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -3972,9 +3910,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address, usdtAddr],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -3983,15 +3919,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         await expect(uniV2OracleImplementation.getPrice(uniV2WethWiseAddr, usdc.address)).to.be.revertedWithCustomError(
           uniV2OracleImplementation,
-          'InvalidOraclePair'
+          'NoOracle'
         )
         await expect(uniV2OracleImplementation.getPrice(usdc.address, uniV2WethWiseAddr)).to.be.revertedWithCustomError(
           uniV2OracleImplementation,
-          'InvalidOraclePair'
+          'NoOracle'
         )
         await expect(uniV2OracleImplementation.getPrice(gohm.address, uniV2WethUsdtAddr)).to.be.revertedWithCustomError(
           uniV2OracleImplementation,
-          'InvalidOraclePair'
+          'NoOracle'
         )
 
         // get prices from uni v2 oracles with Lp token as collateral token
@@ -4317,8 +4253,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
           [usdcEthChainlinkAddr],
-          [uniV2WethUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4326,9 +4261,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -4413,8 +4346,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
           [usdcEthChainlinkAddr],
-          [uniV2WethUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4422,9 +4354,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -4512,8 +4442,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
           [usdcEthChainlinkAddr],
-          [uniV2WethUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4521,9 +4450,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -4625,8 +4552,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address],
           [usdcEthChainlinkAddr],
-          [uniV2WethUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4634,9 +4560,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -4739,8 +4663,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4748,9 +4671,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -4873,8 +4794,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -4882,9 +4802,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -5012,8 +4930,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          weth.address
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5021,9 +4938,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
         await chainlinkBasicImplementation.deployed()
 
