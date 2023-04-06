@@ -6,7 +6,7 @@
 
 
 
-*supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces*
+*supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces should only be utilized with eth based oracles, not usd-based oracles*
 
 ## Methods
 

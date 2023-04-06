@@ -1,16 +1,16 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
+import { ALCHEMY_API_KEY, ARBITRUM_BLOCK_NUMBER, ARBITRUM_CHAIN_ID } from '../../hardhat.config'
 import { collTokenAbi, gmxRewardRouterAbi } from './helpers/abi'
 import { createOnChainRequest } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
 // test config constants & vars
-const ALCHEMY_API_KEY = 'QLXkHVq78U_cbV-q0TMWTH8-QmK2Zp3y' // todo: replace with env before final resubmission
-const BLOCK_NUMBER = 63771760 // todo: replace with env before resubmitting
-const CHAIN_ID = 31336 // todo: replace with env before resubmitting
-let snapshotId : String // use snapshot id to reset state before each test
+const BLOCK_NUMBER = ARBITRUM_BLOCK_NUMBER
+const CHAIN_ID = ARBITRUM_CHAIN_ID
+let snapshotId: String // use snapshot id to reset state before each test
 
 // constants
 const hre = require('hardhat')
@@ -24,29 +24,28 @@ const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 
 describe('Peer-to-Peer: Arbitrum Tests', function () {
-
   before(async function () {
     // reset/overwrite arbitrum endpoint from hardhat.config to allow running eth and arbitrum tests in one go
     await hre.network.provider.request({
-      method: "hardhat_reset",
+      method: 'hardhat_reset',
       params: [
         {
           chainId: CHAIN_ID,
           forking: {
             jsonRpcUrl: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-            blockNumber: BLOCK_NUMBER,
-          },
-        },
-      ],
+            blockNumber: BLOCK_NUMBER
+          }
+        }
+      ]
     })
   })
-  
+
   beforeEach(async () => {
-    snapshotId = await hre.network.provider.send('evm_snapshot');
+    snapshotId = await hre.network.provider.send('evm_snapshot')
   })
 
   afterEach(async () => {
-    await hre.network.provider.send('evm_revert', [snapshotId]);
+    await hre.network.provider.send('evm_revert', [snapshotId])
   })
 
   async function setupTest() {

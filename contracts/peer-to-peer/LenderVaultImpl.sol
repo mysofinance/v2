@@ -46,8 +46,8 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         uint256[] calldata _loanIds,
         bool autoWithdraw
     ) external {
-        // if autoWithdraw is true, only owner can call this function
-        if (autoWithdraw && msg.sender != _owner) {
+        // only owner can call this function
+        if (msg.sender != _owner) {
             revert Errors.InvalidSender();
         }
         // if empty array is passed, revert
@@ -82,7 +82,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         }
 
         lockedAmounts[collToken] -= totalUnlockableColl;
-        // if collToken is not used by vault as loan token, then 
+        // if collToken is not used by vault as loan token, then
         // vault owner may have wanted to leave unlocked coll in vault
         if (autoWithdraw) {
             uint256 currentCollTokenBalance = IERC20Metadata(collToken)
@@ -316,6 +316,33 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
         return _owner;
     }
 
+    function getTokenBalancesAndLockedAmounts(
+        address[] memory tokens
+    )
+        external
+        view
+        returns (uint256[] memory balances, uint256[] memory _lockedAmounts)
+    {
+        if (tokens.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        balances = new uint256[](tokens.length);
+        _lockedAmounts = new uint256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; ) {
+            if (
+                tokens[i] == address(0) ||
+                !IAddressRegistry(addressRegistry).isWhitelistedToken(tokens[i])
+            ) {
+                revert Errors.InvalidAddress();
+            }
+            balances[i] = IERC20Metadata(tokens[i]).balanceOf(address(this));
+            _lockedAmounts[i] = lockedAmounts[tokens[i]];
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     function createCollCompartment(
         address borrowerCompartmentImplementation,
         uint256 loanId
@@ -382,7 +409,7 @@ contract LenderVaultImpl is Initializable, Ownable, IEvents, ILenderVaultImpl {
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
         uint256 vaultLoanTokenBal = IERC20(generalQuoteInfo.loanToken)
             .balanceOf(address(this));
-        // check if loan is too big for vault
+        // check if loan is too big for vault excluding locked funds
         if (
             loanAmount >
             vaultLoanTokenBal - lockedAmounts[generalQuoteInfo.loanToken]
