@@ -110,6 +110,8 @@ library DataTypes {
         // deadline to prevent stale transactions
         uint256 deadline;
         // slippage protection if oracle price is too loose
+        // note: slippage protection is paramount if using uniV2 oracles
+        // to prevent excess slippage from a flash loan attack
         uint256 minLoanAmount;
         // e.g., for one-click leverage
         address callbackAddr;

@@ -10,6 +10,12 @@ import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
 
 /**
+ * @notice this oracle is meant to always provide a lower collateral price per loan token
+ * in cases of extreme skew, the oracle will return a very low price, and this is by design
+ * to protect the lender from a potential flash loan attack skewing the price of a pool and
+ * allowing the borrower to borrow at too favorable a rate
+ * the borrower must protect himself by ensuring they pass in a min loan amount that
+ * limits the slippage from a skew attack
  * @dev supports oracles which have one token which is a 50/50 LP token
  * compatible with v2v3 or v3 interfaces
  * should only be utilized with eth based oracles, not usd-based oracles
