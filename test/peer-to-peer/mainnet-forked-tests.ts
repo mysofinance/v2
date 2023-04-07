@@ -4612,7 +4612,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         // deploy oracle contract for uni v2 oracles
         const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
@@ -4621,16 +4620,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await uniV2OracleImplementation.deployed()
 
-        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
-          [usdc.address, paxg.address],
-          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-          weth.address,
-          BASE
-        )
-        await chainlinkBasicImplementation.deployed()
-
         await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4657,22 +4647,23 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2PaxgUsdcAddr
         )
 
-        // get exact prices Lp token as coll and Lp token as loan
-        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew = uniV2WethUsdcExactEthPricePreSkew
-          .mul(BigNumber.from(10).pow(18))
-          .div(uniV2PaxgUsdcExactEthPricePreSkew)
-
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
         /** skew price by swapping for large weth amount **/
         await uniV2RouterInstance
           .connect(lender)
-          .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, weth.address], lender.address, MAX_UINT256)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, weth.address],
+            lender.address,
+            MAX_UINT256
+          )
 
         const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
 
-        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(10 ** 14))
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
 
         const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
           uniV2WethUsdcAddr,
@@ -4694,37 +4685,31 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2PaxgUsdcAddr
         )
 
-        // get exact prices Lp token as coll and Lp token as loan
-        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew = uniV2WethUsdcExactEthPricePostSkew
-          .mul(BigNumber.from(10).pow(18))
-          .div(uniV2PaxgUsdcExactEthPricePostSkew)
-
-        // even though the overall value of the skewed pool has increased, the coll amount per loan token should decrease
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew).to.be.greaterThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
-        )
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
-        )
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
-        )
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
-        )
+        //pool value increased by greater than a trillion fold due to large usdc skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // paxg usdc pool price should not have changed
+        expect(uniV2PaxgUsdcExactEthPricePostSkew).to.be.equal(uniV2PaxgUsdcExactEthPricePreSkew)
+        // pre and post skew price should still deviate less than 1%
+        expect(
+          getDeltaBNComparison(
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew,
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew,
+            2
+          )
+        ).to.equal(true)
 
         const showLogs = false
         if (showLogs) {
           console.log(
-            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew',
-            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew.toString()
           )
           console.log(
-            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew',
-            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew.toString()
           )
-          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew)
-          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew)
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
         }
       })
 
@@ -4742,7 +4727,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         // deploy oracle contract for uni v2 oracles
         const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
-        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
 
         const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
           [usdc.address, paxg.address],
@@ -4751,16 +4735,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await uniV2OracleImplementation.deployed()
 
-        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
-          [usdc.address, paxg.address],
-          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-          weth.address,
-          BASE
-        )
-        await chainlinkBasicImplementation.deployed()
-
         await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4787,30 +4762,23 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2PaxgUsdcAddr
         )
 
-        // get exact prices Lp token as coll and Lp token as loan
-        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew = uniV2WethUsdcExactEthPricePreSkew
-          .mul(BigNumber.from(10).pow(18))
-          .div(uniV2PaxgUsdcExactEthPricePreSkew)
-
-        //const testNewPrice1 = await uniV2OracleImplementation._getLpTokenPrice(uniV2WethUsdcAddr)
-        const testNewPricePre = await uniV2OracleImplementation._getLpTokenPrice(uniV2PaxgUsdcAddr)
-
-        //console.log('testNewPrice1 WethUsdcLP', testNewPrice1.toString())
-        //console.log('testNewPrice2 PaxgUsdcLP', testNewPricePre.toString())
-        //console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew', uniV2WethUsdcExactEthPricePreSkew .toString())
-
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
         /** skew price by swapping for large paxg amount **/
         await uniV2RouterInstance
           .connect(lender)
-          .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, paxg.address], lender.address, MAX_UINT256)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, paxg.address],
+            lender.address,
+            MAX_UINT256
+          )
 
-        await uniV2OracleImplementation._getLpTokenPrice(uniV2PaxgUsdcAddr)
         const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
 
-        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(10 ** 14))
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
 
         // will be same as pre-skew
         const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
@@ -4832,42 +4800,30 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2PaxgUsdcAddr
         )
 
-        // get exact prices Lp token as coll and Lp token as loan
-        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew = uniV2WethUsdcExactEthPricePostSkew
-          .mul(BigNumber.from(10).pow(18))
-          .div(uniV2PaxgUsdcExactEthPricePostSkew)
-
-        // even though the overall value of the skewed pool has increased, the coll amount per loan token of the lp token pair should decrease
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew).to.be.lessThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
-        )
-        expect(uniV2PaxgUsdcExactEthPricePostSkew).to.be.greaterThan(uniV2PaxgUsdcExactEthPricePreSkew)
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew
-        )
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
-        )
-        expect(uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew).to.be.lessThan(
-          uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
-        )
+        //pool value increased by greater than a trillion fold due to large usdc skew
+        expect(uniV2PaxgUsdcExactEthPricePostSkew.div(uniV2PaxgUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // weth usdc pool price should not have changed
+        expect(uniV2WethUsdcExactEthPricePostSkew).to.be.equal(uniV2WethUsdcExactEthPricePreSkew)
+        expect(
+          getDeltaBNComparison(
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew,
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew,
+            2
+          )
+        ).to.equal(true)
 
         const showLogs = false
         if (showLogs) {
           console.log(
-            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew',
-            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew.toString()
           )
           console.log(
-            'uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew',
-            uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePostSkew
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew.toString()
           )
-          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew)
-          console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew', uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew)
-          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew)
-          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew)
-          console.log('uniV2PaxgUsdcExactEthPricePreSkew', uniV2PaxgUsdcExactEthPricePreSkew)
-          console.log('uniV2PaxgUsdcExactEthPricePostSkew', uniV2PaxgUsdcExactEthPricePostSkew)
+          console.log('uniV2PaxgUsdcExactEthPricePreSkew', uniV2PaxgUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2PaxgUsdcExactEthPricePostSkew', uniV2PaxgUsdcExactEthPricePostSkew.toString())
         }
       })
 
