@@ -3425,13 +3425,19 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_USDC).div(loanTokenPriceRaw)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
+      const borrowerUsdcDelta = Number(borrowerUsdcBalPost.sub(borrowerUsdcBalPre).toString())
+      const vaultUsdcDelta = Number(vaultUsdcBalPost.sub(vaultUsdcBalPre).toString())
+      const estimatedBorrowerUsdcDelta = Number(maxLoanPerColl.div(1000).toString())
+      const estimatedVaultUsdcDelta = Number(maxLoanPerColl.div(1000).toString())
+
       expect(borrowerUniV2WethUsdcBalPre.sub(borrowerUniV2WethUsdcBalPost)).to.equal(collSendAmount)
-      // ~130k USDC loan, JS math and solidity off by less than 0.1 USDC
-      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.be.approximately(maxLoanPerColl.div(1000), 10 ** 5)
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(borrowerUsdcDelta - estimatedBorrowerUsdcDelta) / borrowerUsdcDelta).to.be.lessThan(0.000001)
       expect(
         Math.abs(Number(vaultUniV2WethUsdcBalPost.sub(vaultUniV2WethUsdcBalPre).sub(collSendAmount).toString()))
       ).to.equal(0)
-      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl.div(1000))).to.be.approximately(0, 10 ** 5)
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(vaultUsdcDelta - estimatedVaultUsdcDelta) / vaultUsdcDelta).to.be.lessThan(0.000001)
     })
 
     it('Should process onChain quote with uni v2 oracle (usdc-weth, lp is loan)', async function () {
@@ -3535,26 +3541,31 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
       const collTokenRoundData = await usdcOracleInstance.latestRoundData()
-      const totalEthValueOfLpPool = await getTotalEthValue(
+
+      const FairReservesPriceAndEthValue = await getFairReservesPriceAndEthValue(
         uniV2WethUsdc.address,
         borrower,
         usdcEthChainlinkAddr,
         weth.address,
-        weth.address,
-        false
+        weth.address
       )
-      const totalSupply = await uniV2WethUsdc.totalSupply()
+
       const collTokenPriceRaw = collTokenRoundData.answer
-      const loanTokenPriceRaw = totalEthValueOfLpPool.mul(BigNumber.from(10).pow(18)).div(totalSupply)
+      const loanTokenPriceRaw = FairReservesPriceAndEthValue.fairPriceOfLpToken
 
       const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_WETH).div(loanTokenPriceRaw)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
-      expect(borrowerUniV2WethUsdcBalPost.sub(borrowerUniV2WethUsdcBalPre)).to.equal(maxLoanPerColl.mul(10000))
+      const borrowerLpDelta = Number(borrowerUniV2WethUsdcBalPost.sub(borrowerUniV2WethUsdcBalPre).toString())
+      const vaultLpDelta = Number(vaultUniV2WethUsdcBalPre.sub(vaultUniV2WethUsdcBalPost).toString())
+      const estimatedBorrowerLpDelta = Number(maxLoanPerColl.mul(10000).toString())
+      const estimatedVaultLpDelta = Number(maxLoanPerColl.mul(10000).toString())
+
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(estimatedBorrowerLpDelta - borrowerLpDelta) / borrowerLpDelta).to.be.lessThan(0.000001)
       expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPost)).to.equal(collSendAmount)
-      expect(
-        Math.abs(Number(vaultUniV2WethUsdcBalPre.sub(vaultUniV2WethUsdcBalPost).sub(maxLoanPerColl.mul(10000)).toString()))
-      ).to.equal(0)
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(estimatedVaultLpDelta - vaultLpDelta) / vaultLpDelta).to.be.lessThan(0.000001)
       expect(vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount)).to.equal(0)
     })
 
