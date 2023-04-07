@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IUniV2} from "../../interfaces/oracles/IUniV2.sol";
@@ -59,13 +60,13 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         uint256 collTokenPriceRaw;
         uint256 loanTokenPriceRaw;
         if (isLpToken[collToken]) {
-            collTokenPriceRaw = getLpTokenPrice(collToken, true);
+            collTokenPriceRaw = getLpTokenPrice(collToken);
         } else {
             collTokenPriceRaw = getPriceOfToken(collToken);
         }
 
         if (isLpToken[loanToken]) {
-            loanTokenPriceRaw = getLpTokenPrice(loanToken, false);
+            loanTokenPriceRaw = getLpTokenPrice(loanToken);
         } else {
             loanTokenPriceRaw = getPriceOfToken(loanToken);
         }
@@ -76,49 +77,34 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
     }
 
     function getLpTokenPrice(
-        address lpToken,
-        bool isColl
+        address lpToken
     ) internal view returns (uint256 lpTokenPriceInEth) {
-        uint256 unsignedLpTokenPriceInEth = getTotalEthValue(lpToken, isColl);
-        uint256 lpTokenDecimals = IERC20Metadata(lpToken).decimals();
-        uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
-        lpTokenPriceInEth =
-            (unsignedLpTokenPriceInEth * (10 ** lpTokenDecimals)) /
-            totalLpSupply;
-        if (lpTokenPriceInEth < 1) {
-            revert Errors.InvalidOracleAnswer();
-        }
-    }
-
-    function getTotalEthValue(
-        address lpToken,
-        bool isColl
-    ) internal view returns (uint256 ethValueBounded) {
         (uint112 reserve0, uint112 reserve1, ) = IUniV2(lpToken).getReserves();
         (address token0, address token1) = (
             IUniV2(lpToken).token0(),
             IUniV2(lpToken).token1()
         );
-        uint256 decimalsToken0 = IERC20Metadata(token0).decimals();
-        uint256 decimalsToken1 = IERC20Metadata(token1).decimals();
-        uint256 token0PriceRaw = getPriceOfToken(token0);
-        uint256 token1PriceRaw = getPriceOfToken(token1);
+        uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
+        uint256 lpDecimals = IERC20Metadata(lpToken).decimals();
+        uint256 sqrtK = Math.sqrt(reserve0 * reserve1);
+        uint256 priceToken0 = getPriceOfToken(token0);
+        uint256 priceToken1 = getPriceOfToken(token1);
+        uint256 token0Factor = 10 ** IERC20Metadata(token0).decimals();
+        uint256 token1Factor = 10 ** IERC20Metadata(token1).decimals();
+        uint256 fairReserve0 = (sqrtK) *
+            Math.sqrt(
+                (priceToken1 * token0Factor) / (priceToken0 * token1Factor)
+            );
+        uint256 fairReserve1 = (sqrtK) *
+            Math.sqrt(
+                (priceToken0 * token1Factor) / (priceToken1 * token0Factor)
+            );
 
-        uint256 totalEthValueToken0 = (uint256(reserve0) * token0PriceRaw) /
-            (10 ** decimalsToken0);
-        uint256 totalEthValueToken1 = (uint256(reserve1) * token1PriceRaw) /
-            (10 ** decimalsToken1);
+        uint256 lpTokenEthValue = ((fairReserve0 * priceToken0) /
+            token0Factor) + ((fairReserve1 * priceToken1) / token1Factor);
 
-        if (isColl) {
-            // for collateral LP tokens use the lower bound (since coll token in numerator)
-            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
-                ? totalEthValueToken1 * 2
-                : totalEthValueToken0 * 2;
-        } else {
-            // for loan LP tokens use the upper bound (since loan token is in denominator)
-            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
-                ? totalEthValueToken0 * 2
-                : totalEthValueToken1 * 2;
-        }
+        lpTokenPriceInEth =
+            (lpTokenEthValue * (10 ** lpDecimals)) /
+            totalLpSupply;
     }
 }

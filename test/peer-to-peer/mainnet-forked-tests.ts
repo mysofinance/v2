@@ -2566,10 +2566,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         usdc,
         paxg,
         weth,
-        wbtc,
         ldo,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr,
         team,
         lenderVault
       } = await setupTest()
@@ -2799,10 +2796,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         weth,
         team,
         lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        addressRegistry
       } = await setupTest()
 
       // deploy chainlinkOracleContract
@@ -2908,10 +2902,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         weth,
         team,
         lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        addressRegistry
       } = await setupTest()
 
       // deploy chainlinkOracleContract
@@ -3596,7 +3587,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
     describe('Should handle getPrice correctly', async function () {
       it('Should process chainlink oracle prices correctly', async function () {
-        const { addressRegistry, usdc, paxg, weth, wbtc, ldo, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
+        const { addressRegistry, usdc, paxg, weth, wbtc, ldo, team } =
           await setupTest()
 
         // deploy chainlinkOracleContract
@@ -3878,7 +3869,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process uni v2 oracle prices correctly', async function () {
-        const { addressRegistry, usdc, weth, wbtc, gohm, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team } =
+        const { addressRegistry, usdc, weth, gohm, paxg, team } =
           await setupTest()
 
         const usdtAddr = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
@@ -4236,7 +4227,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process uni v2 oracle price with skew correctly lp token as coll (1/2 token0 reserve inflated)', async () => {
-        const { addressRegistry, usdc, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+        const { addressRegistry, usdc, weth, team, lender } =
           await setupTest()
 
         const tokenAddrToEthOracleAddrObj = {
@@ -4535,7 +4526,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process uni v2 oracle price with skew correctly lp token as loan (2/2 token1 reserve inflated)', async () => {
-        const { addressRegistry, usdc, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+        const { addressRegistry, usdc, weth, team, lender } =
           await setupTest()
 
         const tokenAddrToEthOracleAddrObj = {
@@ -4644,7 +4635,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (1/3 token0 reserve coll token inflated)', async () => {
-        const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+        const { addressRegistry, usdc, weth, paxg, team, lender } =
           await setupTest()
 
         const tokenAddrToEthOracleAddrObj = {
@@ -4775,7 +4766,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (2/3 token1 reserve loan token inflated)', async () => {
-        const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+        const { addressRegistry, usdc, weth, paxg, team, lender } =
           await setupTest()
 
         const tokenAddrToEthOracleAddrObj = {
@@ -4839,6 +4830,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2PaxgUsdcExactEthPricePreSkew)
 
+        //const testNewPrice1 = await uniV2OracleImplementation._getLpTokenPrice(uniV2WethUsdcAddr)
+        const testNewPricePre = await uniV2OracleImplementation._getLpTokenPrice(uniV2PaxgUsdcAddr)
+
+        //console.log('testNewPrice1 WethUsdcLP', testNewPrice1.toString())
+        //console.log('testNewPrice2 PaxgUsdcLP', testNewPricePre.toString())
+        //console.log('uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPricePreSkew', uniV2WethUsdcExactEthPricePreSkew .toString())
+        
+
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
@@ -4847,6 +4846,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           .connect(lender)
           .swapExactTokensForTokens(ONE_USDC.mul(10 ** 14), 0, [usdc.address, paxg.address], lender.address, MAX_UINT256)
 
+          await uniV2OracleImplementation._getLpTokenPrice(uniV2PaxgUsdcAddr)
         const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
 
         expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(10 ** 14))
@@ -4911,7 +4911,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (3/3 both pools skewed token0 reserve coll token and token1 reserve loan token inflated)', async () => {
-        const { addressRegistry, usdc, weth, wbtc, paxg, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+        const { addressRegistry, usdc, weth, paxg, team, lender } =
           await setupTest()
 
         const tokenAddrToEthOracleAddrObj = {
