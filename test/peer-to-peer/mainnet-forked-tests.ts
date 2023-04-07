@@ -4348,7 +4348,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ).to.equal(true)
       })
 
-      it('Should process uni v2 oracle price with skew correctly lp token as coll insert(2/2 token1 reserve inflated)', async () => {
+      it('Should process uni v2 oracle price with skew correctly lp token as coll (2/2 token1 reserve inflated)', async () => {
         const { addressRegistry, usdc, weth, team, lender } = await setupTest()
 
         const tokenAddrToEthOracleAddrObj = {
@@ -4424,7 +4424,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
 
       it('Should process uni v2 oracle price with skew correctly lp token as loan (1/2 token0 reserve inflated)', async () => {
-        const { addressRegistry, usdc, weth, wbtc, btcToUSDChainlinkAddr, wBTCToBTCChainlinkAddr, team, lender } =
+        const { addressRegistry, usdc, weth, team, lender } =
           await setupTest()
 
         const tokenAddrToEthOracleAddrObj = {
