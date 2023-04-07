@@ -244,6 +244,12 @@ export const getFairReservesPriceAndEthValue = async (
   }
 }
 
+export const getDeltaBNComparison = (exact: BigNumber, estimate: BigNumber, threshold: number): boolean => {
+  const Delta = exact.sub(estimate).abs()
+  const DeltaThreshold = Delta.mul(10 ** threshold).div(exact)
+  return DeltaThreshold.isZero()
+}
+
 type FairReservesPriceAndEthValue = {
   fairReserve0: BigNumber
   fairReserve1: BigNumber
