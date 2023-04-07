@@ -86,19 +86,19 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         );
         uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
         uint256 lpDecimals = IERC20Metadata(lpToken).decimals();
-        uint256 sqrtK = Math.sqrt(reserve0 * reserve1);
+        uint256 sqrtK = Math.sqrt(reserve0) * Math.sqrt(reserve1);
         uint256 priceToken0 = getPriceOfToken(token0);
         uint256 priceToken1 = getPriceOfToken(token1);
         uint256 token0Factor = 10 ** IERC20Metadata(token0).decimals();
         uint256 token1Factor = 10 ** IERC20Metadata(token1).decimals();
-        uint256 fairReserve0 = (sqrtK) *
-            Math.sqrt(
-                (priceToken1 * token0Factor) / (priceToken0 * token1Factor)
-            );
-        uint256 fairReserve1 = (sqrtK) *
-            Math.sqrt(
-                (priceToken0 * token1Factor) / (priceToken1 * token0Factor)
-            );
+        uint256 fairReserve0 = ((sqrtK) *
+            Math.sqrt(priceToken1) *
+            Math.sqrt(token0Factor)) /
+            (Math.sqrt(priceToken0) * Math.sqrt(token1Factor));
+        uint256 fairReserve1 = ((sqrtK) *
+            Math.sqrt(priceToken0) *
+            Math.sqrt(token1Factor)) /
+            (Math.sqrt(priceToken1) * Math.sqrt(token0Factor));
 
         uint256 lpTokenEthValue = ((fairReserve0 * priceToken0) /
             token0Factor) + ((fairReserve1 * priceToken1) / token1Factor);
