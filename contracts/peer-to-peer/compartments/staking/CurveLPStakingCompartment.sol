@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
 import {ILenderVaultImpl} from "../../interfaces/ILenderVaultImpl.sol";
-import {DataTypes} from "../../DataTypes.sol";
+import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
 
@@ -24,7 +24,9 @@ contract CurveLPStakingCompartment is BaseCompartment {
         0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
 
     function stake(uint256 gaugeIndex) external {
-        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(loanIdx);
+        DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
+            loanIdx
+        );
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }

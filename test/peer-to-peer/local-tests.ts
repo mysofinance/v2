@@ -72,7 +72,7 @@ const payloadScheme = [
         type: 'bool'
       }
     ],
-    internalType: 'struct DataTypes.GeneralQuoteInfo',
+    internalType: 'struct DataTypesPeerToPeer.GeneralQuoteInfo',
     name: 'generalQuoteInfo',
     type: 'tuple'
   },
@@ -246,8 +246,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       'InvalidSender'
     )
 
-    // reverts if trying to toggle tokens before address registry is initialized
-    await expect(addressRegistry.connect(team).toggleTokens([team.address], true)).to.be.revertedWithCustomError(
+    // reverts if trying to set whitelist state to tokens (=1) before address registry is initialized
+    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 1)).to.be.revertedWithCustomError(
       addressRegistry,
       'Uninitialized'
     )
@@ -315,16 +315,18 @@ describe('Peer-to-Peer: Local Tests', function () {
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).toggleTokens([weth.address], true)).to.be.revertedWithCustomError(
+    await expect(addressRegistry.connect(lender).setWhitelistState([weth.address], 1)).to.be.revertedWithCustomError(
       addressRegistry,
       'InvalidSender'
     )
-    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
-    await expect(addressRegistry.connect(team).toggleTokens([ZERO_ADDRESS], true)).to.be.revertedWithCustomError(
+    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+    await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 1)).to.be.revertedWithCustomError(
       addressRegistry,
       'InvalidAddress'
     )
-    expect(await addressRegistry.isWhitelistedToken(ZERO_ADDRESS)).to.be.false
+    expect(await addressRegistry.whitelistState(ZERO_ADDRESS)).to.be.equal(0)
+    expect(await addressRegistry.whitelistState(weth.address)).to.be.equal(1)
+    expect(await addressRegistry.whitelistState(usdc.address)).to.be.equal(1)
 
     // reverts if trying to manually add lenderVault
     await expect(addressRegistry.connect(team).addLenderVault(lenderVaultAddr)).to.be.revertedWithCustomError(
@@ -418,17 +420,17 @@ describe('Peer-to-Peer: Local Tests', function () {
     it('Should not proccess with bigger fee than max fee', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
-      await expect(borrowerGateway.connect(lender).setNewProtocolFee(0)).to.be.revertedWithCustomError(
+      await expect(borrowerGateway.connect(lender).setProtocolFee(0)).to.be.revertedWithCustomError(
         borrowerGateway,
         'InvalidSender'
       )
-      await expect(borrowerGateway.connect(team).setNewProtocolFee(BASE)).to.be.revertedWithCustomError(
+      await expect(borrowerGateway.connect(team).setProtocolFee(BASE)).to.be.revertedWithCustomError(
         borrowerGateway,
         'InvalidFee'
       )
 
       // set max protocol fee p.a.
-      await borrowerGateway.connect(team).setNewProtocolFee(BASE.mul(5).div(100))
+      await borrowerGateway.connect(team).setProtocolFee(BASE.mul(5).div(100))
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -826,7 +828,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOffChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       expect(borrowEvent).not.be.undefined
@@ -1177,7 +1179,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler.connect(lender).checkAndRegisterOnChainQuote(borrower.address, borrower.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], false)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 0)
 
       await expect(
         borrowerGateway
@@ -1185,7 +1187,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([weth.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 0)
 
       await expect(
         borrowerGateway
@@ -1193,8 +1195,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
-      await addressRegistry.connect(team).toggleTokens([weth.address], false)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 0)
 
       await expect(
         borrowerGateway
@@ -1202,7 +1204,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([weth.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 1)
 
       onChainQuote.generalQuoteInfo.collToken = usdc.address
 

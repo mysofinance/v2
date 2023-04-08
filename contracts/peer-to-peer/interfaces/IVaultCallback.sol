@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import {DataTypes} from "../DataTypes.sol";
+import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface IVaultCallback {
     /**
@@ -10,7 +10,7 @@ interface IVaultCallback {
      * @param data any extra info needed for the callback functionality
      */
     function borrowCallback(
-        DataTypes.Loan calldata loan,
+        DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
     ) external;
 
@@ -20,7 +20,7 @@ interface IVaultCallback {
      * @param data any extra info needed for the callback functionality
      */
     function repayCallback(
-        DataTypes.Loan calldata loan,
+        DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
     ) external;
 }
