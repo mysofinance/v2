@@ -2,42 +2,59 @@
 
 pragma solidity ^0.8.19;
 
-import {DataTypes} from "../DataTypes.sol";
+import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface IQuoteHandler {
+    event OnChainQuoteAdded(
+        address lenderVault,
+        DataTypesPeerToPeer.OnChainQuote onChainQuote,
+        bytes32 onChainQuoteHash
+    );
+
+    event OnChainQuoteDeleted(address lenderVault, bytes32 onChainQuoteHash);
+
+    event OnChainQuoteInvalidated(
+        address lenderVault,
+        bytes32 onChainQuoteHash
+    );
+    event OffChainQuoteInvalidated(
+        address lenderVault,
+        bytes32 offChainQuoteHash
+    );
+
     /**
      * @notice function adds on chain quote
      * @dev function can only be called by vault owner
      * @param lenderVault address of the vault adding quote
-     * @param onChainQuote data for the onChain quote (See notes in DataTypes.sol)
+     * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
     function addOnChainQuote(
         address lenderVault,
-        DataTypes.OnChainQuote calldata onChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external;
 
     /**
      * @notice function updates on chain quote
      * @dev function can only be called by vault owner
      * @param lenderVault address of the vault updating quote
-     * @param oldOnChainQuote data for the old onChain quote (See notes in DataTypes.sol)
-     * @param newOnChainQuote data for the new onChain quote (See notes in DataTypes.sol)
+     * @param oldOnChainQuote data for the old onChain quote (See notes in DataTypesPeerToPeer.sol)
+     * @param newOnChainQuote data for the new onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
     function updateOnChainQuote(
         address lenderVault,
-        DataTypes.OnChainQuote calldata oldOnChainQuote,
-        DataTypes.OnChainQuote calldata newOnChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata oldOnChainQuote,
+        DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external;
 
     /**
      * @notice function deletes on chain quote
      * @dev function can only be called by vault owner
      * @param lenderVault address of the vault deleting
-     * @param onChainQuote data for the onChain quote marked for deletion (See notes in DataTypes.sol)
+     * @param onChainQuote data for the onChain quote marked for deletion (See notes in DataTypesPeerToPeer.sol)
      */
     function deleteOnChainQuote(
         address lenderVault,
-        DataTypes.OnChainQuote calldata onChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external;
 
     /**
@@ -66,12 +83,12 @@ interface IQuoteHandler {
      * @dev function can only be called by borrowerGateway
      * @param borrower address of borrower
      * @param lenderVault address of the vault
-     * @param onChainQuote data for the onChain quote (See notes in DataTypes.sol)
+     * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
     function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.OnChainQuote memory onChainQuote
+        DataTypesPeerToPeer.OnChainQuote memory onChainQuote
     ) external;
 
     /**
@@ -79,15 +96,15 @@ interface IQuoteHandler {
      * @dev function can only be called by borrowerGateway
      * @param borrower address of borrower
      * @param lenderVault address of the vault
-     * @param offChainQuote data for the offChain quote (See notes in DataTypes.sol)
-     * @param quoteTuple quote data (see notes in DataTypes.sol)
+     * @param offChainQuote data for the offChain quote (See notes in DataTypesPeerToPeer.sol)
+     * @param quoteTuple quote data (see notes in DataTypesPeerToPeer.sol)
      * @param proof array of bytes needed to verify merkle proof
      */
     function checkAndRegisterOffChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.OffChainQuote calldata offChainQuote,
-        DataTypes.QuoteTuple calldata quoteTuple,
+        DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof
     ) external;
 

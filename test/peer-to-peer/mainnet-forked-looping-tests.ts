@@ -157,10 +157,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
     await uniV3Looping.deployed()
 
     // whitelist addrs
-    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address], true)
-    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address, true)).to.be.reverted
-    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
-    await addressRegistry.connect(team).toggleCallbackAddr(uniV3Looping.address, true)
+    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address, paxg.address], 1)
+    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
+    await addressRegistry.connect(team).setWhitelistState([uniV3Looping.address], 4)
 
     return {
       addressRegistry,

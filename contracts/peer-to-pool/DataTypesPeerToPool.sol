@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-library DataTypes {
+library DataTypesPeerToPool {
     struct Repayment {
         // The loan token amount due for given period; initially, expressed in relative terms (100%=BASE), once
         // finalized in absolute terms (in loanToken)
@@ -66,7 +66,7 @@ library DataTypes {
         // currentRepaymentIdx (initially 0) only ever gets incremented on repay
         uint256 currentRepaymentIdx;
         // Status of current loan proposal
-        DataTypes.LoanStatus status;
+        DataTypesPeerToPool.LoanStatus status;
     }
 
     enum LoanStatus {

@@ -97,14 +97,11 @@ async function main() {
   /* *************************************** */
 
   // whitelist callbacks and compartments
-  await addressRegistry.connect(deployer).toggleCallbackAddr(balancerV2Looping.address, true)
-  await addressRegistry.connect(deployer).toggleCallbackAddr(uniV3Looping.address, true)
-  await addressRegistry.connect(deployer).toggleCompartmentImpl(aaveStakingCompartmentImplementation.address, true)
-  await addressRegistry.connect(deployer).toggleCompartmentImpl(curveLPStakingCompartmentImplementation.address, true)
-  await addressRegistry.connect(deployer).toggleCompartmentImpl(votingCompartmentImplementation.address, true)
+  await addressRegistry.connect(deployer).setWhitelistState([balancerV2Looping.address, uniV3Looping.address], 4)
+  await addressRegistry.connect(deployer).setWhitelistState([aaveStakingCompartmentImplementation.address, curveLPStakingCompartmentImplementation.address, votingCompartmentImplementation.address], 3)
 
   // only on arbitrum
-  //await addressRegistry.connect(deployer).toggleCompartmentImpl(glpStakingCompartmentImplementation.address, true)
+  //await addressRegistry.connect(deployer).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

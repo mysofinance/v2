@@ -170,9 +170,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     await balancerV2Looping.deployed()
 
     // whitelist addrs
-    //await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address, gohm.address, uniV2WethUsdc])
-    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address, true)).to.be.reverted
-    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
     return {
       addressRegistry,
@@ -246,9 +245,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address, true)).to.be.reverted
+      await expect(addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       // lender vault getter fails if no loans
       await expect(lenderVault.loan(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
@@ -289,7 +288,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -333,7 +332,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -377,7 +376,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -421,7 +420,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -465,7 +464,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
 
@@ -513,7 +512,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -544,7 +543,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: [],
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
@@ -590,7 +589,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -645,20 +644,20 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([weth.address], true)
-      await addressRegistry.connect(team).toggleTokens([usdc.address], false)
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 1)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
 
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -710,7 +709,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -727,7 +726,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         }
       }
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], false)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
 
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(borrower.address, onChainQuote, newOnChainQuote)
@@ -745,13 +744,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([compAddress], true)
+      await addressRegistry.connect(team).setWhitelistState([compAddress], 1)
 
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       onChainQuote.generalQuoteInfo.loanToken = compAddress
 
@@ -807,7 +806,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       expect(borrowEvent).to.not.be.undefined
@@ -853,7 +852,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -886,7 +885,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       expect(borrowEvent).to.not.be.undefined
@@ -1013,7 +1012,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -1076,7 +1075,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -1150,7 +1149,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -1233,7 +1232,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 0)
 
       await expect(
         borrowerGateway
@@ -1241,7 +1240,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
       await expect(
         borrowerGateway
@@ -1312,7 +1311,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const curveLPStakingCompartmentImplementation = await CurveLPStakingCompartmentImplementation.deploy()
       await curveLPStakingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(curveLPStakingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([curveLPStakingCompartmentImplementation.address], 3)
 
       // increase borrower CRV balance
       const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
@@ -1369,11 +1368,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist tokens
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
       // whitelist gauge contract
-      await expect(addressRegistry.connect(lender).toggleCompartmentImpl(crvGaugeAddress, true)).to.be.reverted
-      await addressRegistry.connect(team).toggleCompartmentImpl(crvGaugeAddress, true)
+      await expect(addressRegistry.connect(lender).setWhitelistState([crvGaugeAddress], 3)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      await addressRegistry.connect(team).setWhitelistState([crvGaugeAddress], 3)
 
       // borrower approves borrower gateway
       await crvLPInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1413,7 +1412,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
@@ -1495,7 +1494,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
               callbackData
             )
         )
-          .to.emit(borrowerGateway, 'Repay')
+          .to.emit(borrowerGateway, 'Repaid')
           .withArgs(lenderVault.address, loanId, repayAmount)
 
         // check balance post repay
@@ -1553,7 +1552,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             callbackData
           )
         )
-          .to.emit(borrowerGateway, 'Repay')
+          .to.emit(borrowerGateway, 'Repaid')
           .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
         // check balance post repay
@@ -1718,7 +1717,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
       await aaveStakingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(aaveStakingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
 
       // increase borrower aWETH balance
       const locallyCollBalance = ethers.BigNumber.from(10).pow(18)
@@ -1744,7 +1743,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1796,7 +1795,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
@@ -1828,7 +1827,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackData
         )
       )
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
       // check balance post repay
@@ -1859,7 +1858,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
       await votingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(votingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([votingCompartmentImplementation.address], 3)
 
       // increase borrower UNI balance
       const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
@@ -1888,7 +1887,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1927,7 +1926,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
@@ -1975,7 +1974,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackData
         )
       )
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
       // check balance post repay
@@ -2020,7 +2019,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
       await votingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(votingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([votingCompartmentImplementation.address], 3)
 
       // increase borrower UNI balance
       const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
@@ -2049,10 +2048,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultLoanBalPre).to.equal(ONE_WETH.mul(1000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, weth.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, weth.address], 1)
 
-      expect(await addressRegistry.connect(team).isWhitelistedToken(collTokenAddress)).to.be.true
-      expect(await addressRegistry.connect(team).isWhitelistedToken(weth.address)).to.be.true
+      expect(await addressRegistry.connect(team).whitelistState(collTokenAddress)).to.be.equal(1)
+      expect(await addressRegistry.connect(team).whitelistState(weth.address)).to.be.equal(1)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -2103,7 +2102,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
@@ -2156,7 +2155,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         [poolId, minSwapReceiveRepay, deadline]
       )
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 0)
 
       await expect(
         borrowerGateway.connect(borrower).repay(
@@ -2171,7 +2170,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
       ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
       await expect(
         borrowerGateway.connect(borrower).repay(
@@ -2199,7 +2198,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackDataRepay
         )
       )
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
       // check balance post repay
@@ -2268,7 +2267,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2332,7 +2331,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       //team sets protocolFee
       const protocolFee = BigNumber.from(10).pow(16)
-      await borrowerGateway.connect(team).setNewProtocolFee(protocolFee) // 1% or 100 bp protocolFee
+      await borrowerGateway.connect(team).setProtocolFee(protocolFee) // 1% or 100 bp protocolFee
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -2361,7 +2360,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2454,7 +2453,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2488,7 +2487,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowTransactionReceipt = await borrowTransaction.wait()
 
       const borrowEvent = borrowTransactionReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const loanId = borrowEvent?.args?.['loanId']
@@ -2533,7 +2532,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ).to.be.revertedWithCustomError(lenderVault, 'InvalidBorrower')
 
       await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
       const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
       // full repay of USDC less upfront fee
@@ -2630,9 +2629,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address, true)).to.be.reverted
+      await expect(addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const paxgOracleInstance = new ethers.Contract(paxgEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
@@ -2683,7 +2682,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address, ldo.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address, ldo.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2815,7 +2814,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -2849,7 +2848,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2925,7 +2924,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -2963,7 +2962,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -3024,7 +3023,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await olympusOracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([olympusOracleImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const ohmOracleInstance = new ethers.Contract(ohmEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
@@ -3097,7 +3096,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
 
-      await addressRegistry.connect(team).toggleTokens([gohm.address, usdc.address, ldo.address, weth.address], true)
+      await addressRegistry.connect(team).setWhitelistState([gohm.address, usdc.address, ldo.address, weth.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -3182,7 +3181,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await olympusOracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([olympusOracleImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const ohmOracleInstance = new ethers.Contract(ohmEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
@@ -3221,7 +3220,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
 
-      await addressRegistry.connect(team).toggleTokens([gohm.address, usdc.address, weth.address], true)
+      await addressRegistry.connect(team).setWhitelistState([gohm.address, usdc.address, weth.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -3321,7 +3320,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await uniV2OracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -3393,7 +3392,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry
         .connect(team)
-        .toggleTokens([uniV2WethUsdc.address, usdc.address, weth.address, gohm.address], true)
+        .setWhitelistState([uniV2WethUsdc.address, usdc.address, weth.address, gohm.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -3497,7 +3496,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await uniV2OracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -3533,7 +3532,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([uniV2WethUsdc.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([uniV2WethUsdc.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -3621,7 +3620,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         // prices on 2-16-2023
         const aaveCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
@@ -3688,7 +3687,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicWbtcUSDImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicWbtcUSDImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicWbtcUSDImplementation.address], 2)
 
         // prices on 2-16-2023
         const aaveCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
@@ -3810,7 +3809,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await olympusOracleImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([olympusOracleImplementation.address], 2)
 
         const gOhmCollUSDCLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, usdc.address)
         const gOhmCollLinkLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, linkAddr)
@@ -3914,8 +3913,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         await expect(uniV2OracleImplementation.getPrice(uniV2WethWiseAddr, usdc.address)).to.be.revertedWithCustomError(
           uniV2OracleImplementation,
@@ -4265,8 +4264,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4358,8 +4357,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4454,8 +4453,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4564,8 +4563,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4675,8 +4674,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4806,8 +4805,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 
@@ -4942,8 +4941,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
         await chainlinkBasicImplementation.deployed()
 
-        await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
-        await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
 

@@ -6,16 +6,15 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Constants} from "../Constants.sol";
-import {DataTypes} from "./DataTypes.sol";
+import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
-import {IEvents} from "./interfaces/IEvents.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
-contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
+contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     using SafeERC20 for IERC20Metadata;
 
     // putting fee info in borrow gateway since borrower always pays this upfront
@@ -28,9 +27,10 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
 
     function borrowWithOffChainQuote(
         address lenderVault,
-        DataTypes.BorrowTransferInstructions calldata borrowInstructions,
-        DataTypes.OffChainQuote calldata offChainQuote,
-        DataTypes.QuoteTuple calldata quoteTuple,
+        DataTypesPeerToPeer.BorrowTransferInstructions
+            calldata borrowInstructions,
+        DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof
     ) external nonReentrant {
         checkDeadlineAndRegisteredVault(
@@ -50,7 +50,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
         }
 
         (
-            DataTypes.Loan memory loan,
+            DataTypesPeerToPeer.Loan memory loan,
             uint256 loanId,
             uint256 upfrontFee,
             address collReceiver
@@ -69,7 +69,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             upfrontFee
         );
 
-        emit Borrow(
+        emit Borrowed(
             lenderVault,
             loan.borrower,
             loan,
@@ -82,8 +82,9 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
 
     function borrowWithOnChainQuote(
         address lenderVault,
-        DataTypes.BorrowTransferInstructions calldata borrowInstructions,
-        DataTypes.OnChainQuote calldata onChainQuote,
+        DataTypesPeerToPeer.BorrowTransferInstructions
+            calldata borrowInstructions,
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote,
         uint256 quoteTupleIdx
     ) external nonReentrant {
         // borrow gateway just forwards data to respective vault and orchestrates transfers
@@ -108,11 +109,10 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
                 onChainQuote
             );
         }
-        DataTypes.QuoteTuple memory quoteTuple = onChainQuote.quoteTuples[
-            quoteTupleIdx
-        ];
+        DataTypesPeerToPeer.QuoteTuple memory quoteTuple = onChainQuote
+            .quoteTuples[quoteTupleIdx];
         (
-            DataTypes.Loan memory loan,
+            DataTypesPeerToPeer.Loan memory loan,
             uint256 loanId,
             uint256 upfrontFee,
             address collReceiver
@@ -131,7 +131,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             upfrontFee
         );
 
-        emit Borrow(
+        emit Borrowed(
             lenderVault,
             loan.borrower,
             loan,
@@ -143,7 +143,8 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
     }
 
     function repay(
-        DataTypes.LoanRepayInstructions calldata loanRepayInstructions,
+        DataTypesPeerToPeer.LoanRepayInstructions
+            calldata loanRepayInstructions,
         address vaultAddr,
         address callbackAddr,
         bytes calldata callbackData
@@ -152,7 +153,7 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             revert Errors.UnregisteredVault();
         }
 
-        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
+        DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
             loanRepayInstructions.targetLoanId
         );
 
@@ -177,14 +178,14 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             reclaimCollAmount
         );
 
-        emit Repay(
+        emit Repaid(
             vaultAddr,
             loanRepayInstructions.targetLoanId,
             loanRepayInstructions.targetRepayAmount
         );
     }
 
-    function setNewProtocolFee(uint256 _newFee) external {
+    function setProtocolFee(uint256 _newFee) external {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
             revert Errors.InvalidSender();
         }
@@ -192,14 +193,15 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             revert Errors.InvalidFee();
         }
         protocolFee = _newFee;
-        emit NewProtocolFee(_newFee);
+        emit ProtocolFeeSet(_newFee);
     }
 
     function processTransfers(
         address lenderVault,
         address collReceiver,
-        DataTypes.BorrowTransferInstructions calldata borrowInstructions,
-        DataTypes.Loan memory loan,
+        DataTypesPeerToPeer.BorrowTransferInstructions
+            calldata borrowInstructions,
+        DataTypesPeerToPeer.Loan memory loan,
         uint256 upfrontFee
     ) internal {
         if (borrowInstructions.callbackAddr == address(0)) {
@@ -210,9 +212,9 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             );
         } else {
             if (
-                !IAddressRegistry(addressRegistry).isWhitelistedCallbackAddr(
+                IAddressRegistry(addressRegistry).whitelistState(
                     borrowInstructions.callbackAddr
-                )
+                ) != DataTypesPeerToPeer.WhitelistState.CALLBACK
             ) {
                 revert Errors.NonWhitelistedCallback();
             }
@@ -269,8 +271,8 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
 
     function processRepayTransfers(
         address lenderVault,
-        DataTypes.LoanRepayInstructions memory loanRepayInstructions,
-        DataTypes.Loan memory loan,
+        DataTypesPeerToPeer.LoanRepayInstructions memory loanRepayInstructions,
+        DataTypesPeerToPeer.Loan memory loan,
         address callbackAddr,
         bytes calldata callbackData
     ) internal returns (uint256 reclaimCollAmount) {
@@ -296,9 +298,9 @@ contract BorrowerGateway is ReentrancyGuard, IEvents, IBorrowerGateway {
             }
         } else {
             if (
-                !IAddressRegistry(addressRegistry).isWhitelistedCallbackAddr(
+                IAddressRegistry(addressRegistry).whitelistState(
                     callbackAddr
-                )
+                ) != DataTypesPeerToPeer.WhitelistState.CALLBACK
             ) {
                 revert Errors.NonWhitelistedCallback();
             }

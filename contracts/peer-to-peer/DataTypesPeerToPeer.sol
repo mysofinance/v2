@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-library DataTypes {
+library DataTypesPeerToPeer {
     struct Loan {
         // address of borrower
         address borrower;
@@ -115,5 +115,18 @@ library DataTypes {
         address callbackAddr;
         // any data needed by callback
         bytes callbackData;
+    }
+
+    enum WhitelistState {
+        // not whitelisted
+        NOT_WHITELISTED,
+        // whitelisted as token
+        TOKEN,
+        // whitelisted as oracle
+        ORACLE,
+        // whitelisted as compartment
+        COMPARTMENT,
+        // whitelisted as callback contract
+        CALLBACK
     }
 }

@@ -2,7 +2,14 @@
 
 pragma solidity 0.8.19;
 
+import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
+
 interface IAddressRegistry {
+    event WhitelistStateUpdated(
+        address[] indexed whitelistAddres,
+        DataTypesPeerToPeer.WhitelistState whitelistState
+    );
+
     /**
      * @notice initializes factory, gateway, and quote handler contracts
      * @param _lenderVaultFactory address of the factory for lender vaults
@@ -23,39 +30,15 @@ interface IAddressRegistry {
     function addLenderVault(address addr) external;
 
     /**
-     * @notice toggles whitelist status of provided tokens
-     * @dev can only be called by registry owner
-     * @param addrs addresses of tokens
-     * @param whitelistStatus true if whitelisted, else false to delist
+     * @notice Sets the whitelist state for a given address
+     * @dev Can only be called by registry owner
+     * @param addrs Addresses for which whitelist state shall be set
+     * @param whitelistState The whitelist state to which addresses shall be set (NOT_WHITELISTED, TOKEN, ORACLE, COMPARTMENT, or CALLBACK)
      */
-    function toggleTokens(
+    function setWhitelistState(
         address[] memory addrs,
-        bool whitelistStatus
+        DataTypesPeerToPeer.WhitelistState whitelistState
     ) external;
-
-    /**
-     * @notice toggles whitelist status of callback
-     * @dev can only be called by registry owner
-     * @param addr address of callback
-     * @param whitelistStatus true if whitelisted, else false to delist
-     */
-    function toggleCallbackAddr(address addr, bool whitelistStatus) external;
-
-    /**
-     * @notice toggles whitelist status of compartment
-     * @dev can only be called by registry owner
-     * @param addr address of compartment
-     * @param whitelistStatus true if whitelisted, else false to delist
-     */
-    function toggleCompartmentImpl(address addr, bool whitelistStatus) external;
-
-    /**
-     * @notice toggles whitelist status of oracle
-     * @dev can only be called by registry owner
-     * @param addr address of oracle
-     * @param whitelistStatus true if whitelisted, else false to delist
-     */
-    function toggleOracle(address addr, bool whitelistStatus) external;
 
     /**
      * @notice Returns the address of the vault factory
@@ -83,36 +66,13 @@ interface IAddressRegistry {
     function isRegisteredVault(address addr) external view returns (bool);
 
     /**
-     * @notice Returns boolean flag indicating whether given address is a whitelisted token
-     * @param addr Address to check if it is a whitelisted token
-     * @return Boolean flag indicating whether given address is a whitelisted token
+     * @notice Returns whitelist state for given address
+     * @param addr Address to check whiteliste state for
+     * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, TOKEN, ORACLE, COMPARTMENT, or CALLBACK)
      */
-    function isWhitelistedToken(address addr) external view returns (bool);
-
-    /**
-     * @notice Returns boolean flag indicating whether given address is a whitelisted callback contract
-     * @param addr Address to check if it is a whitelisted callback contract
-     * @return Boolean flag indicating whether given address is a whitelisted callback contract
-     */
-    function isWhitelistedCallbackAddr(
+    function whitelistState(
         address addr
-    ) external view returns (bool);
-
-    /**
-     * @notice Returns boolean flag indicating whether given address is a whitelisted compartment implementation contract
-     * @param addr Address to check if it is a whitelisted compartment implementation contract
-     * @return Boolean flag indicating whether given address is a whitelisted compartment implementation contract
-     */
-    function isWhitelistedCompartmentImpl(
-        address addr
-    ) external view returns (bool);
-
-    /**
-     * @notice Returns boolean flag indicating whether given address is a whitelisted oracle contract
-     * @param addr Address to check if it is a whitelisted oracle contract
-     * @return Boolean flag indicating whether given address is a whitelisted oracle contract
-     */
-    function isWhitelistedOracle(address addr) external view returns (bool);
+    ) external view returns (DataTypesPeerToPeer.WhitelistState whitelistState);
 
     /**
      * @notice Returns an array of registered vault addresses

@@ -126,9 +126,9 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     await weth.connect(borrower).deposit({ value: ONE_WETH.mul(100000) })
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address, true)).to.be.reverted
-    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
-    await addressRegistry.connect(team).toggleCallbackAddr(uniV3Looping.address, true)
+    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
+    await addressRegistry.connect(team).setWhitelistState([uniV3Looping.address], 4)
 
     return {
       addressRegistry,
@@ -157,7 +157,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const glpStakingCompartmentImplementation = await GlpStakingCompartmentImplementation.deploy()
     await glpStakingCompartmentImplementation.deployed()
 
-    await addressRegistry.connect(team).toggleCompartmentImpl(glpStakingCompartmentImplementation.address, true)
+    await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
 
     // increase borrower GLP balance
     const collTokenAddress = '0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf' // GLP
@@ -186,7 +186,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
 
     // whitelist token pair
-    await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+    await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -227,7 +227,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
     const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-      return x.event === 'Borrow'
+      return x.event === 'Borrowed'
     })
 
     const loanId = borrowEvent?.args?.['loanId']
@@ -265,7 +265,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
         callbackData
       )
     )
-      .to.emit(borrowerGateway, 'Repay')
+      .to.emit(borrowerGateway, 'Repaid')
       .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
     // check balance post repay
@@ -334,7 +334,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     }
 
     // whitelist token pair
-    await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
     await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
       quoteHandler,
@@ -471,7 +471,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
 
     // whitelist token pair
-    await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+    await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)

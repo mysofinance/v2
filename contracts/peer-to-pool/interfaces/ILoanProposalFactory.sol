@@ -3,6 +3,15 @@
 pragma solidity 0.8.19;
 
 interface ILoanProposalFactory {
+    event LoanProposalCreated(
+        address indexed loanProposalAddr,
+        address indexed fundingPool,
+        address indexed sender,
+        address collToken,
+        uint256 arrangerFee,
+        uint256 unsubscribeGracePeriod
+    );
+
     /**
      * @notice Creates a new loan proposal
      * @param _fundingPool The address of the funding pool from which lenders are allowed to subscribe, and -if loan proposal is successful- from where loan amount is sourced
