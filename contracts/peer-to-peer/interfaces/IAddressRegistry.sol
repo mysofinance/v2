@@ -6,7 +6,7 @@ import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface IAddressRegistry {
     event WhitelistStateUpdated(
-        address[] indexed whitelistAddres,
+        address[] indexed whitelistAddrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
     );
 
@@ -67,7 +67,7 @@ interface IAddressRegistry {
 
     /**
      * @notice Returns whitelist state for given address
-     * @param addr Address to check whiteliste state for
+     * @param addr Address to check whitelist state for
      * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, TOKEN, ORACLE, COMPARTMENT, or CALLBACK)
      */
     function whitelistState(
