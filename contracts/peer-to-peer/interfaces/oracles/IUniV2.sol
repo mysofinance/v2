@@ -24,4 +24,9 @@ interface IUniV2 {
      * @notice totalSupply of the lp token
      */
     function totalSupply() external view returns (uint256);
+
+    /**
+     * @notice decimals of the lp token
+     */
+    function decimals() external view returns (uint256);
 }
