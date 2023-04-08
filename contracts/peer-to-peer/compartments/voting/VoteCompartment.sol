@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "../../interfaces/ILenderVaultImpl.sol";
-import {DataTypes} from "../../DataTypes.sol";
+import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
 
@@ -15,7 +15,9 @@ contract VoteCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
 
     function delegate(address _delegatee) external {
-        DataTypes.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(loanIdx);
+        DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
+            loanIdx
+        );
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }

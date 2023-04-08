@@ -5,7 +5,7 @@ pragma solidity ^0.8.19;
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
-import {DataTypes} from "../DataTypes.sol";
+import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface ISwapRouter {
     struct ExactInputSingleParams {
@@ -70,7 +70,7 @@ contract UniV3Looping is IVaultCallback {
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     function borrowCallback(
-        DataTypes.Loan calldata loan,
+        DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
     ) external {
         (uint256 minSwapReceive, uint256 deadline, uint24 poolFee) = abi.decode(
@@ -98,7 +98,7 @@ contract UniV3Looping is IVaultCallback {
     }
 
     function repayCallback(
-        DataTypes.Loan calldata loan,
+        DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
     ) external {
         (uint256 minSwapReceive, uint256 deadline, uint24 poolFee) = abi.decode(

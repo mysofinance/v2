@@ -6,9 +6,8 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
-import {IEvents} from "./interfaces/IEvents.sol";
 
-contract LenderVaultFactory is IEvents, ILenderVaultFactory {
+contract LenderVaultFactory is ILenderVaultFactory {
     address public immutable addressRegistry;
     address public immutable lenderVaultImpl;
 

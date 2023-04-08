@@ -3,6 +3,11 @@
 pragma solidity ^0.8.19;
 
 interface ILenderVaultFactory {
+    event NewVaultCreated(
+        address indexed newLenderVaultAddr,
+        address vaultOwner
+    );
+
     /**
      * @notice function creates new lender vaults
      * @return newLenderVaultAddr address of created vault

@@ -5,14 +5,13 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Constants} from "../Constants.sol";
 import {IFundingPool} from "./interfaces/IFundingPool.sol";
-import {IEvents} from "./interfaces/IEvents.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
 import {Constants} from "../Constants.sol";
-import {DataTypes} from "./DataTypes.sol";
+import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
 
-contract FundingPool is IEvents, IFundingPool {
+contract FundingPool is IFundingPool {
     using SafeERC20 for IERC20Metadata;
 
     address public immutable loanProposalFactory;
@@ -66,8 +65,9 @@ contract FundingPool is IEvents, IFundingPool {
         if (amount > balanceOf[msg.sender]) {
             revert Errors.InsufficientBalance();
         }
-        DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
-            .loanTerms();
+        DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
+            loanProposal
+        ).loanTerms();
         if (amount + totalSubscribed[loanProposal] > loanTerms.maxLoanAmount) {
             revert Errors.SubscriptionAmountTooHigh();
         }
@@ -124,8 +124,9 @@ contract FundingPool is IEvents, IFundingPool {
             ,
 
         ) = ILoanProposalImpl(loanProposal).dynamicData();
-        DataTypes.LoanTerms memory loanTerms = ILoanProposalImpl(loanProposal)
-            .loanTerms();
+        DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
+            loanProposal
+        ).loanTerms();
         totalSubscribedIsDeployed[loanProposal] = true;
         ILoanProposalImpl(loanProposal).checkAndupdateStatus();
         IERC20Metadata(depositToken).safeTransfer(

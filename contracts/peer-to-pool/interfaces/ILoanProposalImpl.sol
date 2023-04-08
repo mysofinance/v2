@@ -1,9 +1,32 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import {DataTypes} from "../DataTypes.sol";
+import {DataTypesPeerToPool} from "../DataTypesPeerToPool.sol";
 
 interface ILoanProposalImpl {
+    event LoanTermsProposed(DataTypesPeerToPool.LoanTerms loanTerms);
+    event LoanTermsAccepted();
+    event LoanTermsAndTransferCollFinalized(
+        uint256 finalLoanAmount,
+        uint256 _finalCollAmountReservedForDefault,
+        uint256 _finalCollAmountReservedForConversions,
+        uint256 _arrangerFee
+    );
+    event Rolledback();
+    event LoanDeployed();
+    event ConversionExercised(
+        address indexed sender,
+        uint256 repaymentIdx,
+        uint256 amount
+    );
+    event RepaymentClaimed(address indexed sender, uint256 amount);
+    event Repaid(
+        uint256 remainingLoanTokenDue,
+        uint256 collTokenLeftUnconverted
+    );
+    event LoanDefaulted();
+    event DefaultProceedsClaimed(address indexed sender);
+
     /**
      * @notice Initializes loan proposal
      * @param _arranger Address of the arranger of the proposal
@@ -30,7 +53,7 @@ interface ILoanProposalImpl {
      * @dev Can only be called by the arranger
      */
     function proposeLoanTerms(
-        DataTypes.LoanTerms calldata newLoanTerms
+        DataTypesPeerToPool.LoanTerms calldata newLoanTerms
     ) external;
 
     /**
@@ -131,7 +154,7 @@ interface ILoanProposalImpl {
             uint256 finalCollAmountReservedForConversions,
             uint256 loanTermsLockedTime,
             uint256 currentRepaymentIdx,
-            DataTypes.LoanStatus status
+            DataTypesPeerToPool.LoanStatus status
         );
 
     /**
@@ -159,7 +182,10 @@ interface ILoanProposalImpl {
      * @notice Returns the current loan terms
      * @return The current loan terms
      */
-    function loanTerms() external view returns (DataTypes.LoanTerms memory);
+    function loanTerms()
+        external
+        view
+        returns (DataTypesPeerToPool.LoanTerms memory);
 
     /**
      * @notice Returns flag indicating whether lenders can currently unsubscribe from loan proposal
@@ -185,14 +211,14 @@ interface ILoanProposalImpl {
      * @return absCollAmountReservedForConversions The collateral token amount reserved for lender conversions
      */
     function getAbsoluteLoanTerms(
-        DataTypes.LoanTerms memory _tmpLoanTerms,
+        DataTypesPeerToPool.LoanTerms memory _tmpLoanTerms,
         uint256 totalSubscribed,
         uint256 loanTokenDecimals
     )
         external
         view
         returns (
-            DataTypes.LoanTerms memory loanTerms,
+            DataTypesPeerToPool.LoanTerms memory loanTerms,
             uint256 absArrangerFee,
             uint256 absLoanAmount,
             uint256 absCollAmountReservedForDefault,

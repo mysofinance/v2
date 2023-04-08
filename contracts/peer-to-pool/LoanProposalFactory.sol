@@ -5,12 +5,11 @@ pragma solidity 0.8.19;
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
-import {IEvents} from "./interfaces/IEvents.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 
-contract LoanProposalFactory is Ownable, IEvents, ILoanProposalFactory {
+contract LoanProposalFactory is Ownable, ILoanProposalFactory {
     address public immutable loanProposalImpl;
     address[] public loanProposals;
     mapping(address => bool) public isLoanProposal;
