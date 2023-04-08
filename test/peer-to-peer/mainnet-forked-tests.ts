@@ -3904,6 +3904,37 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           'NoOracle'
         )
 
+        // get LP token prices in ETH
+        const uniV2WethUsdcLpToken = await ethers.getContractAt('IUniV2', uniV2WethUsdcAddr)
+        const uniV2WethUsdcPricePerWholeLpToken = await uniV2OracleImplementation.getLpTokenPrice(uniV2WethUsdcAddr)
+        let lpTokenDecimals = await uniV2WethUsdcLpToken.decimals()
+        let totalSupply = await uniV2WethUsdcLpToken.totalSupply()
+        const uniV2WethUsdcTvlInEth = uniV2WethUsdcPricePerWholeLpToken
+          .mul(totalSupply)
+          .div(ethers.BigNumber.from(10).pow(lpTokenDecimals))
+        expect(uniV2WethUsdcPricePerWholeLpToken).to.be.equal('103568572804675177895042')
+        expect(uniV2WethUsdcTvlInEth).to.be.equal('54297603417419099250160')
+
+        const uniV2WethUsdtLpToken = await ethers.getContractAt('IUniV2', uniV2WethUsdtAddr)
+        const uniV2WethUsdtPricePerWholeLpToken = await uniV2OracleImplementation.getLpTokenPrice(uniV2WethUsdtAddr)
+        lpTokenDecimals = await uniV2WethUsdtLpToken.decimals()
+        totalSupply = await uniV2WethUsdtLpToken.totalSupply()
+        const uniV2WethUsdtTvlInEth = uniV2WethUsdtPricePerWholeLpToken
+          .mul(totalSupply)
+          .div(ethers.BigNumber.from(10).pow(lpTokenDecimals))
+        expect(uniV2WethUsdtPricePerWholeLpToken).to.be.equal('109666401959531641440388')
+        expect(uniV2WethUsdtTvlInEth).to.be.equal('25440517313320386896587')
+
+        const uniV2PaxgUsdcLpToken = await ethers.getContractAt('IUniV2', uniV2PaxgUsdcAddr)
+        const uniV2PaxgUsdcPricePerWholeLpToken = await uniV2OracleImplementation.getLpTokenPrice(uniV2PaxgUsdcAddr)
+        lpTokenDecimals = await uniV2PaxgUsdcLpToken.decimals()
+        totalSupply = await uniV2PaxgUsdcLpToken.totalSupply()
+        const uniV2PaxgUsdcTvlInEth = uniV2PaxgUsdcPricePerWholeLpToken
+          .mul(totalSupply)
+          .div(ethers.BigNumber.from(10).pow(lpTokenDecimals))
+        expect(uniV2PaxgUsdcPricePerWholeLpToken).to.be.equal('28288853749660933246555984908')
+        expect(uniV2PaxgUsdcTvlInEth).to.be.equal('2240408018702745547529')
+
         // get prices from uni v2 oracles with Lp token as collateral token
         const uniV2WethUsdtCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, usdc.address)
         const uniV2PaxgUsdcCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, usdc.address)
@@ -3932,7 +3963,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const wethColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2WethUsdcAddr)
         const wethColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2PaxgUsdcAddr)
 
-        //get prices from uni v2 oracles with Lp token as collateral token and loan token
+        // get prices from uni v2 oracles with Lp token as collateral token and loan token
         const uniV2WethUsdtCollUniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
           uniV2WethUsdtAddr,
           uniV2WethUsdcAddr
@@ -4007,7 +4038,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const uniV2PaxgUsdcCollWethLoanExactPrice = uniV2PaxgUsdcExactEthPrice
           .mul(BigNumber.from(10).pow(18))
           .div(wethExactEthPrice)
-        //get exact prices non-lp token as coll and Lp token as loan
+        // get exact prices non-lp token as coll and Lp token as loan
         const usdcColluniV2WethUsdtLoanExactPrice = usdcExactEthPrice
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2WethUsdtExactEthPrice)
@@ -4064,7 +4095,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           .mul(BigNumber.from(10).pow(18))
           .div(uniV2PaxgUsdcExactEthPrice)
 
-        //Lp tokens are collateral, non-Lp tokens are loan
+        // Lp tokens are collateral, non-Lp tokens are loan
         // console.log(uniV2WethUsdtCollUsdtLoanExactPrice.toString())
         // console.log(uniV2WethUsdtCollUsdtLoanPrice.toString())
         expect(getDeltaBNComparison(uniV2WethUsdtCollUsdcLoanExactPrice, uniV2WethUsdtCollUsdcLoanPrice, 5)).to.be.equal(
@@ -4582,7 +4613,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2WethUsdcAddr
         )
 
-        //pool value increased by greater than a billion fold due to large weth skew
+        // pool value increased by greater than a billion fold due to large weth skew
         expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 9)
         // pre and post skew price should still deviate less than 1%
         expect(getDeltaBNComparison(uniV2WethUsdcExactEthPricePostSkew, uniV2WethUsdcExactEthPricePostSkew, 2)).to.equal(

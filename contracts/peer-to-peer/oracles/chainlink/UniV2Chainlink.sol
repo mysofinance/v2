@@ -57,19 +57,12 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             revert Errors.NoLpTokens();
         }
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        uint256 collTokenPriceRaw;
-        uint256 loanTokenPriceRaw;
-        if (isLpToken[collToken]) {
-            collTokenPriceRaw = getLpTokenPrice(collToken);
-        } else {
-            collTokenPriceRaw = getPriceOfToken(collToken);
-        }
-
-        if (isLpToken[loanToken]) {
-            loanTokenPriceRaw = getLpTokenPrice(loanToken);
-        } else {
-            loanTokenPriceRaw = getPriceOfToken(loanToken);
-        }
+        uint256 collTokenPriceRaw = isLpToken[collToken]
+            ? getLpTokenPrice(collToken)
+            : getPriceOfToken(collToken);
+        uint256 loanTokenPriceRaw = isLpToken[loanToken]
+            ? getLpTokenPrice(loanToken)
+            : getPriceOfToken(loanToken);
 
         collTokenPriceInLoanToken =
             (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
@@ -77,16 +70,16 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
     }
 
     /**
-     * @notice returns the price of an Lp token in ETH
-     * @dev since the uniswap reserves could be skewed in any direction by flash loans,
+     * @notice Returns the price of an LP token (i.e., one base currency unit, e.g., 10**18) in ETH
+     * @dev Since the uniswap reserves could be skewed in any direction by flash loans,
      * we need to calculate the "fair" reserve of each token in the pool using invariant K
      * and then calculate the price of each token in ETH using the oracle prices for each token
-     * @param lpToken address of Lp token
-     * @return lpTokenPriceInEth of Lp token in ETH
+     * @param lpToken Address of LP token
+     * @return lpTokenPriceInEth of LP token in ETH
      */
     function getLpTokenPrice(
         address lpToken
-    ) internal view returns (uint256 lpTokenPriceInEth) {
+    ) public view returns (uint256 lpTokenPriceInEth) {
         (uint256 reserve0, uint256 reserve1, ) = IUniV2(lpToken).getReserves();
         if (reserve0 * reserve1 == 0) {
             revert Errors.ZeroReserve();
@@ -96,24 +89,23 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             IUniV2(lpToken).token1()
         );
         uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
-        uint256 lpDecimals = IERC20Metadata(lpToken).decimals();
-        uint256 sqrtK = Math.sqrt(reserve0 * reserve1);
         uint256 priceToken0 = getPriceOfToken(token0);
         uint256 priceToken1 = getPriceOfToken(token1);
-        uint256 token0Factor = 10 ** IERC20Metadata(token0).decimals();
-        uint256 token1Factor = 10 ** IERC20Metadata(token1).decimals();
-        uint256 fairReserve0 = ((sqrtK) *
-            Math.sqrt(priceToken1 * token0Factor)) /
-            Math.sqrt(priceToken0 * token1Factor);
-        uint256 fairReserve1 = ((sqrtK) *
-            Math.sqrt(priceToken0 * token1Factor)) /
-            (Math.sqrt(priceToken1 * token0Factor));
 
-        uint256 lpTokenEthValue = ((fairReserve0 * priceToken0) /
-            token0Factor) + ((fairReserve1 * priceToken1) / token1Factor);
-
+        // calculate fair LP token price based on "fair reserves" as described in
+        // https://blog.alphaventuredao.io/fair-lp-token-pricing/
+        // formula: p = 2 * sqrt(r0 * r1) * sqrt(p0) * sqrt(p1) / s
+        // note: price is for 1 "whole" LP token unit, hence need to scale up by LP token decimals;
+        // need to divide by sqrt reserve decimals to cancel out units of invariant k
         lpTokenPriceInEth =
-            (lpTokenEthValue * (10 ** lpDecimals)) /
-            totalLpSupply;
+            (2 *
+                Math.sqrt(reserve0 * reserve1) *
+                Math.sqrt(priceToken0 * priceToken1) *
+                10 ** IERC20Metadata(lpToken).decimals()) /
+            totalLpSupply /
+            Math.sqrt(
+                10 ** IERC20Metadata(token0).decimals() *
+                    10 ** IERC20Metadata(token1).decimals()
+            );
     }
 }
