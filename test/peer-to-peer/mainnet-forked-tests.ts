@@ -170,7 +170,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     await balancerV2Looping.deployed()
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await expect(
+      addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
     await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
     return {
@@ -245,7 +247,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await expect(addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      await expect(
+        addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
@@ -1371,7 +1375,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
       // whitelist gauge contract
-      await expect(addressRegistry.connect(lender).setWhitelistState([crvGaugeAddress], 3)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      await expect(addressRegistry.connect(lender).setWhitelistState([crvGaugeAddress], 3)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidSender'
+      )
       await addressRegistry.connect(team).setWhitelistState([crvGaugeAddress], 3)
 
       // borrower approves borrower gateway
@@ -2629,7 +2636,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await expect(addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      await expect(
+        addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 

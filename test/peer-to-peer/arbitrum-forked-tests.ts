@@ -126,7 +126,9 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     await weth.connect(borrower).deposit({ value: ONE_WETH.mul(100000) })
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await expect(
+      addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
     await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
     await addressRegistry.connect(team).setWhitelistState([uniV3Looping.address], 4)
 
