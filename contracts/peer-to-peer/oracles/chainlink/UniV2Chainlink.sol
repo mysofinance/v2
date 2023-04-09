@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IUniV2} from "../../interfaces/oracles/IUniV2.sol";
@@ -56,69 +57,58 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             revert Errors.NoLpTokens();
         }
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        uint256 collTokenPriceRaw;
-        uint256 loanTokenPriceRaw;
-        if (isLpToken[collToken]) {
-            collTokenPriceRaw = getLpTokenPrice(collToken, true);
-        } else {
-            collTokenPriceRaw = getPriceOfToken(collToken);
-        }
-
-        if (isLpToken[loanToken]) {
-            loanTokenPriceRaw = getLpTokenPrice(loanToken, false);
-        } else {
-            loanTokenPriceRaw = getPriceOfToken(loanToken);
-        }
+        uint256 collTokenPriceRaw = isLpToken[collToken]
+            ? getLpTokenPrice(collToken)
+            : getPriceOfToken(collToken);
+        uint256 loanTokenPriceRaw = isLpToken[loanToken]
+            ? getLpTokenPrice(loanToken)
+            : getPriceOfToken(loanToken);
 
         collTokenPriceInLoanToken =
             (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
             (loanTokenPriceRaw);
     }
 
+    /**
+     * @notice Returns the price of 1 "whole" LP token (in 1 base currency unit, e.g., 10**18) in ETH
+     * @dev Since the uniswap reserves could be skewed in any direction by flash loans,
+     * we need to calculate the "fair" reserve of each token in the pool using invariant K
+     * and then calculate the price of each token in ETH using the oracle prices for each token
+     * @param lpToken Address of LP token
+     * @return lpTokenPriceInEth of LP token in ETH
+     */
     function getLpTokenPrice(
-        address lpToken,
-        bool isColl
-    ) internal view returns (uint256 lpTokenPriceInEth) {
-        uint256 unsignedLpTokenPriceInEth = getTotalEthValue(lpToken, isColl);
-        uint256 lpTokenDecimals = IERC20Metadata(lpToken).decimals();
-        uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
-        lpTokenPriceInEth =
-            (unsignedLpTokenPriceInEth * (10 ** lpTokenDecimals)) /
-            totalLpSupply;
-        if (lpTokenPriceInEth < 1) {
-            revert Errors.InvalidOracleAnswer();
+        address lpToken
+    ) public view returns (uint256 lpTokenPriceInEth) {
+        // assign uint112 reserves to uint256 to also handle large k invariants
+        (uint256 reserve0, uint256 reserve1, ) = IUniV2(lpToken).getReserves();
+        if (reserve0 * reserve1 == 0) {
+            revert Errors.ZeroReserve();
         }
-    }
-
-    function getTotalEthValue(
-        address lpToken,
-        bool isColl
-    ) internal view returns (uint256 ethValueBounded) {
-        (uint112 reserve0, uint112 reserve1, ) = IUniV2(lpToken).getReserves();
         (address token0, address token1) = (
             IUniV2(lpToken).token0(),
             IUniV2(lpToken).token1()
         );
-        uint256 decimalsToken0 = IERC20Metadata(token0).decimals();
-        uint256 decimalsToken1 = IERC20Metadata(token1).decimals();
-        uint256 token0PriceRaw = getPriceOfToken(token0);
-        uint256 token1PriceRaw = getPriceOfToken(token1);
+        uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
+        uint256 priceToken0 = getPriceOfToken(token0);
+        uint256 priceToken1 = getPriceOfToken(token1);
 
-        uint256 totalEthValueToken0 = (uint256(reserve0) * token0PriceRaw) /
-            (10 ** decimalsToken0);
-        uint256 totalEthValueToken1 = (uint256(reserve1) * token1PriceRaw) /
-            (10 ** decimalsToken1);
-
-        if (isColl) {
-            // for collateral LP tokens use the lower bound (since coll token in numerator)
-            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
-                ? totalEthValueToken1 * 2
-                : totalEthValueToken0 * 2;
-        } else {
-            // for loan LP tokens use the upper bound (since loan token is in denominator)
-            ethValueBounded = totalEthValueToken0 > totalEthValueToken1
-                ? totalEthValueToken0 * 2
-                : totalEthValueToken1 * 2;
-        }
+        // calculate fair LP token price based on "fair reserves" as described in
+        // https://blog.alphaventuredao.io/fair-lp-token-pricing/
+        // formula: p = 2 * sqrt(r0 * r1) * sqrt(p0) * sqrt(p1) / s
+        // note: price is for 1 "whole" LP token unit, hence need to scale up by LP token decimals;
+        // need to divide by sqrt reserve decimals to cancel out units of invariant k
+        // IMPORTANT: while formula is robust against typical flashloan skews, lenders should us this
+        // oracle with caution and take into account skew scenarios when setting their LTVs
+        lpTokenPriceInEth =
+            (2 *
+                Math.sqrt(reserve0 * reserve1) *
+                Math.sqrt(priceToken0 * priceToken1) *
+                10 ** IERC20Metadata(lpToken).decimals()) /
+            totalLpSupply /
+            Math.sqrt(
+                10 ** IERC20Metadata(token0).decimals() *
+                    10 ** IERC20Metadata(token1).decimals()
+            );
     }
 }

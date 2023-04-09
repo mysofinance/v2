@@ -22,6 +22,7 @@ library Errors {
     error UnknownOnChainQuote();
     error NeitherTokenIsGOHM();
     error NoLpTokens();
+    error ZeroReserve();
     error IncorrectGaugeForLpToken();
     error InvalidGaugeIndex();
     error AlreadyStaked();
