@@ -185,6 +185,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         );
     }
 
+    /**
+     * @notice Protocol fee is allowed to be zero, so no min fee check, only a max fee check
+     */
     function setProtocolFee(uint256 _newFee) external {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
             revert Errors.InvalidSender();
