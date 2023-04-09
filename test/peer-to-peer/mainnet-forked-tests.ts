@@ -5085,6 +5085,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         await uniV2RouterInstance
           .connect(uniV2WethUsdcHolder)
           .removeLiquidity(usdc.address, weth.address, uniV2WethUsdcBal, 0, 0, UNIV2_WETH_USDC_HOLDER, MAX_UINT256)
+        
         // oracle price post remove
         const usdcCollUniV2WethUsdcLoanPricePostRemove = await uniV2OracleImplementation.getPrice(
           usdc.address,
