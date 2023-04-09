@@ -70,7 +70,7 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
     }
 
     /**
-     * @notice Returns the price of an LP token (i.e., one base currency unit, e.g., 10**18) in ETH
+     * @notice Returns the price of 1 "whole" LP token (in 1 base currency unit, e.g., 10**18) in ETH
      * @dev Since the uniswap reserves could be skewed in any direction by flash loans,
      * we need to calculate the "fair" reserve of each token in the pool using invariant K
      * and then calculate the price of each token in ETH using the oracle prices for each token
@@ -80,6 +80,7 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
     function getLpTokenPrice(
         address lpToken
     ) public view returns (uint256 lpTokenPriceInEth) {
+        // assign uint112 reserves to uint256 to also handle large k invariants
         (uint256 reserve0, uint256 reserve1, ) = IUniV2(lpToken).getReserves();
         if (reserve0 * reserve1 == 0) {
             revert Errors.ZeroReserve();
@@ -97,6 +98,8 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         // formula: p = 2 * sqrt(r0 * r1) * sqrt(p0) * sqrt(p1) / s
         // note: price is for 1 "whole" LP token unit, hence need to scale up by LP token decimals;
         // need to divide by sqrt reserve decimals to cancel out units of invariant k
+        // IMPORTANT: while formula is robust against typical flashloan skews, lenders should us this
+        // oracle with caution and take into account skew scenarios when setting their LTVs
         lpTokenPriceInEth =
             (2 *
                 Math.sqrt(reserve0 * reserve1) *
