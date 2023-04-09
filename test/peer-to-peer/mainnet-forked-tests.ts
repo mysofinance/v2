@@ -4571,7 +4571,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [uniV2WethUsdcAddr]
         )
         await uniV2OracleImplementation.deployed()
-        
+
         await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
 
         const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
@@ -4989,6 +4989,132 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           console.log('uniV2PaxgUsdcExactEthPricePostSkew', uniV2PaxgUsdcExactEthPricePostSkew.toString())
           console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
           console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+        }
+      })
+
+      it('Should process uni v2 oracle price with skew and changing k value correctly', async () => {
+        const { addressRegistry, usdc, weth, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr
+        }
+
+        // uni v2 Addr
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // prepare UniV2 Weth/Usdc balances
+        const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
+        const uniV2WethUsdc = await ethers.getContractAt('IWETH', uniV2WethUsdcAddr)
+        await ethers.provider.send('hardhat_setBalance', [UNIV2_WETH_USDC_HOLDER, '0x56BC75E2D63100000'])
+        await hre.network.provider.request({
+          method: 'hardhat_impersonateAccount',
+          params: [UNIV2_WETH_USDC_HOLDER]
+        })
+
+        const uniV2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
+
+        const uniV2WethUsdcBal = await uniV2WethUsdc.balanceOf(UNIV2_WETH_USDC_HOLDER)
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address],
+          [usdcEthChainlinkAddr],
+          [uniV2WethUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+        await uniV2WethUsdc.connect(uniV2WethUsdcHolder).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        // exact price of uni v2 lp token pre skew
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // oracle price of uni v2 lp token pre skew
+        const usdcCollUniV2WethUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, weth.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
+
+        // exact price of uni v2 lp token post skew
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // oracle price post skew
+        const usdcCollUniV2WethUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        const totalLpSupplyPreRemove = await uniV2WethUsdc.totalSupply()
+
+        await uniV2RouterInstance
+          .connect(uniV2WethUsdcHolder)
+          .removeLiquidity(usdc.address, weth.address, uniV2WethUsdcBal, 0, 0, UNIV2_WETH_USDC_HOLDER, MAX_UINT256)
+        // oracle price post remove
+        const usdcCollUniV2WethUsdcLoanPricePostRemove = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        const totalLpSupplyPostRemove = await uniV2WethUsdc.totalSupply()
+
+        //pool value increased by greater than a trillion fold due to large weth skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // pre and post skew price should still deviate less than 1%
+        expect(
+          getDeltaBNComparison(usdcCollUniV2WethUsdcLoanPricePreSkew, usdcCollUniV2WethUsdcLoanPricePostSkew, 2)
+        ).to.equal(true)
+        // remove liquidity should not affect price
+        expect(
+          getDeltaBNComparison(usdcCollUniV2WethUsdcLoanPricePostSkew, usdcCollUniV2WethUsdcLoanPricePostRemove, 6)
+        ).to.equal(true)
+        // total supply should be reduced post remove
+        expect(totalLpSupplyPreRemove).to.be.greaterThan(totalLpSupplyPostRemove)
+
+        const showLogs = false
+        if (showLogs) {
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePreSkew', usdcCollUniV2WethUsdcLoanPricePreSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePostSkew', usdcCollUniV2WethUsdcLoanPricePostSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePostRemove', usdcCollUniV2WethUsdcLoanPricePostRemove.toString())
+          console.log('totalLpSupplyPreRemove', totalLpSupplyPreRemove.toString())
+          console.log('totalLpSupplyPostRemove', totalLpSupplyPostRemove.toString())
         }
       })
     })
