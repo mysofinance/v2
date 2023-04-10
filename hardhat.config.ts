@@ -6,8 +6,8 @@ require('hardhat-contract-sizer')
 require('dotenv').config()
 require('solidity-coverage')
 
-export const INFURA_API_KEY = '764119145a6a4d09a1cf8f8c7a2c7b46' // todo: replace with env before resubmitting
-export const ALCHEMY_API_KEY = 'QLXkHVq78U_cbV-q0TMWTH8-QmK2Zp3y' // todo: replace with env before resubmitting
+export const INFURA_API_KEY = process.env.INFURA_API_KEY ?? '0'
+export const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY ?? '0'
 export const MAINNET_BLOCK_NUMBER = 16640270 // 2023-02-16
 export const ARBITRUM_BLOCK_NUMBER = 63771760 // 2023-02-23
 export const ARBITRUM_CHAIN_ID = 31336

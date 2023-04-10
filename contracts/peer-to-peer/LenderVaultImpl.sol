@@ -16,6 +16,16 @@ import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 
+/**
+ * @title LenderVaultImpl
+ * @notice This contract implements the logic for the Lender Vault.
+ * IMPORTANT: Security best practices dictate that the signers should always take care to
+ * keep their private keys safe. Signing only trusted and human-readable public schema data is a good practice. Additionally,
+ * the Myso team recommends that the signer should use a purpose-bound address for signing to reduce the chance
+ * for a compromised private key to result in loss of funds. The Myso team also recommends that even vaults owned
+ * by an EOA should have multiple signers to reduce chance of forged quotes. In the event that a signer is compromised,
+ * the vault owner should immediately remove the compromised signer and if possible, add a new signer.
+ */
 contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     using SafeERC20 for IERC20Metadata;
 
