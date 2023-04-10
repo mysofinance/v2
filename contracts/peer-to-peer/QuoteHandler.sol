@@ -239,7 +239,8 @@ contract QuoteHandler is IQuoteHandler {
         bytes32[] calldata s
     ) internal view returns (bool) {
         if (
-            (v.length != r.length && v.length != s.length) ||
+            v.length != r.length ||
+            v.length != s.length ||
             v.length != ILenderVaultImpl(lenderVault).minNumOfSigners()
         ) {
             return false;
