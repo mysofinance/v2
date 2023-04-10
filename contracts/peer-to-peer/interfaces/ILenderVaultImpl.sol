@@ -239,4 +239,10 @@ interface ILenderVaultImpl {
      * @return amount of token locked
      */
     function lockedAmounts(address token) external view returns (uint256);
+
+    /**
+     * @notice function returns total number of loans
+     * @return total number of loans
+     */
+    function totalNumLoans() external view returns (uint256);
 }

@@ -21,6 +21,18 @@ interface IQuoteHandler {
         address lenderVault,
         bytes32 offChainQuoteHash
     );
+    event OnChainQuoteUsed(
+        address lenderVault,
+        bytes32 onChainQuoteHash,
+        uint256 nextLoanIdx,
+        uint256 quoteTupleIdx
+    );
+    event OffChainQuoteUsed(
+        address lenderVault,
+        bytes32 offChainQuoteHash,
+        uint256 nextLoanIdx,
+        DataTypesPeerToPeer.QuoteTuple quoteTuple
+    );
 
     /**
      * @notice function adds on chain quote
@@ -83,11 +95,13 @@ interface IQuoteHandler {
      * @dev function can only be called by borrowerGateway
      * @param borrower address of borrower
      * @param lenderVault address of the vault
+     * @param quoteTupleIdx index of the quote tuple in the vault's quote array
      * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
     function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
+        uint256 quoteTupleIdx,
         DataTypesPeerToPeer.OnChainQuote memory onChainQuote
     ) external;
 
