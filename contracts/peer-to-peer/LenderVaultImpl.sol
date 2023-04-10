@@ -261,7 +261,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function removeSigner(address signer, uint256 signerIdx) external {
         senderCheckOwner();
         uint256 signersLen = signers.length;
-        if (signerIdx > signersLen - 1) {
+        if (signerIdx >= signersLen) {
             revert Errors.InvalidArrayIndex();
         }
 
