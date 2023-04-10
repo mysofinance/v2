@@ -141,6 +141,7 @@ contract QuoteHandler is IQuoteHandler {
     function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
+        uint256 quoteTupleIdx,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
         checkSenderAndGeneralQuoteInfo(
@@ -156,6 +157,13 @@ contract QuoteHandler is IQuoteHandler {
             isOnChainQuote[lenderVault][onChainQuoteHash] = false;
             emit OnChainQuoteInvalidated(lenderVault, onChainQuoteHash);
         }
+        uint256 nextLoanIdx = ILenderVaultImpl(lenderVault).totalNumLoans();
+        emit OnChainQuoteUsed(
+            lenderVault,
+            onChainQuoteHash,
+            nextLoanIdx,
+            quoteTupleIdx
+        );
     }
 
     function checkAndRegisterOffChainQuote(
@@ -214,6 +222,13 @@ contract QuoteHandler is IQuoteHandler {
             offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
             emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
         }
+        uint256 nextLoanIdx = ILenderVaultImpl(lenderVault).totalNumLoans();
+        emit OffChainQuoteUsed(
+            lenderVault,
+            offChainQuoteHash,
+            nextLoanIdx,
+            quoteTuple
+        );
     }
 
     function areValidSignatures(

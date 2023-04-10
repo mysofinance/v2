@@ -1176,7 +1176,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
 
       await expect(
-        quoteHandler.connect(lender).checkAndRegisterOnChainQuote(borrower.address, borrower.address, onChainQuote)
+        quoteHandler.connect(lender).checkAndRegisterOnChainQuote(borrower.address, borrower.address, quoteTupleIdx, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 0)

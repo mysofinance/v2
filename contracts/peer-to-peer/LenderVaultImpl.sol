@@ -285,6 +285,10 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan = _loans[loanId];
     }
 
+    function totalNumLoans() external view returns (uint256) {
+        return _loans.length;
+    }
+
     function validateRepayInfo(
         address borrower,
         DataTypesPeerToPeer.Loan memory _loan,

@@ -106,6 +106,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             IQuoteHandler(quoteHandler).checkAndRegisterOnChainQuote(
                 msg.sender,
                 lenderVault,
+                quoteTupleIdx,
                 onChainQuote
             );
         }
