@@ -187,7 +187,7 @@ async function generateOffChainQuote({
   expect(recoveredAddr).to.equal(lender.address)
 
   // add signer
-  lenderVault.connect(lender).addSigners([lender.address])
+  await lenderVault.connect(lender).addSigners([lender.address])
 
   // lender add sig to quote and pass to borrower
   offChainQuote.v = customSignature.v || [sig.v]
@@ -1009,7 +1009,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         usdc
       })
 
-      // define signer setup
+      // define signer setup without lender 
+      await lenderVault.connect(lender).removeSigner(lender.address, 0)
       await lenderVault.connect(lender).addSigners([signer1.address, signer2.address, signer3.address])
       await lenderVault.connect(lender).setMinNumOfSigners(3)
 
@@ -1089,6 +1090,20 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
+      // check revert on unathorized sigs
+      const signature4 = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig4 = ethers.utils.splitSignature(signature4)
+      recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig4)
+      expect(recoveredAddr).to.equal(lender.address)
+      offChainQuote.v = [sig1.v, sig2.v, sig4.v]
+      offChainQuote.r = [sig1.r, sig2.r, sig4.r]
+      offChainQuote.s = [sig1.s, sig2.s, sig4.s]
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
+      
       // check revert on too few sigs
       offChainQuote.v = [sig1.v, sig2.v]
       offChainQuote.r = [sig1.r, sig2.r]
