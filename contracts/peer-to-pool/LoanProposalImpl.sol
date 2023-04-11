@@ -257,7 +257,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 totalSubscribed < _loanTerms.minLoanAmount) ||
             (block.timestamp >=
                 _lenderInOrOutCutoffTime +
-                    Constants.MIN_LOAN_EXECUTION_GRACE_PERIOD)
+                    Constants.LOAN_EXECUTION_GRACE_PERIOD)
         ) {
             dynamicData.status = DataTypesPeerToPool.LoanStatus.ROLLBACK;
             address collToken = staticData.collToken;
