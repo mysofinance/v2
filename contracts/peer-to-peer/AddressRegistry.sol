@@ -7,6 +7,13 @@ import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 
+/**
+ * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
+ * IMPORTANT: This contract allows for de-whitelisting as well. This is an important security feature because if
+ * a contract or token is found to present a vulnerability, it can be de-whitelisted to prevent further borrowing
+ * with that token (repays and withdrawals would still be allowed). In the limit of a total de-whitelisting of all
+ * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
+ */
 contract AddressRegistry is Ownable, IAddressRegistry {
     bool internal isInitialized;
     address public lenderVaultFactory;
