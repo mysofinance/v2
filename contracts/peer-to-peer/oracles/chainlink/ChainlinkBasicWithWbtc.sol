@@ -33,66 +33,16 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
     function getPriceOfToken(
         address token
     ) internal view override(ChainlinkBasic) returns (uint256 tokenPriceRaw) {
-        uint80 roundId;
-        int256 answer;
-        uint256 updatedAt;
-        uint80 answeredInRound;
         if (token == BASE_CURRENCY) {
-            (
-                roundId,
-                answer,
-                ,
-                updatedAt,
-                answeredInRound
-            ) = AggregatorV3Interface(WBTC_BTC_ORACLE).latestRoundData();
-            if (
-                updatedAt == 0 ||
-                answeredInRound < roundId ||
-                answer < 1 ||
-                updatedAt > block.timestamp
-            ) {
-                revert Errors.InvalidOracleAnswer();
-            }
-            int256 answer2;
-            (
-                roundId,
-                answer2,
-                ,
-                updatedAt,
-                answeredInRound
-            ) = AggregatorV3Interface(BTC_USD_ORACLE).latestRoundData();
-            if (
-                updatedAt == 0 ||
-                answeredInRound < roundId ||
-                answer2 < 1 ||
-                updatedAt > block.timestamp
-            ) {
-                revert Errors.InvalidOracleAnswer();
-            }
-            tokenPriceRaw =
-                (uint256(answer) * uint256(answer2)) /
-                BASE_CURRENCY_UNIT;
+            uint256 answer1 = checkAndReturnLatestRoundData(WBTC_BTC_ORACLE);
+            uint256 answer2 = checkAndReturnLatestRoundData(BTC_USD_ORACLE);
+            tokenPriceRaw = (answer1 * answer2) / BASE_CURRENCY_UNIT;
         } else {
             address oracleAddr = oracleAddrs[token];
             if (oracleAddr == address(0)) {
                 revert Errors.NoOracle();
             }
-            (
-                roundId,
-                answer,
-                ,
-                updatedAt,
-                answeredInRound
-            ) = AggregatorV3Interface(oracleAddr).latestRoundData();
-            if (
-                updatedAt == 0 ||
-                answeredInRound < roundId ||
-                answer < 1 ||
-                updatedAt > block.timestamp
-            ) {
-                revert Errors.InvalidOracleAnswer();
-            }
-            tokenPriceRaw = uint256(answer);
+            tokenPriceRaw = checkAndReturnLatestRoundData(oracleAddr);
         }
     }
 }
