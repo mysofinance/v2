@@ -34,3 +34,4 @@ jobs:
     name: Run | Test
     needs: [consecutiveness]
     uses: ./.github/workflows/workflow-test.yaml
+    secrets: inherit

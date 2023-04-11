@@ -1,11 +1,7 @@
 name: Workflow | Test
 
 on:
-  workflow_call:
-    inputs:
-      alchemy_api_key:
-        required: true
-        type: string
+  workflow_call: {}
 
 jobs:
   test:
@@ -20,6 +16,6 @@ jobs:
 
       - name: Test
         run: npm run test
-        secrets:
+        env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
