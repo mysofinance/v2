@@ -5,27 +5,27 @@ require('hardhat-abi-exporter')
 require('hardhat-contract-sizer')
 require('dotenv').config()
 require('solidity-coverage')
-require("@primitivefi/hardhat-dodoc");
 
-const INFURA_API_KEY = '764119145a6a4d09a1cf8f8c7a2c7b46' // added for private repo, otherwise use process.env.INFURA_API_KEY;
-const ALCHEMY_API_KEY = 'QLXkHVq78U_cbV-q0TMWTH8-QmK2Zp3y'
+export const INFURA_API_KEY = process.env.INFURA_API_KEY ?? '0'
+export const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY ?? '0'
+export const MAINNET_BLOCK_NUMBER = 16640270 // 2023-02-16
+export const ARBITRUM_BLOCK_NUMBER = 63771760 // 2023-02-23
+export const ARBITRUM_CHAIN_ID = 31336
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? '000000000000000000000000000000000000000000000000000000000000dead'
-
-console.log(`Using hardhat config with GOERLI_URL=${ALCHEMY_API_KEY} and PRIVATE_KEY=${PRIVATE_KEY}`)
 
 const forkMainnet = {
   chainId: 1,
   forking: {
     url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-    blockNumber: 16640270 // 2023-02-16
+    blockNumber: MAINNET_BLOCK_NUMBER
   }
 }
 
 const forkArbitrum = {
-  chainId: 31336,
+  chainId: ARBITRUM_CHAIN_ID,
   forking: {
     url: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-    blockNumber: 63771760 // 2023-02-23
+    blockNumber: ARBITRUM_BLOCK_NUMBER
   }
 }
 

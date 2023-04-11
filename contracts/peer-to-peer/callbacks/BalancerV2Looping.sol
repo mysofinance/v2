@@ -5,8 +5,7 @@ pragma solidity ^0.8.19;
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
-import {IEvents} from "../interfaces/IEvents.sol";
-import {DataTypes} from "../DataTypes.sol";
+import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface IBalancerAsset {
     // solhint-disable-previous-line no-empty-blocks
@@ -44,14 +43,14 @@ library BalancerDataTypes {
     }
 }
 
-contract BalancerV2Looping is IVaultCallback, IEvents {
+contract BalancerV2Looping is IVaultCallback {
     using SafeERC20 for IERC20Metadata;
 
     address private constant BALANCER_V2_VAULT =
         0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
     function borrowCallback(
-        DataTypes.Loan calldata loan,
+        DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
     ) external {
         BalancerDataTypes.FundManagement
@@ -91,7 +90,7 @@ contract BalancerV2Looping is IVaultCallback, IEvents {
     }
 
     function repayCallback(
-        DataTypes.Loan calldata loan,
+        DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
     ) external {
         BalancerDataTypes.FundManagement

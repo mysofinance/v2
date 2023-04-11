@@ -3,20 +3,25 @@
 pragma solidity 0.8.19;
 
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
-import {IEvents} from "./interfaces/IEvents.sol";
-import {Ownable} from "../Ownable.sol";
+import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
+import {Ownable} from "../Ownable.sol";
 
-contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
+/**
+ * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
+ * IMPORTANT: This contract allows for de-whitelisting as well. This is an important security feature because if
+ * a contract or token is found to present a vulnerability, it can be de-whitelisted to prevent further borrowing
+ * with that token (repays and withdrawals would still be allowed). In the limit of a total de-whitelisting of all
+ * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
+ */
+contract AddressRegistry is Ownable, IAddressRegistry {
     bool internal isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
-    mapping(address => bool) public isWhitelistedToken;
-    mapping(address => bool) public isWhitelistedCallbackAddr;
-    mapping(address => bool) public isWhitelistedCompartmentImpl;
-    mapping(address => bool) public isWhitelistedOracle;
+    mapping(address => DataTypesPeerToPeer.WhitelistState)
+        public whitelistState;
     address[] internal _registeredVaults;
 
     constructor() {
@@ -52,58 +57,21 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
         isInitialized = true;
     }
 
-    function toggleTokens(
-        address[] memory tokens,
-        bool whitelistStatus
+    function setWhitelistState(
+        address[] memory addrs,
+        DataTypesPeerToPeer.WhitelistState _whitelistState
     ) external {
         checkSenderAndIsInitialized();
-        for (uint i = 0; i < tokens.length; ) {
-            if (tokens[i] == address(0)) {
+        for (uint i = 0; i < addrs.length; ) {
+            if (addrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }
-            isWhitelistedToken[tokens[i]] = whitelistStatus;
+            whitelistState[addrs[i]] = _whitelistState;
             unchecked {
                 i++;
             }
         }
-        emit WhitelistAddressToggled(
-            tokens,
-            whitelistStatus,
-            IEvents.EventToggleType.TOKEN
-        );
-    }
-
-    function toggleCallbackAddr(address addr, bool whitelistStatus) external {
-        checkSenderAndIsInitialized();
-        isWhitelistedCallbackAddr[addr] = whitelistStatus;
-        prepareToggleEvent(
-            addr,
-            whitelistStatus,
-            IEvents.EventToggleType.CALLBACK
-        );
-    }
-
-    function toggleCompartmentImpl(
-        address addr,
-        bool whitelistStatus
-    ) external {
-        checkSenderAndIsInitialized();
-        isWhitelistedCompartmentImpl[addr] = whitelistStatus;
-        prepareToggleEvent(
-            addr,
-            whitelistStatus,
-            IEvents.EventToggleType.COMPARTMENT
-        );
-    }
-
-    function toggleOracle(address addr, bool whitelistStatus) external {
-        checkSenderAndIsInitialized();
-        isWhitelistedOracle[addr] = whitelistStatus;
-        prepareToggleEvent(
-            addr,
-            whitelistStatus,
-            IEvents.EventToggleType.ORACLE
-        );
+        emit WhitelistStateUpdated(addrs, _whitelistState);
     }
 
     function addLenderVault(address addr) external {
@@ -126,20 +94,6 @@ contract AddressRegistry is Ownable, IAddressRegistry, IEvents {
         returns (address)
     {
         return _owner;
-    }
-
-    function prepareToggleEvent(
-        address toggledAddr,
-        bool whitelistStatus,
-        IEvents.EventToggleType toggleType
-    ) internal {
-        address[] memory addressToggled = new address[](1);
-        addressToggled[0] = toggledAddr;
-        emit WhitelistAddressToggled(
-            addressToggled,
-            whitelistStatus,
-            toggleType
-        );
     }
 
     function checkSenderAndIsInitialized() internal view {

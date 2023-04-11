@@ -6,7 +6,7 @@ interface IUniV2 {
      * @notice returns reserves of uni v2 pool
      * @return token0 reserves
      * @return token1 reserves
-     * @return timestamp (which isn't too relevant for us)
+     * @return timestamp
      */
     function getReserves() external view returns (uint112, uint112, uint32);
 
@@ -24,4 +24,9 @@ interface IUniV2 {
      * @notice totalSupply of the lp token
      */
     function totalSupply() external view returns (uint256);
+
+    /**
+     * @notice decimals of the lp token
+     */
+    function decimals() external view returns (uint256);
 }

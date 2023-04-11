@@ -1,6 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
+import { INFURA_API_KEY, MAINNET_BLOCK_NUMBER } from '../../hardhat.config'
 import {
   balancerV2VaultAbi,
   balancerV2PoolAbi,
@@ -8,10 +9,24 @@ import {
   aavePoolAbi,
   crvRewardsDistributorAbi,
   chainlinkAggregatorAbi,
-  gohmAbi
+  gohmAbi,
+  uniV2RouterAbi
 } from './helpers/abi'
-import { createOnChainRequest, transferFeeHelper, calcLoanBalanceDelta, getTotalEthValue } from './helpers/misc'
+import {
+  createOnChainRequest,
+  transferFeeHelper,
+  calcLoanBalanceDelta,
+  getTotalEthValue,
+  getExactLpTokenPriceInEth,
+  getFairReservesPriceAndEthValue,
+  getDeltaBNComparison
+} from './helpers/misc'
 
+// test config constants & vars
+const BLOCK_NUMBER = MAINNET_BLOCK_NUMBER
+let snapshotId: String // use snapshot id to reset state before each test
+
+// constants
 const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
@@ -157,9 +172,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     await balancerV2Looping.deployed()
 
     // whitelist addrs
-    //await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address, paxg.address, gohm.address, uniV2WethUsdc])
-    await expect(addressRegistry.connect(lender).toggleCallbackAddr(balancerV2Looping.address, true)).to.be.reverted
-    await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+    await expect(
+      addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
     return {
       addressRegistry,
@@ -182,6 +198,28 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       balancerV2Looping
     }
   }
+
+  before(async function () {
+    await hre.network.provider.request({
+      method: 'hardhat_reset',
+      params: [
+        {
+          forking: {
+            jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
+            blockNumber: BLOCK_NUMBER
+          }
+        }
+      ]
+    })
+  })
+
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot')
+  })
+
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId])
+  })
 
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
@@ -207,15 +245,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
-      await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address, true)).to.be.reverted
+      await expect(
+        addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       // lender vault getter fails if no loans
       await expect(lenderVault.loan(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
@@ -256,7 +294,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -300,7 +338,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -344,7 +382,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -388,7 +426,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -432,7 +470,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
 
@@ -480,7 +518,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -511,7 +549,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: [],
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
@@ -557,7 +595,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
     })
@@ -612,20 +650,20 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([weth.address], true)
-      await addressRegistry.connect(team).toggleTokens([usdc.address], false)
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 1)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
 
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -677,7 +715,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -694,7 +732,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         }
       }
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], false)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
 
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(borrower.address, onChainQuote, newOnChainQuote)
@@ -712,13 +750,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([compAddress], true)
+      await addressRegistry.connect(team).setWhitelistState([compAddress], 1)
 
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).toggleTokens([usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       onChainQuote.generalQuoteInfo.loanToken = compAddress
 
@@ -774,11 +812,171 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
+      })
+
+      expect(borrowEvent).to.not.be.undefined
+    })
+
+    it('Should handle unlocking collateral correctly', async function () {
+      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+        await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
       })
 
       expect(borrowEvent).to.not.be.undefined
 
+      // test partial repays with no compartment
+      const loanId = borrowEvent?.args?.['loanId']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+
+      // lender transfers usdc so borrower can repay (lender is like a faucet)
+      await usdc.connect(lender).transfer(borrower.address, 10000000000)
+
+      const collBalPreRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPreRepay = await lenderVault.lockedAmounts(weth.address)
+      const tokenBalanceAndLockedAmountsPreRepay = await lenderVault
+        .connect(lender)
+        .getTokenBalancesAndLockedAmounts([weth.address])
+      expect(tokenBalanceAndLockedAmountsPreRepay._lockedAmounts[0]).to.equal(lockedVaultCollPreRepay)
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.div(2),
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
+      )
+
+      const collBalPostRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostRepay = await lenderVault.lockedAmounts(weth.address)
+
+      expect(collBalPreRepayVault.sub(collBalPostRepayVault)).to.equal(initCollAmount.div(2))
+      expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostRepay)).to.equal(collBalPreRepayVault.sub(collBalPostRepayVault))
+
+      await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // only owner can unlock
+      await expect(
+        lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId], false)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // cannot pass empty loan array to bypass valid token check
+      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [], false)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidArrayLength'
+      )
+
+      // valid unlock
+      await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
+
+      // revert if trying to unlock twice
+      await expect(
+        lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
+
+      const collBalPostUnlock = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostUnlock = await lenderVault.lockedAmounts(weth.address)
+
+      await expect(lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidArrayLength'
+      )
+      await expect(lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([ZERO_ADDR])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+      await expect(
+        lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([borrower.address])
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+
+      const tokenBalanceAndLockedAmountsPostRepay = await lenderVault
+        .connect(lender)
+        .getTokenBalancesAndLockedAmounts([weth.address])
+      expect(tokenBalanceAndLockedAmountsPostRepay._lockedAmounts[0]).to.equal(0)
+
+      // since did not autowithdraw, no change in collateral balance
+      expect(collBalPostUnlock).to.equal(collBalPostRepayVault)
+      // all coll has been unlocked
+      expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostUnlock)).to.equal(initCollAmount)
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
@@ -820,7 +1018,70 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      await expect(
+        quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+      await expect(
+        quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
+      onChainQuote.generalQuoteInfo.loanToken = weth.address
+      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+
+      onChainQuote.generalQuoteInfo.loanToken = usdc.address
+
+      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteDeleted'
+      )
+    })
+
+    it('Should validate correctly the wrong deleteOnChainQuote', async function () {
+      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -894,7 +1155,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -977,7 +1238,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 0)
 
       await expect(
         borrowerGateway
@@ -985,7 +1246,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
       await expect(
         borrowerGateway
@@ -1056,7 +1317,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const curveLPStakingCompartmentImplementation = await CurveLPStakingCompartmentImplementation.deploy()
       await curveLPStakingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(curveLPStakingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([curveLPStakingCompartmentImplementation.address], 3)
 
       // increase borrower CRV balance
       const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
@@ -1113,11 +1374,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist tokens
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
       // whitelist gauge contract
-      await expect(addressRegistry.connect(lender).toggleCompartmentImpl(crvGaugeAddress, true)).to.be.reverted
-      await addressRegistry.connect(team).toggleCompartmentImpl(crvGaugeAddress, true)
+      await expect(addressRegistry.connect(lender).setWhitelistState([crvGaugeAddress], 3)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidSender'
+      )
+      await addressRegistry.connect(team).setWhitelistState([crvGaugeAddress], 3)
 
       // borrower approves borrower gateway
       await crvLPInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1157,7 +1421,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
@@ -1239,7 +1503,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
               callbackData
             )
         )
-          .to.emit(borrowerGateway, 'Repay')
+          .to.emit(borrowerGateway, 'Repaid')
           .withArgs(lenderVault.address, loanId, repayAmount)
 
         // check balance post repay
@@ -1297,7 +1561,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             callbackData
           )
         )
-          .to.emit(borrowerGateway, 'Repay')
+          .to.emit(borrowerGateway, 'Repaid')
           .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
         // check balance post repay
@@ -1462,7 +1726,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
       await aaveStakingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(aaveStakingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
 
       // increase borrower aWETH balance
       const locallyCollBalance = ethers.BigNumber.from(10).pow(18)
@@ -1488,7 +1752,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1540,7 +1804,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
@@ -1572,7 +1836,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackData
         )
       )
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
       // check balance post repay
@@ -1603,7 +1867,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
       await votingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(votingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([votingCompartmentImplementation.address], 3)
 
       // increase borrower UNI balance
       const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
@@ -1632,7 +1896,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1671,7 +1935,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
@@ -1719,7 +1983,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackData
         )
       )
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
       // check balance post repay
@@ -1764,7 +2028,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const votingCompartmentImplementation = await VotingCompartmentImplementation.deploy()
       await votingCompartmentImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleCompartmentImpl(votingCompartmentImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([votingCompartmentImplementation.address], 3)
 
       // increase borrower UNI balance
       const locallyUNIBalance = ethers.BigNumber.from(10).pow(18)
@@ -1793,10 +2057,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultLoanBalPre).to.equal(ONE_WETH.mul(1000))
 
       // whitelist token pair
-      await addressRegistry.connect(team).toggleTokens([collTokenAddress, weth.address], true)
+      await addressRegistry.connect(team).setWhitelistState([collTokenAddress, weth.address], 1)
 
-      expect(await addressRegistry.connect(team).isWhitelistedToken(collTokenAddress)).to.be.true
-      expect(await addressRegistry.connect(team).isWhitelistedToken(weth.address)).to.be.true
+      expect(await addressRegistry.connect(team).whitelistState(collTokenAddress)).to.be.equal(1)
+      expect(await addressRegistry.connect(team).whitelistState(weth.address)).to.be.equal(1)
 
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1847,7 +2111,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
 
       const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
@@ -1900,7 +2164,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         [poolId, minSwapReceiveRepay, deadline]
       )
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, false)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 0)
 
       await expect(
         borrowerGateway.connect(borrower).repay(
@@ -1915,7 +2179,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
       ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
 
-      await addressRegistry.connect(team).toggleCallbackAddr(balancerV2Looping.address, true)
+      await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
       await expect(
         borrowerGateway.connect(borrower).repay(
@@ -1943,7 +2207,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackDataRepay
         )
       )
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
       // check balance post repay
@@ -2012,7 +2276,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2076,7 +2340,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       //team sets protocolFee
       const protocolFee = BigNumber.from(10).pow(16)
-      await borrowerGateway.connect(team).setNewProtocolFee(protocolFee) // 1% or 100 bp protocolFee
+      await borrowerGateway.connect(team).setProtocolFee(protocolFee) // 1% or 100 bp protocolFee
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -2105,7 +2369,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2198,7 +2462,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2232,7 +2496,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowTransactionReceipt = await borrowTransaction.wait()
 
       const borrowEvent = borrowTransactionReceipt.events?.find(x => {
-        return x.event === 'Borrow'
+        return x.event === 'Borrowed'
       })
 
       const loanId = borrowEvent?.args?.['loanId']
@@ -2277,7 +2541,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ).to.be.revertedWithCustomError(lenderVault, 'InvalidBorrower')
 
       await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
-        .to.emit(borrowerGateway, 'Repay')
+        .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
       const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
       // full repay of USDC less upfront fee
@@ -2286,74 +2550,85 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   })
 
   describe('Testing chainlink oracles', function () {
+    const aaveEthChainlinkAddr = '0x6df09e975c830ecae5bd4ed9d90f3a95a4f88012'
+    const linkEthChainlinkAddr = '0xdc530d9457755926550b59e8eccdae7624181557'
+    const crvEthChainlinkAddr = '0x8a12be339b0cd1829b91adc01977caa5e9ac121e'
+    const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
+    const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
+    const ldoEthChainlinkAddr = '0x4e844125952d32acdf339be976c98e22f6f318db'
+    const usdtEthChainlinkAddr = '0xee9f2375b4bdf6387aa8265dd4fb8f16512a1d46'
+
+    const aaveUsdChainlinkAddr = '0x547a514d5e3769680ce22b2361c10ea13619e8a9'
+    const crvUsdChainlinkAddr = '0xcd627aa160a6fa45eb793d19ef54f5062f20f33f'
+    const linkUsdChainlinkAddr = '0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c'
+    const usdcUsdChainlinkAddr = '0x8fffffd4afb6115b954bd326cbe7b4ba576818f6'
+    const ethUsdChainlinkAddr = '0x5f4ec3df9cbd43714fe2740f5e3616155c5b8419'
+
     it('Should process onChain quote with eth-based oracle address (non-weth)', async function () {
-      const {
-        addressRegistry,
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        paxg,
-        weth,
-        wbtc,
-        ldo,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr,
-        team,
-        lenderVault
-      } = await setupTest()
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, paxg, weth, ldo, team, lenderVault } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-      const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
-      /****deploy errors on base oracles****/
+      // deploy errors on base oracles
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy([], [usdcEthChainlinkAddr], weth.address, BASE)
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [ZERO_ADDR, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          BASE
         )
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [usdcUsdChainlinkAddr, paxgEthChainlinkAddr],
+          weth.address,
+          BASE
+        )
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [usdcUsdChainlinkAddr, paxgEthChainlinkAddr],
+          ZERO_ADDR,
+          BASE
+        )
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
 
-      /****correct deploy****/
+      // correct deploy
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
-      await expect(addressRegistry.connect(borrower).toggleOracle(chainlinkBasicImplementation.address, true)).to.be.reverted
+      await expect(
+        addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const paxgOracleInstance = new ethers.Contract(paxgEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
@@ -2404,7 +2679,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([paxg.address, usdc.address, ldo.address], true)
+      await addressRegistry.connect(team).setWhitelistState([paxg.address, usdc.address, ldo.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2464,7 +2739,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badOnChainQuoteAddrNotInOracle, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(chainlinkBasicImplementation, 'InvalidOraclePair')
+      ).to.be.revertedWithCustomError(chainlinkBasicImplementation, 'NoOracle')
 
       await expect(
         borrowerGateway
@@ -2511,36 +2786,20 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (coll weth)', async function () {
-      const {
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        weth,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -2574,7 +2833,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2624,36 +2883,21 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (loan weth)', async function () {
-      const {
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        weth,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
 
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        BASE
       )
       await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(chainlinkBasicImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -2691,7 +2935,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([weth.address, usdc.address], true)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2739,38 +2983,20 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultWethBalPre.sub(vaultWethBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
 
-    it('Should process onChain quote with olympus gohm oracle (non-weth)', async function () {
-      const {
-        borrowerGateway,
-        quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        gohm,
-        weth,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+    it('Should process onChain quote with olympus gohm oracle (non-weth, gohm is coll)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, ldo, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
       const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
       const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
-        [usdcEthChainlinkAddr],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        [usdcEthChainlinkAddr]
       )
       await olympusOracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(olympusOracleImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([olympusOracleImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
       const ohmOracleInstance = new ethers.Contract(ohmEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
@@ -2808,11 +3034,49 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([gohm.address, usdc.address], true)
+
+      let onChainQuoteWithNeitherAddressGohm = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: olympusOracleImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      let onChainQuoteWithNoOracle = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: gohm.address,
+          loanToken: ldo.address,
+          oracleAddr: olympusOracleImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await addressRegistry.connect(team).setWhitelistState([gohm.address, usdc.address, ldo.address, weth.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
       )
+
+      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuoteWithNeitherAddressGohm)
+      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuoteWithNoOracle)
 
       // check balance pre borrow
       const borrowerGohmBalPre = await gohm.balanceOf(borrower.address)
@@ -2835,6 +3099,19 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuoteWithNeitherAddressGohm, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(olympusOracleImplementation, 'NeitherTokenIsGOHM')
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuoteWithNoOracle, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(olympusOracleImplementation, 'NoOracle')
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -2864,21 +3141,118 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
     })
 
-    it('Should process onChain quote with uni v2 oracle (usdc-weth)', async function () {
-      const {
-        borrowerGateway,
+    it('Should process onChain quote with olympus gohm oracle (non-weth, gohm is loan)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, gohm, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
+
+      // deploy chainlinkOracleContract
+      const ohmEthChainlinkAddr = '0x9a72298ae3886221820B1c878d12D872087D3a23'
+      const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
+      const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+        [usdcEthChainlinkAddr]
+      )
+      await olympusOracleImplementation.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([olympusOracleImplementation.address], 2)
+
+      const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+      const ohmOracleInstance = new ethers.Contract(ohmEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+      const gohmInstance = new ethers.Contract(gohm.address, gohmAbi, borrower.provider)
+
+      // lenderVault owner deposits gohm
+      await gohm.connect(team).transfer(lenderVault.address, ONE_GOHM.mul(10))
+
+      await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: BASE.mul(75).div(100),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: usdc.address,
+          loanToken: gohm.address,
+          oracleAddr: olympusOracleImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await addressRegistry.connect(team).setWhitelistState([gohm.address, usdc.address, weth.address], 1)
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
-        lender,
-        borrower,
-        usdc,
-        weth,
-        team,
-        lenderVault,
-        addressRegistry,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
-      } = await setupTest()
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerGohmBalPre = await gohm.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultGohmBalPre = await gohm.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const collSendAmount = ONE_USDC.mul(10000)
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // check balance post borrow
+      const borrowerGohmBalPost = await gohm.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultGohmBalPost = await gohm.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      const collTokenRoundData = await usdcOracleInstance.latestRoundData()
+      const loanTokenRoundDataPreIndex = await ohmOracleInstance.latestRoundData()
+      const collTokenPriceRaw = collTokenRoundData.answer
+      const loanTokenPriceRawPreIndex = loanTokenRoundDataPreIndex.answer
+      const index = await gohmInstance.index()
+
+      const collTokenPriceInLoanToken = collTokenPriceRaw
+        .mul(ONE_GOHM)
+        .mul(10 ** 9)
+        .div(loanTokenPriceRawPreIndex)
+        .div(index)
+      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+
+      expect(borrowerGohmBalPost.sub(borrowerGohmBalPre)).to.equal(maxLoanPerColl.mul(10000))
+      expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPost)).to.equal(collSendAmount)
+      expect(Math.abs(Number(vaultGohmBalPre.sub(vaultGohmBalPost).sub(maxLoanPerColl.mul(10000)).toString()))).to.equal(0)
+      expect(vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount)).to.equal(0)
+    })
+
+    it('Should process onChain quote with uni v2 oracle (usdc-weth, lp is coll)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, gohm, team, lenderVault, addressRegistry } =
+        await setupTest()
 
       // prepare UniV2 Weth/Usdc balances
       const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
@@ -2895,33 +3269,31 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
       // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
       const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
-      /****deploy error uni oracle****/
+      // deploy error uni oracle
       await expect(
         UniV2OracleImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcEthChainlinkAddr],
-          [ZERO_ADDR],
-          weth.address,
-          wbtc,
-          btcToUSDChainlinkAddr,
-          wBTCToBTCChainlinkAddr
+          [ZERO_ADDR]
         )
-      ).to.be.reverted
-      /****deploy correctly****/
+      ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
+      await expect(
+        UniV2OracleImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+          [usdcEthChainlinkAddr],
+          []
+        )
+      ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidArrayLength')
+      // deploy correctly
       const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
-        [uniV2WethUsdc.address],
-        weth.address,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        [uniV2WethUsdc.address]
       )
       await uniV2OracleImplementation.deployed()
 
-      await addressRegistry.connect(team).toggleOracle(uniV2OracleImplementation.address, true)
+      await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
 
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
@@ -2957,11 +3329,50 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).toggleTokens([uniV2WethUsdc.address, usdc.address], true)
+
+      let onChainQuoteWithNoLpTokens = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: uniV2OracleImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      let onChainQuoteWithLoanTokenNoOracle = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: uniV2WethUsdc.address,
+          loanToken: gohm.address,
+          oracleAddr: uniV2OracleImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry
+        .connect(team)
+        .setWhitelistState([uniV2WethUsdc.address, usdc.address, weth.address, gohm.address], 1)
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
       )
+
+      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuoteWithNoLpTokens)
+      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuoteWithLoanTokenNoOracle)
 
       // check balance pre borrow
       const borrowerUniV2WethUsdcBalPre = await uniV2WethUsdc.balanceOf(borrower.address)
@@ -2984,6 +3395,19 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuoteWithNoLpTokens, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(uniV2OracleImplementation, 'NoLpTokens')
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuoteWithLoanTokenNoOracle, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(uniV2OracleImplementation, 'NoOracle')
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -2995,26 +3419,1705 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
       const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
-      const totalEthValueOfLpPool = await getTotalEthValue(
+
+      const FairReservesPriceAndEthValue = await getFairReservesPriceAndEthValue(
         uniV2WethUsdc.address,
         borrower,
         usdcEthChainlinkAddr,
         weth.address,
         weth.address
       )
-      const totalSupply = await uniV2WethUsdc.totalSupply()
+
       const loanTokenPriceRaw = loanTokenRoundData.answer
-      const collTokenPriceRaw = totalEthValueOfLpPool.mul(BigNumber.from(10).pow(18)).div(totalSupply)
+      const collTokenPriceRaw = FairReservesPriceAndEthValue.fairPriceOfLpToken
 
       const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_USDC).div(loanTokenPriceRaw)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
 
+      const borrowerUsdcDelta = Number(borrowerUsdcBalPost.sub(borrowerUsdcBalPre).toString())
+      const vaultUsdcDelta = Number(vaultUsdcBalPost.sub(vaultUsdcBalPre).toString())
+      const estimatedBorrowerUsdcDelta = Number(maxLoanPerColl.div(1000).toString())
+      const estimatedVaultUsdcDelta = Number(maxLoanPerColl.div(1000).toString())
+
       expect(borrowerUniV2WethUsdcBalPre.sub(borrowerUniV2WethUsdcBalPost)).to.equal(collSendAmount)
-      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl.div(1000))
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(borrowerUsdcDelta - estimatedBorrowerUsdcDelta) / borrowerUsdcDelta).to.be.lessThan(0.000001)
       expect(
         Math.abs(Number(vaultUniV2WethUsdcBalPost.sub(vaultUniV2WethUsdcBalPre).sub(collSendAmount).toString()))
       ).to.equal(0)
-      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl.div(1000))).to.equal(0)
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(vaultUsdcDelta - estimatedVaultUsdcDelta) / vaultUsdcDelta).to.be.lessThan(0.000001)
+    })
+
+    it('Should process onChain quote with uni v2 oracle (usdc-weth, lp is loan)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+        await setupTest()
+
+      // prepare UniV2 Weth/Usdc balances
+      const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+      const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
+      const uniV2WethUsdc = await ethers.getContractAt('IWETH', UNIV2_WETH_USDC_ADDRESS)
+      await ethers.provider.send('hardhat_setBalance', [UNIV2_WETH_USDC_HOLDER, '0x56BC75E2D63100000'])
+      await hre.network.provider.request({
+        method: 'hardhat_impersonateAccount',
+        params: [UNIV2_WETH_USDC_HOLDER]
+      })
+
+      const univ2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
+
+      await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
+
+      // deploy chainlinkOracleContract
+      const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+      const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+        ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+        [usdcEthChainlinkAddr],
+        [uniV2WethUsdc.address]
+      )
+      await uniV2OracleImplementation.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+      const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(10000000))
+
+      await uniV2WethUsdc.connect(team).transfer(lenderVault.address, ONE_WETH.div(1000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: BASE.mul(75).div(100),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: usdc.address,
+          loanToken: uniV2WethUsdc.address,
+          oracleAddr: uniV2OracleImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).setWhitelistState([uniV2WethUsdc.address, usdc.address], 1)
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerUniV2WethUsdcBalPre = await uniV2WethUsdc.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultUniV2WethUsdcBalPre = await uniV2WethUsdc.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const collSendAmount = ONE_USDC.mul(10000)
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // check balance post borrow
+      const borrowerUniV2WethUsdcBalPost = await uniV2WethUsdc.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultUniV2WethUsdcBalPost = await uniV2WethUsdc.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      const collTokenRoundData = await usdcOracleInstance.latestRoundData()
+
+      const FairReservesPriceAndEthValue = await getFairReservesPriceAndEthValue(
+        uniV2WethUsdc.address,
+        borrower,
+        usdcEthChainlinkAddr,
+        weth.address,
+        weth.address
+      )
+
+      const collTokenPriceRaw = collTokenRoundData.answer
+      const loanTokenPriceRaw = FairReservesPriceAndEthValue.fairPriceOfLpToken
+
+      const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_WETH).div(loanTokenPriceRaw)
+      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+
+      const borrowerLpDelta = Number(borrowerUniV2WethUsdcBalPost.sub(borrowerUniV2WethUsdcBalPre).toString())
+      const vaultLpDelta = Number(vaultUniV2WethUsdcBalPre.sub(vaultUniV2WethUsdcBalPost).toString())
+      const estimatedBorrowerLpDelta = Number(maxLoanPerColl.mul(10000).toString())
+      const estimatedVaultLpDelta = Number(maxLoanPerColl.mul(10000).toString())
+
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(estimatedBorrowerLpDelta - borrowerLpDelta) / borrowerLpDelta).to.be.lessThan(0.000001)
+      expect(borrowerUsdcBalPre.sub(borrowerUsdcBalPost)).to.equal(collSendAmount)
+      // expect JS and solidity math to be off by less than 0.0001%
+      expect(Math.abs(estimatedVaultLpDelta - vaultLpDelta) / vaultLpDelta).to.be.lessThan(0.000001)
+      expect(vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount)).to.equal(0)
+    })
+
+    describe('Should handle getPrice correctly', async function () {
+      it('Should process chainlink oracle prices correctly', async function () {
+        const { addressRegistry, usdc, paxg, weth, wbtc, ldo, team } = await setupTest()
+
+        // deploy chainlinkOracleContract
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+
+        const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
+        const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
+        const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
+        // correct deploy
+        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, paxg.address, ldo.address, aaveAddr, crvAddr, linkAddr],
+          [
+            usdcEthChainlinkAddr,
+            paxgEthChainlinkAddr,
+            ldoEthChainlinkAddr,
+            aaveEthChainlinkAddr,
+            crvEthChainlinkAddr,
+            linkEthChainlinkAddr
+          ],
+          weth.address,
+          BASE
+        )
+        await chainlinkBasicImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
+
+        // prices on 2-16-2023
+        const aaveCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
+        const crvCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
+        const linkCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
+        const ldoCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, usdc.address) // ldo was 2.50-3$ that day
+        const paxgCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, usdc.address) // paxg was 1800-1830$ that day
+        const wethCollUSDCLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
+
+        const wethCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, paxg.address) // weth was 1650-1700$ and paxg was 1800-1830$ that day
+        const aaveCollPaxgLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, paxg.address) // aave was 85-90$ and paxg was 1800-1830$ that day
+
+        const wethCollLdoLoanPrice = await chainlinkBasicImplementation.getPrice(weth.address, ldo.address) // weth was 1650-1700$ and ldo was 2.50-3$ that day
+
+        const paxgCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(paxg.address, weth.address) // paxg was 1800-1830$ and weth was 1650-1700$ that day
+        const aaveCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
+        const ldoCollWethLoanPrice = await chainlinkBasicImplementation.getPrice(ldo.address, weth.address) // ldo was 2.50-3$ and weth was 1650-1700$ that day
+
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPrice, 6))) / 100).to.be.within(85, 90)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPrice, 6))) / 100).to.be.within(1.1, 1.2)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPrice, 6))) / 100).to.be.within(7, 7.5)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(ldoCollUSDCLoanPrice, 6))) / 100).to.be.within(2.5, 3)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollUSDCLoanPrice, 6))) / 100).to.be.within(1800, 1830)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPrice, 6))) / 100).to.be.within(1650, 1700)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollPaxgLoanPrice, 18))) / 100).to.be.within(0.9, 1)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollPaxgLoanPrice, 18))) / 100).to.be.within(0.04, 0.06)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLdoLoanPrice, 18))) / 100).to.be.within(600, 605)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollWethLoanPrice, 18))) / 100).to.be.within(1, 1.1)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPrice, 18))) / 100).to.be.within(0.04, 0.06)
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(ldoCollWethLoanPrice, 18))) / 10000).to.be.within(
+          0.001,
+          0.002
+        )
+
+        // toggle to show logs
+        const showLogs = false
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(ldoCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollUSDCLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPrice, 6))) / 100)
+
+          // in terms of PAXG
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollPaxgLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollPaxgLoanPrice, 18))) / 100)
+
+          // in terms of LDO
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLdoLoanPrice, 18))) / 100)
+
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(paxgCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(ldoCollWethLoanPrice, 18))) / 10000)
+        }
+
+        // deploy chainlinkOracleContract
+        const ChainlinkBasicWbtcUSDImplementation = await ethers.getContractFactory('ChainlinkBasicWithWbtc')
+        const chainlinkBasicWbtcUSDImplementation = await ChainlinkBasicWbtcUSDImplementation.connect(team).deploy(
+          [usdc.address, aaveAddr, crvAddr, linkAddr, weth.address],
+          [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr]
+        )
+        await chainlinkBasicWbtcUSDImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicWbtcUSDImplementation.address], 2)
+
+        // prices on 2-16-2023
+        const aaveCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, usdc.address) // aave was 85-90$ that day
+        const crvCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(crvAddr, usdc.address) // crv was 1.10-1.20$ that day
+        const linkCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(linkAddr, usdc.address) // link was 7-7.50$ that day
+        const wethCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(weth.address, usdc.address) // weth was 1650-1700$ that day
+
+        const aaveCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, linkAddr) // aave was 85-90$ and link was 7-7.50$ that day
+        const wethCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(weth.address, linkAddr) // weth was 1650-1700$ and link was 7-7.50$ that day
+        const crvCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(crvAddr, linkAddr) // crv was 1.10-1.20$ and link was 7-7.50$ that day
+        const usdcCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(usdc.address, linkAddr) // usdc was 1$ and link was 7-7.50$ that day
+
+        const aaveCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, weth.address) // aave was 85-90$ and weth was 1650-1700$ that day
+        const crvCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(crvAddr, weth.address) // crv was 1.10-1.20$ and weth was 1650-1700$ that day
+        const usdcCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(usdc.address, weth.address) // usdc was 1$ and weth was 1650-1700$ that day
+
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(85, 90)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(1.1, 1.2)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(7, 7.5)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(
+          1650,
+          1700
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollLinkLoanPriceUSD, 18))) / 100).to.be.within(12, 13)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLinkLoanPriceUSD, 18))) / 100).to.be.within(230, 235)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(crvCollLinkLoanPriceUSD, 18))) / 100).to.be.within(
+          0.13,
+          0.16
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(usdcCollLinkLoanPriceUSD, 18))) / 100).to.be.within(
+          0.13,
+          0.16
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPriceUSD, 18))) / 100).to.be.within(
+          0.04,
+          0.06
+        )
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(crvCollWethLoanPriceUSD, 18))) / 10000).to.be.within(
+          0.0006,
+          0.0008
+        )
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(usdcCollWethLoanPriceUSD, 18))) / 10000).to.be.within(
+          0.0005,
+          0.0007
+        )
+
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollUSDCLoanPriceUSD, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollUSDCLoanPriceUSD, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(linkCollUSDCLoanPriceUSD, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollUSDCLoanPriceUSD, 6))) / 100)
+
+          // in terms of LINK
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollLinkLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollLinkLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(crvCollLinkLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(usdcCollLinkLoanPriceUSD, 18))) / 100)
+
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(aaveCollWethLoanPriceUSD, 18))) / 100)
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(crvCollWethLoanPriceUSD, 18))) / 10000)
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(usdcCollWethLoanPriceUSD, 18))) / 10000)
+        }
+
+        // btc testing
+        const wbtcCollUSDCLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(wbtc, usdc.address) // btc was 23600-24900$ that day
+        const wbtcCollLinkLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(wbtc, linkAddr) // btc was 23600-24900$ and link was 7-7.50$ that day
+        const wbtcCollWethLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(wbtc, weth.address) // btc was 23600-24900$ and weth was 1650-1700$ that day
+
+        const aaveCollWbtcLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(aaveAddr, wbtc) // aave was 85-90$ and btc was 23600-24900$ that day
+        const wethCollWbtcLoanPriceUSD = await chainlinkBasicWbtcUSDImplementation.getPrice(weth.address, wbtc) // weth was 1650-1700$ and btc was 23600-24900$ that day
+
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollUSDCLoanPriceUSD, 6))) / 100).to.be.within(
+          23600,
+          24900
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollLinkLoanPriceUSD, 18))) / 100).to.be.within(
+          3390,
+          4000
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollWethLoanPriceUSD, 18))) / 100).to.be.within(14, 15)
+        expect(Math.round(10000 * Number(ethers.utils.formatUnits(aaveCollWbtcLoanPriceUSD, 8))) / 10000).to.be.within(
+          0.003,
+          0.004
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollWbtcLoanPriceUSD, 8))) / 100).to.be.within(
+          0.06,
+          0.08
+        )
+
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollUSDCLoanPriceUSD, 6))) / 100)
+
+          // in terms of LINK
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollLinkLoanPriceUSD, 18))) / 100)
+
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wbtcCollWethLoanPriceUSD, 18))) / 100)
+
+          // in terms of WBTC
+          console.log(Math.round(10000 * Number(ethers.utils.formatUnits(aaveCollWbtcLoanPriceUSD, 8))) / 10000)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollWbtcLoanPriceUSD, 8))) / 100)
+        }
+      })
+
+      it('Should process olympus oracle prices correctly', async function () {
+        const { addressRegistry, usdc, weth, gohm, team } = await setupTest()
+
+        const aaveAddr = '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9'
+        const crvAddr = '0xD533a949740bb3306d119CC777fa900bA034cd52'
+        const linkAddr = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
+
+        const OlympusOracleImplementation = await ethers.getContractFactory('OlympusOracle')
+        const olympusOracleImplementation = await OlympusOracleImplementation.connect(team).deploy(
+          [usdc.address, linkAddr, aaveAddr, crvAddr],
+          [usdcEthChainlinkAddr, linkEthChainlinkAddr, aaveEthChainlinkAddr, crvEthChainlinkAddr]
+        )
+        await olympusOracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([olympusOracleImplementation.address], 2)
+
+        const gOhmCollUSDCLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, usdc.address)
+        const gOhmCollLinkLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, linkAddr)
+        const gOhmCollAaveLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, aaveAddr)
+        const gOhmCollCrvLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, crvAddr)
+        const gOhmCollWethLoanPrice = await olympusOracleImplementation.getPrice(gohm.address, weth.address)
+
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollUSDCLoanPrice, 6))) / 100).to.be.within(2840, 2930)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollLinkLoanPrice, 18))) / 100).to.be.within(390, 400)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollAaveLoanPrice, 18))) / 100).to.be.within(30, 35)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollCrvLoanPrice, 18))) / 100).to.be.within(2550, 2575)
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollWethLoanPrice, 18))) / 100).to.be.within(1.7, 1.8)
+
+        // toggle to show logs
+        const showLogs = false
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollUSDCLoanPrice, 6))) / 100) // gohm was 2840-2930$ that day
+          // in terms of LINK
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollLinkLoanPrice, 18))) / 100) // gohm was 2840-2930$ and link was 7-7.50$ that day
+          // in terms of AAVE
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollAaveLoanPrice, 18))) / 100) // gohm was 2840-2930$ and aave was 85-90$ that day
+          // in terms of CRV
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollCrvLoanPrice, 18))) / 100) // gohm was 2840-2930$ and crv was 1.10-1.20$ that day
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(gOhmCollWethLoanPrice, 18))) / 100) // gohm was 2840-2930$ and weth was 1650-1700$ that day
+        }
+
+        const usdcCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(usdc.address, gohm.address)
+        const linkCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(linkAddr, gohm.address)
+        const aaveCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(aaveAddr, gohm.address)
+        const crvCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(crvAddr, gohm.address)
+        const wethCollGOhmLoanPrice = await olympusOracleImplementation.getPrice(weth.address, gohm.address)
+
+        expect(Math.round(100000 * Number(ethers.utils.formatUnits(usdcCollGOhmLoanPrice, 18))) / 100000).to.be.within(
+          0.0003,
+          0.0004
+        )
+        expect(Math.round(100000 * Number(ethers.utils.formatUnits(linkCollGOhmLoanPrice, 18))) / 100000).to.be.within(
+          0.0025,
+          0.003
+        )
+        expect(Math.round(1000 * Number(ethers.utils.formatUnits(aaveCollGOhmLoanPrice, 18))) / 1000).to.be.within(
+          0.03,
+          0.04
+        )
+        expect(Math.round(100000 * Number(ethers.utils.formatUnits(crvCollGOhmLoanPrice, 18))) / 100000).to.be.within(
+          0.0003,
+          0.0004
+        )
+        expect(Math.round(100 * Number(ethers.utils.formatUnits(wethCollGOhmLoanPrice, 18))) / 100).to.be.within(0.55, 0.6)
+
+        if (showLogs) {
+          // in terms of USDC
+          console.log(Math.round(100000 * Number(ethers.utils.formatUnits(usdcCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and usdc was 1$ that day
+          // in terms of LINK
+          console.log(Math.round(100000 * Number(ethers.utils.formatUnits(linkCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and link was 7-7.50$ that day
+          // in terms of AAVE
+          console.log(Math.round(1000 * Number(ethers.utils.formatUnits(aaveCollGOhmLoanPrice, 18))) / 1000) // gohm was 2840-2930$ and aave was 85-90$ that day
+          // in terms of CRV
+          console.log(Math.round(100000 * Number(ethers.utils.formatUnits(crvCollGOhmLoanPrice, 18))) / 100000) // gohm was 2840-2930$ and crv was 1.10-1.20$ that day
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(wethCollGOhmLoanPrice, 18))) / 100) // gohm was 2840-2930$ and weth was 1650-1700$ that day
+        }
+      })
+
+      it('Should process uni v2 oracle prices correctly', async function () {
+        const { addressRegistry, usdc, weth, gohm, paxg, team } = await setupTest()
+
+        const usdtAddr = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdtAddr]: usdtEthChainlinkAddr,
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
+
+        // uni v2 Addrs
+        const uniV2WethWiseAddr = '0x21b8065d10f73EE2e260e5B47D3344d3Ced7596E'
+        const uniV2WethUsdtAddr = '0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60'
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+        const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address, usdtAddr],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2WethWiseAddr, uniV2WethUsdtAddr, uniV2PaxgUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+          [usdc.address, paxg.address, usdtAddr],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
+          weth.address,
+          BASE
+        )
+        await chainlinkBasicImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+        await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
+
+        await expect(uniV2OracleImplementation.getPrice(uniV2WethWiseAddr, usdc.address)).to.be.revertedWithCustomError(
+          uniV2OracleImplementation,
+          'NoOracle'
+        )
+        await expect(uniV2OracleImplementation.getPrice(usdc.address, uniV2WethWiseAddr)).to.be.revertedWithCustomError(
+          uniV2OracleImplementation,
+          'NoOracle'
+        )
+        await expect(uniV2OracleImplementation.getPrice(gohm.address, uniV2WethUsdtAddr)).to.be.revertedWithCustomError(
+          uniV2OracleImplementation,
+          'NoOracle'
+        )
+
+        // get LP token prices in ETH
+        const uniV2WethUsdcLpToken = await ethers.getContractAt('IUniV2', uniV2WethUsdcAddr)
+        const uniV2WethUsdcPricePerWholeLpToken = await uniV2OracleImplementation.getLpTokenPrice(uniV2WethUsdcAddr)
+        let lpTokenDecimals = await uniV2WethUsdcLpToken.decimals()
+        let totalSupply = await uniV2WethUsdcLpToken.totalSupply()
+        const uniV2WethUsdcTvlInEth = uniV2WethUsdcPricePerWholeLpToken
+          .mul(totalSupply)
+          .div(ethers.BigNumber.from(10).pow(lpTokenDecimals))
+        expect(uniV2WethUsdcPricePerWholeLpToken).to.be.equal('103568572804675177895042')
+        expect(uniV2WethUsdcTvlInEth).to.be.equal('54297603417419099250160')
+
+        const uniV2WethUsdtLpToken = await ethers.getContractAt('IUniV2', uniV2WethUsdtAddr)
+        const uniV2WethUsdtPricePerWholeLpToken = await uniV2OracleImplementation.getLpTokenPrice(uniV2WethUsdtAddr)
+        lpTokenDecimals = await uniV2WethUsdtLpToken.decimals()
+        totalSupply = await uniV2WethUsdtLpToken.totalSupply()
+        const uniV2WethUsdtTvlInEth = uniV2WethUsdtPricePerWholeLpToken
+          .mul(totalSupply)
+          .div(ethers.BigNumber.from(10).pow(lpTokenDecimals))
+        expect(uniV2WethUsdtPricePerWholeLpToken).to.be.equal('109666401959531641440388')
+        expect(uniV2WethUsdtTvlInEth).to.be.equal('25440517313320386896587')
+
+        const uniV2PaxgUsdcLpToken = await ethers.getContractAt('IUniV2', uniV2PaxgUsdcAddr)
+        const uniV2PaxgUsdcPricePerWholeLpToken = await uniV2OracleImplementation.getLpTokenPrice(uniV2PaxgUsdcAddr)
+        lpTokenDecimals = await uniV2PaxgUsdcLpToken.decimals()
+        totalSupply = await uniV2PaxgUsdcLpToken.totalSupply()
+        const uniV2PaxgUsdcTvlInEth = uniV2PaxgUsdcPricePerWholeLpToken
+          .mul(totalSupply)
+          .div(ethers.BigNumber.from(10).pow(lpTokenDecimals))
+        expect(uniV2PaxgUsdcPricePerWholeLpToken).to.be.equal('28288853749660933246555984908')
+        expect(uniV2PaxgUsdcTvlInEth).to.be.equal('2240408018702745547529')
+
+        // get prices from uni v2 oracles with Lp token as collateral token
+        const uniV2WethUsdtCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, usdc.address)
+        const uniV2PaxgUsdcCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, usdc.address)
+        const uniV2WethUsdcCollUsdcLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, usdc.address)
+        const uniV2WethUsdtCollUsdtLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, usdtAddr)
+        const uniV2WethUsdcCollUsdtLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, usdtAddr)
+        const uniV2PaxgUsdcCollUsdtLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, usdtAddr)
+        const uniV2WethUsdtCollPaxgLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, paxg.address)
+        const uniV2WethUsdcCollPaxgLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, paxg.address)
+        const uniV2PaxgUsdcCollPaxgLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, paxg.address)
+        const uniV2WethUsdtCollWethLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdtAddr, weth.address)
+        const uniV2WethUsdcCollWethLoanPrice = await uniV2OracleImplementation.getPrice(uniV2WethUsdcAddr, weth.address)
+        const uniV2PaxgUsdcCollWethLoanPrice = await uniV2OracleImplementation.getPrice(uniV2PaxgUsdcAddr, weth.address)
+
+        // get prices from uni v2 oracles with Lp token as loan token
+        const usdcColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(usdc.address, uniV2WethUsdtAddr)
+        const usdcColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdc.address, uniV2PaxgUsdcAddr)
+        const usdcColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdc.address, uniV2WethUsdcAddr)
+        const usdtColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(usdtAddr, uniV2WethUsdtAddr)
+        const usdtColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdtAddr, uniV2WethUsdcAddr)
+        const usdtColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(usdtAddr, uniV2PaxgUsdcAddr)
+        const paxgColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(paxg.address, uniV2WethUsdtAddr)
+        const paxgColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(paxg.address, uniV2WethUsdcAddr)
+        const paxgColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(paxg.address, uniV2PaxgUsdcAddr)
+        const wethColluniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2WethUsdtAddr)
+        const wethColluniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2WethUsdcAddr)
+        const wethColluniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(weth.address, uniV2PaxgUsdcAddr)
+
+        // get prices from uni v2 oracles with Lp token as collateral token and loan token
+        const uniV2WethUsdtCollUniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdtAddr,
+          uniV2WethUsdcAddr
+        )
+        const uniV2WethUsdtCollUniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdtAddr,
+          uniV2PaxgUsdcAddr
+        )
+        const uniV2WethUsdcCollUniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2WethUsdtAddr
+        )
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+        const uniV2PaxgUsdcCollUniV2WethUsdtLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2PaxgUsdcAddr,
+          uniV2WethUsdtAddr
+        )
+        const uniV2PaxgUsdcCollUniV2WethUsdcLoanPrice = await uniV2OracleImplementation.getPrice(
+          uniV2PaxgUsdcAddr,
+          uniV2WethUsdcAddr
+        )
+
+        // get exact prices for all tokens in eth
+        const uniV2WethUsdtExactEthPrice = await getExactLpTokenPriceInEth(
+          uniV2WethUsdtAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+        const uniV2PaxgUsdcExactEthPrice = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+        const uniV2WethUsdcExactEthPrice = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+        const usdcExactEthPrice = await chainlinkBasicImplementation.getPrice(usdc.address, weth.address)
+        const usdtExactEthPrice = await chainlinkBasicImplementation.getPrice(usdtAddr, weth.address)
+        const paxgExactEthPrice = await chainlinkBasicImplementation.getPrice(paxg.address, weth.address)
+        const wethExactEthPrice = BASE
+
+        // get exact prices Lp token as coll and non-lp token as loan
+        const uniV2WethUsdtCollUsdcLoanExactPrice = uniV2WethUsdtExactEthPrice.mul(10 ** 6).div(usdcExactEthPrice)
+        const uniV2PaxgUsdcCollUsdcLoanExactPrice = uniV2PaxgUsdcExactEthPrice.mul(10 ** 6).div(usdcExactEthPrice)
+        const uniV2WethUsdcCollUsdcLoanExactPrice = uniV2WethUsdcExactEthPrice.mul(10 ** 6).div(usdcExactEthPrice)
+        const uniV2WethUsdtCollUsdtLoanExactPrice = uniV2WethUsdtExactEthPrice.mul(10 ** 6).div(usdtExactEthPrice)
+        const uniV2WethUsdcCollUsdtLoanExactPrice = uniV2WethUsdcExactEthPrice.mul(10 ** 6).div(usdtExactEthPrice)
+        const uniV2PaxgUsdcCollUsdtLoanExactPrice = uniV2PaxgUsdcExactEthPrice.mul(10 ** 6).div(usdtExactEthPrice)
+        const uniV2WethUsdtCollPaxgLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(paxgExactEthPrice)
+        const uniV2WethUsdcCollPaxgLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(paxgExactEthPrice)
+        const uniV2PaxgUsdcCollPaxgLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(paxgExactEthPrice)
+        const uniV2WethUsdtCollWethLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(wethExactEthPrice)
+        const uniV2WethUsdcCollWethLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(wethExactEthPrice)
+        const uniV2PaxgUsdcCollWethLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(wethExactEthPrice)
+        // get exact prices non-lp token as coll and Lp token as loan
+        const usdcColluniV2WethUsdtLoanExactPrice = usdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const usdcColluniV2PaxgUsdcLoanExactPrice = usdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const usdcColluniV2WethUsdcLoanExactPrice = usdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const usdtColluniV2WethUsdtLoanExactPrice = usdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const usdtColluniV2WethUsdcLoanExactPrice = usdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const usdtColluniV2PaxgUsdcLoanExactPrice = usdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const paxgColluniV2WethUsdtLoanExactPrice = paxgExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const paxgColluniV2WethUsdcLoanExactPrice = paxgExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const paxgColluniV2PaxgUsdcLoanExactPrice = paxgExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const wethColluniV2WethUsdtLoanExactPrice = wethExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const wethColluniV2WethUsdcLoanExactPrice = wethExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const wethColluniV2PaxgUsdcLoanExactPrice = wethExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        // get exact prices Lp token as coll and Lp token as loan
+        const uniV2WethUsdtCollUniV2WethUsdcLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const uniV2WethUsdtCollUniV2PaxgUsdcLoanExactPrice = uniV2WethUsdtExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+        const uniV2PaxgUsdcCollUniV2WethUsdtLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const uniV2PaxgUsdcCollUniV2WethUsdcLoanExactPrice = uniV2PaxgUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdcExactEthPrice)
+        const uniV2WethUsdcCollUniV2WethUsdtLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2WethUsdtExactEthPrice)
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPrice = uniV2WethUsdcExactEthPrice
+          .mul(BigNumber.from(10).pow(18))
+          .div(uniV2PaxgUsdcExactEthPrice)
+
+        // Lp tokens are collateral, non-Lp tokens are loan
+        // console.log(uniV2WethUsdtCollUsdtLoanExactPrice.toString())
+        // console.log(uniV2WethUsdtCollUsdtLoanPrice.toString())
+        expect(getDeltaBNComparison(uniV2WethUsdtCollUsdcLoanExactPrice, uniV2WethUsdtCollUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2PaxgUsdcCollUsdcLoanExactPrice, uniV2PaxgUsdcCollUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2WethUsdcCollUsdcLoanExactPrice, uniV2WethUsdcCollUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2WethUsdtCollUsdtLoanExactPrice, uniV2WethUsdtCollUsdtLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2WethUsdcCollUsdtLoanExactPrice, uniV2WethUsdcCollUsdtLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2PaxgUsdcCollUsdtLoanExactPrice, uniV2PaxgUsdcCollUsdtLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2WethUsdtCollPaxgLoanExactPrice, uniV2WethUsdtCollPaxgLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2WethUsdcCollPaxgLoanExactPrice, uniV2WethUsdcCollPaxgLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2PaxgUsdcCollPaxgLoanExactPrice, uniV2PaxgUsdcCollPaxgLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2WethUsdtCollWethLoanExactPrice, uniV2WethUsdtCollWethLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2WethUsdcCollWethLoanExactPrice, uniV2WethUsdcCollWethLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(uniV2PaxgUsdcCollWethLoanExactPrice, uniV2PaxgUsdcCollWethLoanPrice, 5)).to.be.equal(
+          true
+        )
+        // non-Lp tokens are collateral, Lp tokens are loan
+        expect(getDeltaBNComparison(usdcColluniV2WethUsdtLoanExactPrice, usdcColluniV2WethUsdtLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(usdcColluniV2PaxgUsdcLoanExactPrice, usdcColluniV2PaxgUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(usdcColluniV2WethUsdcLoanExactPrice, usdcColluniV2WethUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(usdtColluniV2WethUsdtLoanExactPrice, usdtColluniV2WethUsdtLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(usdtColluniV2WethUsdcLoanExactPrice, usdtColluniV2WethUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(usdtColluniV2PaxgUsdcLoanExactPrice, usdtColluniV2PaxgUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(paxgColluniV2WethUsdtLoanExactPrice, paxgColluniV2WethUsdtLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(paxgColluniV2WethUsdcLoanExactPrice, paxgColluniV2WethUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(paxgColluniV2PaxgUsdcLoanExactPrice, paxgColluniV2PaxgUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(wethColluniV2WethUsdtLoanExactPrice, wethColluniV2WethUsdtLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(wethColluniV2WethUsdcLoanExactPrice, wethColluniV2WethUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        expect(getDeltaBNComparison(wethColluniV2PaxgUsdcLoanExactPrice, wethColluniV2PaxgUsdcLoanPrice, 5)).to.be.equal(
+          true
+        )
+        // Lp tokens are collateral, Lp tokens are loan
+        expect(
+          getDeltaBNComparison(uniV2WethUsdtCollUniV2WethUsdcLoanExactPrice, uniV2WethUsdtCollUniV2WethUsdcLoanPrice, 5)
+        ).to.be.equal(true)
+        expect(
+          getDeltaBNComparison(uniV2WethUsdtCollUniV2PaxgUsdcLoanExactPrice, uniV2WethUsdtCollUniV2PaxgUsdcLoanPrice, 5)
+        ).to.be.equal(true)
+        expect(
+          getDeltaBNComparison(uniV2PaxgUsdcCollUniV2WethUsdtLoanExactPrice, uniV2PaxgUsdcCollUniV2WethUsdtLoanPrice, 5)
+        ).to.be.equal(true)
+        expect(
+          getDeltaBNComparison(uniV2PaxgUsdcCollUniV2WethUsdcLoanExactPrice, uniV2PaxgUsdcCollUniV2WethUsdcLoanPrice, 5)
+        ).to.be.equal(true)
+        expect(
+          getDeltaBNComparison(uniV2WethUsdcCollUniV2WethUsdtLoanExactPrice, uniV2WethUsdcCollUniV2WethUsdtLoanPrice, 5)
+        ).to.be.equal(true)
+        expect(
+          getDeltaBNComparison(uniV2WethUsdcCollUniV2PaxgUsdcLoanExactPrice, uniV2WethUsdcCollUniV2PaxgUsdcLoanPrice, 5)
+        ).to.be.equal(true)
+
+        // toggle to show logs
+        const showLogs = false
+        if (showLogs) {
+          console.log('Lp tokens as loan')
+          // in terms of USDC
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdcLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdcLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdcLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdcLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdcLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdcLoanPrice, 6))) / 100)
+          // in terms of USDT
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdtLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUsdtLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdtLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUsdtLoanPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdtLoanExactPrice, 6))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUsdtLoanPrice, 6))) / 100)
+          // in terms of PAXG
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollPaxgLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollPaxgLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollPaxgLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollPaxgLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollPaxgLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollPaxgLoanPrice, 18))) / 100)
+          // in terms of WETH
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollWethLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollWethLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollWethLoanPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollWethLoanExactPrice, 18))) / 100)
+          console.log(Math.round(100 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollWethLoanPrice, 18))) / 100)
+          console.log('Lp tokens as collateral')
+          // in terms of Lp tokens with collateral as USDC
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdcColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          // in terms of Lp tokens with collateral as USDT
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(usdtColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          // in terms of Lp tokens with collateral as PAXG
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(paxgColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          // in terms of Lp Tokens with collateral as WETH
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdtLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdtLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2WethUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2PaxgUsdcLoanExactPrice, 18))) / 10 ** 14
+          )
+          console.log(Math.round(10 ** 14 * Number(ethers.utils.formatUnits(wethColluniV2PaxgUsdcLoanPrice, 18))) / 10 ** 14)
+          console.log('Lp tokens as loan and collateral')
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUniV2WethUsdcLoanExactPrice, 18))) /
+              10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdtCollUniV2WethUsdcLoanPrice, 18))) / 10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUniV2WethUsdtLoanExactPrice, 18))) /
+              10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2WethUsdcCollUniV2WethUsdtLoanPrice, 18))) / 10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUniV2WethUsdtLoanExactPrice, 18))) /
+              10 ** 14
+          )
+          console.log(
+            Math.round(10 ** 14 * Number(ethers.utils.formatUnits(uniV2PaxgUsdcCollUniV2WethUsdtLoanPrice, 18))) / 10 ** 14
+          )
+        }
+      })
+
+      it('Should process uni v2 oracle price with skew correctly lp token as coll (1/2 token0 reserve inflated)', async () => {
+        const { addressRegistry, usdc, weth, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr
+        }
+
+        // uni v2 Addr
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address],
+          [usdcEthChainlinkAddr],
+          [uniV2WethUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          usdc.address
+        )
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, weth.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
+
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          usdc.address
+        )
+
+        // pool value increased by greater than a trillion fold due to large usdc skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // pre and post skew price should still deviate less than 1%
+        expect(
+          getDeltaBNComparison(uniV2WethUsdcCollUsdcLoanPricePreSkew, uniV2WethUsdcCollUsdcLoanPricePostSkew, 2)
+        ).to.equal(true)
+      })
+
+      it('Should process uni v2 oracle price with skew correctly lp token as coll (2/2 token1 reserve inflated)', async () => {
+        const { addressRegistry, usdc, weth, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr
+        }
+
+        // uni v2 Addr
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address],
+          [usdcEthChainlinkAddr],
+          [uniV2WethUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await weth.connect(team).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          usdc.address
+        )
+
+        await ethers.provider.send('hardhat_setBalance', [team.address, '0x4ee2d6d415b85acef8100000000000000'])
+        await weth.connect(team).deposit({ value: ONE_WETH.mul(10 ** 14) })
+
+        // lender usdc bal pre-skew
+        const teamWethBalPreSkew = await weth.balanceOf(team.address)
+
+        /** skew price by swapping for large usdc amount **/
+        await uniV2RouterInstance
+          .connect(team)
+          .swapExactTokensForTokens(ONE_WETH.mul(10 ** 14), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
+
+        const teamWethBalPostSkew = await weth.balanceOf(team.address)
+
+        expect(teamWethBalPreSkew.sub(teamWethBalPostSkew)).to.be.equal(ONE_WETH.mul(10 ** 14))
+
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          usdc.address
+        )
+
+        // pool value increased by greater than a billion fold due to large weth skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 9)
+        // pre and post skew price should still deviate less than 1%
+        expect(
+          getDeltaBNComparison(uniV2WethUsdcCollUsdcLoanPricePreSkew, uniV2WethUsdcCollUsdcLoanPricePostSkew, 2)
+        ).to.equal(true)
+      })
+
+      it('Should process uni v2 oracle price with skew correctly lp token as loan (1/2 token0 reserve inflated)', async () => {
+        const { addressRegistry, usdc, weth, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr
+        }
+
+        // uni v2 Addr
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address],
+          [usdcEthChainlinkAddr],
+          [uniV2WethUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        // exact price of uni v2 lp token pre skew
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // oracle price of uni v2 lp token pre skew
+        const usdcCollUniV2WethUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, weth.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
+
+        // exact price of uni v2 lp token post skew
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // oracle price post skew
+        const usdcCollUniV2WethUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        //pool value increased by greater than a trillion fold due to large weth skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // pre and post skew price should still deviate less than 1%
+        expect(getDeltaBNComparison(uniV2WethUsdcExactEthPricePostSkew, uniV2WethUsdcExactEthPricePostSkew, 2)).to.equal(
+          true
+        )
+
+        const showLogs = false
+        if (showLogs) {
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePreSkew', usdcCollUniV2WethUsdcLoanPricePreSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePostSkew', usdcCollUniV2WethUsdcLoanPricePostSkew.toString())
+        }
+      })
+
+      it('Should process uni v2 oracle price with skew correctly lp token as loan (2/2 token1 reserve inflated)', async () => {
+        const { addressRegistry, usdc, weth, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr
+        }
+
+        // uni v2 Addr
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address],
+          [usdcEthChainlinkAddr],
+          [uniV2WethUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await weth.connect(team).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        await ethers.provider.send('hardhat_setBalance', [team.address, '0x4ee2d6d415b85acef81000000000000'])
+        await weth.connect(team).deposit({ value: ONE_WETH.mul(10 ** 14) })
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const usdcCollUniV2WethUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        // lender usdc bal pre-skew
+        const teamWethBalPreSkew = await weth.balanceOf(team.address)
+
+        /** skew price by swapping for large usdc amount **/
+        await uniV2RouterInstance
+          .connect(team)
+          .swapExactTokensForTokens(ONE_WETH.mul(10 ** 14), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
+
+        const teamWethBalPostSkew = await weth.balanceOf(team.address)
+
+        expect(teamWethBalPreSkew.sub(teamWethBalPostSkew)).to.be.equal(ONE_WETH.mul(10 ** 14))
+
+        // exact price of uni v2 lp token post skew
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // oracle price post skew
+        const usdcCollUniV2WethUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        // pool value increased by greater than a billion fold due to large weth skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 9)
+        // pre and post skew price should still deviate less than 1%
+        expect(getDeltaBNComparison(uniV2WethUsdcExactEthPricePostSkew, uniV2WethUsdcExactEthPricePostSkew, 2)).to.equal(
+          true
+        )
+
+        const showLogs = false
+        if (showLogs) {
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePreSkew', usdcCollUniV2WethUsdcLoanPricePreSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePostSkew', usdcCollUniV2WethUsdcLoanPricePostSkew.toString())
+        }
+      })
+
+      it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (1/3 token0 reserve coll token inflated)', async () => {
+        const { addressRegistry, usdc, weth, paxg, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
+
+        // uni v2 Addrs
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, weth.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
+
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // should be same as pre-skew
+        const uniV2PaxgUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        //pool value increased by greater than a trillion fold due to large usdc skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // paxg usdc pool price should not have changed
+        expect(uniV2PaxgUsdcExactEthPricePostSkew).to.be.equal(uniV2PaxgUsdcExactEthPricePreSkew)
+        // pre and post skew price should still deviate less than 1%
+        expect(
+          getDeltaBNComparison(
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew,
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew,
+            2
+          )
+        ).to.equal(true)
+
+        const showLogs = false
+        if (showLogs) {
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew.toString()
+          )
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew.toString()
+          )
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+        }
+      })
+
+      it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (2/3 token1 reserve loan token inflated)', async () => {
+        const { addressRegistry, usdc, weth, paxg, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
+
+        // uni v2 Addrs
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large paxg amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, paxg.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
+
+        // will be same as pre-skew
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        //pool value increased by greater than a trillion fold due to large usdc skew
+        expect(uniV2PaxgUsdcExactEthPricePostSkew.div(uniV2PaxgUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // weth usdc pool price should not have changed
+        expect(uniV2WethUsdcExactEthPricePostSkew).to.be.equal(uniV2WethUsdcExactEthPricePreSkew)
+        expect(
+          getDeltaBNComparison(
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew,
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew,
+            2
+          )
+        ).to.equal(true)
+
+        const showLogs = false
+        if (showLogs) {
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew.toString()
+          )
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew.toString()
+          )
+          console.log('uniV2PaxgUsdcExactEthPricePreSkew', uniV2PaxgUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2PaxgUsdcExactEthPricePostSkew', uniV2PaxgUsdcExactEthPricePostSkew.toString())
+        }
+      })
+
+      it('Should process uni v2 oracle price with skew correctly lp token as coll and loan (3/3 both pools skewed token0 reserve coll token and token1 reserve loan token inflated)', async () => {
+        const { addressRegistry, usdc, weth, paxg, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr,
+          [paxg.address]: paxgEthChainlinkAddr
+        }
+
+        // uni v2 Addrs
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+        const uniV2PaxgUsdcAddr = '0x6D74443bb2d50785989a7212eBfd3a8dbABD1F60' // token0 is paxg, token1 is usdc
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address, paxg.address],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, weth.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        /** skew price by swapping for large paxg amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, paxg.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(2).mul(BigNumber.from(10).pow(20)))
+
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2PaxgUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2PaxgUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        const uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          uniV2WethUsdcAddr,
+          uniV2PaxgUsdcAddr
+        )
+
+        //pool value increased by greater than a trillion fold due to large usdc skew
+        expect(uniV2PaxgUsdcExactEthPricePostSkew.div(uniV2PaxgUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        //pool value increased by greater than a trillion fold due to large usdc skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        expect(
+          getDeltaBNComparison(
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew,
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew,
+            2
+          )
+        ).to.equal(true)
+
+        const showLogs = false
+        if (showLogs) {
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePreSkew.toString()
+          )
+          console.log(
+            'uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew',
+            uniV2WethUsdcCollUniV2PaxgUsdcLoanPricePostSkew.toString()
+          )
+          console.log('uniV2PaxgUsdcExactEthPricePreSkew', uniV2PaxgUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2PaxgUsdcExactEthPricePostSkew', uniV2PaxgUsdcExactEthPricePostSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+        }
+      })
+
+      it('Should process uni v2 oracle price with skew and changing k value correctly', async () => {
+        const { addressRegistry, usdc, weth, team, lender } = await setupTest()
+
+        const tokenAddrToEthOracleAddrObj = {
+          [usdc.address]: usdcEthChainlinkAddr
+        }
+
+        // uni v2 Addr
+        const uniV2WethUsdcAddr = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
+
+        // prepare UniV2 Weth/Usdc balances
+        const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
+        const uniV2WethUsdc = await ethers.getContractAt('IWETH', uniV2WethUsdcAddr)
+        await ethers.provider.send('hardhat_setBalance', [UNIV2_WETH_USDC_HOLDER, '0x56BC75E2D63100000'])
+        await hre.network.provider.request({
+          method: 'hardhat_impersonateAccount',
+          params: [UNIV2_WETH_USDC_HOLDER]
+        })
+
+        const uniV2WethUsdcHolder = await ethers.getSigner(UNIV2_WETH_USDC_HOLDER)
+
+        const uniV2WethUsdcBal = await uniV2WethUsdc.balanceOf(UNIV2_WETH_USDC_HOLDER)
+
+        // deploy oracle contract for uni v2 oracles
+        const UniV2OracleImplementation = await ethers.getContractFactory('UniV2Chainlink')
+
+        const uniV2OracleImplementation = await UniV2OracleImplementation.connect(team).deploy(
+          [usdc.address],
+          [usdcEthChainlinkAddr],
+          [uniV2WethUsdcAddr]
+        )
+        await uniV2OracleImplementation.deployed()
+
+        await addressRegistry.connect(team).setWhitelistState([uniV2OracleImplementation.address], 2)
+
+        const UNI_V2_ROUTER_CONTRACT_ADDR = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'
+
+        const uniV2RouterInstance = new ethers.Contract(UNI_V2_ROUTER_CONTRACT_ADDR, uniV2RouterAbi, team.provider)
+
+        await usdc.connect(lender).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+        await uniV2WethUsdc.connect(uniV2WethUsdcHolder).approve(UNI_V2_ROUTER_CONTRACT_ADDR, MAX_UINT256)
+
+        // exact price of uni v2 lp token pre skew
+        const uniV2WethUsdcExactEthPricePreSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // oracle price of uni v2 lp token pre skew
+        const usdcCollUniV2WethUsdcLoanPricePreSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        // lender usdc bal pre-skew
+        const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
+
+        /** skew price by swapping for large weth amount **/
+        await uniV2RouterInstance
+          .connect(lender)
+          .swapExactTokensForTokens(
+            ONE_USDC.mul(BigNumber.from(10).pow(20)),
+            0,
+            [usdc.address, weth.address],
+            lender.address,
+            MAX_UINT256
+          )
+
+        const lenderUsdcBalPostSkew = await usdc.balanceOf(lender.address)
+
+        expect(lenderUsdcBalPreSkew.sub(lenderUsdcBalPostSkew)).to.be.equal(ONE_USDC.mul(BigNumber.from(10).pow(20)))
+
+        // exact price of uni v2 lp token post skew
+        const uniV2WethUsdcExactEthPricePostSkew = await getExactLpTokenPriceInEth(
+          uniV2WethUsdcAddr,
+          team,
+          tokenAddrToEthOracleAddrObj,
+          weth.address
+        )
+
+        // oracle price post skew
+        const usdcCollUniV2WethUsdcLoanPricePostSkew = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        const totalLpSupplyPreRemove = await uniV2WethUsdc.totalSupply()
+
+        await uniV2RouterInstance
+          .connect(uniV2WethUsdcHolder)
+          .removeLiquidity(usdc.address, weth.address, uniV2WethUsdcBal, 0, 0, UNIV2_WETH_USDC_HOLDER, MAX_UINT256)
+
+        // oracle price post remove
+        const usdcCollUniV2WethUsdcLoanPricePostRemove = await uniV2OracleImplementation.getPrice(
+          usdc.address,
+          uniV2WethUsdcAddr
+        )
+
+        const totalLpSupplyPostRemove = await uniV2WethUsdc.totalSupply()
+
+        //pool value increased by greater than a trillion fold due to large weth skew
+        expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
+        // pre and post skew price should still deviate less than 1%
+        expect(
+          getDeltaBNComparison(usdcCollUniV2WethUsdcLoanPricePreSkew, usdcCollUniV2WethUsdcLoanPricePostSkew, 2)
+        ).to.equal(true)
+        // remove liquidity should not affect price
+        expect(
+          getDeltaBNComparison(usdcCollUniV2WethUsdcLoanPricePostSkew, usdcCollUniV2WethUsdcLoanPricePostRemove, 6)
+        ).to.equal(true)
+        // total supply should be reduced post remove
+        expect(totalLpSupplyPreRemove).to.be.greaterThan(totalLpSupplyPostRemove)
+
+        const showLogs = false
+        if (showLogs) {
+          console.log('uniV2WethUsdcExactEthPricePreSkew', uniV2WethUsdcExactEthPricePreSkew.toString())
+          console.log('uniV2WethUsdcExactEthPricePostSkew', uniV2WethUsdcExactEthPricePostSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePreSkew', usdcCollUniV2WethUsdcLoanPricePreSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePostSkew', usdcCollUniV2WethUsdcLoanPricePostSkew.toString())
+          console.log('usdcCollUniV2WethUsdcLoanPricePostRemove', usdcCollUniV2WethUsdcLoanPricePostRemove.toString())
+          console.log('totalLpSupplyPreRemove', totalLpSupplyPreRemove.toString())
+          console.log('totalLpSupplyPostRemove', totalLpSupplyPostRemove.toString())
+        }
+      })
     })
   })
 })

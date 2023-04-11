@@ -2,9 +2,35 @@
 
 pragma solidity ^0.8.19;
 
-import {DataTypes} from "../DataTypes.sol";
+import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface ILenderVaultImpl {
+    event AddedSigners(address[] _signers);
+
+    event MinNumberOfSignersSet(uint256 numSigners);
+
+    event RemovedSigner(
+        address signerRemoved,
+        uint256 signerIdx,
+        address signerMovedFromEnd
+    );
+
+    event CollateralUnlocked(
+        address indexed vaultOwner,
+        address indexed collToken,
+        uint256[] loanIds,
+        bool autoWithdraw
+    );
+
+    event QuoteProcessed(
+        address borrower,
+        DataTypesPeerToPeer.Loan loan,
+        uint256 loanId,
+        address collReceiver
+    );
+
+    event Withdrew(address indexed tokenAddr, uint256 withdrawAmount);
+
     /**
      * @notice function to initialize lender vault
      * @dev factory creates clone and then initializes the vault
@@ -39,7 +65,7 @@ interface ILenderVaultImpl {
      * @param collAmount amount of collateral to unlock
      */
     function updateLoanInfo(
-        DataTypes.Loan memory loan,
+        DataTypesPeerToPeer.Loan memory loan,
         uint128 repayAmount,
         uint256 loanId,
         uint256 collAmount
@@ -49,9 +75,9 @@ interface ILenderVaultImpl {
      * @notice function to processQuote on a borrow
      * @dev only borrower gateway can call this function
      * @param borrower address of the borrower
-     * @param borrowInstructions struct containing all info for borrow (see DataTypes.sol notes)
+     * @param borrowInstructions struct containing all info for borrow (see DataTypesPeerToPeer.sol notes)
      * @param generalQuoteInfo struct containing quote info (see Datatypes.sol notes)
-     * @param quoteTuple struct containing specific quote tuple info (see DataTypes.sol notes)
+     * @param quoteTuple struct containing specific quote tuple info (see DataTypesPeerToPeer.sol notes)
      * @return loan loan information after processing the quote
      * @return loanId index of loans in the loans array
      * @return upfrontFee upfront fee in coll token
@@ -59,13 +85,14 @@ interface ILenderVaultImpl {
      */
     function processQuote(
         address borrower,
-        DataTypes.BorrowTransferInstructions calldata borrowInstructions,
-        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo,
-        DataTypes.QuoteTuple calldata quoteTuple
+        DataTypesPeerToPeer.BorrowTransferInstructions
+            calldata borrowInstructions,
+        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     )
         external
         returns (
-            DataTypes.Loan memory loan,
+            DataTypesPeerToPeer.Loan memory loan,
             uint256 loanId,
             uint256 upfrontFee,
             address collReceiver
@@ -142,18 +169,18 @@ interface ILenderVaultImpl {
      */
     function loan(
         uint256 index
-    ) external view returns (DataTypes.Loan memory loan);
+    ) external view returns (DataTypesPeerToPeer.Loan memory loan);
 
     /**
      * @notice function validates repay info
      * @param borrower address of the borrower
      * @param loan loan that is being repaid
-     * @param loanRepayInstructions struct containing repayment info (see DataTypes.sol notes)
+     * @param loanRepayInstructions struct containing repayment info (see DataTypesPeerToPeer.sol notes)
      */
     function validateRepayInfo(
         address borrower,
-        DataTypes.Loan memory loan,
-        DataTypes.LoanRepayInstructions memory loanRepayInstructions
+        DataTypesPeerToPeer.Loan memory loan,
+        DataTypesPeerToPeer.LoanRepayInstructions memory loanRepayInstructions
     ) external view;
 
     /**
@@ -161,6 +188,19 @@ interface ILenderVaultImpl {
      * @return owner address
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice function to return unlocked token balances
+     * @param tokens array of token addresses
+     * @return balances the vault balances of the token addresses
+     * @return _lockedAmounts the vault locked amounts of the token addresses
+     */
+    function getTokenBalancesAndLockedAmounts(
+        address[] memory tokens
+    )
+        external
+        view
+        returns (uint256[] memory balances, uint256[] memory _lockedAmounts);
 
     /**
      * @notice function to return address of registry
@@ -199,4 +239,10 @@ interface ILenderVaultImpl {
      * @return amount of token locked
      */
     function lockedAmounts(address token) external view returns (uint256);
+
+    /**
+     * @notice function returns total number of loans
+     * @return total number of loans
+     */
+    function totalNumLoans() external view returns (uint256);
 }

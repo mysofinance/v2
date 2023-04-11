@@ -9,11 +9,10 @@ library Errors {
     error InvalidSender();
     error InvalidFee();
     error InsufficientSendAmount();
-    error InvalidOraclePair();
+    error NoOracle();
     error InvalidOracleAnswer();
     error InvalidOracleDecimals();
     error InvalidOracleVersion();
-    error InvalidBTCOracle();
     error InvalidAddress();
     error InvalidArrayLength();
     error InvalidQuote();
@@ -23,6 +22,7 @@ library Errors {
     error UnknownOnChainQuote();
     error NeitherTokenIsGOHM();
     error NoLpTokens();
+    error ZeroReserve();
     error IncorrectGaugeForLpToken();
     error InvalidGaugeIndex();
     error AlreadyStaked();
@@ -56,7 +56,7 @@ library Errors {
     error EmptyRepaymentSchedule();
     error FirstDueDateTooClose();
     error DueDatesTooClose();
-    error UnsubscribeGracePeriodTooShort();
+    error InvalidGracePeriod();
     error UnregisteredLoanProposal();
     error NotInSubscriptionPhase();
     error NotInUnsubscriptionPhase();
@@ -68,7 +68,8 @@ library Errors {
     error TotalSubscribedNotTargetInRange();
     error InvalidRollBackRequest();
     error UnsubscriptionAmountTooLarge();
-    error InvalidNewLoanTerms();
+    error InvalidMinOrMaxLoanAmount();
+    error NewMaxLoanAmountBelowCurrentSubscriptions();
     error OutsideConversionTimeWindow();
     error OutsideRepaymentTimeWindow();
     error NoDefault();
@@ -76,5 +77,7 @@ library Errors {
     error RepaymentIdxTooLarge();
     error AlreadyClaimed();
     error AlreadyConverted();
-    error InvalidRepaymentSchedule();
+    error InvalidDueDates();
+    error RepaymentOrConversionAmountIsZero();
+    error WaitForLoanTermsCoolOffPeriod();
 }

@@ -2,6 +2,10 @@
 pragma solidity 0.8.19;
 
 interface IFundingPool {
+    event LoanProposalExecuted(address indexed loanProposalAddr);
+    event Subscribed(address indexed loanProposalAddr, uint256 amount);
+    event Unsubscribed(address indexed loanProposalAddr, uint256 amount);
+
     /**
      * @notice function allows users to deposit into funding pool
      * @param amount amount to deposit

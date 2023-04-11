@@ -3,14 +3,13 @@ pragma solidity 0.8.19;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {Constants} from "../Constants.sol";
-import {DataTypes} from "./DataTypes.sol";
+import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
-import {IEvents} from "./interfaces/IEvents.sol";
 import {Errors} from "../Errors.sol";
 
-contract QuoteHandler is IQuoteHandler, IEvents {
+contract QuoteHandler is IQuoteHandler {
     address public immutable addressRegistry;
     mapping(address => uint256) public offChainQuoteNonce;
     mapping(address => mapping(bytes32 => bool))
@@ -23,7 +22,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
 
     function addOnChainQuote(
         address lenderVault,
-        DataTypes.OnChainQuote calldata onChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
         address _addressRegistry = addressRegistry;
         if (
@@ -38,12 +37,14 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.InvalidQuote();
         }
         if (
-            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+            IAddressRegistry(_addressRegistry).whitelistState(
                 onChainQuote.generalQuoteInfo.collToken
-            ) ||
-            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.TOKEN ||
+            IAddressRegistry(_addressRegistry).whitelistState(
                 onChainQuote.generalQuoteInfo.loanToken
-            )
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.TOKEN
         ) {
             revert Errors.NonWhitelistedToken();
         }
@@ -57,8 +58,8 @@ contract QuoteHandler is IQuoteHandler, IEvents {
 
     function updateOnChainQuote(
         address lenderVault,
-        DataTypes.OnChainQuote calldata oldOnChainQuote,
-        DataTypes.OnChainQuote calldata newOnChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata oldOnChainQuote,
+        DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external {
         address _addressRegistry = addressRegistry;
         if (
@@ -73,12 +74,14 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.InvalidQuote();
         }
         if (
-            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+            IAddressRegistry(_addressRegistry).whitelistState(
                 newOnChainQuote.generalQuoteInfo.collToken
-            ) ||
-            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.TOKEN ||
+            IAddressRegistry(_addressRegistry).whitelistState(
                 newOnChainQuote.generalQuoteInfo.loanToken
-            )
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.TOKEN
         ) {
             revert Errors.NonWhitelistedToken();
         }
@@ -95,7 +98,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
 
     function deleteOnChainQuote(
         address lenderVault,
-        DataTypes.OnChainQuote calldata onChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert Errors.UnregisteredVault();
@@ -138,7 +141,8 @@ contract QuoteHandler is IQuoteHandler, IEvents {
     function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.OnChainQuote calldata onChainQuote
+        uint256 quoteTupleIdx,
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
         checkSenderAndGeneralQuoteInfo(
             borrower,
@@ -153,13 +157,20 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             isOnChainQuote[lenderVault][onChainQuoteHash] = false;
             emit OnChainQuoteInvalidated(lenderVault, onChainQuoteHash);
         }
+        uint256 nextLoanIdx = ILenderVaultImpl(lenderVault).totalNumLoans();
+        emit OnChainQuoteUsed(
+            lenderVault,
+            onChainQuoteHash,
+            nextLoanIdx,
+            quoteTupleIdx
+        );
     }
 
     function checkAndRegisterOffChainQuote(
         address borrower,
         address lenderVault,
-        DataTypes.OffChainQuote calldata offChainQuote,
-        DataTypes.QuoteTuple calldata quoteTuple,
+        DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof
     ) external {
         checkSenderAndGeneralQuoteInfo(
@@ -173,7 +184,10 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         ) {
             revert Errors.InvalidQuote();
         }
-        bytes32 offChainQuoteHash = hashOffChainQuote(offChainQuote);
+        bytes32 offChainQuoteHash = hashOffChainQuote(
+            offChainQuote,
+            lenderVault
+        );
         if (offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash]) {
             revert Errors.OffChainQuoteHasBeenInvalidated();
         }
@@ -208,6 +222,13 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
             emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
         }
+        uint256 nextLoanIdx = ILenderVaultImpl(lenderVault).totalNumLoans();
+        emit OffChainQuoteUsed(
+            lenderVault,
+            offChainQuoteHash,
+            nextLoanIdx,
+            quoteTuple
+        );
     }
 
     function areValidSignatures(
@@ -218,8 +239,8 @@ contract QuoteHandler is IQuoteHandler, IEvents {
         bytes32[] calldata s
     ) internal view returns (bool) {
         if (
-            v.length != r.length &&
-            v.length != s.length &&
+            v.length != r.length ||
+            v.length != s.length ||
             v.length != ILenderVaultImpl(lenderVault).minNumOfSigners()
         ) {
             return false;
@@ -253,7 +274,8 @@ contract QuoteHandler is IQuoteHandler, IEvents {
     }
 
     function hashOffChainQuote(
-        DataTypes.OffChainQuote memory offChainQuote
+        DataTypesPeerToPeer.OffChainQuote memory offChainQuote,
+        address lenderVault
     ) internal view returns (bytes32 quoteHash) {
         quoteHash = keccak256(
             abi.encode(
@@ -261,6 +283,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
                 offChainQuote.quoteTuplesRoot,
                 offChainQuote.salt,
                 offChainQuote.nonce,
+                lenderVault,
                 block.chainid
             )
         );
@@ -269,7 +292,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
     function checkSenderAndGeneralQuoteInfo(
         address borrower,
         address lenderVault,
-        DataTypes.GeneralQuoteInfo calldata generalQuoteInfo
+        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo
     ) internal view {
         address _addressRegistry = addressRegistry;
         if (
@@ -283,12 +306,14 @@ contract QuoteHandler is IQuoteHandler, IEvents {
             revert Errors.UnregisteredVault();
         }
         if (
-            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+            IAddressRegistry(_addressRegistry).whitelistState(
                 generalQuoteInfo.collToken
-            ) ||
-            !IAddressRegistry(_addressRegistry).isWhitelistedToken(
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.TOKEN ||
+            IAddressRegistry(_addressRegistry).whitelistState(
                 generalQuoteInfo.loanToken
-            )
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.TOKEN
         ) {
             revert Errors.NonWhitelistedToken();
         }
@@ -304,7 +329,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
     }
 
     function isValidOnChainQuote(
-        DataTypes.OnChainQuote calldata onChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) internal view returns (bool) {
         if (
             onChainQuote.generalQuoteInfo.collToken ==
@@ -359,7 +384,7 @@ contract QuoteHandler is IQuoteHandler, IEvents {
     }
 
     function hashOnChainQuote(
-        DataTypes.OnChainQuote memory onChainQuote
+        DataTypesPeerToPeer.OnChainQuote memory onChainQuote
     ) internal pure returns (bytes32 quoteHash) {
         quoteHash = keccak256(abi.encode(onChainQuote));
     }

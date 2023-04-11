@@ -1,23 +1,50 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-import {DataTypes} from "../DataTypes.sol";
+import {DataTypesPeerToPool} from "../DataTypesPeerToPool.sol";
 
 interface ILoanProposalImpl {
+    event LoanTermsProposed(DataTypesPeerToPool.LoanTerms loanTerms);
+    event LoanTermsAccepted();
+    event LoanTermsAndTransferCollFinalized(
+        uint256 finalLoanAmount,
+        uint256 _finalCollAmountReservedForDefault,
+        uint256 _finalCollAmountReservedForConversions,
+        uint256 _arrangerFee
+    );
+    event Rolledback();
+    event LoanDeployed();
+    event ConversionExercised(
+        address indexed sender,
+        uint256 repaymentIdx,
+        uint256 amount
+    );
+    event RepaymentClaimed(address indexed sender, uint256 amount);
+    event Repaid(
+        uint256 remainingLoanTokenDue,
+        uint256 collTokenLeftUnconverted
+    );
+    event LoanDefaulted();
+    event DefaultProceedsClaimed(address indexed sender);
+
     /**
      * @notice Initializes loan proposal
      * @param _arranger Address of the arranger of the proposal
      * @param _fundingPool Address of the funding pool to be used to source liquidity, if successful
      * @param _collToken Address of collateral token to be used in loan
      * @param _arrangerFee Arranger fee in percent (where 100% = BASE)
-     * @param _lenderGracePeriod If lenders subscribe and proposal gets they can still unsubscribe from the deal for this time period before being locked-in
+     * @param _unsubscribeGracePeriod The unsubscribe grace period, i.e., after a loan gets accepted by the borrower lenders can still unsubscribe for this time period before being locked-in
+     * @param _conversionGracePeriod The grace period during which lenders can convert
+     * @param _repaymentGracePeriod The grace period during which borrowers can repay
      */
     function initialize(
         address _arranger,
         address _fundingPool,
         address _collToken,
         uint256 _arrangerFee,
-        uint256 _lenderGracePeriod
+        uint256 _unsubscribeGracePeriod,
+        uint256 _conversionGracePeriod,
+        uint256 _repaymentGracePeriod
     ) external;
 
     /**
@@ -26,7 +53,7 @@ interface ILoanProposalImpl {
      * @dev Can only be called by the arranger
      */
     function proposeLoanTerms(
-        DataTypes.LoanTerms calldata newLoanTerms
+        DataTypesPeerToPool.LoanTerms calldata newLoanTerms
     ) external;
 
     /**
@@ -46,7 +73,7 @@ interface ILoanProposalImpl {
 
     /**
      * @notice Rolls back the loan proposal
-     * @dev Can be called by borrower during the lender grace period or by anyone in case the total subscribed fell below the minLoanAmount
+     * @dev Can be called by borrower during the unsubscribe grace period or by anyone in case the total subscribed fell below the minLoanAmount
      */
     function rollback() external;
 
@@ -127,7 +154,7 @@ interface ILoanProposalImpl {
             uint256 finalCollAmountReservedForConversions,
             uint256 loanTermsLockedTime,
             uint256 currentRepaymentIdx,
-            DataTypes.LoanStatus status
+            DataTypesPeerToPool.LoanStatus status
         );
 
     /**
@@ -135,7 +162,9 @@ interface ILoanProposalImpl {
      * @return fundingPool The address of the funding pool from which lenders can subscribe, and from which -upon acceptance- the final loan amount gets sourced
      * @return collToken The address of the collateral token to be provided by the borrower
      * @return arranger The address of the arranger of the proposal
-     * @return lenderGracePeriod The lender grace period until which lenders can unsubscribe after a loan proposal got accepted by the borrower
+     * @return unsubscribeGracePeriod Unsubscribe grace period until which lenders can unsubscribe after a loan proposal got accepted by the borrower
+     * @return conversionGracePeriod Conversion grace period during which lenders can convert, i.e., between [dueTimeStamp, dueTimeStamp+conversionGracePeriod]
+     * @return repaymentGracePeriod Repayment grace period during which borrowers can repay, i.e., between [dueTimeStamp+conversionGracePeriod, dueTimeStamp+conversionGracePeriod+repaymentGracePeriod]
      */
     function staticData()
         external
@@ -144,14 +173,19 @@ interface ILoanProposalImpl {
             address fundingPool,
             address collToken,
             address arranger,
-            uint256 lenderGracePeriod
+            uint256 unsubscribeGracePeriod,
+            uint256 conversionGracePeriod,
+            uint256 repaymentGracePeriod
         );
 
     /**
      * @notice Returns the current loan terms
      * @return The current loan terms
      */
-    function loanTerms() external view returns (DataTypes.LoanTerms memory);
+    function loanTerms()
+        external
+        view
+        returns (DataTypesPeerToPool.LoanTerms memory);
 
     /**
      * @notice Returns flag indicating whether lenders can currently unsubscribe from loan proposal
@@ -177,14 +211,14 @@ interface ILoanProposalImpl {
      * @return absCollAmountReservedForConversions The collateral token amount reserved for lender conversions
      */
     function getAbsoluteLoanTerms(
-        DataTypes.LoanTerms memory _tmpLoanTerms,
+        DataTypesPeerToPool.LoanTerms memory _tmpLoanTerms,
         uint256 totalSubscribed,
         uint256 loanTokenDecimals
     )
         external
         view
         returns (
-            DataTypes.LoanTerms memory loanTerms,
+            DataTypesPeerToPool.LoanTerms memory loanTerms,
             uint256 absArrangerFee,
             uint256 absLoanAmount,
             uint256 absCollAmountReservedForDefault,
