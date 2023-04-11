@@ -35,4 +35,5 @@ jobs:
     needs: [consecutiveness]
     uses: ./.github/workflows/workflow-test.yaml
     with:
-      alchemy_api_key: ""
+      ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+      INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
