@@ -154,7 +154,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (
             dynamicData.status !=
             DataTypesPeerToPool.LoanStatus.BORROWER_ACCEPTED ||
-            block.timestamp < timeUntilLendersCanUnsubscribe()
+            block.timestamp < lenderInOrOutCutoffTime()
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
@@ -249,12 +249,15 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         uint256 totalSubscribed = IFundingPool(staticData.fundingPool)
             .totalSubscribed(address(this));
-        uint256 _timeUntilLendersCanUnsubscribe = timeUntilLendersCanUnsubscribe();
+        uint256 _lenderInOrOutCutoffTime = lenderInOrOutCutoffTime();
         if (
             (msg.sender == _loanTerms.borrower &&
-                block.timestamp < _timeUntilLendersCanUnsubscribe) ||
-            (block.timestamp >= _timeUntilLendersCanUnsubscribe &&
-                totalSubscribed < _loanTerms.minLoanAmount)
+                block.timestamp < _lenderInOrOutCutoffTime) ||
+            (block.timestamp >= _lenderInOrOutCutoffTime &&
+                totalSubscribed < _loanTerms.minLoanAmount) ||
+            (block.timestamp >=
+                _lenderInOrOutCutoffTime +
+                    Constants.MIN_LOAN_EXECUTION_GRACE_PERIOD)
         ) {
             dynamicData.status = DataTypesPeerToPool.LoanStatus.ROLLBACK;
             address collToken = staticData.collToken;
@@ -504,11 +507,11 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function canSubscribe() public view returns (bool) {
-        return
-            (dynamicData.status !=
-                DataTypesPeerToPool.LoanStatus.WITHOUT_LOAN_TERMS &&
-                dynamicData.loanTermsLockedTime == 0) ||
-            block.timestamp < timeUntilLendersCanUnsubscribe();
+        return (dynamicData.status ==
+            DataTypesPeerToPool.LoanStatus.IN_NEGOTIATION ||
+            (dynamicData.status ==
+                DataTypesPeerToPool.LoanStatus.BORROWER_ACCEPTED &&
+                block.timestamp < lenderInOrOutCutoffTime()));
     }
 
     function getAbsoluteLoanTerms(
@@ -576,7 +579,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
     }
 
-    function timeUntilLendersCanUnsubscribe() internal view returns (uint256) {
+    function lenderInOrOutCutoffTime() internal view returns (uint256) {
         return
             dynamicData.loanTermsLockedTime + staticData.unsubscribeGracePeriod;
     }
