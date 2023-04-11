@@ -45,7 +45,12 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
                 updatedAt,
                 answeredInRound
             ) = AggregatorV3Interface(WBTC_BTC_ORACLE).latestRoundData();
-            if (updatedAt == 0 || answeredInRound < roundId || answer < 1) {
+            if (
+                updatedAt == 0 ||
+                answeredInRound < roundId ||
+                answer < 1 ||
+                updatedAt > block.timestamp
+            ) {
                 revert Errors.InvalidOracleAnswer();
             }
             int256 answer2;
@@ -56,7 +61,12 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
                 updatedAt,
                 answeredInRound
             ) = AggregatorV3Interface(BTC_USD_ORACLE).latestRoundData();
-            if (updatedAt == 0 || answeredInRound < roundId || answer2 < 1) {
+            if (
+                updatedAt == 0 ||
+                answeredInRound < roundId ||
+                answer2 < 1 ||
+                updatedAt > block.timestamp
+            ) {
                 revert Errors.InvalidOracleAnswer();
             }
             tokenPriceRaw =
@@ -74,7 +84,12 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
                 updatedAt,
                 answeredInRound
             ) = AggregatorV3Interface(oracleAddr).latestRoundData();
-            if (updatedAt == 0 || answeredInRound < roundId || answer < 1) {
+            if (
+                updatedAt == 0 ||
+                answeredInRound < roundId ||
+                answer < 1 ||
+                updatedAt > block.timestamp
+            ) {
                 revert Errors.InvalidOracleAnswer();
             }
             tokenPriceRaw = uint256(answer);

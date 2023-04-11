@@ -80,7 +80,12 @@ contract ChainlinkBasic is IOracle {
                 uint256 updatedAt,
                 uint80 answeredInRound
             ) = AggregatorV3Interface(oracleAddr).latestRoundData();
-            if (updatedAt == 0 || answeredInRound < roundId || answer < 1) {
+            if (
+                updatedAt == 0 ||
+                answeredInRound < roundId ||
+                answer < 1 ||
+                updatedAt > block.timestamp
+            ) {
                 revert Errors.InvalidOracleAnswer();
             }
             tokenPriceRaw = uint256(answer);
