@@ -12,7 +12,7 @@ import {Ownable} from "../Ownable.sol";
  * IMPORTANT: This contract allows for de-whitelisting as well. This is an important security feature because if
  * a contract or token is found to present a vulnerability, it can be de-whitelisted to prevent further borrowing
  * with that token (repays and withdrawals would still be allowed). In the limit of a total de-whitelisting of all
- * tokens, the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
+ * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
  */
 contract AddressRegistry is Ownable, IAddressRegistry {
     bool internal isInitialized;
