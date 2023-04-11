@@ -73,17 +73,29 @@ contract ChainlinkBasic is IOracle {
             if (oracleAddr == address(0)) {
                 revert Errors.NoOracle();
             }
-            (
-                uint80 roundId,
-                int256 answer,
-                ,
-                uint256 updatedAt,
-                uint80 answeredInRound
-            ) = AggregatorV3Interface(oracleAddr).latestRoundData();
-            if (updatedAt == 0 || answeredInRound < roundId || answer < 1) {
-                revert Errors.InvalidOracleAnswer();
-            }
-            tokenPriceRaw = uint256(answer);
+            tokenPriceRaw = checkAndReturnLatestRoundData(oracleAddr);
         }
+    }
+
+    function checkAndReturnLatestRoundData(
+        address oracleAddr
+    ) internal view returns (uint256 tokenPriceRaw) {
+        (
+            uint80 roundId,
+            int256 answer,
+            ,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = AggregatorV3Interface(oracleAddr).latestRoundData();
+        if (
+            roundId == 0 ||
+            answeredInRound < roundId ||
+            answer < 1 ||
+            updatedAt == 0 ||
+            updatedAt > block.timestamp
+        ) {
+            revert Errors.InvalidOracleAnswer();
+        }
+        tokenPriceRaw = uint256(answer);
     }
 }
