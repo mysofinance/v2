@@ -1108,14 +1108,13 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should process off-chain quote with negative rate correctly', async function () {
-      
       const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
-      
+
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       await lenderVault.connect(lender).addSigners([team.address])
-      
+
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
 
@@ -1127,7 +1126,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           tenor: ONE_DAY.mul(180)
         }
       ]
-      
+
       const badQuoteTuplesTree = StandardMerkleTree.of(
         badQuoteTuples.map(quoteTuple => Object.values(quoteTuple)),
         ['uint256', 'int256', 'uint256', 'uint256']
@@ -1203,7 +1202,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         borrowerGateway
           .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuoteWithBadTuples, selectedQuoteTuple, proof)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            borrowInstructions,
+            offChainQuoteWithBadTuples,
+            selectedQuoteTuple,
+            proof
+          )
       ).to.be.revertedWithCustomError(lenderVault, 'NegativeRepaymentAmount')
     })
   })
