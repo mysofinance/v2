@@ -367,6 +367,91 @@ const uniV2RouterAbi = [
   }
 ]
 
+const payloadScheme = [
+  {
+    components: [
+      {
+        internalType: 'address',
+        name: 'borrower',
+        type: 'address'
+      },
+      {
+        internalType: 'address',
+        name: 'collToken',
+        type: 'address'
+      },
+      {
+        internalType: 'address',
+        name: 'loanToken',
+        type: 'address'
+      },
+      {
+        internalType: 'address',
+        name: 'oracleAddr',
+        type: 'address'
+      },
+      {
+        internalType: 'uint256',
+        name: 'minLoan',
+        type: 'uint256'
+      },
+      {
+        internalType: 'uint256',
+        name: 'maxLoan',
+        type: 'uint256'
+      },
+      {
+        internalType: 'uint256',
+        name: 'validUntil',
+        type: 'uint256'
+      },
+      {
+        internalType: 'uint256',
+        name: 'earliestRepayTenor',
+        type: 'uint256'
+      },
+      {
+        internalType: 'address',
+        name: 'borrowerCompartmentImplementation',
+        type: 'address'
+      },
+      {
+        internalType: 'bool',
+        name: 'isSingleUse',
+        type: 'bool'
+      }
+    ],
+    internalType: 'struct DataTypesPeerToPeer.GeneralQuoteInfo',
+    name: 'generalQuoteInfo',
+    type: 'tuple'
+  },
+  {
+    internalType: 'bytes32',
+    name: 'quoteTuplesRoot',
+    type: 'bytes32'
+  },
+  {
+    internalType: 'bytes32',
+    name: 'salt',
+    type: 'bytes32'
+  },
+  {
+    internalType: 'uint256',
+    name: 'nonce',
+    type: 'uint256'
+  },
+  {
+    internalType: 'address',
+    name: 'vaultAddr',
+    type: 'address'
+  },
+  {
+    internalType: 'uint256',
+    name: 'chainId',
+    type: 'uint256'
+  }
+]
+
 export {
   balancerV2VaultAbi,
   balancerV2PoolAbi,
@@ -377,5 +462,6 @@ export {
   chainlinkAggregatorAbi,
   gohmAbi,
   uniV2Abi,
-  uniV2RouterAbi
+  uniV2RouterAbi,
+  payloadScheme
 }

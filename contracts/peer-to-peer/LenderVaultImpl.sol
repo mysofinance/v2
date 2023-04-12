@@ -409,7 +409,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             }
             // arbitrage protection if LTV > 100%
             if (quoteTuple.loanPerCollUnitOrLtv > Constants.BASE) {
-                revert Errors.LTVHigherThanMax();
+                revert Errors.LtvHigherThanMax();
             }
             loanPerCollUnit =
                 (quoteTuple.loanPerCollUnitOrLtv *
