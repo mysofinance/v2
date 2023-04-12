@@ -1,8 +1,9 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
-import { LenderVaultImpl, MyERC20, ChainlinkBasic } from '../typechain-types'
+import { LenderVaultImpl, MyERC20 } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { payloadScheme } from './helpers/abi'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -16,91 +17,6 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-
-const payloadScheme = [
-  {
-    components: [
-      {
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
-        name: 'collToken',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
-        name: 'loanToken',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
-        name: 'oracleAddr',
-        type: 'address'
-      },
-      {
-        internalType: 'uint256',
-        name: 'minLoan',
-        type: 'uint256'
-      },
-      {
-        internalType: 'uint256',
-        name: 'maxLoan',
-        type: 'uint256'
-      },
-      {
-        internalType: 'uint256',
-        name: 'validUntil',
-        type: 'uint256'
-      },
-      {
-        internalType: 'uint256',
-        name: 'earliestRepayTenor',
-        type: 'uint256'
-      },
-      {
-        internalType: 'address',
-        name: 'borrowerCompartmentImplementation',
-        type: 'address'
-      },
-      {
-        internalType: 'bool',
-        name: 'isSingleUse',
-        type: 'bool'
-      }
-    ],
-    internalType: 'struct DataTypesPeerToPeer.GeneralQuoteInfo',
-    name: 'generalQuoteInfo',
-    type: 'tuple'
-  },
-  {
-    internalType: 'bytes32',
-    name: 'quoteTuplesRoot',
-    type: 'bytes32'
-  },
-  {
-    internalType: 'bytes32',
-    name: 'salt',
-    type: 'bytes32'
-  },
-  {
-    internalType: 'uint256',
-    name: 'nonce',
-    type: 'uint256'
-  },
-  {
-    internalType: 'address',
-    name: 'vaultAddr',
-    type: 'address'
-  },
-  {
-    internalType: 'uint256',
-    name: 'chainId',
-    type: 'uint256'
-  }
-]
 
 async function generateOffChainQuote({
   lenderVault,
@@ -1191,37 +1107,18 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(offChainQuoteNoncePre.toNumber() + 1).to.equal(offChainQuoteNoncePost)
     })
 
-    it('Should process off-chain quote with too high ltv or negative rate correctly', async function () {
-      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
+    it('Should process off-chain quote with negative rate correctly', async function () {
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       await lenderVault.connect(lender).addSigners([team.address])
 
-      // deploy chainlinkOracleContract
-      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
-      const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
-        [usdc.address],
-        [usdcEthChainlinkAddr],
-        weth.address,
-        BASE
-      )
-      await chainlinkBasicImplementation.deployed()
-
-      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
-
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
 
       let badQuoteTuples = [
-        {
-          loanPerCollUnitOrLtv: BASE.add(1),
-          interestRatePctInBase: BASE.mul(10).div(100),
-          upfrontFeePctInBase: 0,
-          tenor: ONE_DAY.mul(90)
-        },
         {
           loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
           interestRatePctInBase: BASE.sub(BASE.mul(3)),
@@ -1229,7 +1126,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           tenor: ONE_DAY.mul(180)
         }
       ]
-      
+
       const badQuoteTuplesTree = StandardMerkleTree.of(
         badQuoteTuples.map(quoteTuple => Object.values(quoteTuple)),
         ['uint256', 'int256', 'uint256', 'uint256']
@@ -1242,7 +1139,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           borrower: borrower.address,
           collToken: weth.address,
           loanToken: usdc.address,
-          oracleAddr: chainlinkBasicImplementation.address,
+          oracleAddr: ZERO_ADDRESS,
           minLoan: ONE_USDC.mul(1000),
           maxLoan: MAX_UINT256,
           validUntil: timestamp + 60,
@@ -1301,23 +1198,17 @@ describe('Peer-to-Peer: Local Tests', function () {
         callbackData
       }
 
-      // too large ltv reverts
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuoteWithBadTuples, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'LTVHigherThanMax')
-
-      // borrower obtains proof for quote tuple idx 1
-      quoteTupleIdx = 1
-      selectedQuoteTuple = badQuoteTuples[quoteTupleIdx]
-      proof = badQuoteTuplesTree.getProof(quoteTupleIdx)
-
       // repaymeny amount negative reverts
       await expect(
         borrowerGateway
           .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuoteWithBadTuples, selectedQuoteTuple, proof)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            borrowInstructions,
+            offChainQuoteWithBadTuples,
+            selectedQuoteTuple,
+            proof
+          )
       ).to.be.revertedWithCustomError(lenderVault, 'NegativeRepaymentAmount')
     })
   })

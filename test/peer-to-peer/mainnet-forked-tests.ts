@@ -1,6 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
+import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { INFURA_API_KEY, MAINNET_BLOCK_NUMBER } from '../../hardhat.config'
 import {
   balancerV2VaultAbi,
@@ -10,7 +11,8 @@ import {
   crvRewardsDistributorAbi,
   chainlinkAggregatorAbi,
   gohmAbi,
-  uniV2RouterAbi
+  uniV2RouterAbi,
+  payloadScheme
 } from './helpers/abi'
 import {
   createOnChainRequest,
@@ -222,16 +224,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
-      const {
-        addressRegistry,
-        quoteHandler,
-        lender,
-        borrower,
-        team,
-        usdc,
-        weth,
-        lenderVault
-      } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
@@ -290,9 +283,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)     
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote interestRatePctInBase', async function () {
@@ -336,7 +331,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote tenor', async function () {
@@ -380,7 +377,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote validUntil', async function () {
@@ -424,7 +423,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote minLoan/maxLoan', async function () {
@@ -468,11 +469,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       onChainQuote.generalQuoteInfo.maxLoan = ONE_USDC.mul(100).toNumber()
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong upfrontFeePctInBase', async function () {
@@ -516,7 +521,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quoteTuples length', async function () {
@@ -593,7 +600,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong addOnChainQuote', async function () {
@@ -666,7 +675,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
     })
 
     it('Should validate correctly the wrong updateOnChainQuote', async function () {
@@ -2857,10 +2868,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
 
       await expect(
-          borrowerGateway.
-          connect(borrower).
-          borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)  
-        ).to.be.revertedWithCustomError(lenderVault, 'NonWhitelistedOracle')
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(lenderVault, 'NonWhitelistedOracle')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
@@ -2985,6 +2996,149 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(borrowerWethBalPost.sub(borrowerWethBalPre)).to.equal(maxLoanPerColl)
       expect(Math.abs(Number(vaultUsdcBalPost.sub(vaultUsdcBalPre).sub(collSendAmount).toString()))).to.equal(0)
       expect(vaultWethBalPre.sub(vaultWethBalPost).sub(maxLoanPerColl)).to.equal(0)
+    })
+
+    it('Should process off-chain quote with too high ltv or negative rate correctly', async function () {
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      await lenderVault.connect(lender).addSigners([team.address])
+
+      // deploy chainlinkOracleContract
+      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
+      const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
+      const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
+        [usdc.address],
+        [usdcEthChainlinkAddr],
+        weth.address,
+        BASE
+      )
+      await chainlinkBasicImplementation.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+
+      let badQuoteTuples = [
+        {
+          loanPerCollUnitOrLtv: BASE.add(1),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.sub(BASE.mul(3)),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+
+      const badQuoteTuplesTree = StandardMerkleTree.of(
+        badQuoteTuples.map(quoteTuple => Object.values(quoteTuple)),
+        ['uint256', 'int256', 'uint256', 'uint256']
+      )
+      const badQuoteTuplesRoot = badQuoteTuplesTree.root
+      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
+
+      let offChainQuoteWithBadTuples = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: chainlinkBasicImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuplesRoot: badQuoteTuplesRoot,
+        salt: ZERO_BYTES32,
+        nonce: 0,
+        v: [0],
+        r: [ZERO_BYTES32],
+        s: [ZERO_BYTES32]
+      }
+
+      const payload = ethers.utils.defaultAbiCoder.encode(payloadScheme as any, [
+        offChainQuoteWithBadTuples.generalQuoteInfo,
+        offChainQuoteWithBadTuples.quoteTuplesRoot,
+        offChainQuoteWithBadTuples.salt,
+        offChainQuoteWithBadTuples.nonce,
+        lenderVault.address,
+        chainId
+      ])
+
+      const payloadHash = ethers.utils.keccak256(payload)
+      const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig = ethers.utils.splitSignature(signature)
+      const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+      expect(recoveredAddr).to.equal(lender.address)
+
+      // add signer
+      await lenderVault.connect(lender).addSigners([lender.address])
+
+      // lender add sig to quote and pass to borrower
+      offChainQuoteWithBadTuples.v = [sig.v]
+      offChainQuoteWithBadTuples.r = [sig.r]
+      offChainQuoteWithBadTuples.s = [sig.s]
+
+      // borrower obtains proof for quote tuple idx 0
+      let quoteTupleIdx = 0
+      let selectedQuoteTuple = badQuoteTuples[quoteTupleIdx]
+      let proof = badQuoteTuplesTree.getProof(quoteTupleIdx)
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // too large ltv reverts
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            borrowInstructions,
+            offChainQuoteWithBadTuples,
+            selectedQuoteTuple,
+            proof
+          )
+      ).to.be.revertedWithCustomError(lenderVault, 'LtvHigherThanMax')
+
+      // borrower obtains proof for quote tuple idx 1
+      quoteTupleIdx = 1
+      selectedQuoteTuple = badQuoteTuples[quoteTupleIdx]
+      proof = badQuoteTuplesTree.getProof(quoteTupleIdx)
+
+      // repaymeny amount negative reverts
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            borrowInstructions,
+            offChainQuoteWithBadTuples,
+            selectedQuoteTuple,
+            proof
+          )
+      ).to.be.revertedWithCustomError(lenderVault, 'NegativeRepaymentAmount')
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth, gohm is coll)', async function () {

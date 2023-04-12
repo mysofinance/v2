@@ -35,7 +35,7 @@ library Errors {
     error NonWhitelistedCompartment();
     error NonWhitelistedCallback();
     error NonWhitelistedToken();
-    error LTVHigherThanMax();
+    error LtvHigherThanMax();
     error InsufficientVaultFunds();
     error NegativeRepaymentAmount();
     error OverflowUint128();
