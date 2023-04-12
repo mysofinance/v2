@@ -16,7 +16,6 @@ import {
   createOnChainRequest,
   transferFeeHelper,
   calcLoanBalanceDelta,
-  getTotalEthValue,
   getExactLpTokenPriceInEth,
   getFairReservesPriceAndEthValue,
   getDeltaBNComparison
@@ -231,10 +230,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         team,
         usdc,
         weth,
-        lenderVault,
-        wbtc,
-        btcToUSDChainlinkAddr,
-        wBTCToBTCChainlinkAddr
+        lenderVault
       } = await setupTest()
 
       // deploy chainlinkOracleContract
@@ -294,9 +290,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
-      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)     
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote interestRatePctInBase', async function () {
@@ -340,7 +336,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote tenor', async function () {
@@ -384,7 +380,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote validUntil', async function () {
@@ -428,7 +424,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quote minLoan/maxLoan', async function () {
@@ -472,11 +468,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       onChainQuote.generalQuoteInfo.maxLoan = ONE_USDC.mul(100).toNumber()
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong upfrontFeePctInBase', async function () {
@@ -520,7 +516,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong quoteTuples length', async function () {
@@ -597,7 +593,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
 
     it('Should validate correctly the wrong addOnChainQuote', async function () {
@@ -670,7 +666,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
     })
 
     it('Should validate correctly the wrong updateOnChainQuote', async function () {
@@ -2799,8 +2795,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       await chainlinkBasicImplementation.deployed()
 
-      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
-
       const usdcOracleInstance = new ethers.Contract(usdcEthChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
 
       // lenderVault owner deposits usdc
@@ -2834,6 +2828,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -2860,6 +2855,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await expect(
+          borrowerGateway.
+          connect(borrower).
+          borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)  
+        ).to.be.revertedWithCustomError(lenderVault, 'NonWhitelistedOracle')
+
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
