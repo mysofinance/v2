@@ -3127,7 +3127,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       selectedQuoteTuple = badQuoteTuples[quoteTupleIdx]
       proof = badQuoteTuplesTree.getProof(quoteTupleIdx)
 
-      // repaymeny amount negative reverts
+      // repayment amount negative reverts
       await expect(
         borrowerGateway
           .connect(borrower)
