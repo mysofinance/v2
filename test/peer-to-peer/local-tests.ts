@@ -3,6 +3,7 @@ import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { LenderVaultImpl, MyERC20 } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { payloadScheme } from './helpers/abi'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -12,96 +13,10 @@ const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
-const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-
-const payloadScheme = [
-  {
-    components: [
-      {
-        internalType: 'address',
-        name: 'borrower',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
-        name: 'collToken',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
-        name: 'loanToken',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
-        name: 'oracleAddr',
-        type: 'address'
-      },
-      {
-        internalType: 'uint256',
-        name: 'minLoan',
-        type: 'uint256'
-      },
-      {
-        internalType: 'uint256',
-        name: 'maxLoan',
-        type: 'uint256'
-      },
-      {
-        internalType: 'uint256',
-        name: 'validUntil',
-        type: 'uint256'
-      },
-      {
-        internalType: 'uint256',
-        name: 'earliestRepayTenor',
-        type: 'uint256'
-      },
-      {
-        internalType: 'address',
-        name: 'borrowerCompartmentImplementation',
-        type: 'address'
-      },
-      {
-        internalType: 'bool',
-        name: 'isSingleUse',
-        type: 'bool'
-      }
-    ],
-    internalType: 'struct DataTypesPeerToPeer.GeneralQuoteInfo',
-    name: 'generalQuoteInfo',
-    type: 'tuple'
-  },
-  {
-    internalType: 'bytes32',
-    name: 'quoteTuplesRoot',
-    type: 'bytes32'
-  },
-  {
-    internalType: 'bytes32',
-    name: 'salt',
-    type: 'bytes32'
-  },
-  {
-    internalType: 'uint256',
-    name: 'nonce',
-    type: 'uint256'
-  },
-  {
-    internalType: 'address',
-    name: 'vaultAddr',
-    type: 'address'
-  },
-  {
-    internalType: 'uint256',
-    name: 'chainId',
-    type: 'uint256'
-  }
-]
 
 async function generateOffChainQuote({
   lenderVault,
@@ -352,7 +267,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
   describe('Lender Vault', function () {
     it('Should not proccess with insufficient vault funds', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // check that only owner can propose new owner
       await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
@@ -1090,7 +1005,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
-      // check revert on unathorized sigs
+      // check revert on unauthorized sigs
       const signature4 = await lender.signMessage(ethers.utils.arrayify(payloadHash))
       const sig4 = ethers.utils.splitSignature(signature4)
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig4)
@@ -1135,6 +1050,26 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
+      // check revert if signature arrays unequal length
+      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
+      offChainQuote.r = [sig2.r, sig3.r]
+      offChainQuote.s = [sig1.s, sig2.s, sig3.s]
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
+
+      // check revert if signature arrays unequal length
+      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
+      offChainQuote.r = [sig1.r, sig2.r, sig3.r]
+      offChainQuote.s = [sig2.s, sig3.s]
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
+
       // check borrow tx successful if correct number of valid sigs
       offChainQuote.v = [sig1.v, sig2.v, sig3.v]
       offChainQuote.r = [sig1.r, sig2.r, sig3.r]
@@ -1170,6 +1105,111 @@ describe('Peer-to-Peer: Local Tests', function () {
       const offChainQuoteNoncePost = await quoteHandler.connect(lender).offChainQuoteNonce(lenderVault.address)
 
       expect(offChainQuoteNoncePre.toNumber() + 1).to.equal(offChainQuoteNoncePost)
+    })
+
+    it('Should process off-chain quote with negative rate correctly', async function () {
+      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      await lenderVault.connect(lender).addSigners([team.address])
+
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+
+      let badQuoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.sub(BASE.mul(3)),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+
+      const badQuoteTuplesTree = StandardMerkleTree.of(
+        badQuoteTuples.map(quoteTuple => Object.values(quoteTuple)),
+        ['uint256', 'int256', 'uint256', 'uint256']
+      )
+      const badQuoteTuplesRoot = badQuoteTuplesTree.root
+      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
+
+      let offChainQuoteWithBadTuples = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false
+        },
+        quoteTuplesRoot: badQuoteTuplesRoot,
+        salt: ZERO_BYTES32,
+        nonce: 0,
+        v: [0],
+        r: [ZERO_BYTES32],
+        s: [ZERO_BYTES32]
+      }
+
+      const payload = ethers.utils.defaultAbiCoder.encode(payloadScheme as any, [
+        offChainQuoteWithBadTuples.generalQuoteInfo,
+        offChainQuoteWithBadTuples.quoteTuplesRoot,
+        offChainQuoteWithBadTuples.salt,
+        offChainQuoteWithBadTuples.nonce,
+        lenderVault.address,
+        chainId
+      ])
+
+      const payloadHash = ethers.utils.keccak256(payload)
+      const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig = ethers.utils.splitSignature(signature)
+      const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+      expect(recoveredAddr).to.equal(lender.address)
+
+      // add signer
+      await lenderVault.connect(lender).addSigners([lender.address])
+
+      // lender add sig to quote and pass to borrower
+      offChainQuoteWithBadTuples.v = [sig.v]
+      offChainQuoteWithBadTuples.r = [sig.r]
+      offChainQuoteWithBadTuples.s = [sig.s]
+
+      // borrower obtains proof for quote tuple idx 0
+      let quoteTupleIdx = 0
+      let selectedQuoteTuple = badQuoteTuples[quoteTupleIdx]
+      let proof = badQuoteTuplesTree.getProof(quoteTupleIdx)
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // repaymeny amount negative reverts
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            borrowInstructions,
+            offChainQuoteWithBadTuples,
+            selectedQuoteTuple,
+            proof
+          )
+      ).to.be.revertedWithCustomError(lenderVault, 'NegativeRepaymentAmount')
     })
   })
 
@@ -1368,8 +1408,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
-      await addressRegistry.connect(team).setWhitelistState([weth.address], 0)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 1)
 
       await expect(
         borrowerGateway
@@ -1377,7 +1417,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).setWhitelistState([weth.address], 1)
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       onChainQuote.generalQuoteInfo.collToken = usdc.address
 

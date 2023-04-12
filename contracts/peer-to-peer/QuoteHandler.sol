@@ -144,11 +144,7 @@ contract QuoteHandler is IQuoteHandler {
         uint256 quoteTupleIdx,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        checkSenderAndGeneralQuoteInfo(
-            borrower,
-            lenderVault,
-            onChainQuote.generalQuoteInfo
-        );
+        checkSenderAndGeneralQuoteInfo(borrower, onChainQuote.generalQuoteInfo);
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
@@ -175,7 +171,6 @@ contract QuoteHandler is IQuoteHandler {
     ) external {
         checkSenderAndGeneralQuoteInfo(
             borrower,
-            lenderVault,
             offChainQuote.generalQuoteInfo
         );
         if (
@@ -291,7 +286,6 @@ contract QuoteHandler is IQuoteHandler {
 
     function checkSenderAndGeneralQuoteInfo(
         address borrower,
-        address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo
     ) internal view {
         address _addressRegistry = addressRegistry;
@@ -299,11 +293,6 @@ contract QuoteHandler is IQuoteHandler {
             msg.sender != IAddressRegistry(_addressRegistry).borrowerGateway()
         ) {
             revert Errors.InvalidSender();
-        }
-        if (
-            !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
-        ) {
-            revert Errors.UnregisteredVault();
         }
         if (
             IAddressRegistry(_addressRegistry).whitelistState(

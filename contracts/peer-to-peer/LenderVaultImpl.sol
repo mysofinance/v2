@@ -407,10 +407,9 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             ) {
                 revert Errors.NonWhitelistedOracle();
             }
-            // arbitrage protection...any reason with a callback and
-            // purpose-bound loan might want greater than 100%?
+            // arbitrage protection if LTV > 100%
             if (quoteTuple.loanPerCollUnitOrLtv > Constants.BASE) {
-                revert Errors.LTVHigherThanMax();
+                revert Errors.LtvHigherThanMax();
             }
             loanPerCollUnit =
                 (quoteTuple.loanPerCollUnitOrLtv *

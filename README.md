@@ -122,13 +122,13 @@ File                                                     |  % Stmts | % Branch |
   Errors.sol                                             |      100 |      100 |      100 |      100 |                |
   Helpers.sol                                            |      100 |       50 |      100 |    66.67 |             10 |
   Ownable.sol                                            |      100 |      100 |      100 |      100 |                |
- contracts\peer-to-peer\                                 |      100 |    94.78 |      100 |    98.41 |                |
+ contracts\peer-to-peer\                                 |      100 |    97.81 |      100 |    99.47 |                |
   AddressRegistry.sol                                    |      100 |      100 |      100 |      100 |                |
   BorrowerGateway.sol                                    |      100 |    88.89 |      100 |    98.48 |            250 |
   DataTypesPeerToPeer.sol                                |      100 |      100 |      100 |      100 |                |
   LenderVaultFactory.sol                                 |      100 |      100 |      100 |      100 |                |
-  LenderVaultImpl.sol                                    |      100 |       95 |      100 |     97.3 |204,408,413,438 |
-  QuoteHandler.sol                                       |      100 |    95.74 |      100 |    99.21 |            306 |
+  LenderVaultImpl.sol                                    |      100 |    98.75 |      100 |    99.32 |            204 |
+  QuoteHandler.sol                                       |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\callbacks\                       |      100 |      100 |      100 |      100 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
   UniV3Looping.sol                                       |      100 |      100 |      100 |      100 |                |
@@ -178,6 +178,6 @@ File                                                     |  % Stmts | % Branch |
   MyERC20.sol                                            |      100 |      100 |      100 |      100 |                |
   MyMaliciousERC20.sol                                   |    71.43 |      100 |       50 |       80 |          28,45 |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    99.62 |    92.95 |    98.36 |    98.01 |                |
+All files                                                |    99.62 |    94.44 |    98.36 |    98.48 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```
