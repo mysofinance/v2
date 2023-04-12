@@ -9,6 +9,7 @@ library Constants {
     uint256 internal constant MIN_UNSUBSCRIBE_GRACE_PERIOD = 1 days;
     uint256 internal constant MIN_CONVERSION_GRACE_PERIOD = 1 days;
     uint256 internal constant MIN_REPAYMENT_GRACE_PERIOD = 1 days;
+    uint256 internal constant LOAN_EXECUTION_GRACE_PERIOD = 1 days;
     uint256 internal constant MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD =
         5 days;
     uint256 internal constant MIN_TIME_UNTIL_FIRST_DUE_DATE = 1 days;

@@ -1,11 +1,7 @@
 name: Workflow | Test
 
 on:
-  workflow_call:
-    inputs:
-      alchemy_api_key:
-        required: true
-        type: string
+  workflow_call: {}
 
 jobs:
   test:

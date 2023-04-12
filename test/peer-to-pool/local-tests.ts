@@ -28,6 +28,7 @@ const LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 60 * 60
 const MIN_TIME_BETWEEN_DUE_DATES = ONE_DAY.mul(7)
 const MIN_CONVERSION_GRACE_PERIOD = ONE_DAY
 const MIN_REPAYMENT_GRACE_PERIOD = ONE_DAY
+const MIN_LOAN_EXECUTION_GRACE_PERIOD = ONE_DAY
 const MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD = ONE_DAY.mul(5)
 
 // test loan proposal constants
@@ -699,7 +700,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(dynamicData.status).to.be.equal(3)
   })
 
-  it('Should handle rollbacks correctly (1/2)', async function () {
+  it('Should handle rollbacks correctly (1/3)', async function () {
     const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } =
       await setupTest()
     // arranger creates loan proposal
@@ -764,7 +765,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await fundingPool.connect(lender3).withdraw(balOf)
   })
 
-  it('Should handle rollbacks correctly (2/2)', async function () {
+  it('Should handle rollbacks correctly (2/3)', async function () {
     const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
       await setupTest()
     // arranger creates loan proposal
@@ -834,6 +835,86 @@ describe('Peer-to-Pool: Local Tests', function () {
     await fundingPool.connect(lender1).unsubscribe(loanProposal.address, subscriptionRemainder)
     await fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionRemainder)
     await fundingPool.connect(lender3).unsubscribe(loanProposal.address, subscriptionRemainder)
+    let bal = await fundingPool.balanceOf(lender1.address)
+    await fundingPool.connect(lender1).withdraw(bal)
+    bal = await fundingPool.balanceOf(lender2.address)
+    await fundingPool.connect(lender2).withdraw(bal)
+    bal = await fundingPool.balanceOf(lender3.address)
+    await fundingPool.connect(lender3).withdraw(bal)
+  })
+
+  it('Should handle rollbacks correctly (3/3)', async function () {
+    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+      await setupTest()
+    // arranger creates loan proposal
+    const loanProposal = await createLoanProposal(
+      loanProposalFactory,
+      arranger,
+      fundingPool.address,
+      daoToken.address,
+      REL_ARRANGER_FEE,
+      UNSUBSCRIBE_GRACE_PERIOD,
+      CONVERSION_GRACE_PERIOD,
+      REPAYMENT_GRACE_PERIOD
+    )
+
+    // add some loan terms
+    const loanTerms = await getDummyLoanTerms(daoTreasury.address)
+    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+
+    // add lender subscriptions
+    await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
+
+    // move forward past loan terms update cool off period
+    let blocknum = await ethers.provider.getBlockNumber()
+    let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
+    // borrower accepts
+    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    let dynamicData = await loanProposal.dynamicData()
+    expect(dynamicData.status).to.be.equal(2)
+
+    // move forward past loan execution grace period
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [
+      timestamp + Number(UNSUBSCRIBE_GRACE_PERIOD.toString()) + Number(MIN_LOAN_EXECUTION_GRACE_PERIOD.toString())
+    ])
+
+    // if borrower doesn't execute the loan proposal then lenders can't unsubscribe
+    await expect(
+      fundingPool
+        .connect(lender1)
+        .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address))
+    ).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
+    await expect(
+      fundingPool
+        .connect(lender2)
+        .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address))
+    ).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
+    await expect(
+      fundingPool
+        .connect(lender3)
+        .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender3.address))
+    ).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
+
+    // check that anyone can rollback if borrower didn't execute within loan execution grace period
+    await loanProposal.connect(anyUser).rollback()
+    // check status updated correctly
+    dynamicData = await loanProposal.dynamicData()
+    expect(dynamicData.status).to.be.equal(4)
+
+    // check that borrowers can then unsubscribe again
+    await fundingPool
+      .connect(lender1)
+      .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address))
+    await fundingPool
+      .connect(lender2)
+      .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address))
+    await fundingPool
+      .connect(lender3)
+      .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender3.address))
     let bal = await fundingPool.balanceOf(lender1.address)
     await fundingPool.connect(lender1).withdraw(bal)
     bal = await fundingPool.balanceOf(lender2.address)

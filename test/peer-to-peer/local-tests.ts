@@ -1009,7 +1009,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         usdc
       })
 
-      // define signer setup without lender 
+      // define signer setup without lender
       await lenderVault.connect(lender).removeSigner(lender.address, 0)
       await lenderVault.connect(lender).addSigners([signer1.address, signer2.address, signer3.address])
       await lenderVault.connect(lender).setMinNumOfSigners(3)
@@ -1103,7 +1103,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
-      
+
       // check revert on too few sigs
       offChainQuote.v = [sig1.v, sig2.v]
       offChainQuote.r = [sig1.r, sig2.r]
