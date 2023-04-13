@@ -1739,10 +1739,6 @@ describe('Peer-to-Pool: Local Tests', function () {
     dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.currentRepaymentIdx).to.be.equal(0)
 
-    // check that repayment is not marked as repaid
-    const preRepayLoanTermsState = await loanProposal.loanTerms()
-    expect(preRepayLoanTermsState.repaymentSchedule[0].repaid).to.be.false
-
     // approve and repay
     let totalConvertedSubscriptionsOfPeriod = await loanProposal.totalConvertedSubscriptionsPerIdx(0)
     let originalRepaymentAmountDue = finalLoanTerms.repaymentSchedule[0].loanTokenDue

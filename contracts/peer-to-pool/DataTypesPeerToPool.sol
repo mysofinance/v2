@@ -11,8 +11,6 @@ library DataTypesPeerToPool {
         uint128 collTokenDueIfConverted;
         // Timestamp when repayment is due
         uint40 dueTimestamp;
-        // Flag whether given period is considered repaid
-        bool repaid;
     }
 
     struct LoanTerms {

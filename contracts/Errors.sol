@@ -19,6 +19,7 @@ library Errors {
     error InvalidOffChainSignature();
     error InvalidOffChainMerkleProof();
     error InvalidCollUnlock();
+    error InvalidAmount();
     error UnknownOnChainQuote();
     error NeitherTokenIsGOHM();
     error NoLpTokens();
