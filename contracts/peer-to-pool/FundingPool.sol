@@ -30,6 +30,9 @@ contract FundingPool is IFundingPool {
     }
 
     function deposit(uint256 amount, uint256 transferFee) external {
+        if (amount == 0) {
+            revert Errors.InvalidSendAmount();
+        }
         uint256 preBal = IERC20Metadata(depositToken).balanceOf(address(this));
         IERC20Metadata(depositToken).safeTransferFrom(
             msg.sender,
@@ -44,7 +47,7 @@ contract FundingPool is IFundingPool {
     }
 
     function withdraw(uint256 amount) external {
-        if (amount > balanceOf[msg.sender]) {
+        if (amount == 0 || amount > balanceOf[msg.sender]) {
             revert Errors.InvalidWithdrawAmount();
         }
         balanceOf[msg.sender] -= amount;
@@ -52,6 +55,9 @@ contract FundingPool is IFundingPool {
     }
 
     function subscribe(address loanProposal, uint256 amount) external {
+        if (amount == 0) {
+            revert Errors.InvalidAmount();
+        }
         if (
             !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
                 loanProposal
@@ -82,6 +88,9 @@ contract FundingPool is IFundingPool {
     }
 
     function unsubscribe(address loanProposal, uint256 amount) external {
+        if (amount == 0) {
+            revert Errors.InvalidAmount();
+        }
         if (
             !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
                 loanProposal
