@@ -1376,6 +1376,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowerCRVLpBalPre = await crvLPInstance.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+      const lenderVaultCollBalPre = await crvLPInstance.balanceOf(lenderVault.address)
 
       expect(borrowerCRVLpBalPre).to.equal(locallyCollBalance)
       expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
@@ -1435,6 +1436,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const loanId = borrowEvent?.args?.['loanId']
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const upfrontFee = borrowEvent?.args?.['upfrontFee']
 
       const crvCompInstance = await curveLPStakingCompartmentImplementation.attach(collTokenCompartmentAddr)
 
@@ -1462,11 +1464,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const lenderVaultCollBalPostBorrow = await crvLPInstance.balanceOf(lenderVault.address)
 
       const compartmentGaugeBalPost = await crvGaugeInstance.balanceOf(collTokenCompartmentAddr)
 
-      expect(compartmentGaugeBalPost).to.equal(borrowerCRVLpBalPre)
+      expect(compartmentGaugeBalPost).to.equal(borrowerCRVLpBalPre.sub(upfrontFee))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+      expect(lenderVaultCollBalPostBorrow.sub(lenderVaultCollBalPre)).to.equal(upfrontFee)
 
       // borrower approves borrower gateway
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1523,7 +1527,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           const borrowerRewardTokenBalancePost = await rewardTokenInstance.balanceOf(borrower.address)
           expect(borrowerRewardTokenBalancePost).to.be.greaterThan(borrowerRewardTokenBalancePre)
         }
-        expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance)
+        expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance.sub(upfrontFee))
       }
 
       const partialRepay = async () => {
@@ -1578,7 +1582,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const approxPartialCRVReward = totalGaugeRewardCRV.div(coeffRepay).toString().substring(0, 3)
 
         expect(borrowerCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVReward)
-        expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance.div(coeffRepay))
+        expect(borrowerCRVLpRepayBalPost).to.equal(locallyCollBalance.sub(upfrontFee).div(coeffRepay))
         expect(collTokenCompartmentCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVReward)
 
         // unlock before expiry should revert
@@ -1643,7 +1647,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ? await rewardTokenInstance.balanceOf(lenderVault.address)
           : BigNumber.from(0)
 
-        expect(lenderVaultCollBalPost).to.equal(locallyCollBalance.div(coeffRepay))
+        // (post partial repay: lenderVaultBalance = upfrontFee + (locallyCollBalance-upfrontFee)/2)
+        expect(lenderVaultCollBalPost).to.equal(locallyCollBalance.sub(upfrontFee).div(coeffRepay).add(upfrontFee))
         expect(lenderVaultCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVPostReward)
         if (compartmentRewardTokenBalancePost.gt(0) && lenderVaultRewardTokenBalancePostUnlock.gt(0)) {
           expect(compartmentRewardTokenBalancePostUnlock).to.be.equal(0)
@@ -1817,6 +1822,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanId = borrowEvent?.args?.['loanId']
       const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const upfrontFee = borrowEvent?.args?.['upfrontFee']
 
       const coeffRepay = 2
       const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
@@ -1849,7 +1855,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // check balance post repay
       const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
 
-      expect(borrowerCollRepayBalPost).to.be.above(borrowerCollBalPre.div(coeffRepay))
+      expect(borrowerCollRepayBalPost).to.be.above(borrowerCollBalPre.sub(upfrontFee).div(coeffRepay))
 
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
@@ -1949,6 +1955,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanId = borrowEvent?.args?.['loanId']
       const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const upfrontFee = borrowEvent?.args?.['upfrontFee']
 
       const coeffRepay = 2
       const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
@@ -1968,11 +1975,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const borrowerVotesPost = await collInstance.getCurrentVotes(borrower.address)
 
-      expect(borrowerVotesPost).to.equal(borrowerUNIBalPre)
+      expect(borrowerVotesPost).to.equal(borrowerUNIBalPre.sub(upfrontFee))
       expect(borrowerVotesPreDelegation).to.equal(0)
 
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
-      expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre))
+      expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre).add(upfrontFee))
 
       // borrower approves borrower gateway
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1995,7 +2002,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // check balance post repay
       const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
-      expect(borrowerCollRepayBalPost).to.be.equal(borrowerUNIBalPre.div(coeffRepay))
+      expect(borrowerCollRepayBalPost).to.be.equal(borrowerUNIBalPre.sub(upfrontFee).div(coeffRepay))
 
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
@@ -2008,7 +2015,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const lenderCollBalPost = await collInstance.balanceOf(lender.address)
 
-      expect(lenderCollBalPost).to.equal(borrowerUNIBalPre.div(coeffRepay))
+      expect(lenderCollBalPost).to.equal(borrowerUNIBalPre.sub(upfrontFee).div(coeffRepay).add(upfrontFee))
 
       await expect(lenderVault.connect(lender).withdraw(collTokenAddress, MAX_UINT128)).to.be.revertedWithCustomError(
         lenderVault,
@@ -2124,6 +2131,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanId = borrowEvent?.args?.['loanId']
+      const upfrontFee = borrowEvent?.args?.['upfrontFee']
 
       const coeffRepay = 2
       const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
@@ -2159,7 +2167,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const compartmentCollBalPost = await collInstance.balanceOf(collTokenCompartmentAddr)
 
       expect(borrowerLoanBalPost.sub(borrowerLoanBalPre)).to.equal(0) // borrower: no weth change as all swapped for uni
-      expect(compartmentCollBalPost).to.equal(collSendAmount)
+      expect(compartmentCollBalPost).to.equal(collSendAmount.sub(upfrontFee))
       expect(borrowerVotesPreDelegation).to.equal(0)
 
       // borrower approves borrower gateway

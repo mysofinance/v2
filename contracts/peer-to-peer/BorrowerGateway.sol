@@ -238,15 +238,18 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         );
 
         // protocol fees on whole sendAmount
-        // this will make calculation of upfrontFee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
+        // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
         uint256 protocolFeeAmount = ((borrowInstructions.collSendAmount) *
             protocolFee *
             (loan.expiry - block.timestamp)) /
             (Constants.BASE * Constants.YEAR_IN_SECONDS);
 
-        // should only happen when tenor >> 1 year
-        // e.g. at 5% MAX_FEE_PER_ANNUM, tenor still needs to be 20 years
-        if (borrowInstructions.collSendAmount < protocolFeeAmount) {
+        // should only happen when tenor >> 1 year or very large upfront fees with more reasonable protocol fees
+        // e.g. at 5% MAX_FEE_PER_ANNUM, tenor still needs to be 20 years with no upfront fee
+        // but a high upfrontFee could also make this fail for smaller protocolFee amounts
+        if (
+            borrowInstructions.collSendAmount < protocolFeeAmount + upfrontFee
+        ) {
             revert Errors.InsufficientSendAmount();
         }
 
@@ -258,18 +261,47 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
-        IERC20Metadata(loan.collToken).safeTransferFrom(
-            loan.borrower,
-            collReceiver,
-            borrowInstructions.collSendAmount - protocolFeeAmount
-        );
+        if (collReceiver == lenderVault) {
+            IERC20Metadata(loan.collToken).safeTransferFrom(
+                loan.borrower,
+                collReceiver,
+                borrowInstructions.collSendAmount - protocolFeeAmount
+            );
 
-        collTokenReceived =
-            IERC20Metadata(loan.collToken).balanceOf(collReceiver) -
-            collTokenReceived;
+            collTokenReceived =
+                IERC20Metadata(loan.collToken).balanceOf(collReceiver) -
+                collTokenReceived;
 
-        if (collTokenReceived != loan.initCollAmount + upfrontFee) {
-            revert Errors.InvalidSendAmount();
+            if (collTokenReceived != loan.initCollAmount + upfrontFee) {
+                revert Errors.InvalidSendAmount();
+            }
+        } else {
+            if (upfrontFee != 0) {
+                // Note: the case with an upfront fee, a compartment, and a coll token transfer fee (must be all 3 together)
+                // would result in the vault getting slightly less collToken than upfrontFee due to coll token transferFee
+                // and flow of the accounting. In practice this should be very small and extremely rare, and could be counteracted
+                // with a slightly higher upfrontFee to compensate
+                IERC20Metadata(loan.collToken).safeTransferFrom(
+                    loan.borrower,
+                    lenderVault,
+                    upfrontFee
+                );
+            }
+            IERC20Metadata(loan.collToken).safeTransferFrom(
+                loan.borrower,
+                collReceiver,
+                borrowInstructions.collSendAmount -
+                    protocolFeeAmount -
+                    upfrontFee
+            );
+
+            collTokenReceived =
+                IERC20Metadata(loan.collToken).balanceOf(collReceiver) -
+                collTokenReceived;
+
+            if (collTokenReceived != loan.initCollAmount) {
+                revert Errors.InvalidSendAmount();
+            }
         }
     }
 
