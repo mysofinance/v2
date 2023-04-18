@@ -183,6 +183,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const borrowerCollBalPre = await collInstance.balanceOf(borrower.address)
     const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
     const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+    const vaultCollBalPre = await collInstance.balanceOf(lenderVault.address)
 
     expect(borrowerCollBalPre).to.be.above(BigNumber.from(0))
     expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
@@ -235,15 +236,20 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const loanId = borrowEvent?.args?.['loanId']
     const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
     const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+    const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
 
     const coeffRepay = 2
     const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
 
     // check balance post borrow
+    const borrowerCollBalPost = await collInstance.balanceOf(borrower.address)
+    expect(borrowerCollBalPost).to.be.equal(0)
     const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
     const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
-
     expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+    const expUpfrontFee = collSendAmount.mul(onChainQuote.quoteTuples[0].upfrontFeePctInBase).div(BASE)
+    const vaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
+    expect(vaultCollBalPost.sub(vaultCollBalPre)).to.equal(expUpfrontFee)
 
     // borrower approves borrower gateway
     await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -252,7 +258,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     await hre.network.provider.send('hardhat_mine', [BigNumber.from(50000).toHexString(), BigNumber.from(60).toHexString()])
 
     // increase borrower usdc balance to repay
-    await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(10000000))
+    await usdc.connect(lender).transfer(borrower.address, partialRepayAmount)
 
     // partial repay
     await expect(
@@ -271,15 +277,20 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       .withArgs(lenderVault.address, loanId, partialRepayAmount)
 
     // check balance post repay
+    const vaultUsdcBalPostRepay = await usdc.balanceOf(lenderVault.address)
+    const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
     const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
     const borrowerWethRepayBalPost = await weth.balanceOf(borrower.address)
-
-    expect(borrowerCollRepayBalPost).to.be.equal(borrowerCollBalPre.div(coeffRepay))
+    const expReclaimedColl = initCollAmount.mul(partialRepayAmount).div(repayAmount)
+    expect(borrowerUsdcBalPost).to.be.equal(borrowerUsdcBalPostRepay)
+    expect(vaultUsdcBalPostRepay.sub(vaultUsdcBalPost)).to.be.equal(partialRepayAmount)
+    expect(borrowerCollRepayBalPost).to.be.equal(expReclaimedColl)
     expect(borrowerWethRepayBalPost).to.be.above(borrowerWethBalPre)
 
+    // move forward past loan expiry
     await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
-    // unlock collateral
+    // unlock unclaimed collateral
     const lenderVaultWethBalPre = await weth.balanceOf(lenderVault.address)
     const lenderCollBalPre = await collInstance.balanceOf(lender.address)
 
@@ -291,7 +302,9 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const lenderCollBalPost = await collInstance.balanceOf(lender.address)
 
     expect(lenderVaultWethBalPost).to.be.above(lenderVaultWethBalPre)
-    expect(lenderCollBalPost).to.equal(borrowerCollBalPre.div(coeffRepay))
+    // note that unlockCollateral() causes the entire "available collateral balance" to be withdrawn,
+    // NOT only the amount(s) associated from defaulted loans with unclaimed collateral
+    expect(lenderCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
   })
 
   it('Uni V3 Looping Test', async function () {
