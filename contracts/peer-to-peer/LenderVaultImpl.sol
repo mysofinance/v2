@@ -54,7 +54,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function unlockCollateral(
         address collToken,
         uint256[] calldata _loanIds,
-        bool autoWithdraw
+        bool withdrawAll
     ) external {
         // only owner can call this function
         if (msg.sender != _owner) {
@@ -92,9 +92,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
 
         lockedAmounts[collToken] -= totalUnlockableColl;
-        // if collToken is not used by vault as loan token, then
-        // vault owner may have wanted to leave unlocked coll in vault
-        if (autoWithdraw) {
+        if (withdrawAll) {
             uint256 currentCollTokenBalance = IERC20Metadata(collToken)
                 .balanceOf(address(this));
 
@@ -104,7 +102,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             );
         }
 
-        emit CollateralUnlocked(_owner, collToken, _loanIds, autoWithdraw);
+        emit CollateralUnlocked(_owner, collToken, _loanIds, withdrawAll);
     }
 
     function updateLoanInfo(

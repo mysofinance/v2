@@ -19,7 +19,7 @@ interface ILenderVaultImpl {
         address indexed vaultOwner,
         address indexed collToken,
         uint256[] loanIds,
-        bool autoWithdraw
+        bool withdrawAll
     );
 
     event QuoteProcessed(
@@ -44,15 +44,17 @@ interface ILenderVaultImpl {
      * @dev only loans with same collateral token can be unlocked in one call
      * function will revert if mismatch in coll token to a loan.collToken.
      * note: a vault owner may not want to autowithdraw collateral if he also uses
-     * the token as loans
+     * the token as loans; moreover, note that unlockCollateral() causes the entire
+     * "available collateral balance" to be withdrawn, NOT only the amount(s) associated
+     * from defaulted loans with unclaimed collateral
      * @param collToken address of the collateral token
      * @param _loanIds array of indices of the loans to unlock
-     * @param autoWithdraw if true, then withdraw collateral as well
+     * @param withdrawAll if true, then withdraw all available collateral balance
      */
     function unlockCollateral(
         address collToken,
         uint256[] calldata _loanIds,
-        bool autoWithdraw
+        bool withdrawAll
     ) external;
 
     /**
