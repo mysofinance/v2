@@ -233,7 +233,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
-        uint256 collTokenReceived = IERC20Metadata(loan.collToken).balanceOf(
+        uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
             collReceiver
         );
 
@@ -261,47 +261,32 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
-        if (collReceiver == lenderVault) {
+        uint256 collReceiverTransferAmount = borrowInstructions.collSendAmount -
+            protocolFeeAmount;
+        uint256 collReceiverExpBalDiff = loan.initCollAmount + upfrontFee;
+        if (collReceiver != lenderVault && upfrontFee != 0) {
+            collReceiverTransferAmount -= upfrontFee;
+            collReceiverExpBalDiff -= upfrontFee;
+            // Note: if a compartment is used then we need to transfer the upfront fee to the vault separately;
+            // in the special case where the coll also has a token transfer fee then the vault will receive slightly
+            // less collToken than upfrontFee due to coll token transferFee, which, however can be counteracted with
+            // a slightly higher upfrontFee to compensate for this effect.
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
-                collReceiver,
-                borrowInstructions.collSendAmount - protocolFeeAmount
+                lenderVault,
+                upfrontFee
             );
-
-            collTokenReceived =
-                IERC20Metadata(loan.collToken).balanceOf(collReceiver) -
-                collTokenReceived;
-
-            if (collTokenReceived != loan.initCollAmount + upfrontFee) {
-                revert Errors.InvalidSendAmount();
-            }
-        } else {
-            if (upfrontFee != 0) {
-                // Note: the case with an upfront fee, a compartment, and a coll token transfer fee (must be all 3 together)
-                // would result in the vault getting slightly less collToken than upfrontFee due to coll token transferFee
-                // and flow of the accounting. In practice this should be very small and extremely rare, and could be counteracted
-                // with a slightly higher upfrontFee to compensate
-                IERC20Metadata(loan.collToken).safeTransferFrom(
-                    loan.borrower,
-                    lenderVault,
-                    upfrontFee
-                );
-            }
-            IERC20Metadata(loan.collToken).safeTransferFrom(
-                loan.borrower,
-                collReceiver,
-                borrowInstructions.collSendAmount -
-                    protocolFeeAmount -
-                    upfrontFee
-            );
-
-            collTokenReceived =
-                IERC20Metadata(loan.collToken).balanceOf(collReceiver) -
-                collTokenReceived;
-
-            if (collTokenReceived != loan.initCollAmount) {
-                revert Errors.InvalidSendAmount();
-            }
+        }
+        IERC20Metadata(loan.collToken).safeTransferFrom(
+            loan.borrower,
+            collReceiver,
+            collReceiverTransferAmount
+        );
+        if (
+            IERC20Metadata(loan.collToken).balanceOf(collReceiver) !=
+            collReceiverExpBalDiff + collReceiverPreBal
+        ) {
+            revert Errors.InvalidSendAmount();
         }
     }
 
