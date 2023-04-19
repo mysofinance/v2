@@ -121,7 +121,9 @@ contract QuoteHandler is IQuoteHandler {
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert Errors.InvalidSender();
         }
-        offChainQuoteNonce[lenderVault] += 1;
+        uint256 newNonce = offChainQuoteNonce[lenderVault] + 1;
+        offChainQuoteNonce[lenderVault] = newNonce;
+        emit OffChainQuoteNonceIncremented(lenderVault, newNonce);
     }
 
     function invalidateOffChainQuote(

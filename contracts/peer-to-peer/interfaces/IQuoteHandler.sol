@@ -17,6 +17,7 @@ interface IQuoteHandler {
         address lenderVault,
         bytes32 onChainQuoteHash
     );
+    event OffChainQuoteNonceIncremented(address lenderVault, uint256 newNonce);
     event OffChainQuoteInvalidated(
         address lenderVault,
         bytes32 offChainQuoteHash
