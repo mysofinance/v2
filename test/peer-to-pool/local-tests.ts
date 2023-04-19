@@ -1421,7 +1421,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
   })
 
-  it('Should handle conversions correctly (1/2)', async function () {
+  it('Should handle conversions correctly (1/3)', async function () {
     const {
       fundingPool,
       loanProposalFactory,
@@ -1548,7 +1548,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
   })
 
-  it('Should handle conversions correctly (2/2)', async function () {
+  it('Should handle conversions correctly (2/3)', async function () {
     const {
       fundingPool,
       loanProposalFactory,
@@ -1629,6 +1629,99 @@ describe('Peer-to-Pool: Local Tests', function () {
     await loanProposal.connect(lender3).exerciseConversion()
     let postBalLoanProp = await daoToken.balanceOf(loanProposal.address)
     expect(preBalLoanProp.sub(postBalLoanProp)).to.be.equal(totalConvertible)
+  })
+
+  it('Should handle conversions correctly (3/3)', async function () {
+    const {
+      fundingPool,
+      loanProposalFactory,
+      daoToken,
+      arranger,
+      daoTreasury,
+      usdc,
+      lender1,
+      lender2,
+      lender3,
+      anyUser,
+      team
+    } = await setupTest()
+
+    // arranger creates loan proposal
+    const loanProposal = await createLoanProposal(
+      loanProposalFactory,
+      arranger,
+      fundingPool.address,
+      daoToken.address,
+      REL_ARRANGER_FEE,
+      UNSUBSCRIBE_GRACE_PERIOD,
+      CONVERSION_GRACE_PERIOD,
+      REPAYMENT_GRACE_PERIOD
+    )
+
+    // define subscription amounts
+    const subscriptionLender1 = ONE_USDC.mul(1000000)
+    const subscriptionLender2 = ethers.BigNumber.from("1")
+
+    // add some loan terms
+    const loanTerms = await getDummyLoanTerms(daoTreasury.address)
+    loanTerms.maxLoanAmount = subscriptionLender1.add(subscriptionLender2)
+    loanTerms.repaymentSchedule[0].collTokenDueIfConverted = 1
+    loanTerms.repaymentSchedule[1].collTokenDueIfConverted = 1
+    loanTerms.repaymentSchedule[2].collTokenDueIfConverted = 1
+    loanTerms.repaymentSchedule[3].collTokenDueIfConverted = 1
+    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+
+    // add large lender
+    await usdc.mint(lender1.address, subscriptionLender1)
+    await usdc.connect(lender1).approve(fundingPool.address, subscriptionLender1)
+    await fundingPool.connect(lender1).deposit(subscriptionLender1, 0)
+    await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionLender1)
+  
+    // add smaller lender
+    await usdc.connect(lender2).approve(fundingPool.address, subscriptionLender2)
+    await fundingPool.connect(lender2).deposit(subscriptionLender2, 0)
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionLender2)
+    
+    // move forward past loan terms update cool off period
+    let blocknum = await ethers.provider.getBlockNumber()
+    let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
+    // dao accepts
+    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+
+    // move forward past unsubscription grace period
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(UNSUBSCRIBE_GRACE_PERIOD.toString())])
+
+    // get final amounts
+    let lockedInLoanTerms = await loanProposal.loanTerms()
+    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let loanTokenDecimals = await usdc.decimals()
+    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+
+    // dao finalizes loan terms and sends collateral
+    let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
+    await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+
+    // execute loan
+    await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
+
+    // move forward to first due date
+    let firstDueDate = finalLoanTerms.repaymentSchedule[0].dueTimestamp
+    await ethers.provider.send('evm_mine', [firstDueDate])
+
+    // check conversion reverts if it would lead to zero value
+    let expConversionAmount = finalLoanTerms.repaymentSchedule[0].collTokenDueIfConverted.mul(subscriptionLender2).div(totalSubscribed)
+    expect(expConversionAmount).to.be.equal(0)
+    await expect(loanProposal.connect(lender2).exerciseConversion())
+    .to.be.revertedWithCustomError(
+      loanProposal,
+      'ZeroConversionAmount'
+    )
   })
 
   it('Should handle repayments correctly (1/4)', async function () {

@@ -320,6 +320,9 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             .repaymentSchedule[repaymentIdx]
             .collTokenDueIfConverted * lenderContribution) /
             IFundingPool(fundingPool).totalSubscribed(address(this));
+        if (conversionAmount == 0) {
+            revert Errors.ZeroConversionAmount();
+        }
         collTokenConverted[repaymentIdx] += conversionAmount;
         totalConvertedSubscriptionsPerIdx[repaymentIdx] += lenderContribution;
         lenderExercisedConversion[msg.sender][repaymentIdx] = true;

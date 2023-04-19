@@ -81,4 +81,5 @@ library Errors {
     error InvalidDueDates();
     error RepaymentOrConversionAmountIsZero();
     error WaitForLoanTermsCoolOffPeriod();
+    error ZeroConversionAmount();
 }
