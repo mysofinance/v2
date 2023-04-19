@@ -128,6 +128,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.WaitForLoanTermsCoolOffPeriod();
         }
+        repaymentScheduleCheck(_loanTerms.repaymentSchedule);
         address fundingPool = staticData.fundingPool;
         uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
             address(this)
@@ -172,7 +173,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             _unfinalizedLoanTerms.repaymentSchedule[0].dueTimestamp <=
             block.timestamp + Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
         ) {
-            revert Errors.DueDatesTooClose();
+            revert Errors.FirstDueDateTooCloseOrPassed();
         }
         dynamicData.status = DataTypesPeerToPool.LoanStatus.READY_TO_EXECUTE;
         // note: now that final subscription amounts are known, convert relative values
@@ -585,25 +586,28 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function repaymentScheduleCheck(
-        DataTypesPeerToPool.Repayment[] calldata repaymentSchedule
+        DataTypesPeerToPool.Repayment[] memory repaymentSchedule
     ) internal view {
         if (repaymentSchedule.length == 0) {
             revert Errors.EmptyRepaymentSchedule();
         }
+        // assuming loan proposal gets directly accepted, then loan
+        // can get executed earliest after:
+        // block.timestamp + Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD + Constants.LOAN_EXECUTION_GRACE_PERIOD
         if (
             repaymentSchedule[0].dueTimestamp <
-            block.timestamp + Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
+            block.timestamp +
+                Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD +
+                Constants.LOAN_EXECUTION_GRACE_PERIOD +
+                Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
         ) {
-            revert Errors.FirstDueDateTooClose();
+            revert Errors.FirstDueDateTooCloseOrPassed();
         }
         uint256 prevDueDate;
         uint256 currDueDate;
         for (uint i = 0; i < repaymentSchedule.length; ) {
-            if (
-                repaymentSchedule[i].loanTokenDue == 0 ||
-                repaymentSchedule[i].collTokenDueIfConverted == 0
-            ) {
-                revert Errors.RepaymentOrConversionAmountIsZero();
+            if (repaymentSchedule[i].loanTokenDue == 0) {
+                revert Errors.LoanTokenDueIsZero();
             }
             currDueDate = repaymentSchedule[i].dueTimestamp;
             if (

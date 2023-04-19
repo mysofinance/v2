@@ -30,6 +30,8 @@ const MIN_CONVERSION_GRACE_PERIOD = ONE_DAY
 const MIN_REPAYMENT_GRACE_PERIOD = ONE_DAY
 const MIN_LOAN_EXECUTION_GRACE_PERIOD = ONE_DAY
 const MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD = ONE_DAY.mul(5)
+const MIN_TIME_UNTIL_FIRST_DUE_DATE = ONE_DAY
+const LOAN_EXECUTION_GRACE_PERIOD = ONE_DAY
 
 // test loan proposal constants
 const UNSUBSCRIBE_GRACE_PERIOD = MIN_UNSUBSCRIBE_GRACE_PERIOD
@@ -354,13 +356,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     // revert on too close first due date
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'FirstDueDateTooClose'
+      'FirstDueDateTooCloseOrPassed'
     )
 
     // set next due date too close
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    let firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
+    let firstDueDate = ethers.BigNumber.from(timestamp).add(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD).add(LOAN_EXECUTION_GRACE_PERIOD).add(MIN_TIME_UNTIL_FIRST_DUE_DATE).add(60) // +60s
     firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
     nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES).sub(1)
     secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
@@ -375,7 +377,6 @@ describe('Peer-to-Pool: Local Tests', function () {
     // set non ascending repayment schedule entries
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
     firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
     nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
     secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
@@ -387,10 +388,9 @@ describe('Peer-to-Pool: Local Tests', function () {
       'InvalidDueDates'
     )
 
-    // set repayment value to zero
+    // set 1st repayment value to zero
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
     firstRepaymentScheduleEntry = getRepaymentScheduleEntry(0, relCollTokenDueIfConverted1, firstDueDate)
     nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
     secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
@@ -399,28 +399,26 @@ describe('Peer-to-Pool: Local Tests', function () {
     // revert if repayment amount is zero
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'RepaymentOrConversionAmountIsZero'
+      'LoanTokenDueIsZero'
     )
 
-    // set conversion value to zero
+    // set 2nd repayment value to zero
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
-    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, 0, firstDueDate)
+    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
     nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
-    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
+    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(0, relCollTokenDueIfConverted2, nextDueDate)
     repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
     loanTerms.repaymentSchedule = repaymentSchedule
     // revert if conversion amount is zero
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'RepaymentOrConversionAmountIsZero'
+      'LoanTokenDueIsZero'
     )
 
     // set valid repayment schedule
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    firstDueDate = ethers.BigNumber.from(timestamp).add(ONE_DAY).add(60) // +60s
     firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
     nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
     secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
@@ -698,6 +696,58 @@ describe('Peer-to-Pool: Local Tests', function () {
     // check updated loan proposal status
     dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(3)
+  })
+
+  it('Should revert on invalid loan acceptance', async function () {
+    const {
+      fundingPool,
+      loanProposalFactory,
+      daoToken,
+      arranger,
+      daoTreasury,
+      usdc,
+      lender1,
+      lender2,
+      lender3
+    } = await setupTest()
+
+    // arranger creates loan proposal
+    const loanProposal = await createLoanProposal(
+      loanProposalFactory,
+      arranger,
+      fundingPool.address,
+      daoToken.address,
+      REL_ARRANGER_FEE,
+      UNSUBSCRIBE_GRACE_PERIOD,
+      CONVERSION_GRACE_PERIOD,
+      REPAYMENT_GRACE_PERIOD
+    )
+
+    // add some loan terms
+    const loanTerms = await getDummyLoanTerms(daoTreasury.address)
+    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+
+    // add lender subscriptions
+    await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
+
+    // move forward in time but "too close" to first due date
+    let firstDueDate = loanTerms.repaymentSchedule[0].dueTimestamp
+    await ethers.provider.send('evm_mine', [Number(firstDueDate.sub(MIN_TIME_UNTIL_FIRST_DUE_DATE).toString())])
+
+    // reverts if trying to accept loan terms where first due date is "too close"
+    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(
+      loanProposal,
+      'FirstDueDateTooCloseOrPassed'
+    )
+
+    // move forward past first due date
+    await ethers.provider.send('evm_mine', [Number(firstDueDate.toString()) + 1])
+
+    // reverts if trying to accept loan terms where first due already passed
+    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(
+      loanProposal,
+      'FirstDueDateTooCloseOrPassed'
+    )
   })
 
   it('Should handle rollbacks correctly (1/3)', async function () {
@@ -979,7 +1029,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
   })
 
-  it('Should handle loan execution correctly', async function () {
+  it('Should handle loan execution correctly (1/3)', async function () {
     const {
       fundingPool,
       loanProposalFactory,
@@ -1041,185 +1091,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       fundingPool,
       'UnregisteredLoanProposal'
     )
-
-    // revert when trying to execute loan proposal before being ready to execute
-    await expect(fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidActionForCurrentStatus'
-    )
-
-    // get final amounts
-    let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
-    let loanTokenDecimals = await usdc.decimals()
-    let [
-      finalLoanTerms,
-      arrangerFee,
-      finalLoanAmount,
-      finalCollAmountReservedForDefault,
-      finalCollAmountReservedForConversions
-    ] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
-
-    // dao treasury executes loan proposal
-    let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
-    let preDaoTreasuryBal = await daoToken.balanceOf(daoTreasury.address)
-    let preLoanProposalBal = await daoToken.balanceOf(loanProposal.address)
-    await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
-    let postDaoTreasuryBal = await daoToken.balanceOf(daoTreasury.address)
-    let postLoanProposalBal = await daoToken.balanceOf(loanProposal.address)
-    expect(preDaoTreasuryBal.sub(postDaoTreasuryBal)).to.be.equal(postLoanProposalBal.sub(preLoanProposalBal))
-    expect(preDaoTreasuryBal.sub(postDaoTreasuryBal)).to.be.equal(finalCollTransferAmount)
-
-    // revert when trying to execute invalid loan proposal
-    await expect(fundingPool.connect(daoTreasury).executeLoanProposal(anyUser.address)).to.be.revertedWithCustomError(
-      fundingPool,
-      'UnregisteredLoanProposal'
-    )
-
-    // execute loan and check balance diffs
-    // dao token balances
-    let preDaoTokenLoanProposalBal = await daoToken.balanceOf(loanProposal.address)
-    let preDaoTokenDaoBal = await daoToken.balanceOf(daoTreasury.address)
-    // usdc balances
-    let preUsdcLoanProposalBal = await usdc.balanceOf(loanProposal.address)
-    let preUsdcFundingPoolBal = await usdc.balanceOf(fundingPool.address)
-    let preUsdcDaoBal = await usdc.balanceOf(daoTreasury.address)
-    let preUsdcArrangerBal = await usdc.balanceOf(arranger.address)
-    let preUsdcTeamBal = await usdc.balanceOf(team.address)
-    await fundingPool.connect(anyUser).executeLoanProposal(loanProposal.address)
-    // dao token balances
-    let postDaoTokenLoanProposalBal = await daoToken.balanceOf(loanProposal.address)
-    let postDaoTokenDaoBal = await daoToken.balanceOf(daoTreasury.address)
-    // usdc balances
-    let postUsdcLoanProposalBal = await usdc.balanceOf(loanProposal.address)
-    let postUsdcFundingPoolBal = await usdc.balanceOf(fundingPool.address)
-    let postUsdcDaoBal = await usdc.balanceOf(daoTreasury.address)
-    let postUsdcArrangerBal = await usdc.balanceOf(arranger.address)
-    let postUsdcTeamBal = await usdc.balanceOf(team.address)
-    // check dao token balances remain unchanged
-    expect(postDaoTokenLoanProposalBal.sub(preDaoTokenLoanProposalBal)).to.be.equal(0)
-    expect(postDaoTokenDaoBal.sub(preDaoTokenDaoBal)).to.be.equal(0)
-    // check usdc balance changes
-    expect(postUsdcLoanProposalBal.sub(preUsdcLoanProposalBal)).to.be.equal(0)
-    expect(preUsdcFundingPoolBal.sub(postUsdcFundingPoolBal)).to.be.equal(finalLoanAmount.add(arrangerFee))
-    expect(postUsdcDaoBal.sub(preUsdcDaoBal)).to.be.equal(finalLoanAmount)
-    expect(postUsdcArrangerBal.sub(preUsdcArrangerBal).add(postUsdcTeamBal.sub(preUsdcTeamBal))).to.be.equal(arrangerFee)
-  })
-
-  it('Should not allow unauthorized updating of status', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
-      await setupTest()
-
-    // arranger creates loan proposal
-    const loanProposal = await createLoanProposal(
-      loanProposalFactory,
-      arranger,
-      fundingPool.address,
-      daoToken.address,
-      REL_ARRANGER_FEE,
-      UNSUBSCRIBE_GRACE_PERIOD,
-      CONVERSION_GRACE_PERIOD,
-      REPAYMENT_GRACE_PERIOD
-    )
-
-    // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidSender'
-    )
-
-    // add some loan terms
-    const loanTerms = await getDummyLoanTerms(daoTreasury.address)
-    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
-
-    // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidSender'
-    )
-
-    // add lender subscriptions
-    await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
-
-    // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidSender'
-    )
-
-    // move forward past loan terms update cool off period
-    let blocknum = await ethers.provider.getBlockNumber()
-    let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
-
-    // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
-
-    // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidSender'
-    )
-  })
-
-  it('Should handle loan execution correctly (1/3)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
-
-    // arranger creates loan proposal
-    const loanProposal = await createLoanProposal(
-      loanProposalFactory,
-      arranger,
-      fundingPool.address,
-      daoToken.address,
-      REL_ARRANGER_FEE,
-      UNSUBSCRIBE_GRACE_PERIOD,
-      CONVERSION_GRACE_PERIOD,
-      REPAYMENT_GRACE_PERIOD
-    )
-
-    // revert if any user wants to update loan status
-    await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidSender'
-    )
-
-    // add some loan terms
-    const loanTerms = await getDummyLoanTerms(daoTreasury.address)
-    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
-
-    // add lender subscriptions
-    await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
-
-    // move forward past loan terms update cool off period
-    let blocknum = await ethers.provider.getBlockNumber()
-    let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
-
-    // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
-
-    // move forward past unsubscription grace period
-    blocknum = await ethers.provider.getBlockNumber()
-    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    await ethers.provider.send('evm_mine', [timestamp + 60])
-    let staticData = await loanProposal.staticData()
-    blocknum = await ethers.provider.getBlockNumber()
-    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    await ethers.provider.send('evm_mine', [timestamp + Number(UNSUBSCRIBE_GRACE_PERIOD.toString())])
-
+    
     // revert when trying to execute loan proposal before being ready to execute
     await expect(fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)).to.be.revertedWithCustomError(
       loanProposal,
@@ -1300,8 +1172,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       lender1,
       lender2,
       lender3,
-      anyUser,
-      team
+      anyUser
     } = await setupTest()
 
     // arranger creates loan proposal
@@ -1373,8 +1244,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       lender1,
       lender2,
       lender3,
-      anyUser,
-      team
+      anyUser
     } = await setupTest()
 
     // arranger creates loan proposal
@@ -1410,14 +1280,23 @@ describe('Peer-to-Pool: Local Tests', function () {
     // dao accepts
     await loanProposal.connect(daoTreasury).acceptLoanTerms()
 
-    // move forward past first due date
+    // move forward in time but "too close" to first due date
     let firstDueDate = loanTerms.repaymentSchedule[0].dueTimestamp
-    await ethers.provider.send('evm_mine', [Number(firstDueDate.toString())])
+    await ethers.provider.send('evm_mine', [Number(firstDueDate.sub(MIN_TIME_UNTIL_FIRST_DUE_DATE).toString())])
 
-    // reverts if trying to finalize if past first due date
+    // reverts if trying to finalize if "too close" to first due date
     await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
       loanProposal,
-      'DueDatesTooClose'
+      'FirstDueDateTooCloseOrPassed'
+    )
+
+    // move forward past first due date
+    await ethers.provider.send('evm_mine', [Number(firstDueDate.toString()) + 1])
+
+    // reverts if trying to finalize loan terms where first due already passed
+    await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
+      loanProposal,
+      'FirstDueDateTooCloseOrPassed'
     )
   })
 

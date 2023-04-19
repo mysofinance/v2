@@ -55,7 +55,7 @@ library Errors {
     error OffChainQuoteHasBeenInvalidated();
     error Uninitialized();
     error EmptyRepaymentSchedule();
-    error FirstDueDateTooClose();
+    error FirstDueDateTooCloseOrPassed();
     error DueDatesTooClose();
     error InvalidGracePeriod();
     error UnregisteredLoanProposal();
@@ -79,6 +79,6 @@ library Errors {
     error AlreadyClaimed();
     error AlreadyConverted();
     error InvalidDueDates();
-    error RepaymentOrConversionAmountIsZero();
+    error LoanTokenDueIsZero();
     error WaitForLoanTermsCoolOffPeriod();
 }
