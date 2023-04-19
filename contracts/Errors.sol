@@ -81,4 +81,5 @@ library Errors {
     error InvalidDueDates();
     error LoanTokenDueIsZero();
     error WaitForLoanTermsCoolOffPeriod();
+    error ZeroConversionAmount();
 }
