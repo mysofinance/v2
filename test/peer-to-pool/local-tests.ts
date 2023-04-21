@@ -24,7 +24,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const MIN_ARRANGER_FEE = BASE.mul(5).div(10000) // 5bps
 const MAX_ARRANGER_FEE = BASE.mul(5).div(10) // 50%
 const MIN_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY
-const LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 60 * 60
+const LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 60 * 60 // 1h
 const MIN_TIME_BETWEEN_DUE_DATES = ONE_DAY.mul(7)
 const MIN_CONVERSION_GRACE_PERIOD = ONE_DAY
 const MIN_REPAYMENT_GRACE_PERIOD = ONE_DAY
@@ -32,6 +32,7 @@ const MIN_LOAN_EXECUTION_GRACE_PERIOD = ONE_DAY
 const MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD = ONE_DAY.mul(5)
 const MIN_TIME_UNTIL_FIRST_DUE_DATE = ONE_DAY
 const LOAN_EXECUTION_GRACE_PERIOD = ONE_DAY
+const MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE = 60 // 60s
 
 // test loan proposal constants
 const UNSUBSCRIBE_GRACE_PERIOD = MIN_UNSUBSCRIBE_GRACE_PERIOD
@@ -503,7 +504,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let preBalLender = await usdc.balanceOf(lender1.address)
     let addAmount = preBalLender
     await expect(fundingPool.connect(lender1).deposit(addAmount.add(1), 0)).to.be.reverted
-    await expect(fundingPool.connect(lender1).deposit(addAmount, 10)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender1).deposit(addAmount.sub(10), 10)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidSendAmount'
     )
@@ -578,7 +579,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // move forward past subscription cool down period to check unsubscribe method
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    await ethers.provider.send('evm_mine', [timestamp + 60])
+    await ethers.provider.send('evm_mine', [timestamp + Number(MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE.toString())])
     let preBal = await fundingPool.balanceOf(lender2.address)
     let preSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
     await expect(
@@ -795,7 +796,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // move forward beyond minimum subscription holding period
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    await ethers.provider.send('evm_mine', [timestamp + 60])
+    await ethers.provider.send('evm_mine', [timestamp + Number(MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE.toString())])
 
     // check users can unsubscribe any time
     // lender 1
@@ -850,7 +851,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // move forward beyond minimum subscription holding period
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    await ethers.provider.send('evm_mine', [timestamp + 60])
+    await ethers.provider.send('evm_mine', [timestamp + Number(MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE.toString())])
 
     // lenders unsubscribe such that subscription amount lower than minLoanAmount
     let subscriptionRemainder = 1

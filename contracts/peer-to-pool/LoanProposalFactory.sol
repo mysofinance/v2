@@ -59,10 +59,15 @@ contract LoanProposalFactory is Ownable, ILoanProposalFactory {
 
     function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external {
         senderCheckOwner();
-        if (_newArrangerFeeSplit > Constants.MAX_ARRANGER_SPLIT) {
+        uint256 oldArrangerFeeSplit = arrangerFeeSplit;
+        if (
+            _newArrangerFeeSplit > Constants.MAX_ARRANGER_SPLIT ||
+            _newArrangerFeeSplit == oldArrangerFeeSplit
+        ) {
             revert Errors.InvalidFee();
         }
         arrangerFeeSplit = _newArrangerFeeSplit;
+        emit ArrangerFeeSplitUpdated(oldArrangerFeeSplit, _newArrangerFeeSplit);
     }
 
     function owner()

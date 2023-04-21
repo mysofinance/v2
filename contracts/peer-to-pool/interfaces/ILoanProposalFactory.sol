@@ -11,6 +11,10 @@ interface ILoanProposalFactory {
         uint256 arrangerFee,
         uint256 unsubscribeGracePeriod
     );
+    event ArrangerFeeSplitUpdated(
+        uint256 oldArrangerFeeSplit,
+        uint256 newArrangerFeeSplit
+    );
 
     /**
      * @notice Creates a new loan proposal

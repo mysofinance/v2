@@ -37,13 +37,14 @@ contract FundingPool is IFundingPool {
         IERC20Metadata(depositToken).safeTransferFrom(
             msg.sender,
             address(this),
-            amount
+            amount + transferFee
         );
         uint256 postBal = IERC20Metadata(depositToken).balanceOf(address(this));
-        if ((postBal - preBal) != amount - transferFee) {
+        if (postBal != preBal + amount) {
             revert Errors.InvalidSendAmount();
         }
-        balanceOf[msg.sender] += postBal - preBal;
+        balanceOf[msg.sender] += amount;
+        emit Deposited(msg.sender, amount);
     }
 
     function withdraw(uint256 amount) external {
@@ -52,6 +53,7 @@ contract FundingPool is IFundingPool {
         }
         balanceOf[msg.sender] -= amount;
         IERC20Metadata(depositToken).safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount);
     }
 
     function subscribe(address loanProposal, uint256 amount) external {
@@ -84,7 +86,7 @@ contract FundingPool is IFundingPool {
             block.timestamp +
             Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
 
-        emit Subscribed(loanProposal, amount);
+        emit Subscribed(msg.sender, loanProposal, amount);
     }
 
     function unsubscribe(address loanProposal, uint256 amount) external {
@@ -112,7 +114,7 @@ contract FundingPool is IFundingPool {
         subscribedBalanceOf[loanProposal][msg.sender] -= amount;
         earliestUnsubscribe[loanProposal][msg.sender] = 0;
 
-        emit Unsubscribed(loanProposal, amount);
+        emit Unsubscribed(msg.sender, loanProposal, amount);
     }
 
     function executeLoanProposal(address loanProposal) external {
@@ -156,6 +158,12 @@ contract FundingPool is IFundingPool {
             protocolFeeShare
         );
 
-        emit LoanProposalExecuted(loanProposal);
+        emit LoanProposalExecuted(
+            loanProposal,
+            loanTerms.borrower,
+            finalLoanAmount,
+            arrangerFee - protocolFeeShare,
+            protocolFeeShare
+        );
     }
 }
