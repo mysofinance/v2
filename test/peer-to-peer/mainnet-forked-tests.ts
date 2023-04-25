@@ -2248,11 +2248,33 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // create maliciousToken
       const MyMaliciousERC20 = await ethers.getContractFactory('MyMaliciousERC20')
       await MyMaliciousERC20.connect(team)
-      const myMaliciousERC20 = await MyMaliciousERC20.deploy('MalciousToken', 'MyMal', 18, ZERO_ADDR, lenderVault.address)
+      const myMaliciousERC20 = await MyMaliciousERC20.deploy('MaliciousToken', 'MyMal', 18, ZERO_ADDR, lenderVault.address)
       await myMaliciousERC20.deployed()
-      await lenderVault.connect(lender).withdraw(myMaliciousERC20.address, ONE_WETH)
+
+      await expect(lenderVault.connect(lender).withdraw(myMaliciousERC20.address, ONE_WETH)).to.be.reverted
+      
       const wethBalPostAttack = await weth.balanceOf(lenderVault.address)
       expect(wethBalPostAttack).to.equal(wethBalPreAttack)
+    })
+
+    it('Should not allow callbacks into withdraw(...)', async function () {
+      const { lender, team, usdc, addressRegistry, lenderVault } = await setupTest()
+
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+      
+      // get vault balance
+      const bal = await usdc.balanceOf(lenderVault.address)
+
+      // deploy malicious callback contract
+      const MyMaliciousCallback2 = await ethers.getContractFactory('MyMaliciousCallback2')
+      const myMaliciousCallback2 = await MyMaliciousCallback2.deploy(lenderVault.address, usdc.address, bal)
+      await myMaliciousCallback2.deployed()
+
+      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback2.address, 0)).to.be.revertedWithCustomError(lenderVault, 'WithdrawEntered')
     })
 
     it('Should process compartment with protocol fee and transfer fees correctly with rewards', async () => {
@@ -2422,6 +2444,101 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // note: currently we do not plan to have compartments with any known coll tokens with transfer fees
       // but this case covers a possible future token that might fall into that category
       expect(vaultPaxgBalPost).to.equal(upfrontFee.mul(9998).div(10000))
+    })
+
+    it('Should not allow callbacks into transferCollFromCompartment(...)', async function () {
+      const { lender, borrower, team, weth, usdc, addressRegistry, borrowerGateway, quoteHandler, lenderVault } = await setupTest()
+
+      // create curve staking implementation
+      const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
+      await AaveStakingCompartmentImplementation.connect(team)
+      const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
+      await aaveStakingCompartmentImplementation.deployed()
+
+      // whitelist aave compartment implementation
+      await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
+
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+      
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: aaveStakingCompartmentImplementation.address,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves and prepares borrow instructions
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // send borrow instructions and get compartment
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
+      })
+      const collTokenCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
+
+      // deploy malicious callback contract
+      const MyMaliciousCallback1 = await ethers.getContractFactory('MyMaliciousCallback1')
+      const myMaliciousCallback1 = await MyMaliciousCallback1.deploy(lenderVault.address, weth.address, collTokenCompartmentAddr)
+      await myMaliciousCallback1.deployed()
+      
+      // trick vault owner to call withdraw with malicious token contract that uses delegate call to call back
+      // into compartment contract and try bypassing access control.
+      // This is expected to revert due to mutex in vault; moreover, note that even without mutex the delegate call would 
+      // operate on state/balances of myMaliciousCallback rather than compartment, leaving delegate call unable to access
+      // compartment balances
+      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback1.address, 0)).to.be.revertedWithCustomError(lenderVault, 'WithdrawEntered')
     })
   })
 
@@ -4687,7 +4804,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by swapping for large weth amount **/
+        // skew price by swapping for large weth amount
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(
@@ -4768,7 +4885,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const teamWethBalPreSkew = await weth.balanceOf(team.address)
 
-        /** skew price by swapping for large usdc amount **/
+        // skew price by swapping for large usdc amount
         await uniV2RouterInstance
           .connect(team)
           .swapExactTokensForTokens(ONE_WETH.mul(10 ** 14), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
@@ -4842,7 +4959,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by swapping for large weth amount **/
+        // skew price by swapping for large weth amount
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(
@@ -4933,7 +5050,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const teamWethBalPreSkew = await weth.balanceOf(team.address)
 
-        /** skew price by swapping for large usdc amount **/
+        // skew price by swapping for large usdc amount
         await uniV2RouterInstance
           .connect(team)
           .swapExactTokensForTokens(ONE_WETH.mul(10 ** 14), 0, [weth.address, usdc.address], lender.address, MAX_UINT256)
@@ -5024,7 +5141,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by swapping for large weth amount **/
+        // skew price by swapping for large weth amount
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(
@@ -5059,7 +5176,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           uniV2PaxgUsdcAddr
         )
 
-        //pool value increased by greater than a trillion fold due to large usdc skew
+        // pool value increased by greater than a trillion fold due to large usdc skew
         expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
         // paxg usdc pool price should not have changed
         expect(uniV2PaxgUsdcExactEthPricePostSkew).to.be.equal(uniV2PaxgUsdcExactEthPricePreSkew)
@@ -5139,7 +5256,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by swapping for large paxg amount **/
+        // skew price by swapping for large paxg amount
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(
@@ -5253,7 +5370,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by swapping for large weth amount **/
+        // skew price by swapping for large weth amount
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(
@@ -5264,7 +5381,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             MAX_UINT256
           )
 
-        /** skew price by swapping for large paxg amount **/
+        // skew price by swapping for large paxg amount
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(
@@ -5386,7 +5503,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         // lender usdc bal pre-skew
         const lenderUsdcBalPreSkew = await usdc.balanceOf(lender.address)
 
-        /** skew price by swapping for large weth amount **/
+        // skew price by swapping for large weth amount
         await uniV2RouterInstance
           .connect(lender)
           .swapExactTokensForTokens(
@@ -5429,7 +5546,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         const totalLpSupplyPostRemove = await uniV2WethUsdc.totalSupply()
 
-        //pool value increased by greater than a trillion fold due to large weth skew
+        // pool value increased by greater than a trillion fold due to large weth skew
         expect(uniV2WethUsdcExactEthPricePostSkew.div(uniV2WethUsdcExactEthPricePreSkew)).to.be.greaterThan(10 ** 12)
         // pre and post skew price should still deviate less than 1%
         expect(
