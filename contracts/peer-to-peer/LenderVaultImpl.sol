@@ -313,8 +313,9 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
         // checks repayAmount <= remaining loan balance
         if (
-            loanRepayInstructions.targetRepayAmount >
-            _loan.initRepayAmount - _loan.amountRepaidSoFar
+            loanRepayInstructions.targetRepayAmount == 0 ||
+            loanRepayInstructions.targetRepayAmount + _loan.amountRepaidSoFar >
+            _loan.initRepayAmount
         ) {
             revert Errors.InvalidRepayAmount();
         }

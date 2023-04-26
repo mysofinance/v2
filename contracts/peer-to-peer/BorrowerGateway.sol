@@ -300,6 +300,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         reclaimCollAmount =
             (loan.initCollAmount * loanRepayInstructions.targetRepayAmount) /
             loan.initRepayAmount;
+        if (reclaimCollAmount == 0) {
+            revert Errors.ReclaimAmountIsZero();
+        }
         if (callbackAddr == address(0)) {
             if (loan.collTokenCompartmentAddr != address(0)) {
                 ILenderVaultImpl(lenderVault).transferCollFromCompartment(

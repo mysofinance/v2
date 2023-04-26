@@ -31,6 +31,7 @@ library Errors {
     error InvalidBorrower();
     error OutsideValidRepayWindow();
     error InvalidRepayAmount();
+    error ReclaimAmountIsZero();
     error UnregisteredGateway();
     error NonWhitelistedOracle();
     error NonWhitelistedCompartment();

@@ -986,6 +986,109 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostUnlock)).to.equal(initCollAmount)
     })
 
+    it('Should revert on invalid repays', async function () {
+      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+        await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(10000000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10000000000), // set super high interest rate to test rounding error on repay
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_WETH.div(1000000)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
+      })
+
+      expect(borrowEvent).to.not.be.undefined
+
+      // test partial repays with no compartment
+      const loanId = borrowEvent?.args?.['loanId']
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      
+      // check revert on zero repay amount
+      await expect(borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: 0,
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
+      )).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
+
+      // check revert if reclaim amount is zero (due to rounding)
+      await expect(borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: 1,
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
+      )).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
+    })
+
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
       const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
