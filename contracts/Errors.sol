@@ -83,4 +83,5 @@ library Errors {
     error LoanTokenDueIsZero();
     error WaitForLoanTermsCoolOffPeriod();
     error ZeroConversionAmount();
+    error InvalidNewOwnerProposal();
 }

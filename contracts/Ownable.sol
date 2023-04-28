@@ -14,6 +14,7 @@ abstract contract Ownable {
 
     function proposeNewOwner(address _newOwnerProposal) external {
         senderCheckOwner();
+        newOwnerProposalCheck(_newOwnerProposal);
         _newOwner = _newOwnerProposal;
         emit NewOwnerProposed(_owner, _newOwnerProposal);
     }
@@ -35,6 +36,17 @@ abstract contract Ownable {
     function senderCheckOwner() internal view {
         if (msg.sender != _owner) {
             revert Errors.InvalidSender();
+        }
+    }
+
+    function newOwnerProposalCheck(
+        address _newOwnerProposal
+    ) internal view virtual {
+        if (
+            _newOwnerProposal == address(0) ||
+            _newOwnerProposal == address(this)
+        ) {
+            revert Errors.InvalidNewOwnerProposal();
         }
     }
 }

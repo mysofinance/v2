@@ -3,13 +3,13 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
-import {Helpers} from "../Helpers.sol";
 import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
@@ -167,15 +167,15 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan.borrower = borrower;
         _loan.loanToken = generalQuoteInfo.loanToken;
         _loan.collToken = generalQuoteInfo.collToken;
-        _loan.initCollAmount = Helpers.toUint128(
+        _loan.initCollAmount = SafeCast.toUint128(
             borrowInstructions.collSendAmount -
                 upfrontFee -
                 borrowInstructions.expectedTransferFee
         );
-        _loan.initLoanAmount = Helpers.toUint128(loanAmount);
-        _loan.initRepayAmount = Helpers.toUint128(repayAmount);
-        _loan.expiry = uint40(block.timestamp + quoteTuple.tenor);
-        _loan.earliestRepay = uint40(
+        _loan.initLoanAmount = SafeCast.toUint128(loanAmount);
+        _loan.initRepayAmount = SafeCast.toUint128(repayAmount);
+        _loan.expiry = SafeCast.toUint40(block.timestamp + quoteTuple.tenor);
+        _loan.earliestRepay = SafeCast.toUint40(
             block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
         if (_loan.expiry <= _loan.earliestRepay) {
@@ -204,7 +204,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         withdrawEntered = true;
         senderCheckOwner();
         uint256 vaultBalance = IERC20Metadata(token).balanceOf(address(this));
-        if (amount > vaultBalance - lockedAmounts[token]) {
+        if (amount == 0 || amount > vaultBalance - lockedAmounts[token]) {
             revert Errors.InvalidWithdrawAmount();
         }
         IERC20Metadata(token).safeTransfer(_owner, amount);
@@ -437,5 +437,14 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
         repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;
+    }
+
+    function newOwnerProposalCheck(
+        address _newOwnerProposal
+    ) internal view override {
+        if (isSigner[_newOwnerProposal]) {
+            revert Errors.InvalidNewOwnerProposal();
+        }
+        super.newOwnerProposalCheck(_newOwnerProposal);
     }
 }

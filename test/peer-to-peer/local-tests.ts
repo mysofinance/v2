@@ -266,6 +266,310 @@ describe('Peer-to-Peer: Local Tests', function () {
   }
 
   describe('Lender Vault', function () {
+
+    it('Should handle ownership transfer correctly', async function () {
+      const { lender, team, borrower, lenderVault } = await setupTest()
+
+      // check that only owner can propose new owner
+      await expect(lenderVault.connect(team).proposeNewOwner(team.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+
+      // check that new owner can't be zero address
+      await expect(lenderVault.connect(lender).proposeNewOwner(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidNewOwnerProposal'
+      )
+
+      // check that new owner can't be lender vault address itself
+      await expect(lenderVault.connect(lender).proposeNewOwner(lenderVault.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidNewOwnerProposal'
+      )
+
+      // add signer
+      await lenderVault.connect(lender).addSigners([borrower.address])
+
+      // check that new owner can't be a signer
+      await expect(lenderVault.connect(lender).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidNewOwnerProposal'
+      )
+
+      // make valid owner proposal
+      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.emit(
+        lenderVault,
+        'NewOwnerProposed'
+      )
+
+      // claim ownership
+      await expect(lenderVault.connect(team).claimOwnership()).to.emit(
+        lenderVault,
+        'ClaimedOwnership'
+      )
+
+      // check that old owner can't propose new owner anymore
+      await expect(lenderVault.connect(lender).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+    })
+
+    it('Should handle deposits and withdrawals correctly (1/2)', async function () {
+      const { addressRegistry, team, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      
+      let depositAmount
+      let withdrawAmount
+      let preLenderBal
+      let preVaultBal
+      let postLenderBal
+      let postVaultBal
+
+      // lenderVault owner deposits usdc
+      depositAmount = ONE_USDC.mul(100000)
+      preLenderBal = await usdc.balanceOf(lender.address)
+      preVaultBal = await usdc.balanceOf(lenderVault.address)
+      await usdc.connect(lender).transfer(lenderVault.address, depositAmount)
+      postLenderBal = await usdc.balanceOf(lender.address)
+      postVaultBal = await usdc.balanceOf(lenderVault.address)
+      expect(postVaultBal.sub(preVaultBal)).to.be.equal(preLenderBal.sub(postLenderBal))
+
+      // reverts if non-owner tries to withdraw
+      withdrawAmount = depositAmount.div(3)
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+
+      // reverts if non-owner tries to withdraw invalid amount
+      withdrawAmount = 0
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+      withdrawAmount = depositAmount.add(1)
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+      
+      // reverts if owner tries to withdraw invalid token
+      withdrawAmount = depositAmount
+      await expect(lenderVault.connect(lender).withdraw(weth.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidWithdrawAmount'
+      )
+
+      // reverts if owner tries to withdraw invalid amount
+      withdrawAmount = depositAmount.add(1)
+      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidWithdrawAmount'
+      )
+      withdrawAmount = 0
+      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidWithdrawAmount'
+      )
+
+      // whitelisting shouldn't affect withdrawability
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
+
+      // lender can withdraw valid token and amount
+      withdrawAmount = depositAmount.div(3)
+      preLenderBal = await usdc.balanceOf(lender.address)
+      preVaultBal = await usdc.balanceOf(lenderVault.address)
+      await lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)
+      postLenderBal = await usdc.balanceOf(lender.address)
+      postVaultBal = await usdc.balanceOf(lenderVault.address)
+      expect(postLenderBal.sub(preLenderBal)).to.be.equal(preVaultBal.sub(postVaultBal))
+
+      // de-whitelisting shouldn't affect withdrawability
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
+      
+      // transfer ownership to new vault owner
+      await lenderVault.connect(lender).proposeNewOwner(team.address)
+      await lenderVault.connect(team).claimOwnership()
+
+      // reverts if old owner tries to withdraw
+      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // new owner can withdraw
+      withdrawAmount = postVaultBal
+      preLenderBal = await usdc.balanceOf(team.address)
+      preVaultBal = await usdc.balanceOf(lenderVault.address)
+      await lenderVault.connect(team).withdraw(usdc.address, withdrawAmount)
+      postLenderBal = await usdc.balanceOf(team.address)
+      postVaultBal = await usdc.balanceOf(lenderVault.address)
+      expect(postLenderBal.sub(preLenderBal)).to.be.equal(preVaultBal.sub(postVaultBal))
+    })
+
+    it('Should handle deposits and withdrawals correctly (2/2)', async function () {
+      const { addressRegistry, quoteHandler, borrowerGateway, team, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      
+      let depositAmount
+      let withdrawAmount
+      let preLenderBal
+      let preVaultBal
+      let postLenderBal
+      let postVaultBal
+
+      // lenderVault owner deposits usdc
+      depositAmount = ONE_USDC.mul(100000)
+      preLenderBal = await usdc.balanceOf(lender.address)
+      preVaultBal = await usdc.balanceOf(lenderVault.address)
+      await usdc.connect(lender).transfer(lenderVault.address, depositAmount)
+      postLenderBal = await usdc.balanceOf(lender.address)
+      postVaultBal = await usdc.balanceOf(lenderVault.address)
+      expect(postVaultBal.sub(preVaultBal)).to.be.equal(preLenderBal.sub(postLenderBal))
+
+      // lenderVault owner deposits weth
+      depositAmount = ONE_WETH.mul(1000)
+      await weth.mint(lender.address, depositAmount)
+      preLenderBal = await weth.balanceOf(lender.address)
+      preVaultBal = await weth.balanceOf(lenderVault.address)
+      await weth.connect(lender).transfer(lenderVault.address, depositAmount)
+      postLenderBal = await weth.balanceOf(lender.address)
+      postVaultBal = await weth.balanceOf(lenderVault.address)
+      expect(postVaultBal.sub(preVaultBal)).to.be.equal(preLenderBal.sub(postLenderBal))
+      
+      // reverts if non-owner tries to withdraw
+      withdrawAmount = usdc.balanceOf(lenderVault.address)
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+      withdrawAmount = weth.balanceOf(lenderVault.address)
+      await expect(lenderVault.connect(borrower).withdraw(weth.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+
+      // reverts if owner tries to withdraw invalid amount
+      withdrawAmount = (await usdc.balanceOf(lenderVault.address)).add(1)
+      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidWithdrawAmount'
+      )
+      withdrawAmount = (await weth.balanceOf(lenderVault.address)).add(1)
+      await expect(lenderVault.connect(lender).withdraw(weth.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidWithdrawAmount'
+      )
+
+      // prepare borrow, lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          borrower: borrower.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+      const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_WETH)
+      const expectedReclaimableAmount = collSendAmount.sub(collSendAmount.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE))
+
+      // check pre/post amounts on borrow
+      let preLockedWethAmounts = await lenderVault.lockedAmounts(weth.address)
+      let preLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
+      let preVaultWethBal = await weth.balanceOf(lenderVault.address)
+      let preBorrowerWethBal = await weth.balanceOf(borrower.address)
+      let preVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
+      let preBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+      await borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      let postLockedWethAmounts = await lenderVault.lockedAmounts(weth.address)
+      let postLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
+      let postVaultWethBal = await weth.balanceOf(lenderVault.address)
+      let postBorrowerWethBal = await weth.balanceOf(borrower.address)
+      let postVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
+      let postBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+
+      // check collateral amount diffs
+      expect(postVaultWethBal.sub(preVaultWethBal)).to.be.equal(preBorrowerWethBal.sub(postBorrowerWethBal))
+      // check loan amount diffs
+      expect(preVaultUsdcBal.sub(postVaultUsdcBal)).to.be.equal(postBorrowerUsdcBal.sub(preBorrowerUsdcBal))
+      expect(expectedLoanAmount).to.be.equal(postBorrowerUsdcBal.sub(preBorrowerUsdcBal))
+      // check locked amounts
+      expect(preLockedWethAmounts).to.be.equal(0)
+      expect(preLockedUsdcAmounts).to.be.equal(0)
+      expect(postLockedUsdcAmounts).to.be.equal(0)
+      expect(postLockedWethAmounts).to.be.equal(expectedReclaimableAmount)
+
+      // de-whitelisting shouldn't affect withdrawability
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 0)
+
+      // de-whitelisting should affect new borrows
+      await expect(borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
+
+      // should revert when trying to withdraw whole lender vault balance, which also incl locked amounts
+      withdrawAmount = await weth.balanceOf(lenderVault.address)
+      await expect(lenderVault.connect(lender).withdraw(weth.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidWithdrawAmount'
+      )
+
+      // do valid withdrawals (1/2)
+      withdrawAmount = (await weth.balanceOf(lenderVault.address)).sub(expectedReclaimableAmount)
+      preLenderBal = await weth.balanceOf(lender.address)
+      preVaultBal = await weth.balanceOf(lenderVault.address)
+      await lenderVault.connect(lender).withdraw(weth.address, withdrawAmount)
+      postLenderBal = await weth.balanceOf(lender.address)
+      postVaultBal = await weth.balanceOf(lenderVault.address)
+      expect(postLenderBal.sub(preLenderBal)).to.be.equal(preVaultBal.sub(postVaultBal))
+
+      // do valid withdrawals (2/2)
+      withdrawAmount = await usdc.balanceOf(lenderVault.address)
+      preLenderBal = await usdc.balanceOf(lender.address)
+      preVaultBal = await usdc.balanceOf(lenderVault.address)
+      await lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)
+      postLenderBal = await usdc.balanceOf(lender.address)
+      postVaultBal = await usdc.balanceOf(lenderVault.address)
+      expect(postLenderBal.sub(preLenderBal)).to.be.equal(preVaultBal.sub(postVaultBal))
+    })
+
     it('Should not proccess with insufficient vault funds', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
@@ -334,7 +638,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.reverted
+      ).to.be.revertedWithCustomError(lenderVault, 'InsufficientVaultFunds')
 
       // allow for transfer of vault ownership
       await lenderVault.connect(lender).proposeNewOwner(borrower.address)
