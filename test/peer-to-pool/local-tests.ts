@@ -84,8 +84,13 @@ describe('Peer-to-Pool: Local Tests', function () {
       loanProposalFactory,
       'InvalidFee'
     )
-    await loanProposalFactory.connect(team).setArrangerFeeSplit(BASE.mul(20).div(100))
-
+    const newFee = BASE.mul(20).div(100)
+    await loanProposalFactory.connect(team).setArrangerFeeSplit(newFee)
+    await expect(loanProposalFactory.connect(team).setArrangerFeeSplit(newFee)).to.be.revertedWithCustomError(
+      loanProposalFactory,
+      'InvalidFee'
+    )
+    
     const FundingPool = await ethers.getContractFactory('FundingPool')
     const fundingPool = await FundingPool.deploy(loanProposalFactory.address, usdc.address)
     await fundingPool.deployed()
@@ -503,7 +508,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     await usdc.connect(lender1).approve(fundingPool.address, MAX_UINT256)
     let preBalLender = await usdc.balanceOf(lender1.address)
     let addAmount = preBalLender
-    await expect(fundingPool.connect(lender1).deposit(addAmount.add(1), 0)).to.be.reverted
+    await expect(fundingPool.connect(lender1).deposit(0, 0)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidSendAmount'
+    )
+    await expect(fundingPool.connect(lender1).deposit(addAmount.add(1), 0)).to.be.revertedWith(
+      'ERC20: transfer amount exceeds balance'
+    )
     await expect(fundingPool.connect(lender1).deposit(addAmount.sub(10), 10)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidSendAmount'
@@ -515,6 +526,10 @@ describe('Peer-to-Pool: Local Tests', function () {
     // lender can withdraw
     preBalLender = await usdc.balanceOf(lender1.address)
     let preBalPool = await usdc.balanceOf(fundingPool.address)
+    await expect(fundingPool.connect(lender1).withdraw(0)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidWithdrawAmount'
+    )
     await expect(fundingPool.connect(lender1).withdraw(addAmount.add(1))).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidWithdrawAmount'
@@ -552,6 +567,11 @@ describe('Peer-to-Pool: Local Tests', function () {
     await expect(
       fundingPool.connect(lender1).subscribe(loanProposal.address, depositedBalance.add(1))
     ).to.be.revertedWithCustomError(fundingPool, 'InsufficientBalance')
+
+    // check can't subscribe with zero amount
+    await expect(
+      fundingPool.connect(lender1).subscribe(loanProposal.address, 0)
+    ).to.be.revertedWithCustomError(fundingPool, 'InvalidAmount')
 
     // check valid subscribe works
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
@@ -592,6 +612,11 @@ describe('Peer-to-Pool: Local Tests', function () {
       'UnregisteredLoanProposal'
     )
 
+    // check can't unsubscribe with zero amount
+    await expect(
+      fundingPool.connect(lender2).unsubscribe(loanProposal.address, 0)
+    ).to.be.revertedWithCustomError(fundingPool, 'InvalidAmount')
+    
     // check valid unsubscribe works
     await fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionAmount)
     let postBal = await fundingPool.balanceOf(lender2.address)

@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
@@ -9,7 +10,6 @@ import {IFundingPool} from "./interfaces/IFundingPool.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
-import {Helpers} from "../Helpers.sol";
 
 contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     using SafeERC20 for IERC20Metadata;
@@ -535,7 +535,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     {
         uint256 _arrangerFee = (dynamicData.arrangerFee * totalSubscribed) /
             Constants.BASE;
-        uint256 _finalLoanAmount = Helpers.toUint128(
+        uint256 _finalLoanAmount = SafeCast.toUint128(
             totalSubscribed - _arrangerFee
         );
         uint256 _finalCollAmountReservedForDefault = (_finalLoanAmount *
@@ -546,19 +546,20 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         // 1 loanToken for 8 collToken)
         uint256 _finalCollAmountReservedForConversions;
         for (uint256 i = 0; i < _tmpLoanTerms.repaymentSchedule.length; ) {
-            _tmpLoanTerms.repaymentSchedule[i].loanTokenDue = Helpers.toUint128(
-                (_finalLoanAmount *
-                    _tmpLoanTerms.repaymentSchedule[i].loanTokenDue) /
-                    Constants.BASE
-            );
-            _tmpLoanTerms.repaymentSchedule[i].collTokenDueIfConverted = Helpers
+            _tmpLoanTerms.repaymentSchedule[i].loanTokenDue = SafeCast
                 .toUint128(
-                    (_tmpLoanTerms.repaymentSchedule[i].loanTokenDue *
-                        _tmpLoanTerms
-                            .repaymentSchedule[i]
-                            .collTokenDueIfConverted) /
-                        (10 ** loanTokenDecimals)
+                    (_finalLoanAmount *
+                        _tmpLoanTerms.repaymentSchedule[i].loanTokenDue) /
+                        Constants.BASE
                 );
+            _tmpLoanTerms
+                .repaymentSchedule[i]
+                .collTokenDueIfConverted = SafeCast.toUint128(
+                (_tmpLoanTerms.repaymentSchedule[i].loanTokenDue *
+                    _tmpLoanTerms
+                        .repaymentSchedule[i]
+                        .collTokenDueIfConverted) / (10 ** loanTokenDecimals)
+            );
             _finalCollAmountReservedForConversions += _tmpLoanTerms
                 .repaymentSchedule[i]
                 .collTokenDueIfConverted;
