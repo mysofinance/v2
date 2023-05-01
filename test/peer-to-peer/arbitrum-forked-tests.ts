@@ -333,7 +333,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     ]
     let onChainQuote = {
       generalQuoteInfo: {
-        borrower: borrower.address,
+        whitelistAuthority: borrower.address,
         collToken: weth.address,
         loanToken: usdc.address,
         oracleAddr: ZERO_ADDR,

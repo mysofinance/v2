@@ -41,7 +41,7 @@ export const createOnChainRequest = async ({
   ]
   let onChainQuote = {
     generalQuoteInfo: {
-      borrower: ZERO_ADDR,
+      whitelistAuthority: ZERO_ADDR,
       collToken: collToken,
       loanToken: loanToken,
       oracleAddr: ZERO_ADDR,

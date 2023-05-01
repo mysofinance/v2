@@ -233,7 +233,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          borrower: borrower.address,
+          whitelistAuthority: borrower.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,

@@ -30,7 +30,7 @@ interface IAddressRegistry {
     function addLenderVault(address addr) external;
 
     /**
-     * @notice Allows user to get whitelisted
+     * @notice Allows user to claim whitelisted status
      * @param whitelistAuthority Address of whitelist authorithy
      * @param whitelistedUntil Timestamp until when user is whitelisted
      * @param v Part of signature from whitelist authority
@@ -38,7 +38,7 @@ interface IAddressRegistry {
      * @param s Part of signature from whitelist authority
      * @param salt Salt to make signature unique
      */
-    function getWhitelistedAsBorrower(
+    function claimWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
         uint8 v,

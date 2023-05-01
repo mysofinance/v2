@@ -21,7 +21,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => uint256))
-        internal borrowerWhitelistExpiry;
+        internal borrowerWhitelistedUntil;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
         public whitelistState;
     address[] internal _registeredVaults;
@@ -85,7 +85,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         _registeredVaults.push(addr);
     }
 
-    function getWhitelistedAsBorrower(
+    function claimWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
         uint8 v,
@@ -93,14 +93,11 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         bytes32 s,
         bytes32 salt
     ) external {
+        bytes32 payloadHash = keccak256(
+            abi.encode(msg.sender, whitelistedUntil, block.chainid, salt)
+        );
         bytes32 messageHash = keccak256(
-            abi.encodePacked(
-                "\x19Ethereum Signed Message:\n32",
-                msg.sender,
-                whitelistedUntil,
-                block.chainid,
-                salt
-            )
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
         );
         address recoveredSigner = ecrecover(messageHash, v, r, s);
         if (
@@ -109,7 +106,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         ) {
             revert Errors.InvalidSignature();
         }
-        borrowerWhitelistExpiry[whitelistAuthority][
+        borrowerWhitelistedUntil[whitelistAuthority][
             msg.sender
         ] = whitelistedUntil;
     }
@@ -124,11 +121,11 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         }
         if (
             whitelistedUntil ==
-            borrowerWhitelistExpiry[whitelistAuthority][borrower]
+            borrowerWhitelistedUntil[whitelistAuthority][borrower]
         ) {
             revert Errors.InvalidUpdate();
         }
-        borrowerWhitelistExpiry[whitelistAuthority][
+        borrowerWhitelistedUntil[whitelistAuthority][
             borrower
         ] = whitelistedUntil;
     }
@@ -138,7 +135,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address borrower
     ) external view returns (bool) {
         return
-            borrowerWhitelistExpiry[whitelistAuthority][borrower] <
+            borrowerWhitelistedUntil[whitelistAuthority][borrower] >
             block.timestamp;
     }
 

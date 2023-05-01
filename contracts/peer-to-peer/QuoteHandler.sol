@@ -313,7 +313,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         if (
             generalQuoteInfo.whitelistAuthority != address(0) &&
-            IAddressRegistry(_addressRegistry).isWhitelistedBorrower(
+            !IAddressRegistry(_addressRegistry).isWhitelistedBorrower(
                 generalQuoteInfo.whitelistAuthority,
                 borrower
             )

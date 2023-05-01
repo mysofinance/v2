@@ -372,7 +372,7 @@ const payloadScheme = [
     components: [
       {
         internalType: 'address',
-        name: 'borrower',
+        name: 'whitelistAuthority',
         type: 'address'
       },
       {
