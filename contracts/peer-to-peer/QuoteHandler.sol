@@ -144,9 +144,16 @@ contract QuoteHandler is IQuoteHandler {
         address borrower,
         address lenderVault,
         uint256 quoteTupleIdx,
-        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote,
+        DataTypesPeerToPeer.BorrowerWhitelistAuthorization
+            calldata borrowerWhitelistAuthorization
     ) external {
-        checkSenderAndGeneralQuoteInfo(borrower, onChainQuote.generalQuoteInfo);
+        checkSenderAndGeneralQuoteInfo(
+            borrower,
+            lenderVault,
+            onChainQuote.generalQuoteInfo,
+            borrowerWhitelistAuthorization
+        );
         bytes32 onChainQuoteHash = hashOnChainQuote(onChainQuote);
         if (!isOnChainQuote[lenderVault][onChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
@@ -169,11 +176,15 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
-        bytes32[] memory proof
+        bytes32[] memory proof,
+        DataTypesPeerToPeer.BorrowerWhitelistAuthorization
+            calldata borrowerWhitelistAuthorization
     ) external {
         checkSenderAndGeneralQuoteInfo(
             borrower,
-            offChainQuote.generalQuoteInfo
+            lenderVault,
+            offChainQuote.generalQuoteInfo,
+            borrowerWhitelistAuthorization
         );
         if (
             offChainQuote.nonce < offChainQuoteNonce[lenderVault] ||
@@ -288,7 +299,10 @@ contract QuoteHandler is IQuoteHandler {
 
     function checkSenderAndGeneralQuoteInfo(
         address borrower,
-        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo
+        address lenderVault,
+        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypesPeerToPeer.BorrowerWhitelistAuthorization
+            calldata borrowerWhitelistAuthorization
     ) internal view {
         address _addressRegistry = addressRegistry;
         if (
@@ -316,6 +330,17 @@ contract QuoteHandler is IQuoteHandler {
             generalQuoteInfo.borrower != borrower
         ) {
             revert Errors.InvalidBorrower();
+        }
+        if (
+            generalQuoteInfo.whitelistSigner != address(0) &&
+            !isValidWhitelistedBorrower(
+                lenderVault,
+                borrower,
+                generalQuoteInfo.whitelistSigner,
+                borrowerWhitelistAuthorization
+            )
+        ) {
+            revert Errors.NonWhitelistedBorrower();
         }
     }
 
@@ -370,6 +395,40 @@ contract QuoteHandler is IQuoteHandler {
             unchecked {
                 k++;
             }
+        }
+        return true;
+    }
+
+    function isValidWhitelistedBorrower(
+        address lenderVault,
+        address borrower,
+        address whitelistSigner,
+        DataTypesPeerToPeer.BorrowerWhitelistAuthorization
+            calldata borrowerWhitelistAuthorization
+    ) internal view returns (bool) {
+        if (
+            borrowerWhitelistAuthorization.authorizationExpiry < block.timestamp
+        ) {
+            return false;
+        }
+
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                lenderVault,
+                borrower,
+                block.chainid,
+                borrowerWhitelistAuthorization.authorizationExpiry
+            )
+        );
+        address recoveredSigner = ecrecover(
+            messageHash,
+            borrowerWhitelistAuthorization.v,
+            borrowerWhitelistAuthorization.r,
+            borrowerWhitelistAuthorization.s
+        );
+        if (recoveredSigner != whitelistSigner) {
+            return false;
         }
         return true;
     }

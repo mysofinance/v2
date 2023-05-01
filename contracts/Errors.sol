@@ -37,6 +37,7 @@ library Errors {
     error NonWhitelistedCompartment();
     error NonWhitelistedCallback();
     error NonWhitelistedToken();
+    error NonWhitelistedBorrower();
     error LtvHigherThanMax();
     error InsufficientVaultFunds();
     error NegativeRepaymentAmount();

@@ -44,6 +44,8 @@ library DataTypesPeerToPeer {
     struct GeneralQuoteInfo {
         // address of borrower (if address(0), open to any borrowers)
         address borrower;
+        // address of whitelist authorizer (if address(0), no access control)
+        address whitelistSigner;
         // address of collateral token
         address collToken;
         // address of loan token
@@ -115,6 +117,17 @@ library DataTypesPeerToPeer {
         address callbackAddr;
         // any data needed by callback
         bytes callbackData;
+        // authorization for whitelisted borrowers
+        BorrowerWhitelistAuthorization borrowerWhitelistAuthorization;
+    }
+
+    struct BorrowerWhitelistAuthorization {
+        // when the authorization expires
+        uint40 authorizationExpiry;
+        // data for recovering the signer
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
     }
 
     enum WhitelistState {

@@ -98,12 +98,15 @@ interface IQuoteHandler {
      * @param lenderVault address of the vault
      * @param quoteTupleIdx index of the quote tuple in the vault's quote array
      * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
+     * @param borrowerWhitelistAuthorization data for the borrower whitelist authorization (See notes in DataTypesPeerToPeer.sol)
      */
     function checkAndRegisterOnChainQuote(
         address borrower,
         address lenderVault,
         uint256 quoteTupleIdx,
-        DataTypesPeerToPeer.OnChainQuote memory onChainQuote
+        DataTypesPeerToPeer.OnChainQuote memory onChainQuote,
+        DataTypesPeerToPeer.BorrowerWhitelistAuthorization
+            memory borrowerWhitelistAuthorization
     ) external;
 
     /**
@@ -114,13 +117,16 @@ interface IQuoteHandler {
      * @param offChainQuote data for the offChain quote (See notes in DataTypesPeerToPeer.sol)
      * @param quoteTuple quote data (see notes in DataTypesPeerToPeer.sol)
      * @param proof array of bytes needed to verify merkle proof
+     * @param borrowerWhitelistAuthorization data for the borrower whitelist authorization (See notes in DataTypesPeerToPeer.sol)
      */
     function checkAndRegisterOffChainQuote(
         address borrower,
         address lenderVault,
         DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
-        bytes32[] memory proof
+        bytes32[] memory proof,
+        DataTypesPeerToPeer.BorrowerWhitelistAuthorization
+            memory borrowerWhitelistAuthorization
     ) external;
 
     /**

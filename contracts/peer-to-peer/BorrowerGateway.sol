@@ -45,7 +45,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 lenderVault,
                 offChainQuote,
                 quoteTuple,
-                proof
+                proof,
+                borrowInstructions.borrowerWhitelistAuthorization
             );
         }
 
@@ -107,7 +108,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 msg.sender,
                 lenderVault,
                 quoteTupleIdx,
-                onChainQuote
+                onChainQuote,
+                borrowInstructions.borrowerWhitelistAuthorization
             );
         }
         DataTypesPeerToPeer.QuoteTuple memory quoteTuple = onChainQuote
