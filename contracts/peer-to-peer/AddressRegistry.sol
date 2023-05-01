@@ -20,6 +20,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public borrowerGateway;
     address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
+    mapping(address => mapping(address => uint256))
+        internal borrowerWhitelistExpiry;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
         public whitelistState;
     address[] internal _registeredVaults;
@@ -81,6 +83,63 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         }
         isRegisteredVault[addr] = true;
         _registeredVaults.push(addr);
+    }
+
+    function getWhitelistedAsBorrower(
+        address whitelistAuthority,
+        uint256 whitelistedUntil,
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        bytes32 salt
+    ) external {
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                msg.sender,
+                whitelistedUntil,
+                block.chainid,
+                salt
+            )
+        );
+        address recoveredSigner = ecrecover(messageHash, v, r, s);
+        if (
+            recoveredSigner != whitelistAuthority ||
+            whitelistedUntil < block.timestamp
+        ) {
+            revert Errors.InvalidSignature();
+        }
+        borrowerWhitelistExpiry[whitelistAuthority][
+            msg.sender
+        ] = whitelistedUntil;
+    }
+
+    function updateBorrowerWhitelist(
+        address whitelistAuthority,
+        address borrower,
+        uint256 whitelistedUntil
+    ) external {
+        if (msg.sender != whitelistAuthority) {
+            revert Errors.InvalidSender();
+        }
+        if (
+            whitelistedUntil ==
+            borrowerWhitelistExpiry[whitelistAuthority][borrower]
+        ) {
+            revert Errors.InvalidUpdate();
+        }
+        borrowerWhitelistExpiry[whitelistAuthority][
+            borrower
+        ] = whitelistedUntil;
+    }
+
+    function isWhitelistedBorrower(
+        address whitelistAuthority,
+        address borrower
+    ) external view returns (bool) {
+        return
+            borrowerWhitelistExpiry[whitelistAuthority][borrower] <
+            block.timestamp;
     }
 
     function registeredVaults() external view returns (address[] memory) {

@@ -30,6 +30,36 @@ interface IAddressRegistry {
     function addLenderVault(address addr) external;
 
     /**
+     * @notice Allows user to get whitelisted
+     * @param whitelistAuthority Address of whitelist authorithy
+     * @param whitelistedUntil Timestamp until when user is whitelisted
+     * @param v Part of signature from whitelist authority
+     * @param r Part of signature from whitelist authority
+     * @param s Part of signature from whitelist authority
+     * @param salt Salt to make signature unique
+     */
+    function getWhitelistedAsBorrower(
+        address whitelistAuthority,
+        uint256 whitelistedUntil,
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        bytes32 salt
+    ) external;
+
+    /**
+     * @notice Allows whitelist authority to set the whitelist state for a given borrower
+     * @param whitelistAuthority Address of whitelist authorithy
+     * @param borrower Address of the borrower
+     * @param whitelistedUntil Timestamp until which borrower shall be whitelisted
+     */
+    function updateBorrowerWhitelist(
+        address whitelistAuthority,
+        address borrower,
+        uint256 whitelistedUntil
+    ) external;
+
+    /**
      * @notice Sets the whitelist state for a given address
      * @dev Can only be called by registry owner
      * @param addrs Addresses for which whitelist state shall be set
@@ -39,6 +69,17 @@ interface IAddressRegistry {
         address[] memory addrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
     ) external;
+
+    /**
+     * @notice Returns boolean flag indicating whether the borrower has been whitelisted by whitelistAuthority
+     * @param whitelistAuthority Addresses of the whitelist authority
+     * @param borrower Addresses of the borrower
+     * @return Boolean flag indicating whether the borrower has been whitelisted by whitelistAuthority
+     */
+    function isWhitelistedBorrower(
+        address whitelistAuthority,
+        address borrower
+    ) external view returns (bool);
 
     /**
      * @notice Returns the address of the vault factory

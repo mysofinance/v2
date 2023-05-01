@@ -84,4 +84,6 @@ library Errors {
     error WaitForLoanTermsCoolOffPeriod();
     error ZeroConversionAmount();
     error InvalidNewOwnerProposal();
+    error InvalidSignature();
+    error InvalidUpdate();
 }
