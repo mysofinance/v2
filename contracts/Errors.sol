@@ -86,4 +86,5 @@ library Errors {
     error InvalidNewOwnerProposal();
     error InvalidSignature();
     error InvalidUpdate();
+    error CannotClaimOutdatedStatus();
 }

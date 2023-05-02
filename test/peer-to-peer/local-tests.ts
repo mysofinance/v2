@@ -47,9 +47,7 @@ async function setupBorrowerWhitelist({
   expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
   // have borrower claim whitelist status
-  expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
-  await addressRegistry.connect(borrower).claimWhitelistStatus(whitelistAuthority.address, whitelistedUntil, sig.v, sig.r, sig.s, salt)
-  expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
+  await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, sig.v, sig.r, sig.s, salt)
 }
 
 async function generateOffChainQuote({
@@ -299,6 +297,81 @@ describe('Peer-to-Peer: Local Tests', function () {
       lenderVault
     }
   }
+
+  describe('Address Registry', function() {
+    it('Should handle borrower whitelist correctly', async function () {
+      const { addressRegistry, team, lender, borrower, whitelistAuthority } = await setupTest()
+
+      // define whitelistedUntil
+      let blocknum = await ethers.provider.getBlockNumber()
+      let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const whitelistedUntil1 = Number(timestamp.toString()) + 60*60*365
+
+      // get chain id
+      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
+
+      // get salt
+      const salt = ZERO_BYTES32
+
+      // construct payload and sign
+      let payload = ethers.utils.defaultAbiCoder.encode(
+      [ "address", "uint256", "uint256", "bytes32"],
+      [ borrower.address, whitelistedUntil1, chainId, salt ])
+      let payloadHash = ethers.utils.keccak256(payload)
+      let signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig1 = ethers.utils.splitSignature(signature)
+      let recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig1)
+      expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+      // revert if non-authorized borrower tries to claim status
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
+      await expect(addressRegistry.connect(team).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, sig1.v, sig1.r, sig1.s, salt)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
+
+      // move forward past valid until timestamp
+      await ethers.provider.send('evm_mine', [whitelistedUntil1 + 1])
+      
+      // revert if whitelistedUntil is before than current block time
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
+      await expect(addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, sig1.v, sig1.r, sig1.s, salt)).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
+
+      // do new sig
+      blocknum = await ethers.provider.getBlockNumber()
+      timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const whitelistedUntil2 = Number(timestamp.toString()) + 60*60*365
+      payload = ethers.utils.defaultAbiCoder.encode(
+      [ "address", "uint256", "uint256", "bytes32"],
+      [ borrower.address, whitelistedUntil2, chainId, salt ])
+      payloadHash = ethers.utils.keccak256(payload)
+      signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig2 = ethers.utils.splitSignature(signature)
+      recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig2)
+
+      // have borrower claim whitelist status
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
+      await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, sig2.v, sig2.r, sig2.s, salt)
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
+
+      // revert if trying to claim again
+      await expect(addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, sig2.v, sig2.r, sig2.s, salt)).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+
+      // revert if trying to claim previous sig with outdated whitelistedUntil timestamp
+      await expect(addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, sig1.v, sig1.r, sig1.s, salt)).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+      
+      // revert if whitelist authority tries to set same whitelistedUntil on borrower
+      await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
+       [borrower.address], whitelistedUntil2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+
+      // check that whitelist authority can overwrite whitelistedUntil
+      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
+        [borrower.address], 0)
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
+      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
+        [borrower.address], MAX_UINT256)
+        expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
+    })
+  })
 
   describe('Lender Vault', function () {
 

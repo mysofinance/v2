@@ -85,7 +85,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         _registeredVaults.push(addr);
     }
 
-    function claimWhitelistStatus(
+    function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
         uint8 v,
@@ -100,34 +100,46 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
         );
         address recoveredSigner = ecrecover(messageHash, v, r, s);
-        if (
-            recoveredSigner != whitelistAuthority ||
-            whitelistedUntil < block.timestamp
-        ) {
+        if (recoveredSigner != whitelistAuthority) {
             revert Errors.InvalidSignature();
+        }
+        if (
+            whitelistedUntil < block.timestamp ||
+            whitelistedUntil <=
+            borrowerWhitelistedUntil[whitelistAuthority][msg.sender]
+        ) {
+            revert Errors.CannotClaimOutdatedStatus();
         }
         borrowerWhitelistedUntil[whitelistAuthority][
             msg.sender
         ] = whitelistedUntil;
+        emit BorrowerWhitelistStatusClaimed(
+            whitelistAuthority,
+            msg.sender,
+            whitelistedUntil
+        );
     }
 
     function updateBorrowerWhitelist(
-        address whitelistAuthority,
-        address borrower,
+        address[] memory borrowers,
         uint256 whitelistedUntil
     ) external {
-        if (msg.sender != whitelistAuthority) {
-            revert Errors.InvalidSender();
+        for (uint i = 0; i < borrowers.length; ) {
+            if (
+                borrowers[i] == address(0) ||
+                whitelistedUntil ==
+                borrowerWhitelistedUntil[msg.sender][borrowers[i]]
+            ) {
+                revert Errors.InvalidUpdate();
+            }
+            borrowerWhitelistedUntil[msg.sender][
+                borrowers[i]
+            ] = whitelistedUntil;
+            unchecked {
+                i++;
+            }
         }
-        if (
-            whitelistedUntil ==
-            borrowerWhitelistedUntil[whitelistAuthority][borrower]
-        ) {
-            revert Errors.InvalidUpdate();
-        }
-        borrowerWhitelistedUntil[whitelistAuthority][
-            borrower
-        ] = whitelistedUntil;
+        emit BorrowerWhitelistUpdated(msg.sender, borrowers, whitelistedUntil);
     }
 
     function isWhitelistedBorrower(

@@ -10,6 +10,17 @@ interface IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState whitelistState
     );
 
+    event BorrowerWhitelistStatusClaimed(
+        address indexed whitelistAuthority,
+        address indexed borrower,
+        uint256 whitelistedUntil
+    );
+    event BorrowerWhitelistUpdated(
+        address whitelistAuthority,
+        address[] indexed borrower,
+        uint256 whitelistedUntil
+    );
+
     /**
      * @notice initializes factory, gateway, and quote handler contracts
      * @param _lenderVaultFactory address of the factory for lender vaults
@@ -38,7 +49,7 @@ interface IAddressRegistry {
      * @param s Part of signature from whitelist authority
      * @param salt Salt to make signature unique
      */
-    function claimWhitelistStatus(
+    function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
         uint8 v,
@@ -48,14 +59,13 @@ interface IAddressRegistry {
     ) external;
 
     /**
-     * @notice Allows whitelist authority to set the whitelist state for a given borrower
-     * @param whitelistAuthority Address of whitelist authorithy
-     * @param borrower Address of the borrower
-     * @param whitelistedUntil Timestamp until which borrower shall be whitelisted
+     * @notice Allows a whitelist authority to set the whitelistedUntil state for a given borrower
+     * @dev Anyone can create their own whitelist, and lenders can decide if and which whitelist they want to use
+     * @param borrowers Array of borrower addresses
+     * @param whitelistedUntil Timestamp until which borrowers shall be whitelisted under given whitelist authority
      */
     function updateBorrowerWhitelist(
-        address whitelistAuthority,
-        address borrower,
+        address[] memory borrowers,
         uint256 whitelistedUntil
     ) external;
 
