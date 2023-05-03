@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.8.19;
 
-import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
+import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
 /**
  * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
@@ -15,6 +15,8 @@ import {Ownable} from "../Ownable.sol";
  * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
  */
 contract AddressRegistry is Ownable, IAddressRegistry {
+    using ECDSA for bytes32;
+
     bool internal isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
@@ -88,9 +90,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        uint8 v,
-        bytes32 r,
-        bytes32 s,
+        bytes memory signature,
         bytes32 salt
     ) external {
         bytes32 payloadHash = keccak256(
@@ -99,8 +99,11 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         bytes32 messageHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
         );
-        address recoveredSigner = ecrecover(messageHash, v, r, s);
-        if (recoveredSigner != whitelistAuthority) {
+        address recoveredSigner = messageHash.recover(signature);
+        if (
+            whitelistAuthority == address(0) ||
+            recoveredSigner != whitelistAuthority
+        ) {
             revert Errors.InvalidSignature();
         }
         if (

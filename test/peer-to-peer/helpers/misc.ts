@@ -285,5 +285,5 @@ export const setupBorrowerWhitelist = async ({
   expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
   // have borrower claim whitelist status
-  await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, sig.v, sig.r, sig.s, salt)
+  await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
 }

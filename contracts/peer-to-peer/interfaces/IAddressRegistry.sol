@@ -44,17 +44,13 @@ interface IAddressRegistry {
      * @notice Allows user to claim whitelisted status
      * @param whitelistAuthority Address of whitelist authorithy
      * @param whitelistedUntil Timestamp until when user is whitelisted
-     * @param v Part of signature from whitelist authority
-     * @param r Part of signature from whitelist authority
-     * @param s Part of signature from whitelist authority
+     * @param signature Signature from whitelist authority
      * @param salt Salt to make signature unique
      */
     function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        uint8 v,
-        bytes32 r,
-        bytes32 s,
+        bytes memory signature,
         bytes32 salt
     ) external;
 
