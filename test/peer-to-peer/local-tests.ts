@@ -4,7 +4,7 @@ import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { LenderVaultImpl, MyERC20 } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
-import { AddressRegistry } from '../../typechain-types'
+import { setupBorrowerWhitelist } from './helpers/misc'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -18,37 +18,6 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-
-async function setupBorrowerWhitelist({
-  addressRegistry,
-  borrower,
-  whitelistAuthority,
-  whitelistedUntil = 0,
-}: {
-  addressRegistry: AddressRegistry
-  borrower: SignerWithAddress
-  whitelistAuthority: SignerWithAddress
-  whitelistedUntil?: any
-}) {
-  // get chain id
-  const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
-
-  // get salt
-  const salt = ZERO_BYTES32
-
-  // construct payload and sign
-  const payload = ethers.utils.defaultAbiCoder.encode(
-  [ "address", "uint256", "uint256", "bytes32"],
-  [ borrower.address, whitelistedUntil, chainId, salt ])
-  const payloadHash = ethers.utils.keccak256(payload)
-  const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
-  const sig = ethers.utils.splitSignature(signature)
-  const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
-  expect(recoveredAddr).to.equal(whitelistAuthority.address)
-
-  // have borrower claim whitelist status
-  await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, sig.v, sig.r, sig.s, salt)
-}
 
 async function generateOffChainQuote({
   lenderVault,
@@ -362,6 +331,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       // revert if whitelist authority tries to set same whitelistedUntil on borrower
       await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
        [borrower.address], whitelistedUntil2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+
+      // revert if whitelist authority tries to whitelist zero address
+      await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
+        [ZERO_ADDRESS], whitelistedUntil2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
 
       // check that whitelist authority can overwrite whitelistedUntil
       await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(

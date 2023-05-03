@@ -20,7 +20,8 @@ import {
   calcLoanBalanceDelta,
   getExactLpTokenPriceInEth,
   getFairReservesPriceAndEthValue,
-  getDeltaBNComparison
+  getDeltaBNComparison,
+  setupBorrowerWhitelist
 } from './helpers/misc'
 
 // test config constants & vars
@@ -56,7 +57,7 @@ function getLoopingSendAmount(
 
 describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   async function setupTest() {
-    const [lender, borrower, team] = await ethers.getSigners()
+    const [ lender, borrower, team, whitelistAuthority ] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -186,6 +187,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       lender,
       borrower,
       team,
+      whitelistAuthority,
       usdc,
       weth,
       paxg,
@@ -269,7 +271,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -283,6 +285,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(
@@ -291,7 +294,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong quote interestRatePctInBase', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -315,7 +318,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -329,6 +332,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(
@@ -337,7 +341,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong quote tenor', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -361,7 +365,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -375,6 +379,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
+
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
       await expect(
@@ -383,7 +388,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong quote validUntil', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -407,7 +412,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -453,7 +458,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -481,7 +486,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong upfrontFeePctInBase', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -505,7 +510,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -527,7 +532,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong quoteTuples length', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -538,7 +543,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -560,7 +565,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong quote collToken, loanToken', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, quoteHandler, lender, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -584,7 +589,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: weth.address,
           oracleAddr: ZERO_ADDR,
@@ -630,7 +635,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -681,7 +686,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong updateOnChainQuote', async function () {
-      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
         await setupTest()
 
       // lenderVault owner deposits usdc
@@ -708,7 +713,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -812,6 +817,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      await setupBorrowerWhitelist({
+        addressRegistry,
+        borrower,
+        whitelistAuthority,
+        whitelistedUntil
+      })
+      
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -826,7 +840,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should handle unlocking collateral correctly', async function () {
-      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
         await setupTest()
 
       // lenderVault owner deposits usdc
@@ -851,7 +865,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -891,6 +905,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      await setupBorrowerWhitelist({
+        addressRegistry,
+        borrower,
+        whitelistAuthority,
+        whitelistedUntil
+      })
+    
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -987,7 +1010,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should revert on invalid repays', async function () {
-      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
         await setupTest()
 
       // lenderVault owner deposits usdc
@@ -1006,7 +1029,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1046,6 +1069,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      await setupBorrowerWhitelist({
+        addressRegistry,
+        borrower,
+        whitelistAuthority,
+        whitelistedUntil
+      })
+      
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -1114,7 +1146,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1177,7 +1209,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1223,6 +1255,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         lender,
         borrower,
         team,
+        whitelistAuthority,
         usdc,
         weth,
         lenderVault,
@@ -1251,7 +1284,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1326,6 +1359,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      await setupBorrowerWhitelist({
+        addressRegistry,
+        borrower,
+        whitelistAuthority,
+        whitelistedUntil
+      })
+      
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
@@ -2586,7 +2628,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -2666,7 +2708,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: paxg.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -2759,7 +2801,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: paxg.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -2852,7 +2894,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: usdc.address,
           loanToken: paxg.address,
           oracleAddr: ZERO_ADDR,
@@ -3053,7 +3095,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: paxg.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -3069,7 +3111,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       let badOnChainQuoteAddrNotInOracle = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: ldo.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -3221,7 +3263,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -3295,7 +3337,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (loan weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault, addressRegistry } =
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, whitelistAuthority, lenderVault, addressRegistry } =
         await setupTest()
 
       // deploy chainlinkOracleContract
@@ -3333,7 +3375,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: whitelistAuthority.address,
           collToken: usdc.address,
           loanToken: weth.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -3359,6 +3401,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      await setupBorrowerWhitelist({
+        addressRegistry,
+        borrower,
+        whitelistAuthority,
+        whitelistedUntil
+      })
+    
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
       const expectedTransferFee = 0
@@ -3444,7 +3495,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let offChainQuoteWithBadTuples = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -3575,7 +3626,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: gohm.address,
           loanToken: usdc.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -3592,7 +3643,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithNeitherAddressGohm = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -3609,7 +3660,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithNoOracle = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: gohm.address,
           loanToken: ldo.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -3733,7 +3784,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: usdc.address,
           loanToken: gohm.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -3870,7 +3921,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: uniV2WethUsdc.address,
           loanToken: usdc.address,
           oracleAddr: uniV2OracleImplementation.address,
@@ -3887,7 +3938,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithNoLpTokens = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: uniV2OracleImplementation.address,
@@ -3904,7 +3955,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithLoanTokenNoOracle = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: uniV2WethUsdc.address,
           loanToken: gohm.address,
           oracleAddr: uniV2OracleImplementation.address,
@@ -4053,7 +4104,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: borrower.address,
+          whitelistAuthority: ZERO_ADDR,
           collToken: usdc.address,
           loanToken: uniV2WethUsdc.address,
           oracleAddr: uniV2OracleImplementation.address,

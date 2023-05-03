@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { BigNumber as BN } from 'bignumber.js'
 import { ethers } from 'hardhat'
-import { LenderVaultImpl, QuoteHandler } from '../typechain-types'
+import { LenderVaultImpl, QuoteHandler, AddressRegistry } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { chainlinkAggregatorAbi, collTokenAbi, uniV2Abi } from './abi'
 
@@ -255,4 +255,35 @@ type FairReservesPriceAndEthValue = {
   fairReserve1: BigNumber
   totalFairReserveEthValue: BigNumber
   fairPriceOfLpToken: BigNumber
+}
+
+export const setupBorrowerWhitelist = async ({
+  addressRegistry,
+  borrower,
+  whitelistAuthority,
+  whitelistedUntil = 0,
+}: {
+  addressRegistry: AddressRegistry
+  borrower: SignerWithAddress
+  whitelistAuthority: SignerWithAddress
+  whitelistedUntil?: any
+}) => {
+  // get chain id
+  const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
+
+  // get salt
+  const salt = ZERO_BYTES32
+
+  // construct payload and sign
+  const payload = ethers.utils.defaultAbiCoder.encode(
+  [ "address", "uint256", "uint256", "bytes32"],
+  [ borrower.address, whitelistedUntil, chainId, salt ])
+  const payloadHash = ethers.utils.keccak256(payload)
+  const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+  const sig = ethers.utils.splitSignature(signature)
+  const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+  expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+  // have borrower claim whitelist status
+  await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, sig.v, sig.r, sig.s, salt)
 }
