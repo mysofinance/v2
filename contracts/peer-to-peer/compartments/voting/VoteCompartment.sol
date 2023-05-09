@@ -24,7 +24,16 @@ contract VoteCompartment is BaseCompartment {
         if (_delegatee == address(0)) {
             revert Errors.InvalidDelegatee();
         }
+        uint256 preDelegateCompartmentBal = IERC20(loan.collToken).balanceOf(
+            address(this)
+        );
         IVotes(loan.collToken).delegate(_delegatee);
+        uint256 postDelegateCompartmentBal = IERC20(loan.collToken).balanceOf(
+            address(this)
+        );
+        if (preDelegateCompartmentBal > postDelegateCompartmentBal) {
+            revert Errors.DelegateReducedBalance();
+        }
     }
 
     // transfer coll on repays
