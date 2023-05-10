@@ -150,6 +150,16 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // deploy LenderVaultFactory
     const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
+    // reverts if zero address is passed as address registry or lender vault implementation
+    await expect(LenderVaultFactory.connect(team).deploy(ZERO_ADDRESS, lenderVaultImplementation.address)).to.be.revertedWithCustomError(
+      LenderVaultFactory,
+      'InvalidAddress'
+    )
+    await expect(LenderVaultFactory.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      LenderVaultFactory,
+      'InvalidAddress'
+    )
+    // correct deployment
     const lenderVaultFactory = await LenderVaultFactory.connect(team).deploy(
       addressRegistry.address,
       lenderVaultImplementation.address

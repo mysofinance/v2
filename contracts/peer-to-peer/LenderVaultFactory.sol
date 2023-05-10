@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {Errors} from "../Errors.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
@@ -12,6 +13,9 @@ contract LenderVaultFactory is ILenderVaultFactory {
     address public immutable lenderVaultImpl;
 
     constructor(address _addressRegistry, address _lenderVaultImpl) {
+        if (_addressRegistry == address(0) || _lenderVaultImpl == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         addressRegistry = _addressRegistry;
         lenderVaultImpl = _lenderVaultImpl;
     }
