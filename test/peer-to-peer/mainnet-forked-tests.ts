@@ -3535,7 +3535,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             selectedQuoteTuple,
             proof
           )
-      ).to.be.revertedWithCustomError(lenderVault, 'NegativeRepaymentAmount')
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidInterestRateFactor')
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth, gohm is coll)', async function () {
