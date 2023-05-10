@@ -16,6 +16,7 @@ library Errors {
     error InvalidAddress();
     error InvalidArrayLength();
     error InvalidQuote();
+    error OutdatedQuote();
     error InvalidOffChainSignature();
     error InvalidOffChainMerkleProof();
     error InvalidCollUnlock();

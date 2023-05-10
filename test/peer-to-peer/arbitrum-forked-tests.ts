@@ -201,7 +201,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       borrowerCompartmentImplementation: glpStakingCompartmentImplementation.address,
       lenderVault,
       quoteHandler,
-      loanPerCollUnit: ONE_USDC.mul(1000)
+      loanPerCollUnit: ONE_USDC.mul(1000),
+      validUntil: MAX_UINT256
     })
 
     // borrow with on chain quote
