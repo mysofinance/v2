@@ -135,6 +135,11 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // deploy borrower gateway
     const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
+    // reverts if zero address is passed as address registry 
+    await expect(BorrowerGateway.connect(team).deploy(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      BorrowerGateway,
+      'InvalidAddress'
+    )
     const borrowerGateway = await BorrowerGateway.connect(team).deploy(addressRegistry.address)
     await borrowerGateway.deployed()
 

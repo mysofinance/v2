@@ -22,6 +22,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     uint256 public protocolFee; // in BASE
 
     constructor(address _addressRegistry) {
+        if (_addressRegistry == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         addressRegistry = _addressRegistry;
     }
 
