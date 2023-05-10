@@ -17,6 +17,9 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
 
     constructor(address _addressRegistry) {
+        if (_addressRegistry == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         addressRegistry = _addressRegistry;
     }
 
