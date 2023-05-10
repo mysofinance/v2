@@ -261,12 +261,6 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                     Constants.LOAN_EXECUTION_GRACE_PERIOD)
         ) {
             dynamicData.status = DataTypesPeerToPool.LoanStatus.ROLLBACK;
-            address collToken = staticData.collToken;
-            // transfer any previously provided collToken back to borrower
-            IERC20Metadata(collToken).safeTransfer(
-                _loanTerms.borrower,
-                IERC20Metadata(collToken).balanceOf(address(this))
-            );
         } else {
             revert Errors.InvalidRollBackRequest();
         }
