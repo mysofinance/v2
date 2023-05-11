@@ -189,14 +189,17 @@ contract CurveLPStakingCompartment is BaseCompartment {
                 currentRewardTokenBal = IERC20(_rewardTokenAddr[index])
                     .balanceOf(address(this));
 
-                tokenAmount = isUnlock
-                    ? currentRewardTokenBal
-                    : (repayAmount * currentRewardTokenBal) / repayAmountLeft;
+                if (currentRewardTokenBal > 0) {
+                    tokenAmount = isUnlock
+                        ? currentRewardTokenBal
+                        : (repayAmount * currentRewardTokenBal) /
+                            repayAmountLeft;
 
-                IERC20(_rewardTokenAddr[index]).safeTransfer(
-                    rewardReceiver,
-                    tokenAmount
-                );
+                    IERC20(_rewardTokenAddr[index]).safeTransfer(
+                        rewardReceiver,
+                        tokenAmount
+                    );
+                }
             }
             unchecked {
                 index++;
