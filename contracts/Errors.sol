@@ -72,7 +72,7 @@ library Errors {
     error InvalidRollBackRequest();
     error UnsubscriptionAmountTooLarge();
     error InvalidSubscriptionRange();
-    error MaxLoanAmountTooLow();
+    error InvalidMaxTotalSubscriptions();
     error OutsideConversionTimeWindow();
     error OutsideRepaymentTimeWindow();
     error NoDefault();

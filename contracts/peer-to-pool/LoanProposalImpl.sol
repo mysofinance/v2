@@ -99,7 +99,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         uint256 totalSubscriptions = IFundingPool(fundingPool)
             .totalSubscriptions(address(this));
         if (totalSubscriptions > newLoanTerms.maxTotalSubscriptions) {
-            revert Errors.MaxLoanAmountTooLow();
+            revert Errors.InvalidMaxTotalSubscriptions();
         }
         _loanTerms = newLoanTerms;
         dynamicData.status = DataTypesPeerToPool.LoanStatus.IN_NEGOTIATION;

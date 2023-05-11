@@ -592,7 +592,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     loanTerms.maxTotalSubscriptions = prospectiveFinalLoanAmount.sub(1)
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'MaxLoanAmountTooLow'
+      'InvalidMaxTotalSubscriptions'
     )
     loanTerms.maxTotalSubscriptions = prevMaxLoanAmount
 
