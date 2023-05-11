@@ -86,7 +86,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
     function withdrawCollFromGauge(
         uint256 repayAmount,
         uint256 repayAmountLeft
-    ) internal returns (address _rewardTokenAddr) {
+    ) internal returns (address[8] memory _rewardTokenAddr) {
         address _liqGaugeAddr = liqGaugeAddr;
 
         uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
@@ -103,10 +103,22 @@ contract CurveLPStakingCompartment is BaseCompartment {
             address rewardTokenAddr
         ) {
             if (rewardTokenAddr != address(0)) {
-                _rewardTokenAddr = rewardTokenAddr;
+                _rewardTokenAddr[0] = rewardTokenAddr;
+                uint256 index = 1;
+                while (index < 8) {
+                    try
+                        IStakingHelper(_liqGaugeAddr).reward_tokens(index)
+                    returns (address additionalRewardTokenAddr) {
+                        _rewardTokenAddr[index] = additionalRewardTokenAddr;
+                    } catch {
+                        break;
+                    }
+                    unchecked {
+                        index++;
+                    }
+                }
                 IStakingHelper(_liqGaugeAddr).claim_rewards();
             }
-
             IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         } catch {
             IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
@@ -126,9 +138,18 @@ contract CurveLPStakingCompartment is BaseCompartment {
         address _liqGaugeAddr = liqGaugeAddr;
         // check staked balance in gauge if gaugeAddr has been set
         // if not staked, then liqGaugeAddr = 0 and will not withdraw or have a reward address
-        address _rewardTokenAddr = _liqGaugeAddr != address(0)
+        address[8] memory _rewardTokenAddr = _liqGaugeAddr != address(0)
             ? withdrawCollFromGauge(repayAmount, repayAmountLeft)
-            : address(0);
+            : [
+                address(0),
+                address(0),
+                address(0),
+                address(0),
+                address(0),
+                address(0),
+                address(0),
+                address(0)
+            ];
 
         // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
@@ -160,16 +181,25 @@ contract CurveLPStakingCompartment is BaseCompartment {
             : (repayAmount * currentCrvBal) / repayAmountLeft;
         IERC20(CRV_ADDR).safeTransfer(rewardReceiver, tokenAmount);
 
-        if (_rewardTokenAddr != address(0)) {
-            uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr).balanceOf(
-                address(this)
-            );
+        uint256 index = 0;
+        while (index < 8 && _rewardTokenAddr[index] != address(0)) {
+            // skip reward if it is also be the coll token (a curve lp token...should be very unlikely)
+            if (_rewardTokenAddr[index] != collTokenAddr) {
+                uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr[index])
+                    .balanceOf(address(this));
 
-            tokenAmount = isUnlock
-                ? currentRewardTokenBal
-                : (repayAmount * currentRewardTokenBal) / repayAmountLeft;
+                tokenAmount = isUnlock
+                    ? currentRewardTokenBal
+                    : (repayAmount * currentRewardTokenBal) / repayAmountLeft;
 
-            IERC20(_rewardTokenAddr).safeTransfer(rewardReceiver, tokenAmount);
+                IERC20(_rewardTokenAddr[index]).safeTransfer(
+                    rewardReceiver,
+                    tokenAmount
+                );
+            }
+            unchecked {
+                index++;
+            }
         }
     }
 }
