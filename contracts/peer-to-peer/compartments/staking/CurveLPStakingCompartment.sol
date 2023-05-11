@@ -182,10 +182,11 @@ contract CurveLPStakingCompartment is BaseCompartment {
         IERC20(CRV_ADDR).safeTransfer(rewardReceiver, tokenAmount);
 
         uint256 index = 0;
+        uint256 currentRewardTokenBal;
         while (index < 8 && _rewardTokenAddr[index] != address(0)) {
             // skip reward if it is also be the coll token (a curve lp token...should be very unlikely)
             if (_rewardTokenAddr[index] != collTokenAddr) {
-                uint256 currentRewardTokenBal = IERC20(_rewardTokenAddr[index])
+                currentRewardTokenBal = IERC20(_rewardTokenAddr[index])
                     .balanceOf(address(this));
 
                 tokenAmount = isUnlock
