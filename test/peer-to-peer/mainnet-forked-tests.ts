@@ -1429,6 +1429,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await addressRegistry.connect(team).setWhitelistState([curveLPStakingCompartmentImplementation.address], 3)
 
+
+      await addressRegistry.connect(team).setStateOfCompartmentForToken(
+        [collTokenAddress],
+        [curveLPStakingCompartmentImplementation.address],
+        [true]
+      )
+
       // increase borrower CRV balance
       const crvTokenAddress = '0xD533a949740bb3306d119CC777fa900bA034cd52'
       const gaugeControllerAddress = '0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB'
@@ -1848,6 +1855,49 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const collTokenAddress = '0x4d5F47FA6A74757f35C14fD3a6Ef8E3C9BC514E8' // aave WETH
       const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
 
+      // should revert is empty array
+      await expect(
+        addressRegistry.connect(team).setStateOfCompartmentForToken([], [], [])
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+
+      // should revert if not same length
+      await expect(
+        addressRegistry.connect(team).setStateOfCompartmentForToken(
+          [collTokenAddress, team.address],
+          [aaveStakingCompartmentImplementation.address],
+          [true]
+        )
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+      await expect(
+        addressRegistry.connect(team).setStateOfCompartmentForToken(
+          [collTokenAddress],
+          [aaveStakingCompartmentImplementation.address],
+          [true, true]
+        )
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+
+      // should revert if address is zero
+      await expect(
+        addressRegistry.connect(team).setStateOfCompartmentForToken(
+          [ethers.constants.AddressZero],
+          [aaveStakingCompartmentImplementation.address],
+          [true]
+        )
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+      await expect(
+        addressRegistry.connect(team).setStateOfCompartmentForToken(
+          [collTokenAddress],
+          [ethers.constants.AddressZero],
+          [true]
+        )
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+
+      await addressRegistry.connect(team).setStateOfCompartmentForToken(
+        [collTokenAddress],
+        [aaveStakingCompartmentImplementation.address],
+        [true]
+      )
+
       const poolAddress = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2'
       const poolInstance = new ethers.Contract(poolAddress, aavePoolAbi, borrower.provider)
 
@@ -1907,6 +1957,20 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
+      // borrow with bad compartment before token-compartment-pair is whitelisted should fail
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badCompartmentOnChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidCompartmentForToken')
+
+      await addressRegistry.connect(team).setStateOfCompartmentForToken(
+        [collTokenAddress],
+        [team.address],
+        [true]
+      )
+
+      // borrow with bad compartment not whitelisted should fail
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2043,6 +2107,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await addressRegistry.connect(team).setStateOfCompartmentForToken(
+        [collTokenAddress],
+        [votingCompartmentImplementation.address],
+        [true]
+      )
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -2220,6 +2290,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      await addressRegistry.connect(team).setStateOfCompartmentForToken(
+        [collTokenAddress],
+        [votingCompartmentImplementation.address],
+        [true]
+      )
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -2464,6 +2540,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
+      await addressRegistry.connect(team).setStateOfCompartmentForToken(
+        [paxg.address, collTokenAddress],
+        [aaveStakingCompartmentImplementation.address, aaveStakingCompartmentImplementation.address],
+        [true, true]
+      )
+
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -2564,6 +2646,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // whitelist tokens
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 
+      // whitelist weth-compartment pair
+      await addressRegistry.connect(team).setStateOfCompartmentForToken(
+        [weth.address],
+        [aaveStakingCompartmentImplementation.address],
+        [true]
+      )
+      
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
       

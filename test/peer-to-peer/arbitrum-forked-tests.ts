@@ -161,12 +161,19 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
 
+
     // increase borrower GLP balance
     const collTokenAddress = '0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf' // GLP
     const rewardRouterAddress = '0xB95DB5B167D75e6d04227CfFFA61069348d271F5' // GMX: Reward Router V2
     const glpManagerAddress = '0x3963FfC9dff443c2A94f21b129D429891E32ec18' // GLP Manager
     const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
 
+    await addressRegistry.connect(team).setStateOfCompartmentForToken(
+      [collTokenAddress],
+      [glpStakingCompartmentImplementation.address],
+      [true]
+    )
+    
     const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewardRouterAbi, borrower.provider)
 
     // mint GLP token
