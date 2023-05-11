@@ -969,7 +969,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      ).to.be.revertedWithCustomError(quoteHandler, 'OutdatedQuote')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
@@ -1013,7 +1013,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      ).to.be.revertedWithCustomError(quoteHandler, 'OutdatedQuote')
     })
 
     it('Should validate off-chain singleUse quote correctly', async function () {
@@ -1543,7 +1543,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
   describe('On-Chain Quote Testing', function () {
     it('Should process on-chain quote correctly', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1635,6 +1635,14 @@ describe('Peer-to-Peer: Local Tests', function () {
           callbackData
         )
       ).to.be.revertedWithCustomError(lenderVault, 'OutsideValidRepayWindow')
+
+      // move forward past valid until timestamp
+      await ethers.provider.send('evm_mine', [Number(onChainQuote.generalQuoteInfo.validUntil.toString()) + 1])
+
+      // revert if trying to execute quote after valid until
+      await expect(
+        borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(quoteHandler, 'OutdatedQuote')
     })
 
     it('Should process on-chain single use quote correctly', async function () {

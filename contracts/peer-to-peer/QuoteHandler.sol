@@ -175,10 +175,7 @@ contract QuoteHandler is IQuoteHandler {
             borrower,
             offChainQuote.generalQuoteInfo
         );
-        if (
-            offChainQuote.nonce < offChainQuoteNonce[lenderVault] ||
-            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
-        ) {
+        if (offChainQuote.nonce < offChainQuoteNonce[lenderVault]) {
             revert Errors.InvalidQuote();
         }
         bytes32 offChainQuoteHash = hashOffChainQuote(
@@ -307,6 +304,9 @@ contract QuoteHandler is IQuoteHandler {
             DataTypesPeerToPeer.WhitelistState.TOKEN
         ) {
             revert Errors.NonWhitelistedToken();
+        }
+        if (generalQuoteInfo.validUntil < block.timestamp) {
+            revert Errors.OutdatedQuote();
         }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
             revert Errors.InvalidQuote();
