@@ -10,6 +10,12 @@ interface IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState whitelistState
     );
 
+    event AllowedCompartmentForTokenUpdated(
+        address[] tokens,
+        address[] compartmentImpls,
+        bool[] isAllowed
+    );
+
     /**
      * @notice initializes factory, gateway, and quote handler contracts
      * @param _lenderVaultFactory address of the factory for lender vaults
@@ -38,6 +44,19 @@ interface IAddressRegistry {
     function setWhitelistState(
         address[] memory addrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
+    ) external;
+
+    /**
+     * @notice Sets the compartment state for a given token
+     * @dev Can only be called by registry owner
+     * @param tokens Tokens for which compartment state shall be set
+     * @param compartmentImpls Compartment implementations for which compartment state shall be set
+     * @param isAllowed The compartment state to which tokens shall be set
+     */
+    function setStateOfCompartmentForToken(
+        address[] memory tokens,
+        address[] memory compartmentImpls,
+        bool[] memory isAllowed
     ) external;
 
     /**
@@ -88,4 +107,15 @@ interface IAddressRegistry {
      * @return Address of the owner
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns boolean flag indicating whether given compartment implementation is allowed for given token
+     * @param token Address of token to check if compartment implementation is allowed
+     * @param compartmentImpl Address of compartment implementation to check if it is allowed for token
+     * @return isAllowed Boolean flag indicating whether compartment implementation is allowed for token
+     */
+    function isAllowedCompartmentForToken(
+        address token,
+        address compartmentImpl
+    ) external view returns (bool isAllowed);
 }

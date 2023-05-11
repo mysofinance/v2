@@ -22,6 +22,9 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     mapping(address => bool) public isRegisteredVault;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
         public whitelistState;
+    // token => compartment => isAllowed
+    mapping(address => mapping(address => bool))
+        public isAllowedCompartmentForToken;
     address[] internal _registeredVaults;
 
     constructor() {
@@ -72,6 +75,37 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             }
         }
         emit WhitelistStateUpdated(addrs, _whitelistState);
+    }
+
+    function setStateOfCompartmentForToken(
+        address[] calldata tokens,
+        address[] calldata compartmentImpls,
+        bool[] calldata isAllowed
+    ) external {
+        checkSenderAndIsInitialized();
+        if (
+            tokens.length == 0 ||
+            tokens.length != compartmentImpls.length ||
+            tokens.length != isAllowed.length
+        ) {
+            revert Errors.InvalidArrayLength();
+        }
+        for (uint i = 0; i < tokens.length; ) {
+            if (tokens[i] == address(0) || compartmentImpls[i] == address(0)) {
+                revert Errors.InvalidAddress();
+            }
+            isAllowedCompartmentForToken[tokens[i]][
+                compartmentImpls[i]
+            ] = isAllowed[i];
+            unchecked {
+                i++;
+            }
+        }
+        emit AllowedCompartmentForTokenUpdated(
+            tokens,
+            compartmentImpls,
+            isAllowed
+        );
     }
 
     function addLenderVault(address addr) external {
