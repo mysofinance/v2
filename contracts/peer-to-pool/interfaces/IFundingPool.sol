@@ -77,17 +77,12 @@ interface IFundingPool {
     /**
      * @notice function tracks total subscription amount for a given proposal address
      */
-    function totalSubscribed(address) external view returns (uint256);
-
-    /**
-     * @notice function tracks if subscription is deployed for a given proposal address
-     */
-    function totalSubscribedIsDeployed(address) external view returns (bool);
+    function totalSubscriptions(address) external view returns (uint256);
 
     /**
      * @notice function tracks subscription amounts for a given proposal address and subsciber address
      */
-    function subscribedBalanceOf(
+    function subscriptionAmountOf(
         address,
         address
     ) external view returns (uint256);

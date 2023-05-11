@@ -65,13 +65,14 @@ library Errors {
     error InsufficientBalance();
     error SubscriptionAmountTooHigh();
     error BeforeEarliestUnsubscribe();
-    error TotalSubscribedTooLow();
+    error InconsistentLastLoanTermsUpdateTime();
+    error NotEnoughSubscriptions();
     error InvalidActionForCurrentStatus();
-    error TotalSubscribedNotTargetInRange();
+    error FellShortOfTotalSubscriptionTarget();
     error InvalidRollBackRequest();
     error UnsubscriptionAmountTooLarge();
-    error InvalidMinOrMaxLoanAmount();
-    error NewMaxLoanAmountBelowCurrentSubscriptions();
+    error InvalidSubscriptionRange();
+    error MaxLoanAmountTooLow();
     error OutsideConversionTimeWindow();
     error OutsideRepaymentTimeWindow();
     error NoDefault();
