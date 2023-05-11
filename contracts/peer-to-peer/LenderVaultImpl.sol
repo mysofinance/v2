@@ -185,7 +185,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                     Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
             )
         ) {
-            revert Errors.ExpiresBeforeRepayAllowed();
+            revert Errors.InvalidEarliestRepay();
         }
 
         if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {

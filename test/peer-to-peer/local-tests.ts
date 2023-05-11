@@ -1275,7 +1275,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'ExpiresBeforeRepayAllowed')
+      ).to.be.revertedWithCustomError(lenderVault, ' InvalidEarliestRepay')
     })
 
     it('Should validate off-chain MerkleProof correctly', async function () {
