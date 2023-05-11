@@ -39,7 +39,7 @@ library Errors {
     error NonWhitelistedToken();
     error LtvHigherThanMax();
     error InsufficientVaultFunds();
-    error NegativeRepaymentAmount();
+    error InvalidInterestRateFactor();
     error OverflowUint128();
     error InconsistentUnlockTokenAddresses();
     error ExpiresBeforeRepayAllowed();
