@@ -296,17 +296,32 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             revert Errors.InvalidSender();
         }
+        DataTypesPeerToPeer.WhitelistState collWhitelistState = IAddressRegistry(
+                _addressRegistry
+            ).whitelistState(generalQuoteInfo.collToken);
+        DataTypesPeerToPeer.WhitelistState loanWhitelistState = IAddressRegistry(
+                _addressRegistry
+            ).whitelistState(generalQuoteInfo.loanToken);
         if (
-            IAddressRegistry(_addressRegistry).whitelistState(
-                generalQuoteInfo.collToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN ||
-            IAddressRegistry(_addressRegistry).whitelistState(
-                generalQuoteInfo.loanToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN
+            (collWhitelistState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
+                collWhitelistState !=
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .COMPARTMENTALIZE_IF_COLLATERAL) ||
+            (loanWhitelistState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
+                loanWhitelistState !=
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .COMPARTMENTALIZE_IF_COLLATERAL)
         ) {
             revert Errors.NonWhitelistedToken();
+        }
+        if (
+            collWhitelistState ==
+            DataTypesPeerToPeer.WhitelistState.COMPARTMENTALIZE_IF_COLLATERAL &&
+            generalQuoteInfo.borrowerCompartmentImplementation == address(0)
+        ) {
+            revert Errors.CollateralMustBeCompartmentalized();
         }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
             revert Errors.InvalidQuote();

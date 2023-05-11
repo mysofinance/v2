@@ -127,6 +127,10 @@ library DataTypesPeerToPeer {
         // whitelisted as compartment
         COMPARTMENT,
         // whitelisted as callback contract
-        CALLBACK
+        CALLBACK,
+        // whitelisted as token which if used as collateral then must be in a compartment
+        // (e.g., for stETH where a negative rebase would possibly affect others in the vault)
+        // can still be used as loan token like any other whitelisted token
+        COMPARTMENTALIZE_IF_COLLATERAL
     }
 }
