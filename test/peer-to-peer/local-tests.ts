@@ -140,6 +140,11 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // deploy quote handler
     const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
+    // reverts if zero address is passed as address registry
+    await expect(QuoteHandler.connect(team).deploy(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      QuoteHandler,
+      'InvalidAddress'
+    )
     const quoteHandler = await QuoteHandler.connect(team).deploy(addressRegistry.address)
     await quoteHandler.deployed()
 
