@@ -23,11 +23,13 @@ contract CurveLPStakingCompartment is BaseCompartment {
     address internal constant CRV_MINTER_ADDR =
         0xd061D61a4d941c39E5453435B6345Dc261C2fcE0;
 
+    mapping(address => bool) public approvedStaker;
+
     function stake(uint256 gaugeIndex) external {
         DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
             loanIdx
         );
-        if (msg.sender != loan.borrower) {
+        if (msg.sender != loan.borrower && !approvedStaker[msg.sender]) {
             revert Errors.InvalidSender();
         }
         if (liqGaugeAddr != address(0)) {
@@ -51,6 +53,16 @@ contract CurveLPStakingCompartment is BaseCompartment {
         liqGaugeAddr = _liqGaugeAddr;
         IERC20(loan.collToken).approve(_liqGaugeAddr, amount);
         IStakingHelper(_liqGaugeAddr).deposit(amount, address(this));
+    }
+
+    function toggleApprovedStaker(address _staker) external {
+        DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
+            loanIdx
+        );
+        if (msg.sender != loan.borrower) {
+            revert Errors.InvalidSender();
+        }
+        approvedStaker[_staker] = !approvedStaker[_staker];
     }
 
     // transfer coll on repays

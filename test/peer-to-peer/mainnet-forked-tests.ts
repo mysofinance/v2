@@ -1063,30 +1063,34 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves borrower gateway for repay
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      
+
       // check revert on zero repay amount
-      await expect(borrowerGateway.connect(borrower).repay(
-        {
-          targetLoanId: loanId,
-          targetRepayAmount: 0,
-          expectedTransferFee: 0
-        },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
-      )).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: 0,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
 
       // check revert if reclaim amount is zero (due to rounding)
-      await expect(borrowerGateway.connect(borrower).repay(
-        {
-          targetLoanId: loanId,
-          targetRepayAmount: 1,
-          expectedTransferFee: 0
-        },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
-      )).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: 1,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
@@ -1555,6 +1559,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         crvCompInstance,
         'IncorrectGaugeForLpToken'
       )
+      await expect(crvCompInstance.connect(lender).toggleApprovedStaker(lender.address)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'InvalidSender'
+      )
       await crvCompInstance.connect(borrower).stake(compartmentData)
       await expect(crvCompInstance.connect(borrower).stake(compartmentData)).to.be.revertedWithCustomError(
         crvCompInstance,
@@ -1563,6 +1571,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await expect(
         crvCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
       ).to.be.revertedWithCustomError(crvCompInstance, 'InvalidSender')
+
+      const lenderStakeStatus = await crvCompInstance.approvedStaker(lender.address)
+
+      expect(lenderStakeStatus).to.equal(false)
+
+      await crvCompInstance.connect(borrower).toggleApprovedStaker(lender.address)
+
+      const lenderStakeStatusPost = await crvCompInstance.approvedStaker(lender.address)
+
+      expect(lenderStakeStatusPost).to.equal(true)
+
+      // this passes the invalid sender check
+      await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'AlreadyStaked'
+      )
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -2067,7 +2091,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
 
-      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.reverted
+      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.revertedWithCustomError(
+        votingCompartmentImplementation,
+        'InvalidSender'
+      )
       await uniCompInstance.connect(borrower).delegate(borrower.address)
 
       // check balance post borrow
@@ -2080,6 +2107,25 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(borrowerVotesPost).to.equal(borrowerUNIBalPre.sub(upfrontFee))
       expect(borrowerVotesPreDelegation).to.equal(0)
+
+      await expect(uniCompInstance.connect(team).toggleApprovedDelegator(team.address)).to.be.revertedWithCustomError(
+        votingCompartmentImplementation,
+        'InvalidSender'
+      )
+
+      await uniCompInstance.connect(borrower).toggleApprovedDelegator(team.address)
+
+      const teamApprovedDelegator = await uniCompInstance.approvedDelegator(team.address)
+
+      expect(teamApprovedDelegator).to.equal(true)
+
+      const teamVotesPreDelegation = await collInstance.getCurrentVotes(team.address)
+
+      await uniCompInstance.connect(team).delegate(team.address)
+
+      const teamVotesPostDelegation = await collInstance.getCurrentVotes(team.address)
+
+      expect(teamVotesPostDelegation).to.equal(borrowerVotesPost.sub(teamVotesPreDelegation))
 
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
       expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre).add(upfrontFee))
@@ -2355,7 +2401,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await myMaliciousERC20.deployed()
 
       await expect(lenderVault.connect(lender).withdraw(myMaliciousERC20.address, ONE_WETH)).to.be.reverted
-      
+
       const wethBalPostAttack = await weth.balanceOf(lenderVault.address)
       expect(wethBalPostAttack).to.equal(wethBalPreAttack)
     })
@@ -2368,7 +2414,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-      
+
       // get vault balance
       const bal = await usdc.balanceOf(lenderVault.address)
 
@@ -2377,7 +2423,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const myMaliciousCallback2 = await MyMaliciousCallback2.deploy(lenderVault.address, usdc.address, bal)
       await myMaliciousCallback2.deployed()
 
-      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback2.address, 0)).to.be.revertedWithCustomError(lenderVault, 'WithdrawEntered')
+      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback2.address, 0)).to.be.revertedWithCustomError(
+        lenderVault,
+        'WithdrawEntered'
+      )
     })
 
     it('Should process compartment with protocol fee and transfer fees correctly with rewards', async () => {
@@ -2550,7 +2599,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should not allow callbacks into transferCollFromCompartment(...)', async function () {
-      const { lender, borrower, team, weth, usdc, addressRegistry, borrowerGateway, quoteHandler, lenderVault } = await setupTest()
+      const { lender, borrower, team, weth, usdc, addressRegistry, borrowerGateway, quoteHandler, lenderVault } =
+        await setupTest()
 
       // create curve staking implementation
       const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
@@ -2566,7 +2616,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-      
+
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
@@ -2633,15 +2683,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy malicious callback contract
       const MyMaliciousCallback1 = await ethers.getContractFactory('MyMaliciousCallback1')
-      const myMaliciousCallback1 = await MyMaliciousCallback1.deploy(lenderVault.address, weth.address, collTokenCompartmentAddr)
+      const myMaliciousCallback1 = await MyMaliciousCallback1.deploy(
+        lenderVault.address,
+        weth.address,
+        collTokenCompartmentAddr
+      )
       await myMaliciousCallback1.deployed()
-      
+
       // trick vault owner to call withdraw with malicious token contract that uses delegate call to call back
       // into compartment contract and try bypassing access control.
-      // This is expected to revert due to mutex in vault; moreover, note that even without mutex the delegate call would 
+      // This is expected to revert due to mutex in vault; moreover, note that even without mutex the delegate call would
       // operate on state/balances of myMaliciousCallback rather than compartment, leaving delegate call unable to access
       // compartment balances
-      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback1.address, 0)).to.be.revertedWithCustomError(lenderVault, 'WithdrawEntered')
+      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback1.address, 0)).to.be.revertedWithCustomError(
+        lenderVault,
+        'WithdrawEntered'
+      )
     })
   })
 
