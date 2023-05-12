@@ -31,7 +31,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             calldata borrowInstructions,
         DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
-        bytes32[] memory proof
+        bytes32[] calldata proof
     ) external nonReentrant {
         checkDeadlineAndRegisteredVault(
             borrowInstructions.deadline,
