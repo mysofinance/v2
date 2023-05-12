@@ -62,7 +62,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     }
 
     function setWhitelistState(
-        address[] memory addrs,
+        address[] calldata addrs,
         DataTypesPeerToPeer.WhitelistState _whitelistState
     ) external {
         checkSenderAndIsInitialized();
