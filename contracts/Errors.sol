@@ -89,4 +89,5 @@ library Errors {
     error InvalidSignature();
     error InvalidUpdate();
     error CannotClaimOutdatedStatus();
+    error DelegateReducedBalance();
 }
