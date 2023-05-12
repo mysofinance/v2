@@ -17,6 +17,9 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
 
     constructor(address _addressRegistry) {
+        if (_addressRegistry == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         addressRegistry = _addressRegistry;
     }
 
@@ -312,8 +315,11 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.InvalidQuote();
         }
         if (
-            generalQuoteInfo.borrower != address(0) &&
-            generalQuoteInfo.borrower != borrower
+            generalQuoteInfo.whitelistAuthority != address(0) &&
+            !IAddressRegistry(_addressRegistry).isWhitelistedBorrower(
+                generalQuoteInfo.whitelistAuthority,
+                borrower
+            )
         ) {
             revert Errors.InvalidBorrower();
         }

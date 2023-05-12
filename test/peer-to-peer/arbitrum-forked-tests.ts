@@ -3,7 +3,7 @@ import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
 import { ALCHEMY_API_KEY, ARBITRUM_BLOCK_NUMBER, ARBITRUM_CHAIN_ID } from '../../hardhat.config'
 import { collTokenAbi, gmxRewardRouterAbi } from './helpers/abi'
-import { createOnChainRequest } from './helpers/misc'
+import { createOnChainRequest, setupBorrowerWhitelist } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
@@ -49,7 +49,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, borrower, team] = await ethers.getSigners()
+    const [lender, borrower, team, whitelistAuthority] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -139,6 +139,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       lender,
       borrower,
       team,
+      whitelistAuthority,
       usdc,
       weth,
       lenderVault,
@@ -309,8 +310,19 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
   })
 
   it('Uni V3 Looping Test', async function () {
-    const { quoteHandler, lender, borrower, usdc, weth, lenderVault, addressRegistry, team, uniV3Looping, borrowerGateway } =
-      await setupTest()
+    const {
+      quoteHandler,
+      lender,
+      borrower,
+      whitelistAuthority,
+      usdc,
+      weth,
+      lenderVault,
+      addressRegistry,
+      team,
+      uniV3Looping,
+      borrowerGateway
+    } = await setupTest()
 
     // lenderVault owner deposits usdc
     await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -334,7 +346,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     ]
     let onChainQuote = {
       generalQuoteInfo: {
-        borrower: borrower.address,
+        whitelistAuthority: whitelistAuthority.address,
         collToken: weth.address,
         loanToken: usdc.address,
         oracleAddr: ZERO_ADDR,
@@ -348,6 +360,15 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       quoteTuples: quoteTuples,
       salt: ZERO_BYTES32
     }
+
+    // get borrower whitelisted
+    const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
+    await setupBorrowerWhitelist({
+      addressRegistry,
+      borrower,
+      whitelistAuthority,
+      whitelistedUntil
+    })
 
     // whitelist token pair
     await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
