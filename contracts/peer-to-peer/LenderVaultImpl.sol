@@ -178,8 +178,14 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan.earliestRepay = SafeCast.toUint40(
             block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
-        if (_loan.expiry <= _loan.earliestRepay) {
-            revert Errors.ExpiresBeforeRepayAllowed();
+        if (
+            _loan.expiry <
+            SafeCast.toUint40(
+                _loan.earliestRepay +
+                    Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
+            )
+        ) {
+            revert Errors.InvalidEarliestRepay();
         }
 
         if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {

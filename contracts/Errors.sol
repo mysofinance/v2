@@ -43,7 +43,7 @@ library Errors {
     error InvalidInterestRateFactor();
     error OverflowUint128();
     error InconsistentUnlockTokenAddresses();
-    error ExpiresBeforeRepayAllowed();
+    error InvalidEarliestRepay();
     error InvalidNewMinNumOfSigners();
     error AlreadySigner();
     error InvalidArrayIndex();
