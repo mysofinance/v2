@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.19;
 
-interface ILoanProposalFactory {
+interface IFactory {
     event LoanProposalCreated(
         address indexed loanProposalAddr,
         address indexed fundingPool,
@@ -10,6 +10,10 @@ interface ILoanProposalFactory {
         address collToken,
         uint256 arrangerFee,
         uint256 unsubscribeGracePeriod
+    );
+    event FundingPoolCreated(
+        address indexed newFundingPool,
+        address indexed depositToken
     );
     event ArrangerFeeSplitUpdated(
         uint256 oldArrangerFeeSplit,
@@ -33,6 +37,12 @@ interface ILoanProposalFactory {
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external;
+
+    /**
+     * @notice Creates a new funding pool
+     * @param _depositToken The address of the deposit token to be accepted by the given funding pool
+     */
+    function createFundingPool(address _depositToken) external;
 
     /**
      * @notice Sets the arranger fee split between the arranger and the protocol

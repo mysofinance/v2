@@ -3,20 +3,25 @@
 pragma solidity 0.8.19;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 
-contract LoanProposalFactory is Ownable, ILoanProposalFactory {
+contract Factory is Ownable, IFactory {
     address public immutable loanProposalImpl;
+    address public immutable fundingPoolImpl;
     address[] public loanProposals;
+    address[] public fundingPools;
     mapping(address => bool) public isLoanProposal;
+    mapping(address => bool) public depositTokenHasFundingPool;
     uint256 public arrangerFeeSplit;
 
-    constructor(address _loanProposalImpl) {
+    constructor(address _loanProposalImpl, address _fundingPoolImpl) {
         loanProposalImpl = _loanProposalImpl;
+        fundingPoolImpl = _fundingPoolImpl;
         _owner = msg.sender;
     }
 
@@ -57,6 +62,30 @@ contract LoanProposalFactory is Ownable, ILoanProposalFactory {
         );
     }
 
+    function createFundingPool(address _depositToken) external {
+        if (_depositToken == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        if (depositTokenHasFundingPool[_depositToken]) {
+            revert Errors.FundingPoolAlreadyExists();
+        }
+        bytes32 salt = keccak256(
+            abi.encodePacked(_depositToken, fundingPools.length)
+        );
+        address newFundingPool = Clones.cloneDeterministic(
+            fundingPoolImpl,
+            salt
+        );
+        fundingPools.push(newFundingPool);
+        depositTokenHasFundingPool[_depositToken] = true;
+        IFundingPoolImpl(newFundingPool).initialize(
+            address(this),
+            _depositToken
+        );
+
+        emit FundingPoolCreated(newFundingPool, _depositToken);
+    }
+
     function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external {
         senderCheckOwner();
         uint256 oldArrangerFeeSplit = arrangerFeeSplit;
@@ -73,7 +102,7 @@ contract LoanProposalFactory is Ownable, ILoanProposalFactory {
     function owner()
         external
         view
-        override(Ownable, ILoanProposalFactory)
+        override(Ownable, IFactory)
         returns (address)
     {
         return _owner;

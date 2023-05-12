@@ -2,20 +2,20 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Constants} from "../Constants.sol";
-import {IFundingPool} from "./interfaces/IFundingPool.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
-import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
 
-contract FundingPool is IFundingPool {
+contract FundingPoolImpl is Initializable, IFundingPoolImpl {
     using SafeERC20 for IERC20Metadata;
 
-    address public immutable loanProposalFactory;
-    address public immutable depositToken;
+    address public factory;
+    address public depositToken;
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public totalSubscriptions;
     mapping(address => mapping(address => uint256)) public subscriptionAmountOf;
@@ -23,8 +23,15 @@ contract FundingPool is IFundingPool {
     mapping(address => mapping(address => uint256))
         internal earliestUnsubscribe;
 
-    constructor(address _loanProposalFactory, address _depositToken) {
-        loanProposalFactory = _loanProposalFactory;
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address _factory,
+        address _depositToken
+    ) external initializer {
+        factory = _factory;
         depositToken = _depositToken;
     }
 
@@ -59,11 +66,7 @@ contract FundingPool is IFundingPool {
         if (amount == 0) {
             revert Errors.InvalidAmount();
         }
-        if (
-            !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
-                loanProposal
-            )
-        ) {
+        if (!IFactory(factory).isLoanProposal(loanProposal)) {
             revert Errors.UnregisteredLoanProposal();
         }
         if (!ILoanProposalImpl(loanProposal).canSubscribe()) {
@@ -95,11 +98,7 @@ contract FundingPool is IFundingPool {
         if (amount == 0) {
             revert Errors.InvalidAmount();
         }
-        if (
-            !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
-                loanProposal
-            )
-        ) {
+        if (!IFactory(factory).isLoanProposal(loanProposal)) {
             revert Errors.UnregisteredLoanProposal();
         }
         if (!ILoanProposalImpl(loanProposal).canUnsubscribe()) {
@@ -120,11 +119,7 @@ contract FundingPool is IFundingPool {
     }
 
     function executeLoanProposal(address loanProposal) external {
-        if (
-            !ILoanProposalFactory(loanProposalFactory).isLoanProposal(
-                loanProposal
-            )
-        ) {
+        if (!IFactory(factory).isLoanProposal(loanProposal)) {
             revert Errors.UnregisteredLoanProposal();
         }
 
@@ -148,14 +143,13 @@ contract FundingPool is IFundingPool {
         (, , address arranger, , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
         uint256 protocolFeeShare = (arrangerFee *
-            ILoanProposalFactory(loanProposalFactory).arrangerFeeSplit()) /
-            Constants.BASE;
+            IFactory(factory).arrangerFeeSplit()) / Constants.BASE;
         IERC20Metadata(depositToken).safeTransfer(
             arranger,
             arrangerFee - protocolFeeShare
         );
         IERC20Metadata(depositToken).safeTransfer(
-            ILoanProposalFactory(loanProposalFactory).owner(),
+            IFactory(factory).owner(),
             protocolFeeShare
         );
 
