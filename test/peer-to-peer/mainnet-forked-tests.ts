@@ -57,7 +57,7 @@ function getLoopingSendAmount(
 
 describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   async function setupTest() {
-    const [ lender, borrower, team, whitelistAuthority ] = await ethers.getSigners()
+    const [lender, borrower, team, whitelistAuthority] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -686,8 +686,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should validate correctly the wrong updateOnChainQuote', async function () {
-      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        addressRegistry,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -818,14 +828,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
 
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -840,8 +850,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should handle unlocking collateral correctly', async function () {
-      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        addressRegistry,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -906,14 +926,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
 
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-    
+
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -1010,8 +1030,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should revert on invalid repays', async function () {
-      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        addressRegistry,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(10000000))
@@ -1070,14 +1100,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
 
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -1095,30 +1125,34 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves borrower gateway for repay
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      
+
       // check revert on zero repay amount
-      await expect(borrowerGateway.connect(borrower).repay(
-        {
-          targetLoanId: loanId,
-          targetRepayAmount: 0,
-          expectedTransferFee: 0
-        },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
-      )).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: 0,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
 
       // check revert if reclaim amount is zero (due to rounding)
-      await expect(borrowerGateway.connect(borrower).repay(
-        {
-          targetLoanId: loanId,
-          targetRepayAmount: 1,
-          expectedTransferFee: 0
-        },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
-      )).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: 1,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
     })
 
     it('Should validate correctly the wrong deleteOnChainQuote', async function () {
@@ -1360,14 +1394,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
@@ -2397,7 +2431,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await myMaliciousERC20.deployed()
 
       await expect(lenderVault.connect(lender).withdraw(myMaliciousERC20.address, ONE_WETH)).to.be.reverted
-      
+
       const wethBalPostAttack = await weth.balanceOf(lenderVault.address)
       expect(wethBalPostAttack).to.equal(wethBalPreAttack)
     })
@@ -2410,7 +2444,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-      
+
       // get vault balance
       const bal = await usdc.balanceOf(lenderVault.address)
 
@@ -2419,7 +2453,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const myMaliciousCallback2 = await MyMaliciousCallback2.deploy(lenderVault.address, usdc.address, bal)
       await myMaliciousCallback2.deployed()
 
-      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback2.address, 0)).to.be.revertedWithCustomError(lenderVault, 'WithdrawEntered')
+      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback2.address, 0)).to.be.revertedWithCustomError(
+        lenderVault,
+        'WithdrawEntered'
+      )
     })
 
     it('Should process compartment with protocol fee and transfer fees correctly with rewards', async () => {
@@ -2592,7 +2629,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should not allow callbacks into transferCollFromCompartment(...)', async function () {
-      const { lender, borrower, team, weth, usdc, addressRegistry, borrowerGateway, quoteHandler, lenderVault } = await setupTest()
+      const { lender, borrower, team, weth, usdc, addressRegistry, borrowerGateway, quoteHandler, lenderVault } =
+        await setupTest()
 
       // create curve staking implementation
       const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
@@ -2608,7 +2646,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-      
+
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
@@ -2675,15 +2713,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // deploy malicious callback contract
       const MyMaliciousCallback1 = await ethers.getContractFactory('MyMaliciousCallback1')
-      const myMaliciousCallback1 = await MyMaliciousCallback1.deploy(lenderVault.address, weth.address, collTokenCompartmentAddr)
+      const myMaliciousCallback1 = await MyMaliciousCallback1.deploy(
+        lenderVault.address,
+        weth.address,
+        collTokenCompartmentAddr
+      )
       await myMaliciousCallback1.deployed()
-      
+
       // trick vault owner to call withdraw with malicious token contract that uses delegate call to call back
       // into compartment contract and try bypassing access control.
-      // This is expected to revert due to mutex in vault; moreover, note that even without mutex the delegate call would 
+      // This is expected to revert due to mutex in vault; moreover, note that even without mutex the delegate call would
       // operate on state/balances of myMaliciousCallback rather than compartment, leaving delegate call unable to access
       // compartment balances
-      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback1.address, 0)).to.be.revertedWithCustomError(lenderVault, 'WithdrawEntered')
+      await expect(lenderVault.connect(lender).withdraw(myMaliciousCallback1.address, 0)).to.be.revertedWithCustomError(
+        lenderVault,
+        'WithdrawEntered'
+      )
     })
   })
 
@@ -3337,8 +3382,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process onChain quote with eth-based oracle address (loan weth)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, whitelistAuthority, lenderVault, addressRegistry } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        usdc,
+        weth,
+        team,
+        whitelistAuthority,
+        lenderVault,
+        addressRegistry
+      } = await setupTest()
 
       // deploy chainlinkOracleContract
 
@@ -3402,14 +3457,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
 
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-    
+
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
       const expectedTransferFee = 0
@@ -3586,7 +3641,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             selectedQuoteTuple,
             proof
           )
-      ).to.be.revertedWithCustomError(lenderVault, 'NegativeRepaymentAmount')
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidInterestRateFactor')
     })
 
     it('Should process onChain quote with olympus gohm oracle (non-weth, gohm is coll)', async function () {

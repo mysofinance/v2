@@ -19,7 +19,8 @@ export const createOnChainRequest = async ({
   borrowerCompartmentImplementation,
   lenderVault,
   quoteHandler,
-  loanPerCollUnit
+  loanPerCollUnit,
+  validUntil
 }: {
   lender: SignerWithAddress
   collToken: string
@@ -28,9 +29,13 @@ export const createOnChainRequest = async ({
   lenderVault: LenderVaultImpl
   quoteHandler: QuoteHandler
   loanPerCollUnit: BigNumber
+  validUntil?: BigNumber
 }) => {
   const blocknum = await ethers.provider.getBlockNumber()
-  const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+  const _validUntil =
+    typeof validUntil == 'undefined'
+      ? ethers.BigNumber.from((await ethers.provider.getBlock(blocknum)).timestamp + 60)
+      : validUntil
   let quoteTuples = [
     {
       loanPerCollUnitOrLtv: loanPerCollUnit,
@@ -47,7 +52,7 @@ export const createOnChainRequest = async ({
       oracleAddr: ZERO_ADDR,
       minLoan: 0,
       maxLoan: MAX_UINT256,
-      validUntil: timestamp + 60,
+      validUntil: _validUntil,
       earliestRepayTenor: 0,
       borrowerCompartmentImplementation: borrowerCompartmentImplementation,
       isSingleUse: false
@@ -59,7 +64,6 @@ export const createOnChainRequest = async ({
     quoteHandler,
     'OnChainQuoteAdded'
   )
-
   return onChainQuote
 }
 
@@ -261,7 +265,7 @@ export const setupBorrowerWhitelist = async ({
   addressRegistry,
   borrower,
   whitelistAuthority,
-  whitelistedUntil = 0,
+  whitelistedUntil = 0
 }: {
   addressRegistry: AddressRegistry
   borrower: SignerWithAddress
@@ -276,8 +280,9 @@ export const setupBorrowerWhitelist = async ({
 
   // construct payload and sign
   const payload = ethers.utils.defaultAbiCoder.encode(
-  [ "address", "uint256", "uint256", "bytes32"],
-  [ borrower.address, whitelistedUntil, chainId, salt ])
+    ['address', 'uint256', 'uint256', 'bytes32'],
+    [borrower.address, whitelistedUntil, chainId, salt]
+  )
   const payloadHash = ethers.utils.keccak256(payload)
   const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
   const sig = ethers.utils.splitSignature(signature)
@@ -285,5 +290,7 @@ export const setupBorrowerWhitelist = async ({
   expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
   // have borrower claim whitelist status
-  await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
+  await addressRegistry
+    .connect(borrower)
+    .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
 }

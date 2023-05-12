@@ -90,7 +90,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       loanProposalFactory,
       'InvalidFee'
     )
-    
+
     const FundingPool = await ethers.getContractFactory('FundingPool')
     const fundingPool = await FundingPool.deploy(loanProposalFactory.address, usdc.address)
     await fundingPool.deployed()
@@ -309,31 +309,31 @@ describe('Peer-to-Pool: Local Tests', function () {
     // revert on zero min/max loan amount
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'InvalidMinOrMaxLoanAmount'
+      'InvalidSubscriptionRange'
     )
     // set valid min loan amount
-    loanTerms.minLoanAmount = ONE_USDC.mul(1000000)
+    loanTerms.minTotalSubscriptions = ONE_USDC.mul(1000000)
     // revert if max loan amount still zero
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'InvalidMinOrMaxLoanAmount'
+      'InvalidSubscriptionRange'
     )
-    loanTerms.maxLoanAmount = loanTerms.minLoanAmount
+    loanTerms.maxTotalSubscriptions = loanTerms.minTotalSubscriptions
     // revert if same min and max loan amount
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'InvalidMinOrMaxLoanAmount'
+      'InvalidSubscriptionRange'
     )
-    loanTerms.minLoanAmount = loanTerms.maxLoanAmount.add(1)
+    loanTerms.minTotalSubscriptions = loanTerms.maxTotalSubscriptions.add(1)
     // revert if min loan amount less than max loan amount
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'InvalidMinOrMaxLoanAmount'
+      'InvalidSubscriptionRange'
     )
 
     // set valid min and max loan amounts
-    loanTerms.minLoanAmount = ONE_USDC.mul(1000000)
-    loanTerms.maxLoanAmount = ONE_USDC.mul(10000000)
+    loanTerms.minTotalSubscriptions = ONE_USDC.mul(1000000)
+    loanTerms.maxTotalSubscriptions = ONE_USDC.mul(10000000)
 
     // revert on empty repayment schedule
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
@@ -368,7 +368,11 @@ describe('Peer-to-Pool: Local Tests', function () {
     // set next due date too close
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    let firstDueDate = ethers.BigNumber.from(timestamp).add(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD).add(LOAN_EXECUTION_GRACE_PERIOD).add(MIN_TIME_UNTIL_FIRST_DUE_DATE).add(60) // +60s
+    let firstDueDate = ethers.BigNumber.from(timestamp)
+      .add(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD)
+      .add(LOAN_EXECUTION_GRACE_PERIOD)
+      .add(MIN_TIME_UNTIL_FIRST_DUE_DATE)
+      .add(60) // +60s
     firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
     nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES).sub(1)
     secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
@@ -468,6 +472,8 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(dynamicData.status).to.be.equal(0)
     // propose 1st loan terms
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
+
     // check that status was updated
     dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(1)
@@ -488,7 +494,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       expect(unfinalizedLoanTerms.repaymentSchedule[i].dueTimestamp).to.equal(loanTerms.repaymentSchedule[i].dueTimestamp)
     }
     // reverts if trying to accept while terms are in cool off period
-    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)).to.be.revertedWithCustomError(
       loanProposal,
       'WaitForLoanTermsCoolOffPeriod'
     )
@@ -499,19 +505,16 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // reverts if too few subscriptions
-    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)).to.be.revertedWithCustomError(
       loanProposal,
-      'TotalSubscribedTooLow'
+      'NotEnoughSubscriptions'
     )
 
     // lender can deposit
     await usdc.connect(lender1).approve(fundingPool.address, MAX_UINT256)
     let preBalLender = await usdc.balanceOf(lender1.address)
     let addAmount = preBalLender
-    await expect(fundingPool.connect(lender1).deposit(0, 0)).to.be.revertedWithCustomError(
-      fundingPool,
-      'InvalidSendAmount'
-    )
+    await expect(fundingPool.connect(lender1).deposit(0, 0)).to.be.revertedWithCustomError(fundingPool, 'InvalidSendAmount')
     await expect(fundingPool.connect(lender1).deposit(addAmount.add(1), 0)).to.be.revertedWith(
       'ERC20: transfer amount exceeds balance'
     )
@@ -569,28 +572,29 @@ describe('Peer-to-Pool: Local Tests', function () {
     ).to.be.revertedWithCustomError(fundingPool, 'InsufficientBalance')
 
     // check can't subscribe with zero amount
-    await expect(
-      fundingPool.connect(lender1).subscribe(loanProposal.address, 0)
-    ).to.be.revertedWithCustomError(fundingPool, 'InvalidAmount')
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 0)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidAmount'
+    )
 
     // check valid subscribe works
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
 
     // revert when trying to propose new loan terms with max loan amount smaller than prospective loan amount based on current subscriptions
-    const prevMaxLoanAmount = loanTerms.maxLoanAmount
-    const currTotalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    const prevMaxLoanAmount = loanTerms.maxTotalSubscriptions
+    const currTotalSubscribed = await fundingPool.totalSubscriptions(loanProposal.address)
     const loanTokenDecimals = await usdc.decimals()
     let [, , prospectiveFinalLoanAmount, ,] = await loanProposal.getAbsoluteLoanTerms(
       loanTerms,
       currTotalSubscribed,
       loanTokenDecimals
     )
-    loanTerms.maxLoanAmount = prospectiveFinalLoanAmount.sub(1)
+    loanTerms.maxTotalSubscriptions = prospectiveFinalLoanAmount.sub(1)
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'NewMaxLoanAmountBelowCurrentSubscriptions'
+      'InvalidMaxTotalSubscriptions'
     )
-    loanTerms.maxLoanAmount = prevMaxLoanAmount
+    loanTerms.maxTotalSubscriptions = prevMaxLoanAmount
 
     // revert when unsubscribing during cool down period
     await expect(
@@ -601,7 +605,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     await ethers.provider.send('evm_mine', [timestamp + Number(MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE.toString())])
     let preBal = await fundingPool.balanceOf(lender2.address)
-    let preSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+    let preSubscribedBal = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     await expect(
       fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionAmount.add(1))
     ).to.be.revertedWithCustomError(fundingPool, 'UnsubscriptionAmountTooLarge')
@@ -613,14 +617,15 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // check can't unsubscribe with zero amount
-    await expect(
-      fundingPool.connect(lender2).unsubscribe(loanProposal.address, 0)
-    ).to.be.revertedWithCustomError(fundingPool, 'InvalidAmount')
-    
+    await expect(fundingPool.connect(lender2).unsubscribe(loanProposal.address, 0)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidAmount'
+    )
+
     // check valid unsubscribe works
     await fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionAmount)
     let postBal = await fundingPool.balanceOf(lender2.address)
-    let postSubscribedBal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+    let postSubscribedBal = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     expect(preSubscribedBal.sub(postSubscribedBal)).to.be.equal(postBal.sub(preBal))
     // subscribe again
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
@@ -628,7 +633,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // check subscriptions don't change pool balance, only shift regular balance and subscription balance
     let remainingDepositBalance = await fundingPool.balanceOf(lender2.address)
     expect(remainingDepositBalance).to.be.equal(totalDeposited.sub(subscriptionAmount))
-    expect(await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)).to.be.equal(subscriptionAmount)
+    expect(await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)).to.be.equal(subscriptionAmount)
     expect(await usdc.balanceOf(fundingPool.address)).to.be.equal(poolBal)
     await expect(
       fundingPool.connect(lender2).subscribe(loanProposal.address, remainingDepositBalance)
@@ -647,16 +652,20 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // reverts if unauthorized user tries to accept loan terms
-    await expect(loanProposal.connect(lender1).acceptLoanTerms()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(lender1).acceptLoanTerms(lastLoanTermsUpdateTime)).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidSender'
     )
+    // reverts if trying to accept with non-matching loan terms update time
+    await expect(
+      loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime.sub(1))
+    ).to.be.revertedWithCustomError(loanProposal, 'InconsistentLastLoanTermsUpdateTime')
     // check status didn't change
     dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(1)
 
     // test that dao treasury can accept loan terms and move forward
-    let tx = await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    let tx = await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
     let receipt = await tx.wait()
     timestamp = (await ethers.provider.getBlock(receipt.blockNumber)).timestamp
     // check loanTermsLockedTime and status were updated
@@ -670,7 +679,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       'InvalidActionForCurrentStatus'
     )
     // reverts if trying to 'double accept'
-    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidActionForCurrentStatus'
     )
@@ -700,9 +709,9 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let [, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
 
     // reverts if non-borrower tries to rollback during unsubscribe grace period
@@ -725,17 +734,8 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should revert on invalid loan acceptance', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3
-    } = await setupTest()
+    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
@@ -752,6 +752,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -761,7 +762,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [Number(firstDueDate.sub(MIN_TIME_UNTIL_FIRST_DUE_DATE).toString())])
 
     // reverts if trying to accept loan terms where first due date is "too close"
-    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)).to.be.revertedWithCustomError(
       loanProposal,
       'FirstDueDateTooCloseOrPassed'
     )
@@ -770,7 +771,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [Number(firstDueDate.toString()) + 1])
 
     // reverts if trying to accept loan terms where first due already passed
-    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms()).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)).to.be.revertedWithCustomError(
       loanProposal,
       'FirstDueDateTooCloseOrPassed'
     )
@@ -794,6 +795,8 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
+
     // check status updated correctly
     let dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(1)
@@ -807,7 +810,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
     // check status updated correctly
     dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(2)
@@ -825,17 +828,17 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // check users can unsubscribe any time
     // lender 1
-    let subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address)
+    let subscriptionBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
     await fundingPool.connect(lender1).unsubscribe(loanProposal.address, subscriptionBalOf)
     let balOf = await fundingPool.balanceOf(lender1.address)
     await fundingPool.connect(lender1).withdraw(balOf)
     // lender 2
-    subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+    subscriptionBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     await fundingPool.connect(lender2).unsubscribe(loanProposal.address, subscriptionBalOf)
     balOf = await fundingPool.balanceOf(lender2.address)
     await fundingPool.connect(lender2).withdraw(balOf)
     // lender 3
-    subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender3.address)
+    subscriptionBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender3.address)
     await fundingPool.connect(lender3).unsubscribe(loanProposal.address, subscriptionBalOf)
     balOf = await fundingPool.balanceOf(lender3.address)
     await fundingPool.connect(lender3).withdraw(balOf)
@@ -859,6 +862,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -869,7 +873,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
     let dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(2)
 
@@ -878,19 +882,19 @@ describe('Peer-to-Pool: Local Tests', function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     await ethers.provider.send('evm_mine', [timestamp + Number(MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE.toString())])
 
-    // lenders unsubscribe such that subscription amount lower than minLoanAmount
+    // lenders unsubscribe such that subscription amount lower than minTotalSubscriptions
     let subscriptionRemainder = 1
-    let subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address)
+    let subscriptionBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
     await fundingPool
       .connect(lender1)
       .unsubscribe(loanProposal.address, (await subscriptionBalOf).sub(subscriptionRemainder))
     // test scenario where lender1 also withdraws unsubscribed amount
     await fundingPool.connect(lender1).withdraw(subscriptionBalOf.sub(subscriptionRemainder))
-    subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+    subscriptionBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     await fundingPool
       .connect(lender2)
       .unsubscribe(loanProposal.address, (await subscriptionBalOf).sub(subscriptionRemainder))
-    subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender3.address)
+    subscriptionBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender3.address)
     await fundingPool
       .connect(lender3)
       .unsubscribe(loanProposal.address, (await subscriptionBalOf).sub(subscriptionRemainder))
@@ -937,6 +941,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -947,7 +952,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // borrower accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
     let dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(2)
 
@@ -962,17 +967,17 @@ describe('Peer-to-Pool: Local Tests', function () {
     await expect(
       fundingPool
         .connect(lender1)
-        .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address))
+        .unsubscribe(loanProposal.address, await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address))
     ).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
     await expect(
       fundingPool
         .connect(lender2)
-        .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address))
+        .unsubscribe(loanProposal.address, await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address))
     ).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
     await expect(
       fundingPool
         .connect(lender3)
-        .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender3.address))
+        .unsubscribe(loanProposal.address, await fundingPool.subscriptionAmountOf(loanProposal.address, lender3.address))
     ).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
 
     // check that anyone can rollback if borrower didn't execute within loan execution grace period
@@ -984,13 +989,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     // check that borrowers can then unsubscribe again
     await fundingPool
       .connect(lender1)
-      .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address))
+      .unsubscribe(loanProposal.address, await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address))
     await fundingPool
       .connect(lender2)
-      .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address))
+      .unsubscribe(loanProposal.address, await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address))
     await fundingPool
       .connect(lender3)
-      .unsubscribe(loanProposal.address, await fundingPool.subscribedBalanceOf(loanProposal.address, lender3.address))
+      .unsubscribe(loanProposal.address, await fundingPool.subscriptionAmountOf(loanProposal.address, lender3.address))
     let bal = await fundingPool.balanceOf(lender1.address)
     await fundingPool.connect(lender1).withdraw(bal)
     bal = await fundingPool.balanceOf(lender2.address)
@@ -1024,6 +1029,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // revert if any user wants to update loan status
     await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
@@ -1046,7 +1052,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // revert if any user wants to update loan status
     await expect(loanProposal.connect(anyUser).checkAndupdateStatus()).to.be.revertedWithCustomError(
@@ -1091,6 +1097,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1101,7 +1108,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1117,7 +1124,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       fundingPool,
       'UnregisteredLoanProposal'
     )
-    
+
     // revert when trying to execute loan proposal before being ready to execute
     await expect(fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)).to.be.revertedWithCustomError(
       loanProposal,
@@ -1126,7 +1133,7 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [
       finalLoanTerms,
@@ -1134,7 +1141,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       finalLoanAmount,
       finalCollAmountReservedForDefault,
       finalCollAmountReservedForConversions
-    ] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+    ] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao treasury executes loan proposal
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -1188,18 +1195,8 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle loan execution correctly (2/3)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser
-    } = await setupTest()
+    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
@@ -1222,6 +1219,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1232,7 +1230,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1240,11 +1238,11 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + 60])
 
     // have all lenders unsubscribe
-    let bal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address)
+    let bal = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
     await fundingPool.connect(lender1).unsubscribe(loanProposal.address, bal)
-    bal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+    bal = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     await fundingPool.connect(lender2).unsubscribe(loanProposal.address, bal)
-    bal = await fundingPool.subscribedBalanceOf(loanProposal.address, lender3.address)
+    bal = await fundingPool.subscriptionAmountOf(loanProposal.address, lender3.address)
     await fundingPool.connect(lender3).unsubscribe(loanProposal.address, bal)
 
     // move forward past unsubscription grace period
@@ -1255,23 +1253,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     // reverts if trying to finalize and subscriptions below min loan
     await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
       loanProposal,
-      'TotalSubscribedNotTargetInRange'
+      'FellShortOfTotalSubscriptionTarget'
     )
   })
 
   it('Should handle loan execution correctly (3/3)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser
-    } = await setupTest()
+    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
@@ -1294,6 +1282,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1304,7 +1293,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward in time but "too close" to first due date
     let firstDueDate = loanTerms.repaymentSchedule[0].dueTimestamp
@@ -1362,6 +1351,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1372,7 +1362,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1381,10 +1371,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -1423,10 +1413,10 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // lender converts
-    let subscribedBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address)
-    totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let subscribedBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
+    totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let totalConvertible = finalLoanTerms.repaymentSchedule[0].collTokenDueIfConverted
-    let expectedConversionAmount = totalConvertible.mul(subscribedBalOf).div(totalSubscribed)
+    let expectedConversionAmount = totalConvertible.mul(subscribedBalOf).div(totalSubscriptions)
     let preBalLender = await daoToken.balanceOf(lender1.address)
     let preBalLoanProp = await daoToken.balanceOf(loanProposal.address)
     await loanProposal.connect(lender1).exerciseConversion()
@@ -1489,6 +1479,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1499,7 +1490,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1508,10 +1499,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -1565,35 +1556,36 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // define subscription amounts
     const subscriptionLender1 = ONE_USDC.mul(1000000)
-    const subscriptionLender2 = ethers.BigNumber.from("1")
+    const subscriptionLender2 = ethers.BigNumber.from('1')
 
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
-    loanTerms.maxLoanAmount = subscriptionLender1.add(subscriptionLender2)
+    loanTerms.maxTotalSubscriptions = subscriptionLender1.add(subscriptionLender2)
     loanTerms.repaymentSchedule[0].collTokenDueIfConverted = 1
     loanTerms.repaymentSchedule[1].collTokenDueIfConverted = 1
     loanTerms.repaymentSchedule[2].collTokenDueIfConverted = 1
     loanTerms.repaymentSchedule[3].collTokenDueIfConverted = 1
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add large lender
     await usdc.mint(lender1.address, subscriptionLender1)
     await usdc.connect(lender1).approve(fundingPool.address, subscriptionLender1)
     await fundingPool.connect(lender1).deposit(subscriptionLender1, 0)
     await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionLender1)
-  
+
     // add smaller lender
     await usdc.connect(lender2).approve(fundingPool.address, subscriptionLender2)
     await fundingPool.connect(lender2).deposit(subscriptionLender2, 0)
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionLender2)
-    
+
     // move forward past loan terms update cool off period
     let blocknum = await ethers.provider.getBlockNumber()
     let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1602,10 +1594,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -1620,10 +1612,11 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [firstDueDate])
 
     // check conversion reverts if it would lead to zero value
-    let expConversionAmount = finalLoanTerms.repaymentSchedule[0].collTokenDueIfConverted.mul(subscriptionLender2).div(totalSubscribed)
+    let expConversionAmount = finalLoanTerms.repaymentSchedule[0].collTokenDueIfConverted
+      .mul(subscriptionLender2)
+      .div(totalSubscriptions)
     expect(expConversionAmount).to.be.equal(0)
-    await expect(loanProposal.connect(lender2).exerciseConversion())
-    .to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(lender2).exerciseConversion()).to.be.revertedWithCustomError(
       loanProposal,
       'ZeroConversionAmount'
     )
@@ -1665,6 +1658,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1675,7 +1669,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1684,10 +1678,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -1740,7 +1734,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     // approve and repay
     let totalConvertedSubscriptionsOfPeriod = await loanProposal.totalConvertedSubscriptionsPerIdx(0)
     let originalRepaymentAmountDue = finalLoanTerms.repaymentSchedule[0].loanTokenDue
-    let obsoleteRepaymentAmountDue = originalRepaymentAmountDue.mul(totalConvertedSubscriptionsOfPeriod).div(totalSubscribed)
+    let obsoleteRepaymentAmountDue = originalRepaymentAmountDue
+      .mul(totalConvertedSubscriptionsOfPeriod)
+      .div(totalSubscriptions)
     let leftRepaymentAmountDue = originalRepaymentAmountDue.sub(obsoleteRepaymentAmountDue)
     await usdc.connect(daoTreasury).approve(loanProposal.address, leftRepaymentAmountDue)
     // mint tokens
@@ -1792,13 +1788,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // valid claim
-    let subscriptionBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender2.address)
+    let subscriptionBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     let preBal = await usdc.balanceOf(lender2.address)
     await loanProposal.connect(lender2).claimRepayment(0)
     let postBal = await usdc.balanceOf(lender2.address)
 
     // check bal diff matches expected repayment claim
-    let remainingEntitledSubscriptions = totalSubscribed.sub(totalConvertedSubscriptionsOfPeriod)
+    let remainingEntitledSubscriptions = totalSubscriptions.sub(totalConvertedSubscriptionsOfPeriod)
     let expectedRepaymentClaim = leftRepaymentAmountDue.mul(subscriptionBalOf).div(remainingEntitledSubscriptions)
     expect(postBal.sub(preBal)).to.be.equal(expectedRepaymentClaim)
 
@@ -1845,6 +1841,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1855,7 +1852,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1864,10 +1861,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -1939,6 +1936,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -1949,7 +1947,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1958,10 +1956,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -2034,6 +2032,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // add lender subscriptions
     await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
@@ -2044,7 +2043,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // move forward past unsubscription grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -2053,10 +2052,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -2142,6 +2141,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add some loan terms
     const loanTerms = await getDummyLoanTerms(daoTreasury.address)
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // revert if any user tries to mark as defaulted before loan is deployed
     await expect(loanProposal.connect(anyUser).markAsDefaulted()).to.be.revertedWithCustomError(
@@ -2158,7 +2158,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
 
     // dao accepts
-    await loanProposal.connect(daoTreasury).acceptLoanTerms()
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
 
     // revert if any user tries to mark as defaulted before loan is deployed
     await expect(loanProposal.connect(anyUser).markAsDefaulted()).to.be.revertedWithCustomError(
@@ -2173,10 +2173,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // get final amounts
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let totalSubscribed = await fundingPool.totalSubscribed(loanProposal.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
     let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
-      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscribed, loanTokenDecimals)
+      await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
@@ -2231,8 +2231,8 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // claim default proceeds
     let totalBal = await daoToken.balanceOf(loanProposal.address)
-    let subscribedBalOf = await fundingPool.subscribedBalanceOf(loanProposal.address, lender1.address)
-    let expectedDefaultProceeds = totalBal.mul(subscribedBalOf).div(totalSubscribed)
+    let subscribedBalOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
+    let expectedDefaultProceeds = totalBal.mul(subscribedBalOf).div(totalSubscriptions)
     let preLenderBal = await daoToken.balanceOf(lender1.address)
     let preLoanPropBal = await daoToken.balanceOf(loanProposal.address)
     await loanProposal.connect(lender1).claimDefaultProceeds()

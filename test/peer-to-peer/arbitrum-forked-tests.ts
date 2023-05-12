@@ -202,7 +202,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       borrowerCompartmentImplementation: glpStakingCompartmentImplementation.address,
       lenderVault,
       quoteHandler,
-      loanPerCollUnit: ONE_USDC.mul(1000)
+      loanPerCollUnit: ONE_USDC.mul(1000),
+      validUntil: MAX_UINT256
     })
 
     // borrow with on chain quote
@@ -309,8 +310,19 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
   })
 
   it('Uni V3 Looping Test', async function () {
-    const { quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault, addressRegistry, team, uniV3Looping, borrowerGateway } =
-      await setupTest()
+    const {
+      quoteHandler,
+      lender,
+      borrower,
+      whitelistAuthority,
+      usdc,
+      weth,
+      lenderVault,
+      addressRegistry,
+      team,
+      uniV3Looping,
+      borrowerGateway
+    } = await setupTest()
 
     // lenderVault owner deposits usdc
     await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -350,14 +362,14 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     }
 
     // get borrower whitelisted
-    const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+    const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
     await setupBorrowerWhitelist({
       addressRegistry,
       borrower,
       whitelistAuthority,
       whitelistedUntil
     })
-    
+
     // whitelist token pair
     await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
 

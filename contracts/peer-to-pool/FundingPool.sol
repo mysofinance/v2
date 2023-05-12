@@ -17,9 +17,8 @@ contract FundingPool is IFundingPool {
     address public immutable loanProposalFactory;
     address public immutable depositToken;
     mapping(address => uint256) public balanceOf;
-    mapping(address => uint256) public totalSubscribed;
-    mapping(address => bool) public totalSubscribedIsDeployed;
-    mapping(address => mapping(address => uint256)) public subscribedBalanceOf;
+    mapping(address => uint256) public totalSubscriptions;
+    mapping(address => mapping(address => uint256)) public subscriptionAmountOf;
     // note: earliest unsubscribe time is to prevent griefing accept loans through atomic flashborrow, deposit, subscribe, unsubscribe, and withdraw
     mapping(address => mapping(address => uint256))
         internal earliestUnsubscribe;
@@ -76,12 +75,15 @@ contract FundingPool is IFundingPool {
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
-        if (amount + totalSubscribed[loanProposal] > loanTerms.maxLoanAmount) {
+        if (
+            amount + totalSubscriptions[loanProposal] >
+            loanTerms.maxTotalSubscriptions
+        ) {
             revert Errors.SubscriptionAmountTooHigh();
         }
         balanceOf[msg.sender] -= amount;
-        totalSubscribed[loanProposal] += amount;
-        subscribedBalanceOf[loanProposal][msg.sender] += amount;
+        totalSubscriptions[loanProposal] += amount;
+        subscriptionAmountOf[loanProposal][msg.sender] += amount;
         earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
             Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
@@ -103,15 +105,15 @@ contract FundingPool is IFundingPool {
         if (!ILoanProposalImpl(loanProposal).canUnsubscribe()) {
             revert Errors.NotInUnsubscriptionPhase();
         }
-        if (amount > subscribedBalanceOf[loanProposal][msg.sender]) {
+        if (amount > subscriptionAmountOf[loanProposal][msg.sender]) {
             revert Errors.UnsubscriptionAmountTooLarge();
         }
         if (block.timestamp < earliestUnsubscribe[loanProposal][msg.sender]) {
             revert Errors.BeforeEarliestUnsubscribe();
         }
         balanceOf[msg.sender] += amount;
-        totalSubscribed[loanProposal] -= amount;
-        subscribedBalanceOf[loanProposal][msg.sender] -= amount;
+        totalSubscriptions[loanProposal] -= amount;
+        subscriptionAmountOf[loanProposal][msg.sender] -= amount;
         earliestUnsubscribe[loanProposal][msg.sender] = 0;
 
         emit Unsubscribed(msg.sender, loanProposal, amount);
@@ -138,7 +140,6 @@ contract FundingPool is IFundingPool {
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
-        totalSubscribedIsDeployed[loanProposal] = true;
         ILoanProposalImpl(loanProposal).checkAndupdateStatus();
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,

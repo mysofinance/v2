@@ -432,8 +432,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
         int256 _interestRateFactor = int256(Constants.BASE) +
             quoteTuple.interestRatePctInBase;
-        if (_interestRateFactor < 0) {
-            revert Errors.NegativeRepaymentAmount();
+        if (_interestRateFactor <= 0) {
+            revert Errors.InvalidInterestRateFactor();
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
         repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;

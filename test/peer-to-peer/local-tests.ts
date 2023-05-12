@@ -267,14 +267,14 @@ describe('Peer-to-Peer: Local Tests', function () {
     }
   }
 
-  describe('Address Registry', function() {
+  describe('Address Registry', function () {
     it('Should handle borrower whitelist correctly', async function () {
       const { addressRegistry, team, lender, borrower, whitelistAuthority } = await setupTest()
 
       // define whitelistedUntil
       let blocknum = await ethers.provider.getBlockNumber()
       let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil1 = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil1 = Number(timestamp.toString()) + 60 * 60 * 365
 
       // get chain id
       const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
@@ -284,8 +284,9 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // construct payload and sign
       let payload = ethers.utils.defaultAbiCoder.encode(
-      [ "address", "uint256", "uint256", "bytes32"],
-      [ borrower.address, whitelistedUntil1, chainId, salt ])
+        ['address', 'uint256', 'uint256', 'bytes32'],
+        [borrower.address, whitelistedUntil1, chainId, salt]
+      )
       let payloadHash = ethers.utils.keccak256(payload)
       const signature1 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
       const sig1 = ethers.utils.splitSignature(signature1)
@@ -294,27 +295,38 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // revert if non-authorized borrower tries to claim status
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
-      await expect(addressRegistry.connect(team).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
+      await expect(
+        addressRegistry
+          .connect(team)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
 
       // revert if trying to claim whitelist with whitelist authority being zero address
-      await expect(addressRegistry.connect(team).claimBorrowerWhitelistStatus(ZERO_ADDRESS, whitelistedUntil1, signature1, salt)).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
+      await expect(
+        addressRegistry.connect(team).claimBorrowerWhitelistStatus(ZERO_ADDRESS, whitelistedUntil1, signature1, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
 
       // move forward past valid until timestamp
       await ethers.provider.send('evm_mine', [whitelistedUntil1 + 1])
-      
+
       // revert if whitelistedUntil is before than current block time
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
-      await expect(addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+      await expect(
+        addressRegistry
+          .connect(borrower)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
 
       // do new sig
       blocknum = await ethers.provider.getBlockNumber()
       timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil2 = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil2 = Number(timestamp.toString()) + 60 * 60 * 365
       payload = ethers.utils.defaultAbiCoder.encode(
-      [ "address", "uint256", "uint256", "bytes32"],
-      [ borrower.address, whitelistedUntil2, chainId, salt ])
+        ['address', 'uint256', 'uint256', 'bytes32'],
+        [borrower.address, whitelistedUntil2, chainId, salt]
+      )
       payloadHash = ethers.utils.keccak256(payload)
       const signature2 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
       const sig2 = ethers.utils.splitSignature(signature2)
@@ -322,35 +334,44 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // have borrower claim whitelist status
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
-      await addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)
+      await addressRegistry
+        .connect(borrower)
+        .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
 
       // revert if trying to claim again
-      await expect(addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+      await expect(
+        addressRegistry
+          .connect(borrower)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
 
       // revert if trying to claim previous sig with outdated whitelistedUntil timestamp
-      await expect(addressRegistry.connect(borrower).claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
-      
+      await expect(
+        addressRegistry
+          .connect(borrower)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+
       // revert if whitelist authority tries to set same whitelistedUntil on borrower
-      await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
-       [borrower.address], whitelistedUntil2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+      await expect(
+        addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], whitelistedUntil2)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
 
       // revert if whitelist authority tries to whitelist zero address
-      await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
-        [ZERO_ADDRESS], whitelistedUntil2)).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+      await expect(
+        addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([ZERO_ADDRESS], whitelistedUntil2)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
 
       // check that whitelist authority can overwrite whitelistedUntil
-      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
-        [borrower.address], 0)
+      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], 0)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
-      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist(
-        [borrower.address], MAX_UINT256)
-        expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
+      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], MAX_UINT256)
+      expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
     })
   })
 
   describe('Lender Vault', function () {
-
     it('Should handle ownership transfer correctly', async function () {
       const { lender, team, borrower, lenderVault } = await setupTest()
 
@@ -382,16 +403,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
 
       // make valid owner proposal
-      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.emit(
-        lenderVault,
-        'NewOwnerProposed'
-      )
+      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.emit(lenderVault, 'NewOwnerProposed')
 
       // claim ownership
-      await expect(lenderVault.connect(team).claimOwnership()).to.emit(
-        lenderVault,
-        'ClaimedOwnership'
-      )
+      await expect(lenderVault.connect(team).claimOwnership()).to.emit(lenderVault, 'ClaimedOwnership')
 
       // check that old owner can't propose new owner anymore
       await expect(lenderVault.connect(lender).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
@@ -402,7 +417,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     it('Should handle deposits and withdrawals correctly (1/2)', async function () {
       const { addressRegistry, team, lender, borrower, usdc, weth, lenderVault } = await setupTest()
-      
+
       let depositAmount
       let withdrawAmount
       let preLenderBal
@@ -437,7 +452,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault,
         'InvalidSender'
       )
-      
+
       // reverts if owner tries to withdraw invalid token
       withdrawAmount = depositAmount
       await expect(lenderVault.connect(lender).withdraw(weth.address, withdrawAmount)).to.be.revertedWithCustomError(
@@ -471,13 +486,16 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // de-whitelisting shouldn't affect withdrawability
       await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
-      
+
       // transfer ownership to new vault owner
       await lenderVault.connect(lender).proposeNewOwner(team.address)
       await lenderVault.connect(team).claimOwnership()
 
       // reverts if old owner tries to withdraw
-      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
 
       // new owner can withdraw
       withdrawAmount = postVaultBal
@@ -490,8 +508,19 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should handle deposits and withdrawals correctly (2/2)', async function () {
-      const { addressRegistry, quoteHandler, borrowerGateway, team, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
-      
+      const {
+        addressRegistry,
+        quoteHandler,
+        borrowerGateway,
+        team,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
+
       let depositAmount
       let withdrawAmount
       let preLenderBal
@@ -517,7 +546,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       postLenderBal = await weth.balanceOf(lender.address)
       postVaultBal = await weth.balanceOf(lenderVault.address)
       expect(postVaultBal.sub(preVaultBal)).to.be.equal(preLenderBal.sub(postLenderBal))
-      
+
       // reverts if non-owner tries to withdraw
       withdrawAmount = usdc.balanceOf(lenderVault.address)
       await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
@@ -575,7 +604,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
 
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
@@ -609,8 +638,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       let preVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
       let preBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
       await borrowerGateway
-          .connect(borrower)
-          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       let postLockedWethAmounts = await lenderVault.lockedAmounts(weth.address)
       let postLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
       let postVaultWethBal = await weth.balanceOf(lenderVault.address)
@@ -633,9 +662,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 0)
 
       // de-whitelisting should affect new borrows
-      await expect(borrowerGateway
+      await expect(
+        borrowerGateway
           .connect(borrower)
-          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       // should revert when trying to withdraw whole lender vault balance, which also incl locked amounts
       withdrawAmount = await weth.balanceOf(lenderVault.address)
@@ -819,7 +850,18 @@ describe('Peer-to-Peer: Local Tests', function () {
 
   describe('Off-Chain Quote Testing', function () {
     it('Should process off-chain quote correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -860,7 +902,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
@@ -978,22 +1020,31 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should handle off-chain quote nonce correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       // lender produces quote
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
         lenderVault,
@@ -1040,22 +1091,31 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
@@ -1095,26 +1155,35 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      ).to.be.revertedWithCustomError(quoteHandler, 'OutdatedQuote')
     })
 
     it('Should validate off-chain validUntil quote correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
@@ -1150,26 +1219,35 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      ).to.be.revertedWithCustomError(quoteHandler, 'OutdatedQuote')
     })
 
     it('Should validate off-chain singleUse quote correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
@@ -1221,22 +1299,22 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should validate off-chain earliest repay correctly', async function () {
-      const { addressRegistry, borrowerGateway, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const { addressRegistry, borrowerGateway, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } =
+        await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       // generate offchain quote where earliest repay is after loan expiry/tenor
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
@@ -1279,22 +1357,31 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should validate off-chain MerkleProof correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
@@ -1340,22 +1427,31 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should validate off-chain wrong signature correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
@@ -1395,23 +1491,34 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should handle case of multiple signers correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault, signer1, signer2, signer3 } =
-        await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault,
+        signer1,
+        signer2,
+        signer3
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
@@ -1603,8 +1710,9 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(offChainQuoteNoncePre.toNumber() + 1).to.equal(offChainQuoteNoncePost)
     })
 
-    it('Should process off-chain quote with negative rate correctly', async function () {
-      const { addressRegistry, borrowerGateway, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+    it('Should process off-chain quote with zero or negative interest rate factor correctly', async function () {
+      const { addressRegistry, borrowerGateway, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
+        await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1620,6 +1728,12 @@ describe('Peer-to-Peer: Local Tests', function () {
           interestRatePctInBase: BASE.sub(BASE.mul(3)),
           upfrontFeePctInBase: 0,
           tenor: ONE_DAY.mul(180)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(-1),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(365)
         }
       ]
 
@@ -1678,16 +1792,15 @@ describe('Peer-to-Peer: Local Tests', function () {
       let quoteTupleIdx = 0
       let selectedQuoteTuple = badQuoteTuples[quoteTupleIdx]
       let proof = badQuoteTuplesTree.getProof(quoteTupleIdx)
-
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
@@ -1703,7 +1816,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         callbackData
       }
 
-      // repaymeny amount negative reverts
+      // check revert if negative interest rate factor
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1714,13 +1827,41 @@ describe('Peer-to-Peer: Local Tests', function () {
             selectedQuoteTuple,
             proof
           )
-      ).to.be.revertedWithCustomError(lenderVault, 'NegativeRepaymentAmount')
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidInterestRateFactor')
+
+      // borrower obtains proof for quote tuple idx 1
+      quoteTupleIdx = 1
+      selectedQuoteTuple = badQuoteTuples[quoteTupleIdx]
+      proof = badQuoteTuplesTree.getProof(quoteTupleIdx)
+
+      // check revert if zero interest rate factor
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(
+            lenderVault.address,
+            borrowInstructions,
+            offChainQuoteWithBadTuples,
+            selectedQuoteTuple,
+            proof
+          )
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidInterestRateFactor')
     })
   })
 
   describe('On-Chain Quote Testing', function () {
     it('Should process on-chain quote correctly', async function () {
-      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } = await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1763,16 +1904,15 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler,
         'OnChainQuoteAdded'
       )
-
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
@@ -1821,11 +1961,31 @@ describe('Peer-to-Peer: Local Tests', function () {
           callbackData
         )
       ).to.be.revertedWithCustomError(lenderVault, 'OutsideValidRepayWindow')
+
+      // move forward past valid until timestamp
+      await ethers.provider.send('evm_mine', [Number(onChainQuote.generalQuoteInfo.validUntil.toString()) + 1])
+
+      // revert if trying to execute quote after valid until
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(quoteHandler, 'OutdatedQuote')
     })
 
     it('Should process on-chain single use quote correctly', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault, addressRegistry } =
-        await setupTest()
+      const {
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault,
+        addressRegistry
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1877,16 +2037,15 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler,
         'OnChainQuoteAdded'
       )
-
       // get borrower whitelisted
-      const whitelistedUntil = Number(timestamp.toString()) + 60*60*365
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
         addressRegistry,
         borrower,
         whitelistAuthority,
         whitelistedUntil
       })
-      
+
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
