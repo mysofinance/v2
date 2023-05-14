@@ -32,7 +32,12 @@ contract GLPStakingCompartment is BaseCompartment {
             callbackAddr
         );
 
-        IStakingHelper(FEE_GLP).claim(address(this));
+        //solhint-ignore-empty-blocks
+        try IStakingHelper(FEE_GLP).claim(address(this)) {
+            // do nothing
+        } catch {
+            // do nothing
+        }
 
         // check weth token balance
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
@@ -47,7 +52,12 @@ contract GLPStakingCompartment is BaseCompartment {
     function unlockCollToVault(address collTokenAddr) external {
         _unlockCollToVault(collTokenAddr);
 
-        IStakingHelper(FEE_GLP).claim(address(this));
+        //solhint-ignore-empty-blocks
+        try IStakingHelper(FEE_GLP).claim(address(this)) {
+            // do nothing
+        } catch {
+            // do nothing
+        }
 
         // get weth token balance
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
