@@ -52,6 +52,12 @@ interface IFactory {
     function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external;
 
     /**
+     * @notice Returns the address of the funding pool implementation
+     * @return The address of the funding pool implementation
+     */
+    function fundingPoolImpl() external view returns (address);
+
+    /**
      * @notice Returns the address of the proposal implementation
      * @return The address of the proposal implementation
      */
@@ -65,11 +71,25 @@ interface IFactory {
     function loanProposals(uint256 idx) external view returns (address);
 
     /**
+     * @notice Returns the address of a registered funding pool
+     * @param idx The index of the given funding pool
+     * @return The address of a registered funding pool
+     */
+    function fundingPools(uint256 idx) external view returns (address);
+
+    /**
      * @notice Returns flag whether given address is a registered loan proposal contract
      * @param addr The address to check if its a registered loan proposal
      * @return Flag indicating whether address is a registered loan proposal contract
      */
     function isLoanProposal(address addr) external view returns (bool);
+
+    /**
+     * @notice Returns flag whether given address is a registered funding pool contract
+     * @param addr The address to check if its a registered funding pool
+     * @return Flag indicating whether address is a registered funding pool contract
+     */
+    function isFundingPool(address addr) external view returns (bool);
 
     /**
      * @notice Returns the arranger fee split between the arranger and the protocol (e.g. 10% = BASE/10, meaning 10% of absolute arranger fee goes to protocol and rest to arranger)

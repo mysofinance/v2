@@ -11,15 +11,19 @@ import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 
 contract Factory is Ownable, IFactory {
+    uint256 public arrangerFeeSplit;
     address public immutable loanProposalImpl;
     address public immutable fundingPoolImpl;
     address[] public loanProposals;
     address[] public fundingPools;
     mapping(address => bool) public isLoanProposal;
-    mapping(address => bool) public depositTokenHasFundingPool;
-    uint256 public arrangerFeeSplit;
+    mapping(address => bool) public isFundingPool;
+    mapping(address => bool) internal depositTokenHasFundingPool;
 
     constructor(address _loanProposalImpl, address _fundingPoolImpl) {
+        if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         loanProposalImpl = _loanProposalImpl;
         fundingPoolImpl = _fundingPoolImpl;
         _owner = msg.sender;
@@ -33,6 +37,9 @@ contract Factory is Ownable, IFactory {
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external {
+        if (!isFundingPool[_fundingPool]) {
+            revert Errors.InvalidAddress();
+        }
         bytes32 salt = keccak256(
             abi.encodePacked(loanProposalImpl, msg.sender, loanProposals.length)
         );
@@ -63,9 +70,6 @@ contract Factory is Ownable, IFactory {
     }
 
     function createFundingPool(address _depositToken) external {
-        if (_depositToken == address(0)) {
-            revert Errors.InvalidAddress();
-        }
         if (depositTokenHasFundingPool[_depositToken]) {
             revert Errors.FundingPoolAlreadyExists();
         }
@@ -77,6 +81,7 @@ contract Factory is Ownable, IFactory {
             salt
         );
         fundingPools.push(newFundingPool);
+        isFundingPool[newFundingPool] = true;
         depositTokenHasFundingPool[_depositToken] = true;
         IFundingPoolImpl(newFundingPool).initialize(
             address(this),

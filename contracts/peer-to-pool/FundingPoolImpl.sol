@@ -31,6 +31,9 @@ contract FundingPoolImpl is Initializable, IFundingPoolImpl {
         address _factory,
         address _depositToken
     ) external initializer {
+        if (_factory == address(0) || _depositToken == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         factory = _factory;
         depositToken = _depositToken;
     }

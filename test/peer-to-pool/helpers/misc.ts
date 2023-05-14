@@ -1,5 +1,5 @@
 import { ethers } from 'hardhat'
-import { LoanProposalFactory, LoanProposal, FundingPool, MyERC20, LoanTerms } from '../../../typechain-types'
+import { Factory, LoanProposal, FundingPool, MyERC20 } from '../../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { BigNumber } from 'ethers'
 
@@ -73,7 +73,7 @@ export const getDummyLoanTerms = async (daoTreasuryAddr: string) => {
 }
 
 export const createLoanProposal = async (
-  loanProposalFactory: LoanProposalFactory,
+  factory: Factory,
   arranger: SignerWithAddress,
   fundingPoolAddr: string,
   daoTokenAddr: string,
@@ -83,7 +83,7 @@ export const createLoanProposal = async (
   repaymentGracePeriod: BigNumber
 ) => {
   // arranger creates loan proposal
-  await loanProposalFactory
+  await factory
     .connect(arranger)
     .createLoanProposal(
       fundingPoolAddr,
@@ -93,7 +93,7 @@ export const createLoanProposal = async (
       conversionGracePeriod,
       repaymentGracePeriod
     )
-  const loanProposalAddr = await loanProposalFactory.loanProposals(0)
+  const loanProposalAddr = await factory.loanProposals(0)
   const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
   const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
   return loanProposal

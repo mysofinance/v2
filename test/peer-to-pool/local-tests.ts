@@ -74,35 +74,59 @@ describe('Peer-to-Pool: Local Tests', function () {
     const loanProposalImpl = await LoanProposalImpl.deploy()
     await loanProposalImpl.deployed()
 
-    const LoanProposalFactory = await ethers.getContractFactory('LoanProposalFactory')
-    const loanProposalFactory = await LoanProposalFactory.connect(team).deploy(loanProposalImpl.address)
-    await loanProposalFactory.deployed()
-    await expect(
-      loanProposalFactory.connect(lender1).setArrangerFeeSplit(BASE.mul(20).div(100))
-    ).to.be.revertedWithCustomError(loanProposalFactory, 'InvalidSender')
-    await expect(loanProposalFactory.connect(team).setArrangerFeeSplit(BASE.mul(80).div(100))).to.be.revertedWithCustomError(
-      loanProposalFactory,
+    const FundingPoolImpl = await ethers.getContractFactory('FundingPoolImpl')
+    const fundingPoolImpl = await FundingPoolImpl.deploy()
+    await fundingPoolImpl.deployed()
+
+    const Factory = await ethers.getContractFactory('Factory')
+
+    // reverts if trying to initialize base contract
+    await expect(Factory.connect(team).deploy(ADDRESS_ZERO, fundingPoolImpl.address)).to.be.revertedWithCustomError(
+      Factory,
+      'InvalidAddress'
+    )
+    await expect(Factory.connect(team).deploy(loanProposalImpl.address, ADDRESS_ZERO)).to.be.revertedWithCustomError(
+      Factory,
+      'InvalidAddress'
+    )
+    const factory = await Factory.connect(team).deploy(loanProposalImpl.address, fundingPoolImpl.address)
+    await factory.deployed()
+    await expect(factory.connect(lender1).setArrangerFeeSplit(BASE.mul(20).div(100))).to.be.revertedWithCustomError(
+      factory,
+      'InvalidSender'
+    )
+    await expect(factory.connect(team).setArrangerFeeSplit(BASE.mul(80).div(100))).to.be.revertedWithCustomError(
+      factory,
       'InvalidFee'
     )
     const newFee = BASE.mul(20).div(100)
-    await loanProposalFactory.connect(team).setArrangerFeeSplit(newFee)
-    await expect(loanProposalFactory.connect(team).setArrangerFeeSplit(newFee)).to.be.revertedWithCustomError(
-      loanProposalFactory,
-      'InvalidFee'
-    )
+    await factory.connect(team).setArrangerFeeSplit(newFee)
+    await expect(factory.connect(team).setArrangerFeeSplit(newFee)).to.be.revertedWithCustomError(factory, 'InvalidFee')
 
-    const FundingPool = await ethers.getContractFactory('FundingPool')
-    const fundingPool = await FundingPool.deploy(loanProposalFactory.address, usdc.address)
-    await fundingPool.deployed()
+    // create a deposit pool
+    await factory.createFundingPool(usdc.address)
+    const fundingPoolAddr = await factory.fundingPools(0)
+    const fundingPool = await FundingPoolImpl.attach(fundingPoolAddr)
+
+    // reverts if trying to create deposit pool for zero address
+    await expect(factory.createFundingPool(ADDRESS_ZERO)).to.be.revertedWithCustomError(factory, 'InvalidAddress')
+
+    // reverts if trying to create deposit pool for the same token again
+    await expect(factory.createFundingPool(usdc.address)).to.be.revertedWithCustomError(factory, 'FundingPoolAlreadyExists')
 
     // reverts if trying to initialize base contract
     await expect(
       loanProposalImpl.initialize(arranger.address, fundingPool.address, daoToken.address, 1, ONE_DAY, ONE_DAY, ONE_DAY)
     ).to.be.revertedWith('Initializable: contract is already initialized')
 
+    // reverts if trying to initialize base contract
+    await expect(fundingPoolImpl.initialize(factory.address, usdc.address)).to.be.revertedWith(
+      'Initializable: contract is already initialized'
+    )
+
     return {
       fundingPool,
-      loanProposalFactory,
+      factory,
       usdc,
       daoToken,
       lender0,
@@ -117,11 +141,11 @@ describe('Peer-to-Pool: Local Tests', function () {
   }
 
   it('Should handle creating a new loan proposal contract correctly', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger } = await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -133,7 +157,7 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // revert on zero addresses
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           ADDRESS_ZERO,
@@ -145,7 +169,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -158,7 +182,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
     // revert on too small arranger fee
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -170,7 +194,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -182,7 +206,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -195,7 +219,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
     // revert on too short unsubscribe grace period
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -207,7 +231,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -219,7 +243,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -231,7 +255,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -243,7 +267,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -255,7 +279,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
     await expect(
-      loanProposalFactory
+      factory
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
@@ -269,10 +293,10 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle loan proposals correctly', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, team } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, team } = await setupTest()
 
     // arranger creates loan proposal
-    await loanProposalFactory
+    await factory
       .connect(arranger)
       .createLoanProposal(
         fundingPool.address,
@@ -282,7 +306,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         CONVERSION_GRACE_PERIOD,
         REPAYMENT_GRACE_PERIOD
       )
-    const loanProposalAddr = await loanProposalFactory.loanProposals(0)
+    const loanProposalAddr = await factory.loanProposals(0)
     const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
     const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
 
@@ -439,11 +463,10 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle loan term subscriptions and acceptance correctly', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender0, lender1, lender2 } =
-      await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender0, lender1, lender2 } = await setupTest()
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -734,12 +757,11 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should revert on invalid loan acceptance', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } =
-      await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } = await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -778,11 +800,10 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle rollbacks correctly (1/3)', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } =
-      await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } = await setupTest()
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -845,11 +866,11 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle rollbacks correctly (2/3)', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
       await setupTest()
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -924,11 +945,11 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle rollbacks correctly (3/3)', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
       await setupTest()
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1005,12 +1026,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should not allow unauthorized updating of status', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
       await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1062,23 +1083,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle loan execution correctly (1/3)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1195,12 +1205,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle loan execution correctly (2/3)', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
       await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1258,12 +1268,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle loan execution correctly (3/3)', async function () {
-    const { fundingPool, loanProposalFactory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser } =
       await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1316,23 +1326,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle conversions correctly (1/3)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1444,23 +1443,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle conversions correctly (2/3)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1528,23 +1516,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle conversions correctly (3/3)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1623,23 +1600,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle repayments correctly (1/4)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1806,23 +1772,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle repayments correctly (2/4)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1901,23 +1856,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle repayments correctly (3/4)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -1997,23 +1941,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle repayments correctly (4/4)', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
@@ -2100,23 +2033,12 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle default claims correctly', async function () {
-    const {
-      fundingPool,
-      loanProposalFactory,
-      daoToken,
-      arranger,
-      daoTreasury,
-      usdc,
-      lender1,
-      lender2,
-      lender3,
-      anyUser,
-      team
-    } = await setupTest()
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3, anyUser, team } =
+      await setupTest()
 
     // arranger creates loan proposal
     const loanProposal = await createLoanProposal(
-      loanProposalFactory,
+      factory,
       arranger,
       fundingPool.address,
       daoToken.address,
