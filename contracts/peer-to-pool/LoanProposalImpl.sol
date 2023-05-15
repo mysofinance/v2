@@ -263,8 +263,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function checkAndupdateStatus() external {
-        address fundingPool = staticData.fundingPool;
-        if (msg.sender != fundingPool) {
+        if (msg.sender != staticData.fundingPool) {
             revert Errors.InvalidSender();
         }
         if (
@@ -298,18 +297,17 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         // must be after when the period of this loan is due, but before borrower can repay
         // note: conversion can be done if blocktime is in the half-open interval of:
         // [dueTimestamp, dueTimestamp + conversionGracePeriod)
+        DataTypesPeerToPool.Repayment memory _repayment = _loanTerms
+            .repaymentSchedule[repaymentIdx];
         if (
-            block.timestamp <
-            _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp ||
+            block.timestamp < _repayment.dueTimestamp ||
             block.timestamp >=
-            _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-                staticData.conversionGracePeriod
+            _repayment.dueTimestamp + staticData.conversionGracePeriod
         ) {
             revert Errors.OutsideConversionTimeWindow();
         }
-        uint256 conversionAmount = (_loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .collTokenDueIfConverted * lenderContribution) /
+        uint256 conversionAmount = (_repayment.collTokenDueIfConverted *
+            lenderContribution) /
             IFundingPoolImpl(fundingPool).totalSubscriptions(address(this));
         if (conversionAmount == 0) {
             revert Errors.ZeroConversionAmount();
@@ -340,9 +338,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         // but before default period for this period
         // note: repayment can be done in the half-open interval of:
         // [dueTimestamp + conversionGracePeriod, dueTimestamp + conversionGracePeriod + repaymentGracePeriod)
-        uint256 currConversionCutoffTime = _loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .dueTimestamp + staticData.conversionGracePeriod;
+        DataTypesPeerToPool.Repayment memory _repayment = _loanTerms
+            .repaymentSchedule[repaymentIdx];
+        uint256 currConversionCutoffTime = _repayment.dueTimestamp +
+            staticData.conversionGracePeriod;
         uint256 currRepaymentCutoffTime = currConversionCutoffTime +
             staticData.repaymentGracePeriod;
         if (
@@ -353,15 +352,11 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         address fundingPool = staticData.fundingPool;
         address loanToken = IFundingPoolImpl(fundingPool).depositToken();
-        uint256 collTokenDueIfAllConverted = _loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .collTokenDueIfConverted;
+        uint256 collTokenDueIfAllConverted = _repayment.collTokenDueIfConverted;
         uint256 collTokenLeftUnconverted = collTokenDueIfAllConverted -
             collTokenConverted[repaymentIdx];
-        uint256 remainingLoanTokenDue = (_loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .loanTokenDue * collTokenLeftUnconverted) /
-            collTokenDueIfAllConverted;
+        uint256 remainingLoanTokenDue = (_repayment.loanTokenDue *
+            collTokenLeftUnconverted) / collTokenDueIfAllConverted;
         loanTokenRepaid[repaymentIdx] = remainingLoanTokenDue;
         uint256 preBal = IERC20Metadata(loanToken).balanceOf(address(this));
         IERC20Metadata(loanToken).safeTransferFrom(
@@ -408,10 +403,9 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.AlreadyClaimed();
         }
         // repaid amount for that period split over those who didn't convert in that period
-        uint256 subscriptionsEntitledToRepayment = (IFundingPoolImpl(
-            fundingPool
-        ).totalSubscriptions(address(this)) -
-            totalConvertedSubscriptionsPerIdx[repaymentIdx]);
+        uint256 subscriptionsEntitledToRepayment = IFundingPoolImpl(fundingPool)
+            .totalSubscriptions(address(this)) -
+            totalConvertedSubscriptionsPerIdx[repaymentIdx];
         uint256 claimAmount = (loanTokenRepaid[repaymentIdx] *
             lenderContribution) / subscriptionsEntitledToRepayment;
         lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
