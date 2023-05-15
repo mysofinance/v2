@@ -123,6 +123,6 @@ contract BalancerV2Looping is IVaultCallback {
             minSwapReceive,
             deadline
         );
-        IERC20Metadata(loan.collToken).safeApprove(BALANCER_V2_VAULT, 0);
+        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, 0);
     }
 }
