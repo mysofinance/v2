@@ -60,17 +60,19 @@ interface ILenderVaultImpl {
     /**
      * @notice function to update loan info on a reoay
      * @dev only borrower gateway can call this function
-     * loanId is needed by vault to store updated array
-     * @param loan loan info passed in
+     * loanId is needed by vault to store updated loan info
      * @param repayAmount amount of loan repaid
      * @param loanId index of loan in loans array
      * @param collAmount amount of collateral to unlock
+     * @param collTokenCompartmentAddr address of the compartment to unlock collateral
+     * @param collToken address of the collateral token
      */
     function updateLoanInfo(
-        DataTypesPeerToPeer.Loan memory loan,
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount
+        uint256 collAmount,
+        address collTokenCompartmentAddr,
+        address collToken
     ) external;
 
     /**

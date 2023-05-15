@@ -106,19 +106,20 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function updateLoanInfo(
-        DataTypesPeerToPeer.Loan memory _loan,
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount
+        uint256 collAmount,
+        address collTokenCompartmentAddr,
+        address collToken
     ) external {
         senderCheckGateway();
-        _loan.amountRepaidSoFar += repayAmount;
+
+        _loans[loanId].amountRepaidSoFar += repayAmount;
 
         // only update lockedAmounts when no compartment
-        if (_loan.collTokenCompartmentAddr == address(0)) {
-            lockedAmounts[_loan.collToken] -= collAmount;
+        if (collTokenCompartmentAddr == address(0)) {
+            lockedAmounts[collToken] -= collAmount;
         }
-        _loans[loanId] = _loan;
     }
 
     function processQuote(

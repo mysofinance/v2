@@ -176,10 +176,11 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         );
 
         ILenderVaultImpl(vaultAddr).updateLoanInfo(
-            loan,
             loanRepayInstructions.targetRepayAmount,
             loanRepayInstructions.targetLoanId,
-            reclaimCollAmount
+            reclaimCollAmount,
+            loan.collTokenCompartmentAddr,
+            loan.collToken
         );
 
         emit Repaid(
