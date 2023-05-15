@@ -87,14 +87,16 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             }
         }
 
-        lockedAmounts[collToken] -= totalUnlockableColl;
+        uint256 currLockedAmount = lockedAmounts[
+            collToken
+        ] -= totalUnlockableColl;
         if (withdrawAllTokenBalance) {
             uint256 currentCollTokenBalance = IERC20Metadata(collToken)
                 .balanceOf(address(this));
 
             IERC20Metadata(collToken).safeTransfer(
                 _owner,
-                currentCollTokenBalance - lockedAmounts[collToken]
+                currentCollTokenBalance - currLockedAmount
             );
         }
 
