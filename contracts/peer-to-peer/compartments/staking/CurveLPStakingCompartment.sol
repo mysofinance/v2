@@ -74,8 +74,8 @@ contract CurveLPStakingCompartment is BaseCompartment {
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
         _collAccountingHelper(
-            uint256(1),
-            uint256(1),
+            1,
+            1,
             address(0),
             collTokenAddr,
             address(0),
@@ -99,30 +99,23 @@ contract CurveLPStakingCompartment is BaseCompartment {
 
         IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
 
-        try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
-            address rewardTokenAddr
-        ) {
-            if (rewardTokenAddr != address(0)) {
-                _rewardTokenAddr[0] = rewardTokenAddr;
-                uint256 index = 1;
-                while (index < 8) {
-                    try
-                        IStakingHelper(_liqGaugeAddr).reward_tokens(index)
-                    returns (address additionalRewardTokenAddr) {
-                        _rewardTokenAddr[index] = additionalRewardTokenAddr;
-                    } catch {
-                        break;
-                    }
-                    unchecked {
-                        index++;
-                    }
-                }
-                IStakingHelper(_liqGaugeAddr).claim_rewards();
+        uint256 index = 0;
+        while (index < 8) {
+            try IStakingHelper(_liqGaugeAddr).reward_tokens(index) returns (
+                address rewardTokenAddr
+            ) {
+                _rewardTokenAddr[index] = rewardTokenAddr;
+            } catch {
+                break;
             }
-            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
-        } catch {
-            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+            unchecked {
+                index++;
+            }
         }
+        if (index > 0) {
+            IStakingHelper(_liqGaugeAddr).claim_rewards();
+        }
+        IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
     }
 
     function _collAccountingHelper(
