@@ -236,13 +236,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
-        uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
-            collReceiver
-        );
-
         // protocol fees on whole sendAmount
         // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
-        uint256 protocolFeeAmount = ((borrowInstructions.collSendAmount) *
+        uint256 protocolFeeAmount = (borrowInstructions.collSendAmount *
             protocolFee *
             (loan.expiry - block.timestamp)) /
             (Constants.BASE * Constants.YEAR_IN_SECONDS);
@@ -263,6 +259,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 protocolFeeAmount
             );
         }
+
+        uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
+            collReceiver
+        );
 
         uint256 collReceiverTransferAmount = borrowInstructions.collSendAmount -
             protocolFeeAmount;
@@ -307,22 +307,20 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             revert Errors.ReclaimAmountIsZero();
         }
         if (callbackAddr == address(0)) {
-            if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVaultImpl(lenderVault).transferCollFromCompartment(
+            loan.collTokenCompartmentAddr != address(0)
+                ? ILenderVaultImpl(lenderVault).transferCollFromCompartment(
                     loanRepayInstructions.targetRepayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,
                     loan.collToken,
                     callbackAddr,
                     loan.collTokenCompartmentAddr
-                );
-            } else {
-                ILenderVaultImpl(lenderVault).transferTo(
+                )
+                : ILenderVaultImpl(lenderVault).transferTo(
                     loan.collToken,
                     loan.borrower,
                     reclaimCollAmount
                 );
-            }
         } else {
             if (
                 IAddressRegistry(addressRegistry).whitelistState(
@@ -331,24 +329,21 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             ) {
                 revert Errors.NonWhitelistedCallback();
             }
-            if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVaultImpl(lenderVault).transferCollFromCompartment(
+            loan.collTokenCompartmentAddr != address(0)
+                ? ILenderVaultImpl(lenderVault).transferCollFromCompartment(
                     loanRepayInstructions.targetRepayAmount,
                     loan.initRepayAmount - loan.amountRepaidSoFar,
                     loan.borrower,
                     loan.collToken,
                     callbackAddr,
                     loan.collTokenCompartmentAddr
-                );
-                IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
-            } else {
-                ILenderVaultImpl(lenderVault).transferTo(
+                )
+                : ILenderVaultImpl(lenderVault).transferTo(
                     loan.collToken,
                     callbackAddr,
                     reclaimCollAmount
                 );
-                IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
-            }
+            IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
         }
 
         uint256 loanTokenReceived = IERC20Metadata(loan.loanToken).balanceOf(
