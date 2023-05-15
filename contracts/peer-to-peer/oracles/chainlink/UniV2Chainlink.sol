@@ -53,20 +53,22 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         override(ChainlinkBasic, IOracle)
         returns (uint256 collTokenPriceInLoanToken)
     {
-        if (!isLpToken[collToken] && !isLpToken[loanToken]) {
+        bool isCollTokenLpToken = isLpToken[collToken];
+        bool isLoanTokenLpToken = isLpToken[loanToken];
+        if (!isCollTokenLpToken && !isLoanTokenLpToken) {
             revert Errors.NoLpTokens();
         }
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        uint256 collTokenPriceRaw = isLpToken[collToken]
+        uint256 collTokenPriceRaw = isCollTokenLpToken
             ? getLpTokenPrice(collToken)
             : getPriceOfToken(collToken);
-        uint256 loanTokenPriceRaw = isLpToken[loanToken]
+        uint256 loanTokenPriceRaw = isLoanTokenLpToken
             ? getLpTokenPrice(loanToken)
             : getPriceOfToken(loanToken);
 
         collTokenPriceInLoanToken =
             (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
-            (loanTokenPriceRaw);
+            loanTokenPriceRaw;
     }
 
     /**
