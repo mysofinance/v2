@@ -248,21 +248,18 @@ contract QuoteHandler is IQuoteHandler {
                 offChainQuoteHash
             )
         );
-        uint256 tmp;
         address recoveredSigner;
-        uint256 newHash;
+        uint160 prevSignerCastToUint160;
         for (uint256 i = 0; i < v.length; ) {
             recoveredSigner = ecrecover(messageHash, v[i], r[i], s[i]);
-            // use hash instead of address to spread out over 256 bits and reduce false positives
-            newHash = uint256(keccak256(abi.encode(recoveredSigner)));
-            if (tmp == tmp | newHash) {
-                return false;
-            }
-
             if (!ILenderVaultImpl(lenderVault).isSigner(recoveredSigner)) {
                 return false;
             }
-            tmp |= newHash;
+            uint160 recoveredSignerCastToUint160 = uint160(recoveredSigner);
+            if (recoveredSignerCastToUint160 <= prevSignerCastToUint160) {
+                return false;
+            }
+            prevSignerCastToUint160 = recoveredSignerCastToUint160;
             unchecked {
                 i++;
             }
