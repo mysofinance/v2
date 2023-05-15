@@ -91,5 +91,4 @@ library Errors {
     error CannotClaimOutdatedStatus();
     error DelegateReducedBalance();
     error FundingPoolAlreadyExists();
-    error NoDefaultProceeds();
 }
