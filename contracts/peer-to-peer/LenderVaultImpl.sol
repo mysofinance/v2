@@ -54,19 +54,16 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function unlockCollateral(
         address collToken,
         uint256[] calldata _loanIds,
-        bool withdrawAll
+        bool withdrawAllTokenBalance
     ) external {
         // only owner can call this function
-        if (msg.sender != _owner) {
-            revert Errors.InvalidSender();
-        }
+        senderCheckOwner();
         // if empty array is passed, revert
         if (_loanIds.length == 0) {
             revert Errors.InvalidArrayLength();
         }
         uint256 totalUnlockableColl;
         for (uint256 i = 0; i < _loanIds.length; ) {
-            uint256 tmp = 0;
             DataTypesPeerToPeer.Loan storage _loan = _loans[_loanIds[i]];
 
             if (_loan.collToken != collToken) {
@@ -79,11 +76,10 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                 IBaseCompartment(_loan.collTokenCompartmentAddr)
                     .unlockCollToVault(_loan.collToken);
             } else {
-                tmp =
+                totalUnlockableColl =
                     _loan.initCollAmount -
-                    (_loan.initCollAmount * _loan.amountRepaidSoFar) /
-                    _loan.initRepayAmount;
-                totalUnlockableColl += tmp;
+                    ((_loan.initCollAmount * _loan.amountRepaidSoFar) /
+                        _loan.initRepayAmount);
             }
             _loan.collUnlocked = true;
             unchecked {
@@ -92,7 +88,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
 
         lockedAmounts[collToken] -= totalUnlockableColl;
-        if (withdrawAll) {
+        if (withdrawAllTokenBalance) {
             uint256 currentCollTokenBalance = IERC20Metadata(collToken)
                 .balanceOf(address(this));
 
@@ -102,7 +98,12 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             );
         }
 
-        emit CollateralUnlocked(_owner, collToken, _loanIds, withdrawAll);
+        emit CollateralUnlocked(
+            _owner,
+            collToken,
+            _loanIds,
+            withdrawAllTokenBalance
+        );
     }
 
     function updateLoanInfo(
@@ -283,7 +284,9 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             revert Errors.InvalidSignerRemoveInfo();
         }
         address signerMovedFromEnd = signers[signersLen - 1];
-        signers[signerIdx] = signerMovedFromEnd;
+        if (signerIdx < signersLen - 1) {
+            signers[signerIdx] = signerMovedFromEnd;
+        }
         signers.pop();
         isSigner[signer] = false;
         emit RemovedSigner(signer, signerIdx, signerMovedFromEnd);

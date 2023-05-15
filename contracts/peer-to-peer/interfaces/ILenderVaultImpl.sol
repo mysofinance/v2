@@ -46,15 +46,21 @@ interface ILenderVaultImpl {
      * note: a vault owner may not want to autowithdraw collateral if he also uses
      * the token as loans; moreover, note that unlockCollateral() causes the entire
      * "available collateral balance" to be withdrawn, NOT only the amount(s) associated
-     * from defaulted loans with unclaimed collateral
+     * from defaulted loans with unclaimed collateral.
+     * This is intentional, as there are two main cases:
+     * 1. the vault owner only uses this token as collateral, and thus wants to withdraw not only
+     * the unlocked collateral, but also any upfront fees that were paid in this token for other loans.
+     * 2. the vault owner uses this token as collateral and as a loan token, and thus would not want to withdraw.
+     * Therefore, we have not implemented only withdrawing what is unlocked as that should be a very rare case, where
+     * owner uses the token as a loan token, but is exactly at the peak of the balance and wants to remove only what is unlocked.
      * @param collToken address of the collateral token
      * @param _loanIds array of indices of the loans to unlock
-     * @param withdrawAll if true, then withdraw all available collateral balance
+     * @param withdrawAllTokenBalance if true, then withdraw all available collateral balance
      */
     function unlockCollateral(
         address collToken,
         uint256[] calldata _loanIds,
-        bool withdrawAll
+        bool withdrawAllTokenBalance
     ) external;
 
     /**
