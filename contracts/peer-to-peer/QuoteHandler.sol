@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
@@ -228,6 +229,9 @@ contract QuoteHandler is IQuoteHandler {
         );
     }
 
+    /**
+     * @dev The signer addresses must be sent in increasing order (cast to uint160).
+     */
     function areValidSignatures(
         address lenderVault,
         bytes32 offChainQuoteHash,
@@ -251,7 +255,7 @@ contract QuoteHandler is IQuoteHandler {
         address recoveredSigner;
         uint160 prevSignerCastToUint160;
         for (uint256 i = 0; i < v.length; ) {
-            recoveredSigner = ecrecover(messageHash, v[i], r[i], s[i]);
+            recoveredSigner = ECDSA.recover(messageHash, v[i], r[i], s[i]);
             if (!ILenderVaultImpl(lenderVault).isSigner(recoveredSigner)) {
                 return false;
             }

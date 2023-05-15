@@ -123,7 +123,7 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, borrower, team, whitelistAuthority, signer1, signer2, signer3] = await ethers.getSigners()
+    const [lender, borrower, team, whitelistAuthority, addr1, addr2, addr3] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -135,7 +135,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // deploy borrower gateway
     const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
-    // reverts if zero address is passed as address registry 
+    // reverts if zero address is passed as address registry
     await expect(BorrowerGateway.connect(team).deploy(ZERO_ADDRESS)).to.be.revertedWithCustomError(
       BorrowerGateway,
       'InvalidAddress'
@@ -161,14 +161,12 @@ describe('Peer-to-Peer: Local Tests', function () {
     // deploy LenderVaultFactory
     const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
     // reverts if zero address is passed as address registry or lender vault implementation
-    await expect(LenderVaultFactory.connect(team).deploy(ZERO_ADDRESS, lenderVaultImplementation.address)).to.be.revertedWithCustomError(
-      LenderVaultFactory,
-      'InvalidAddress'
-    )
-    await expect(LenderVaultFactory.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
-      LenderVaultFactory,
-      'InvalidAddress'
-    )
+    await expect(
+      LenderVaultFactory.connect(team).deploy(ZERO_ADDRESS, lenderVaultImplementation.address)
+    ).to.be.revertedWithCustomError(LenderVaultFactory, 'InvalidAddress')
+    await expect(
+      LenderVaultFactory.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)
+    ).to.be.revertedWithCustomError(LenderVaultFactory, 'InvalidAddress')
     // correct deployment
     const lenderVaultFactory = await LenderVaultFactory.connect(team).deploy(
       addressRegistry.address,
@@ -270,6 +268,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       'InvalidSender'
     )
 
+    const sortedAddrs = [addr1, addr2, addr3].sort((a, b) => (ethers.BigNumber.from(a.address).lt(b.address) ? -1 : 1))
+
     return {
       addressRegistry,
       borrowerGateway,
@@ -278,9 +278,9 @@ describe('Peer-to-Peer: Local Tests', function () {
       borrower,
       team,
       whitelistAuthority,
-      signer1,
-      signer2,
-      signer3,
+      signer1: sortedAddrs[0],
+      signer2: sortedAddrs[1],
+      signer3: sortedAddrs[2],
       usdc,
       weth,
       lenderVault
@@ -1373,7 +1373,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, ' InvalidEarliestRepay')
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
     })
 
     it('Should validate off-chain MerkleProof correctly', async function () {
@@ -1687,6 +1687,16 @@ describe('Peer-to-Peer: Local Tests', function () {
       offChainQuote.v = [sig1.v, sig2.v, sig3.v]
       offChainQuote.r = [sig1.r, sig2.r, sig3.r]
       offChainQuote.s = [sig2.s, sig3.s]
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
+
+      // check revert if correct number of valid sigs but wrong order
+      offChainQuote.v = [sig2.v, sig1.v, sig3.v]
+      offChainQuote.r = [sig2.r, sig1.r, sig3.r]
+      offChainQuote.s = [sig2.s, sig1.s, sig3.s]
       await expect(
         borrowerGateway
           .connect(borrower)
