@@ -212,38 +212,32 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.Loan memory loan,
         uint256 upfrontFee
     ) internal {
-        if (borrowInstructions.callbackAddr == address(0)) {
-            ILenderVaultImpl(lenderVault).transferTo(
-                loan.loanToken,
-                loan.borrower,
-                loan.initLoanAmount
-            );
-        } else {
-            if (
-                IAddressRegistry(addressRegistry).whitelistState(
-                    borrowInstructions.callbackAddr
-                ) != DataTypesPeerToPeer.WhitelistState.CALLBACK
-            ) {
-                revert Errors.NonWhitelistedCallback();
-            }
-            ILenderVaultImpl(lenderVault).transferTo(
-                loan.loanToken,
-                borrowInstructions.callbackAddr,
-                loan.initLoanAmount
-            );
+        if (
+            borrowInstructions.callbackAddr != address(0) &&
+            IAddressRegistry(addressRegistry).whitelistState(
+                borrowInstructions.callbackAddr
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.CALLBACK
+        ) {
+            revert Errors.NonWhitelistedCallback();
+        }
+        ILenderVaultImpl(lenderVault).transferTo(
+            loan.loanToken,
+            borrowInstructions.callbackAddr == address(0)
+                ? loan.borrower
+                : borrowInstructions.callbackAddr,
+            loan.initLoanAmount
+        );
+        if (borrowInstructions.callbackAddr != address(0)) {
             IVaultCallback(borrowInstructions.callbackAddr).borrowCallback(
                 loan,
                 borrowInstructions.callbackData
             );
         }
 
-        uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
-            collReceiver
-        );
-
         // protocol fees on whole sendAmount
         // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
-        uint256 protocolFeeAmount = ((borrowInstructions.collSendAmount) *
+        uint256 protocolFeeAmount = (borrowInstructions.collSendAmount *
             protocolFee *
             (loan.expiry - block.timestamp)) /
             (Constants.BASE * Constants.YEAR_IN_SECONDS);
@@ -264,6 +258,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 protocolFeeAmount
             );
         }
+
+        uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
+            collReceiver
+        );
 
         uint256 collReceiverTransferAmount = borrowInstructions.collSendAmount -
             protocolFeeAmount;
@@ -307,51 +305,30 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (reclaimCollAmount == 0) {
             revert Errors.ReclaimAmountIsZero();
         }
-        if (callbackAddr == address(0)) {
-            if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVaultImpl(lenderVault).transferCollFromCompartment(
-                    loanRepayInstructions.targetRepayAmount,
-                    loan.initRepayAmount - loan.amountRepaidSoFar,
-                    loan.borrower,
-                    loan.collToken,
-                    callbackAddr,
-                    loan.collTokenCompartmentAddr
-                );
-            } else {
-                ILenderVaultImpl(lenderVault).transferTo(
-                    loan.collToken,
-                    loan.borrower,
-                    reclaimCollAmount
-                );
-            }
-        } else {
-            if (
-                IAddressRegistry(addressRegistry).whitelistState(
-                    callbackAddr
-                ) != DataTypesPeerToPeer.WhitelistState.CALLBACK
-            ) {
-                revert Errors.NonWhitelistedCallback();
-            }
-            if (loan.collTokenCompartmentAddr != address(0)) {
-                ILenderVaultImpl(lenderVault).transferCollFromCompartment(
-                    loanRepayInstructions.targetRepayAmount,
-                    loan.initRepayAmount - loan.amountRepaidSoFar,
-                    loan.borrower,
-                    loan.collToken,
-                    callbackAddr,
-                    loan.collTokenCompartmentAddr
-                );
-                IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
-            } else {
-                ILenderVaultImpl(lenderVault).transferTo(
-                    loan.collToken,
-                    callbackAddr,
-                    reclaimCollAmount
-                );
-                IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
-            }
+        if (
+            callbackAddr != address(0) &&
+            IAddressRegistry(addressRegistry).whitelistState(callbackAddr) !=
+            DataTypesPeerToPeer.WhitelistState.CALLBACK
+        ) {
+            revert Errors.NonWhitelistedCallback();
         }
-
+        loan.collTokenCompartmentAddr == address(0)
+            ? ILenderVaultImpl(lenderVault).transferTo(
+                loan.collToken,
+                callbackAddr == address(0) ? loan.borrower : callbackAddr,
+                reclaimCollAmount
+            )
+            : ILenderVaultImpl(lenderVault).transferCollFromCompartment(
+                loanRepayInstructions.targetRepayAmount,
+                loan.initRepayAmount - loan.amountRepaidSoFar,
+                loan.borrower,
+                loan.collToken,
+                callbackAddr,
+                loan.collTokenCompartmentAddr
+            );
+        if (callbackAddr != address(0)) {
+            IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
+        }
         uint256 loanTokenReceived = IERC20Metadata(loan.loanToken).balanceOf(
             lenderVault
         );
