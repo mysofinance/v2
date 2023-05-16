@@ -86,6 +86,7 @@ library Errors {
     error WaitForLoanTermsCoolOffPeriod();
     error ZeroConversionAmount();
     error InvalidNewOwnerProposal();
+    error InvalidCompartmentForToken();
     error InvalidSignature();
     error InvalidUpdate();
     error CannotClaimOutdatedStatus();

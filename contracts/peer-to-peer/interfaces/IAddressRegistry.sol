@@ -9,7 +9,11 @@ interface IAddressRegistry {
         address[] indexed whitelistAddrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
     );
-
+    event TokenWhitelistForCompartmentUpdated(
+        address compartmentImpl,
+        address[] tokens,
+        bool isWhitelisted
+    );
     event BorrowerWhitelistStatusClaimed(
         address indexed whitelistAuthority,
         address indexed borrower,
@@ -77,6 +81,19 @@ interface IAddressRegistry {
     ) external;
 
     /**
+     * @notice Sets the token whitelist for a given compartment implementation
+     * @dev Can only be called by registry owner
+     * @param compartmentImpl Compartment implementations for which token whitelist shall be set
+     * @param tokens Tokens for which whitelist state shall be set
+     * @param isWhitelisted Boolean flag indicating whether tokens are whitelisted for compartment implementation
+     */
+    function setWhitelistedTokensForCompartment(
+        address compartmentImpl,
+        address[] memory tokens,
+        bool isWhitelisted
+    ) external;
+
+    /**
      * @notice Returns boolean flag indicating whether the borrower has been whitelisted by whitelistAuthority
      * @param whitelistAuthority Addresses of the whitelist authority
      * @param borrower Addresses of the borrower
@@ -135,4 +152,15 @@ interface IAddressRegistry {
      * @return Address of the owner
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns boolean flag indicating whether given compartment implementation and token combination is whitelisted
+     * @param compartmentImpl Address of compartment implementation to check if it is allowed for token
+     * @param token Address of token to check if compartment implementation is allowed
+     * @return isWhitelisted Boolean flag indicating whether compartment implementation is whitelisted for given token
+     */
+    function isWhitelistedCompartment(
+        address compartmentImpl,
+        address token
+    ) external view returns (bool isWhitelisted);
 }

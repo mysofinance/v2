@@ -26,6 +26,9 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         internal borrowerWhitelistedUntil;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
         public whitelistState;
+    // compartment => token => active
+    mapping(address => mapping(address => bool))
+        internal isTokenWhitelistedForCompartment;
     address[] internal _registeredVaults;
 
     function initialize(
@@ -72,6 +75,45 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             }
         }
         emit WhitelistStateUpdated(addrs, _whitelistState);
+    }
+
+    function setWhitelistedTokensForCompartment(
+        address compartmentImpl,
+        address[] calldata tokens,
+        bool isWhitelisted
+    ) external {
+        checkSenderAndIsInitialized();
+        // check that tokens can only be whitelisted for valid compartment (whereas de-whitelisting is always possible)
+        if (
+            isWhitelisted &&
+            whitelistState[compartmentImpl] !=
+            DataTypesPeerToPeer.WhitelistState.COMPARTMENT
+        ) {
+            revert Errors.NonWhitelistedCompartment();
+        }
+        if (tokens.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        for (uint i = 0; i < tokens.length; ) {
+            if (
+                isWhitelisted &&
+                whitelistState[tokens[i]] !=
+                DataTypesPeerToPeer.WhitelistState.TOKEN
+            ) {
+                revert Errors.NonWhitelistedToken();
+            }
+            isTokenWhitelistedForCompartment[compartmentImpl][
+                tokens[i]
+            ] = isWhitelisted;
+            unchecked {
+                i++;
+            }
+        }
+        emit TokenWhitelistForCompartmentUpdated(
+            compartmentImpl,
+            tokens,
+            isWhitelisted
+        );
     }
 
     function addLenderVault(address addr) external {
@@ -148,6 +190,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         return
             borrowerWhitelistedUntil[whitelistAuthority][borrower] >
             block.timestamp;
+    }
+
+    function isWhitelistedCompartment(
+        address compartment,
+        address token
+    ) external view returns (bool) {
+        return
+            whitelistState[compartment] ==
+            DataTypesPeerToPeer.WhitelistState.COMPARTMENT &&
+            isTokenWhitelistedForCompartment[compartment][token];
     }
 
     function registeredVaults() external view returns (address[] memory) {
