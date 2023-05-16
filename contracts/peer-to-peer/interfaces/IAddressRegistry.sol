@@ -9,11 +9,10 @@ interface IAddressRegistry {
         address[] indexed whitelistAddrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
     );
-
-    event AllowedCompartmentForTokenUpdated(
+    event TokenWhitelistForCompartmentUpdated(
+        address compartmentImpl,
         address[] tokens,
-        address[] compartmentImpls,
-        bool[] isAllowed
+        bool isWhitelisted
     );
     event BorrowerWhitelistStatusClaimed(
         address indexed whitelistAuthority,
@@ -82,18 +81,19 @@ interface IAddressRegistry {
     ) external;
 
     /**
-     * @notice Sets the compartment state for a given token
+     * @notice Sets the token whitelist for a given compartment implementation
      * @dev Can only be called by registry owner
-     * @param tokens Tokens for which compartment state shall be set
-     * @param compartmentImpls Compartment implementations for which compartment state shall be set
-     * @param isAllowed The compartment state to which tokens shall be set
+     * @param compartmentImpl Compartment implementations for which token whitelist shall be set
+     * @param tokens Tokens for which whitelist state shall be set
+     * @param isWhitelisted Boolean flag indicating whether tokens are whitelisted for compartment implementation
      */
-    function setStateOfCompartmentForToken(
+    function setWhitelistedTokensForCompartment(
+        address compartmentImpl,
         address[] memory tokens,
-        address[] memory compartmentImpls,
-        bool[] memory isAllowed
+        bool isWhitelisted
     ) external;
 
+    /**
      * @notice Returns boolean flag indicating whether the borrower has been whitelisted by whitelistAuthority
      * @param whitelistAuthority Addresses of the whitelist authority
      * @param borrower Addresses of the borrower
@@ -154,13 +154,13 @@ interface IAddressRegistry {
     function owner() external view returns (address);
 
     /**
-     * @notice Returns boolean flag indicating whether given compartment implementation is allowed for given token
-     * @param token Address of token to check if compartment implementation is allowed
+     * @notice Returns boolean flag indicating whether given compartment implementation and token combination is whitelisted
      * @param compartmentImpl Address of compartment implementation to check if it is allowed for token
-     * @return isAllowed Boolean flag indicating whether compartment implementation is allowed for token
+     * @param token Address of token to check if compartment implementation is allowed
+     * @return isWhitelisted Boolean flag indicating whether compartment implementation is whitelisted for given token
      */
-    function isAllowedCompartmentForToken(
-        address token,
-        address compartmentImpl
-    ) external view returns (bool isAllowed);
+    function isWhitelistedCompartment(
+        address compartmentImpl,
+        address token
+    ) external view returns (bool isWhitelisted);
 }

@@ -160,21 +160,21 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const glpStakingCompartmentImplementation = await GlpStakingCompartmentImplementation.deploy()
     await glpStakingCompartmentImplementation.deployed()
 
-    await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
-
-
     // increase borrower GLP balance
     const collTokenAddress = '0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf' // GLP
     const rewardRouterAddress = '0xB95DB5B167D75e6d04227CfFFA61069348d271F5' // GMX: Reward Router V2
     const glpManagerAddress = '0x3963FfC9dff443c2A94f21b129D429891E32ec18' // GLP Manager
     const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
 
-    await addressRegistry.connect(team).setStateOfCompartmentForToken(
-      [collTokenAddress],
-      [glpStakingCompartmentImplementation.address],
-      [true]
-    )
-    
+    // whitelist tokens
+    await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
+    // whitelist compartment
+    await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
+    // whitelist tokens for compartment
+    await addressRegistry
+      .connect(team)
+      .setWhitelistedTokensForCompartment(glpStakingCompartmentImplementation.address, [collTokenAddress], true)
+
     const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewardRouterAbi, borrower.provider)
 
     // mint GLP token
@@ -195,9 +195,6 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     expect(borrowerCollBalPre).to.be.above(BigNumber.from(0))
     expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
-
-    // whitelist token pair
-    await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
