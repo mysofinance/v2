@@ -306,46 +306,30 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (reclaimCollAmount == 0) {
             revert Errors.ReclaimAmountIsZero();
         }
-        if (callbackAddr == address(0)) {
-            loan.collTokenCompartmentAddr != address(0)
-                ? ILenderVaultImpl(lenderVault).transferCollFromCompartment(
-                    loanRepayInstructions.targetRepayAmount,
-                    loan.initRepayAmount - loan.amountRepaidSoFar,
-                    loan.borrower,
-                    loan.collToken,
-                    callbackAddr,
-                    loan.collTokenCompartmentAddr
-                )
-                : ILenderVaultImpl(lenderVault).transferTo(
-                    loan.collToken,
-                    loan.borrower,
-                    reclaimCollAmount
-                );
-        } else {
-            if (
-                IAddressRegistry(addressRegistry).whitelistState(
-                    callbackAddr
-                ) != DataTypesPeerToPeer.WhitelistState.CALLBACK
-            ) {
-                revert Errors.NonWhitelistedCallback();
-            }
-            loan.collTokenCompartmentAddr != address(0)
-                ? ILenderVaultImpl(lenderVault).transferCollFromCompartment(
-                    loanRepayInstructions.targetRepayAmount,
-                    loan.initRepayAmount - loan.amountRepaidSoFar,
-                    loan.borrower,
-                    loan.collToken,
-                    callbackAddr,
-                    loan.collTokenCompartmentAddr
-                )
-                : ILenderVaultImpl(lenderVault).transferTo(
-                    loan.collToken,
-                    callbackAddr,
-                    reclaimCollAmount
-                );
+        if (
+            callbackAddr != address(0) &&
+            IAddressRegistry(addressRegistry).whitelistState(callbackAddr) !=
+            DataTypesPeerToPeer.WhitelistState.CALLBACK
+        ) {
+            revert Errors.NonWhitelistedCallback();
+        }
+        loan.collTokenCompartmentAddr == address(0)
+            ? ILenderVaultImpl(lenderVault).transferTo(
+                loan.collToken,
+                callbackAddr == address(0) ? loan.borrower : callbackAddr,
+                reclaimCollAmount
+            )
+            : ILenderVaultImpl(lenderVault).transferCollFromCompartment(
+                loanRepayInstructions.targetRepayAmount,
+                loan.initRepayAmount - loan.amountRepaidSoFar,
+                loan.borrower,
+                loan.collToken,
+                callbackAddr,
+                loan.collTokenCompartmentAddr
+            );
+        if (callbackAddr != address(0)) {
             IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
         }
-
         uint256 loanTokenReceived = IERC20Metadata(loan.loanToken).balanceOf(
             lenderVault
         );
