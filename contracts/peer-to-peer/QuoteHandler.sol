@@ -230,7 +230,8 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     /**
-     * @dev The signer addresses must be sent in increasing order (cast to uint160).
+     * @dev The passed signatures must be sorted such that
+     * recovered addresses (cast to uint160) are increasing.
      */
     function areValidSignatures(
         address lenderVault,
