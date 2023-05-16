@@ -6,9 +6,8 @@ interface IStakingHelper {
     /**
      * @notice Deposit `value` LP tokens, curve type take pools
      * @param value Number of tokens to deposit
-     * @param depositAddr Address to deposit for
      */
-    function deposit(uint256 value, address depositAddr) external;
+    function deposit(uint256 value) external;
 
     /**
      * @notice Withdraw `value` LP tokens, curve type take pools
