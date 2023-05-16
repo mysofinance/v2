@@ -1923,6 +1923,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         crvCompInstance,
         'IncorrectGaugeForLpToken'
       )
+      await expect(crvCompInstance.connect(lender).toggleApprovedStaker(lender.address)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'InvalidSender'
+      )
       await crvCompInstance.connect(borrower).stake(compartmentData)
       await expect(crvCompInstance.connect(borrower).stake(compartmentData)).to.be.revertedWithCustomError(
         crvCompInstance,
@@ -1931,6 +1935,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await expect(
         crvCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
       ).to.be.revertedWithCustomError(crvCompInstance, 'InvalidSender')
+
+      const lenderStakeStatus = await crvCompInstance.approvedStaker(lender.address)
+
+      expect(lenderStakeStatus).to.equal(false)
+
+      await crvCompInstance.connect(borrower).toggleApprovedStaker(lender.address)
+
+      const lenderStakeStatusPost = await crvCompInstance.approvedStaker(lender.address)
+
+      expect(lenderStakeStatusPost).to.equal(true)
+
+      // this passes the invalid sender check
+      await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.revertedWithCustomError(
+        crvCompInstance,
+        'AlreadyStaked'
+      )
 
       // check balance post borrow
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
@@ -2490,7 +2510,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const borrowerVotesPreDelegation = await collInstance.getCurrentVotes(borrower.address)
 
-      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.reverted
+      await expect(uniCompInstance.connect(team).delegate(borrower.address)).to.be.revertedWithCustomError(
+        votingCompartmentImplementation,
+        'InvalidSender'
+      )
       await uniCompInstance.connect(borrower).delegate(borrower.address)
 
       // check balance post borrow
@@ -2503,6 +2526,25 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(borrowerVotesPost).to.equal(borrowerUNIBalPre.sub(upfrontFee))
       expect(borrowerVotesPreDelegation).to.equal(0)
+
+      await expect(uniCompInstance.connect(team).toggleApprovedDelegator(team.address)).to.be.revertedWithCustomError(
+        votingCompartmentImplementation,
+        'InvalidSender'
+      )
+
+      await uniCompInstance.connect(borrower).toggleApprovedDelegator(team.address)
+
+      const teamApprovedDelegator = await uniCompInstance.approvedDelegator(team.address)
+
+      expect(teamApprovedDelegator).to.equal(true)
+
+      const teamVotesPreDelegation = await collInstance.getCurrentVotes(team.address)
+
+      await uniCompInstance.connect(team).delegate(team.address)
+
+      const teamVotesPostDelegation = await collInstance.getCurrentVotes(team.address)
+
+      expect(teamVotesPostDelegation).to.equal(borrowerVotesPost.sub(teamVotesPreDelegation))
 
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
       expect(borrowerUNIBalPre.sub(borroweUNIBalPost)).to.equal(vaultUNIBalPost.sub(vaultUNIBalPre).add(upfrontFee))
