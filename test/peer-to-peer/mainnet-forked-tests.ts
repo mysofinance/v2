@@ -849,7 +849,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(borrowEvent).to.not.be.undefined
     })
 
-    it('Should handle unlocking collateral correctly', async function () {
+    it('Should handle unlocking collateral correctly (1/3)', async function () {
       const {
         borrowerGateway,
         addressRegistry,
@@ -985,23 +985,25 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
       // only owner can unlock
-      await expect(
-        lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId], false)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+      await expect(lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
 
       // cannot pass empty loan array to bypass valid token check
-      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [], false)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [])).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidArrayLength'
       )
 
       // valid unlock
-      await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
+      await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId])
 
       // revert if trying to unlock twice
-      await expect(
-        lenderVault.connect(lender).unlockCollateral(weth.address, [loanId], false)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
+      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [loanId])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidCollUnlock'
+      )
 
       const collBalPostUnlock = await weth.balanceOf(lenderVault.address)
       const lockedVaultCollPostUnlock = await lenderVault.lockedAmounts(weth.address)
@@ -1027,6 +1029,297 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(collBalPostUnlock).to.equal(collBalPostRepayVault)
       // all coll has been unlocked
       expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostUnlock)).to.equal(initCollAmount)
+    })
+
+    it('Should handle unlocking collateral correctly (2/3)', async function () {
+      const {
+        borrowerGateway,
+        addressRegistry,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          whitelistAuthority: whitelistAuthority.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
+      await setupBorrowerWhitelist({
+        addressRegistry,
+        borrower,
+        whitelistAuthority,
+        whitelistedUntil
+      })
+
+      // top up weth balance
+      await weth.connect(borrower).deposit({ value: ONE_WETH.mul(20) })
+
+      // do 20 borrows, get receipt for last one
+      let totalCollSent = ethers.BigNumber.from(0)
+      let totalUpfrontFees = ethers.BigNumber.from(0)
+      let totalLockedColl = ethers.BigNumber.from(0)
+      for (var i = 0; i < 19; i++) {
+        totalCollSent = totalCollSent.add(borrowInstructions.collSendAmount)
+        const borrowWithOnChainQuoteTransaction = await borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+        const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+        const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+          return x.event === 'Borrowed'
+        })
+        const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+        totalLockedColl = totalLockedColl.add(initCollAmount)
+        totalUpfrontFees = totalUpfrontFees.add(borrowInstructions.collSendAmount.sub(initCollAmount))
+      }
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
+      })
+      expect(borrowEvent).to.not.be.undefined
+      // get last loan expiry
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+
+      // update local vars
+      totalCollSent = totalCollSent.add(borrowInstructions.collSendAmount)
+      totalLockedColl = totalLockedColl.add(initCollAmount)
+      totalUpfrontFees = totalUpfrontFees.add(borrowInstructions.collSendAmount.sub(initCollAmount))
+
+      // check locked amounts
+      const lockedVaultCollPreRepay = await lenderVault.lockedAmounts(weth.address)
+      expect(lockedVaultCollPreRepay).to.equal(totalLockedColl)
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // move forward past last loan expiry
+      await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // valid unlock
+      const preVaultBal = await weth.balanceOf(lenderVault.address)
+      const preOwnerBal = await weth.balanceOf(lender.address)
+      await lenderVault.connect(lender).unlockCollateral(weth.address, [...Array(20).keys()])
+      const postVaultBal = await weth.balanceOf(lenderVault.address)
+      const postOwnerBal = await weth.balanceOf(lender.address)
+      const postLockedAmounts = await lenderVault.lockedAmounts(weth.address)
+      expect(preVaultBal.sub(postVaultBal)).to.be.equal(0)
+      expect(postOwnerBal.sub(preOwnerBal)).to.be.equal(0)
+      //const totalUpfrontFeesExpected = quoteTuples[0].upfrontFeePctInBase.mul(totalCollSent).div(BASE)
+      expect(preVaultBal).to.equal(totalLockedColl.add(totalUpfrontFees))
+      expect(postLockedAmounts).to.be.equal(0)
+
+      // revert if trying to unlock twice
+      await expect(
+        lenderVault.connect(lender).unlockCollateral(weth.address, [...Array(20).keys()])
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
+      await expect(lenderVault.connect(lender).unlockCollateral(weth.address, [1, 4, 10])).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidCollUnlock'
+      )
+    })
+
+    it('Should handle unlocking collateral correctly (3/3)', async function () {
+      const {
+        borrowerGateway,
+        addressRegistry,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          whitelistAuthority: whitelistAuthority.address,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
+      await setupBorrowerWhitelist({
+        addressRegistry,
+        borrower,
+        whitelistAuthority,
+        whitelistedUntil
+      })
+
+      // top up weth balance
+      await weth.connect(borrower).deposit({ value: ONE_WETH.mul(20) })
+
+      // do 20 borrows, get receipt for last one
+      let totalLockedColl = ethers.BigNumber.from(0)
+      for (var i = 0; i < 19; i++) {
+        const borrowWithOnChainQuoteTransaction = await borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+        const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+        const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+          return x.event === 'Borrowed'
+        })
+        const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+        totalLockedColl = totalLockedColl.add(initCollAmount)
+      }
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
+      })
+      expect(borrowEvent).to.not.be.undefined
+      // get last loan expiry
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+      totalLockedColl = totalLockedColl.add(initCollAmount)
+
+      // check locked amounts
+      const lockedVaultCollPreRepay = await lenderVault.lockedAmounts(weth.address)
+      expect(lockedVaultCollPreRepay).to.equal(totalLockedColl)
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // move forward past last loan expiry
+      await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // valid unlock
+      const preVaultBal = await weth.balanceOf(lenderVault.address)
+      const preOwnerBal = await weth.balanceOf(lender.address)
+      await lenderVault.connect(lender).unlockCollateral(weth.address, [...Array(20).keys()])
+      const postVaultBal = await weth.balanceOf(lenderVault.address)
+      const postOwnerBal = await weth.balanceOf(lender.address)
+      const postLockedAmounts = await lenderVault.lockedAmounts(weth.address)
+      expect(preVaultBal).to.be.equal(postVaultBal)
+      expect(preOwnerBal).to.be.equal(postOwnerBal)
+      expect(postLockedAmounts).to.be.equal(0)
+
+      // check withdraw
+      const preVaultBal2 = await weth.balanceOf(lenderVault.address)
+      const preOwnerBal2 = await weth.balanceOf(lender.address)
+      const withdrawAmount = preVaultBal2
+      await lenderVault.connect(lender).withdraw(weth.address, withdrawAmount)
+      const postVaultBal2 = await weth.balanceOf(lenderVault.address)
+      const postOwnerBal2 = await weth.balanceOf(lender.address)
+      expect(preVaultBal2.sub(postVaultBal2)).to.be.equal(postOwnerBal2.sub(preOwnerBal2))
+      expect(preVaultBal2.sub(postVaultBal2)).to.be.equal(withdrawAmount)
+      expect(postLockedAmounts).to.be.equal(0)
+      expect(postVaultBal2).to.be.equal(0)
     })
 
     it('Should revert on invalid repays', async function () {
@@ -1765,9 +2058,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         expect(collTokenCompartmentCRVBalancePost.toString().substring(0, 3)).to.equal(approxPartialCRVReward)
 
         // unlock before expiry should revert
-        await expect(
-          lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], false)
-        ).to.be.revertedWithCustomError(lenderVault, 'InvalidCollUnlock')
+        await expect(lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId])).to.be.revertedWithCustomError(
+          lenderVault,
+          'InvalidCollUnlock'
+        )
 
         await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
@@ -1811,10 +2105,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const lenderVaultRewardTokenBalancePreUnlock = rewardTokenAddress
           ? await rewardTokenInstance.balanceOf(lenderVault.address)
           : BigNumber.from(0)
-        await expect(
-          lenderVault.connect(lender).unlockCollateral(lender.address, [loanId], false)
-        ).to.be.revertedWithCustomError(lenderVault, 'InconsistentUnlockTokenAddresses')
-        await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], false)
+        await expect(lenderVault.connect(lender).unlockCollateral(lender.address, [loanId])).to.be.revertedWithCustomError(
+          lenderVault,
+          'InconsistentUnlockTokenAddresses'
+        )
+        await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId])
         const compartmentRewardTokenBalancePostUnlock = rewardTokenAddress
           ? await rewardTokenInstance.balanceOf(collTokenCompartmentAddr)
           : BigNumber.from(0)
@@ -2002,6 +2297,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const loanId = borrowEvent?.args?.['loanId']
       const loanExpiry = borrowEvent?.args?.loan?.['expiry']
       const upfrontFee = borrowEvent?.args?.['upfrontFee']
+      const collateralCompartmentAddr = borrowEvent?.args?.loan?.['collTokenCompartmentAddr']
 
       const coeffRepay = 2
       const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
@@ -2043,11 +2339,30 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(lenderCollBalPre).to.equal(BigNumber.from(0))
 
-      await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+      const lockedAmountsPre = await lenderVault.lockedAmounts(collTokenAddress)
+
+      expect(lockedAmountsPre).to.equal(0)
+
+      const lenderVaultCollBalPre = await collInstance.balanceOf(lenderVault.address)
+
+      const compartmentCollBalPreRepay = await collInstance.balanceOf(collateralCompartmentAddr)
+
+      await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId])
+
+      const lockedAmountsPost = await lenderVault.lockedAmounts(collTokenAddress)
+
+      expect(lockedAmountsPost).to.equal(0)
+
+      const lenderVaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
+
+      // above because of rebasing rewards
+      expect(lenderVaultCollBalPost.sub(lenderVaultCollBalPre)).to.be.above(collSendAmount.sub(upfrontFee).div(coeffRepay))
+
+      expect(lenderVaultCollBalPost.sub(lenderVaultCollBalPre)).to.be.above(compartmentCollBalPreRepay)
 
       const lenderCollBalPost = await collInstance.balanceOf(lender.address)
 
-      expect(lenderCollBalPost).to.be.above(borrowerCollBalPre.div(coeffRepay))
+      expect(lenderCollBalPost).to.be.equal(0)
     })
 
     it('Should delegate voting correctly with borrow and partial repayment', async () => {
@@ -2190,11 +2505,27 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(lenderCollBalPre).to.equal(BigNumber.from(0))
 
-      await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+      const lockedAmountsPre = await lenderVault.lockedAmounts(collTokenAddress)
+
+      expect(lockedAmountsPre).to.equal(0)
+
+      const lenderVaultCollBalPre = await collInstance.balanceOf(lenderVault.address)
+
+      expect(lenderVaultCollBalPre).to.equal(upfrontFee)
+
+      await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId])
+
+      const lockedAmountsPost = await lenderVault.lockedAmounts(collTokenAddress)
+
+      expect(lockedAmountsPost).to.equal(0)
+
+      const lenderVaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
+
+      expect(lenderVaultCollBalPost).to.be.equal(borrowerUNIBalPre.sub(upfrontFee).div(coeffRepay).add(upfrontFee))
 
       const lenderCollBalPost = await collInstance.balanceOf(lender.address)
 
-      expect(lenderCollBalPost).to.equal(borrowerUNIBalPre.sub(upfrontFee).div(coeffRepay).add(upfrontFee))
+      expect(lenderCollBalPost).to.equal(0)
 
       await expect(lenderVault.connect(lender).withdraw(collTokenAddress, MAX_UINT128)).to.be.revertedWithCustomError(
         lenderVault,

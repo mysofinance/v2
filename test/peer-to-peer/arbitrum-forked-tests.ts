@@ -298,15 +298,19 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     expect(lenderCollBalPre).to.equal(BigNumber.from(0))
 
-    await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+    const lenderVaultCollBalPre = await collInstance.balanceOf(lenderVault.address)
+
+    await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId])
 
     const lenderVaultWethBalPost = await weth.balanceOf(lenderVault.address)
     const lenderCollBalPost = await collInstance.balanceOf(lender.address)
+    const lenderVaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
 
     expect(lenderVaultWethBalPost).to.be.above(lenderVaultWethBalPre)
     // note that unlockCollateral() causes the entire "available collateral balance" to be withdrawn,
     // NOT only the amount(s) associated from defaulted loans with unclaimed collateral
-    expect(lenderCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
+    expect(lenderCollBalPost).to.equal(lenderCollBalPre)
+    expect(lenderVaultCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
   })
 
   it('Uni V3 Looping Test', async function () {
