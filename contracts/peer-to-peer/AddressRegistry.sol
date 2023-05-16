@@ -100,6 +100,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         }
         for (uint i = 0; i < tokens.length; ) {
             if (
+                isWhitelisted &&
                 whitelistState[tokens[i]] !=
                 DataTypesPeerToPeer.WhitelistState.TOKEN
             ) {
