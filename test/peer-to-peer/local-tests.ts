@@ -135,7 +135,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // deploy borrower gateway
     const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
-    // reverts if zero address is passed as address registry 
+    // reverts if zero address is passed as address registry
     await expect(BorrowerGateway.connect(team).deploy(ZERO_ADDRESS)).to.be.revertedWithCustomError(
       BorrowerGateway,
       'InvalidAddress'
@@ -161,14 +161,12 @@ describe('Peer-to-Peer: Local Tests', function () {
     // deploy LenderVaultFactory
     const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
     // reverts if zero address is passed as address registry or lender vault implementation
-    await expect(LenderVaultFactory.connect(team).deploy(ZERO_ADDRESS, lenderVaultImplementation.address)).to.be.revertedWithCustomError(
-      LenderVaultFactory,
-      'InvalidAddress'
-    )
-    await expect(LenderVaultFactory.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
-      LenderVaultFactory,
-      'InvalidAddress'
-    )
+    await expect(
+      LenderVaultFactory.connect(team).deploy(ZERO_ADDRESS, lenderVaultImplementation.address)
+    ).to.be.revertedWithCustomError(LenderVaultFactory, 'InvalidAddress')
+    await expect(
+      LenderVaultFactory.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)
+    ).to.be.revertedWithCustomError(LenderVaultFactory, 'InvalidAddress')
     // correct deployment
     const lenderVaultFactory = await LenderVaultFactory.connect(team).deploy(
       addressRegistry.address,
@@ -424,6 +422,12 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // make valid owner proposal
       await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.emit(lenderVault, 'NewOwnerProposed')
+
+      // check that you can't re-submit same new owner proposal
+      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidNewOwnerProposal'
+      )
 
       // claim ownership
       await expect(lenderVault.connect(team).claimOwnership()).to.emit(lenderVault, 'ClaimedOwnership')
