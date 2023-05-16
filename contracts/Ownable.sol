@@ -20,14 +20,14 @@ abstract contract Ownable {
     }
 
     function claimOwnership() external {
-        address newOwner = _newOwner;
-        if (msg.sender != newOwner) {
+        address tmpNewOwner = _newOwner;
+        if (msg.sender != tmpNewOwner) {
             revert Errors.InvalidSender();
         }
         address oldOwner = _owner;
-        _owner = newOwner;
+        _owner = tmpNewOwner;
         delete _newOwner;
-        emit ClaimedOwnership(newOwner, oldOwner);
+        emit ClaimedOwnership(tmpNewOwner, oldOwner);
     }
 
     // note: needs to be explicitly overriden by inheriting contracts
