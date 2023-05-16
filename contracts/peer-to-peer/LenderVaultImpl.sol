@@ -194,9 +194,9 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             lockedAmounts[_loan.collToken] += _loan.initCollAmount;
         } else {
             if (
-                !IAddressRegistry(addressRegistry).isAllowedCompartmentForToken(
-                    _loan.collToken,
-                    generalQuoteInfo.borrowerCompartmentImplementation
+                !IAddressRegistry(addressRegistry).isWhitelistedCompartment(
+                    generalQuoteInfo.borrowerCompartmentImplementation,
+                    _loan.collToken
                 )
             ) {
                 revert Errors.InvalidCompartmentForToken();
@@ -377,13 +377,6 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         address borrowerCompartmentImplementation,
         uint256 loanId
     ) internal returns (address collCompartment) {
-        if (
-            IAddressRegistry(addressRegistry).whitelistState(
-                borrowerCompartmentImplementation
-            ) != DataTypesPeerToPeer.WhitelistState.COMPARTMENT
-        ) {
-            revert Errors.NonWhitelistedCompartment();
-        }
         bytes32 salt = keccak256(
             abi.encodePacked(
                 borrowerCompartmentImplementation,
