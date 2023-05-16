@@ -28,10 +28,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         public whitelistState;
     address[] internal _registeredVaults;
 
-    constructor() {
-        _owner = msg.sender;
-    }
-
     function initialize(
         address _lenderVaultFactory,
         address _borrowerGateway,

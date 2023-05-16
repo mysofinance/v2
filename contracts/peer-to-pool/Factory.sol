@@ -20,13 +20,12 @@ contract Factory is Ownable, IFactory {
     mapping(address => bool) public isFundingPool;
     mapping(address => bool) internal depositTokenHasFundingPool;
 
-    constructor(address _loanProposalImpl, address _fundingPoolImpl) {
+    constructor(address _loanProposalImpl, address _fundingPoolImpl) Ownable() {
         if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
             revert Errors.InvalidAddress();
         }
         loanProposalImpl = _loanProposalImpl;
         fundingPoolImpl = _fundingPoolImpl;
-        _owner = msg.sender;
     }
 
     function createLoanProposal(
