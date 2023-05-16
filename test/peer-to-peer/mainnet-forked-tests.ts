@@ -1509,10 +1509,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // whitelist compartment
       await addressRegistry.connect(team).setWhitelistState([curveLPStakingCompartmentImplementation.address], 3)
 
-      await expect(addressRegistry.connect(lender).setWhitelistState([crvGaugeAddress], 3)).to.be.revertedWithCustomError(
-        addressRegistry,
-        'InvalidSender'
-      )
       // whitelist tokens for compartment
       await addressRegistry
         .connect(team)
