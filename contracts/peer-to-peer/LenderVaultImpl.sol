@@ -76,10 +76,10 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                 IBaseCompartment(_loan.collTokenCompartmentAddr)
                     .unlockCollToVault(_loan.collToken);
             } else {
-                totalUnlockableColl =
-                    _loan.initCollAmount -
-                    ((_loan.initCollAmount * _loan.amountRepaidSoFar) /
-                        _loan.initRepayAmount);
+                totalUnlockableColl +=
+                    ((_loan.initRepayAmount - _loan.amountRepaidSoFar) *
+                        _loan.initCollAmount) /
+                    _loan.initRepayAmount;
             }
             _loan.collUnlocked = true;
             unchecked {
