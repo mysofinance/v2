@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
@@ -11,7 +12,7 @@ import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
 
-contract FundingPoolImpl is Initializable, IFundingPoolImpl {
+contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     using SafeERC20 for IERC20Metadata;
 
     address public factory;
@@ -38,7 +39,10 @@ contract FundingPoolImpl is Initializable, IFundingPoolImpl {
         depositToken = _depositToken;
     }
 
-    function deposit(uint256 amount, uint256 transferFee) external {
+    function deposit(
+        uint256 amount,
+        uint256 transferFee
+    ) external nonReentrant {
         if (amount == 0) {
             revert Errors.InvalidSendAmount();
         }
@@ -57,10 +61,13 @@ contract FundingPoolImpl is Initializable, IFundingPoolImpl {
     }
 
     function withdraw(uint256 amount) external {
-        if (amount == 0 || amount > balanceOf[msg.sender]) {
+        uint256 _balanceOf = balanceOf[msg.sender];
+        if (amount == 0 || amount > _balanceOf) {
             revert Errors.InvalidWithdrawAmount();
         }
-        balanceOf[msg.sender] -= amount;
+        unchecked {
+            balanceOf[msg.sender] = _balanceOf - amount;
+        }
         IERC20Metadata(depositToken).safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
@@ -75,20 +82,19 @@ contract FundingPoolImpl is Initializable, IFundingPoolImpl {
         if (!ILoanProposalImpl(loanProposal).canSubscribe()) {
             revert Errors.NotInSubscriptionPhase();
         }
-        if (amount > balanceOf[msg.sender]) {
+        uint256 _balanceOf = balanceOf[msg.sender];
+        if (amount > _balanceOf) {
             revert Errors.InsufficientBalance();
         }
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
-        if (
-            amount + totalSubscriptions[loanProposal] >
-            loanTerms.maxTotalSubscriptions
-        ) {
+        uint256 _totalSubscriptions = totalSubscriptions[loanProposal];
+        if (amount + _totalSubscriptions > loanTerms.maxTotalSubscriptions) {
             revert Errors.SubscriptionAmountTooHigh();
         }
-        balanceOf[msg.sender] -= amount;
-        totalSubscriptions[loanProposal] += amount;
+        balanceOf[msg.sender] = _balanceOf - amount;
+        totalSubscriptions[loanProposal] = _totalSubscriptions + amount;
         subscriptionAmountOf[loanProposal][msg.sender] += amount;
         earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
@@ -107,7 +113,10 @@ contract FundingPoolImpl is Initializable, IFundingPoolImpl {
         if (!ILoanProposalImpl(loanProposal).canUnsubscribe()) {
             revert Errors.NotInUnsubscriptionPhase();
         }
-        if (amount > subscriptionAmountOf[loanProposal][msg.sender]) {
+        uint256 _subscriptionAmountOf = subscriptionAmountOf[loanProposal][
+            msg.sender
+        ];
+        if (amount > _subscriptionAmountOf) {
             revert Errors.UnsubscriptionAmountTooLarge();
         }
         if (block.timestamp < earliestUnsubscribe[loanProposal][msg.sender]) {
@@ -115,7 +124,9 @@ contract FundingPoolImpl is Initializable, IFundingPoolImpl {
         }
         balanceOf[msg.sender] += amount;
         totalSubscriptions[loanProposal] -= amount;
-        subscriptionAmountOf[loanProposal][msg.sender] -= amount;
+        subscriptionAmountOf[loanProposal][msg.sender] =
+            _subscriptionAmountOf -
+            amount;
         earliestUnsubscribe[loanProposal][msg.sender] = 0;
 
         emit Unsubscribed(msg.sender, loanProposal, amount);
