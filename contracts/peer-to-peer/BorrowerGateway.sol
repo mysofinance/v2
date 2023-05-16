@@ -163,12 +163,13 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         if (
             callbackAddr != address(0) &&
+            loan.collTokenCompartmentAddr != address(0) &&
             !IAddressRegistry(addressRegistry).isAllowedRepayCallbackForToken(
                 loan.collToken,
                 callbackAddr
             )
         ) {
-            revert Errors.InvalidCallbackForToken();
+            revert Errors.InvalidRepayCallbackForToken();
         }
 
         ILenderVaultImpl(vaultAddr).validateRepayInfo(

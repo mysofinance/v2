@@ -45,7 +45,10 @@ contract GLPStakingCompartment is BaseCompartment {
         // transfer proportion of weth token balance
         uint256 wethTokenAmount = (repayAmount * currentWethBal) /
             repayAmountLeft;
-        IERC20(WETH).safeTransfer(borrowerAddr, wethTokenAmount);
+        IERC20(WETH).safeTransfer(
+            callbackAddr == address(0) ? borrowerAddr : callbackAddr,
+            wethTokenAmount
+        );
     }
 
     // unlockColl this would be called on defaults

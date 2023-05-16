@@ -1,11 +1,11 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { getOutGivenIn, fromReadableAmount, toReadableAmount, getOptimCollSendAndFlashBorrowAmount } from './helpers/uniV3'
+import { fromReadableAmount, toReadableAmount, getOptimCollSendAndFlashBorrowAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
+import { INFURA_API_KEY, MAINNET_BLOCK_NUMBER } from '../../hardhat.config'
 
 // test config constants & vars
-const INFURA_API_KEY = '764119145a6a4d09a1cf8f8c7a2c7b46' // todo: replace with env before resubmitting
-const BLOCK_NUMBER = 16640270 // todo: replace with env before resubmitting
+const BLOCK_NUMBER = MAINNET_BLOCK_NUMBER
 let snapshotId: String // use snapshot id to reset state before each test
 
 // constants
@@ -13,12 +13,9 @@ const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
-const ONE_PAXG = ethers.BigNumber.from(10).pow(18)
-const ONE_GOHM = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
-const YEAR_IN_SECONDS = 31_536_000
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 
@@ -88,48 +85,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
     await ethers.provider.send('hardhat_setBalance', [borrower.address, '0x204FCE5E3E25026110000000'])
     await weth.connect(borrower).deposit({ value: ONE_WETH.mul(10) })
 
-    // prepare PAXG balances
-    const PAXG_ADDRESS = '0x45804880De22913dAFE09f4980848ECE6EcbAf78'
-    const SUPPLY_CONTROLLER = '0xE25a329d385f77df5D4eD56265babe2b99A5436e'
-    const paxg = await ethers.getContractAt('IPAXG', PAXG_ADDRESS)
-    await ethers.provider.send('hardhat_setBalance', [SUPPLY_CONTROLLER, '0x56BC75E2D63100000'])
-    await hre.network.provider.request({
-      method: 'hardhat_impersonateAccount',
-      params: [SUPPLY_CONTROLLER]
-    })
-    const supplyController = await ethers.getSigner(SUPPLY_CONTROLLER)
-
-    await paxg.connect(supplyController).increaseSupply('800000000000000000000000000')
-    await paxg.connect(supplyController).transfer(borrower.address, '800000000000000000000000000')
-
-    // prepare LDO balances
-    const LDO_ADDRESS = '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32'
-    const LDO_HOLDER = '0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c'
-    const ldo = await ethers.getContractAt('IWETH', LDO_ADDRESS)
-    await ethers.provider.send('hardhat_setBalance', [LDO_HOLDER, '0x56BC75E2D63100000'])
-    await hre.network.provider.request({
-      method: 'hardhat_impersonateAccount',
-      params: [LDO_HOLDER]
-    })
-
-    const ldoHolder = await ethers.getSigner(LDO_HOLDER)
-
-    await ldo.connect(ldoHolder).transfer(team.address, '10000000000000000000000')
-
-    // prepare GOHM balances
-    const GOHM_ADDRESS = '0x0ab87046fBb341D058F17CBC4c1133F25a20a52f'
-    const GOHM_HOLDER = '0x168fa4917e7cD18f4eD3dc313c4975851cA9E5E7'
-    const gohm = await ethers.getContractAt('IWETH', GOHM_ADDRESS)
-    await ethers.provider.send('hardhat_setBalance', [GOHM_HOLDER, '0x56BC75E2D63100000'])
-    await hre.network.provider.request({
-      method: 'hardhat_impersonateAccount',
-      params: [GOHM_HOLDER]
-    })
-
-    const gohmHolder = await ethers.getSigner(GOHM_HOLDER)
-
-    await gohm.connect(gohmHolder).transfer(team.address, '100000000000000000000')
-
     // prepare UniV2 Weth/Usdc balances
     const UNIV2_WETH_USDC_ADDRESS = '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc'
     const UNIV2_WETH_USDC_HOLDER = '0xeC08867a12546ccf53b32efB8C23bb26bE0C04f1'
@@ -144,12 +99,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
 
     await uniV2WethUsdc.connect(univ2WethUsdcHolder).transfer(team.address, '3000000000000000')
 
-    // deploy balancer v2 callbacks
-    const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
-    await BalancerV2Looping.connect(lender)
-    const balancerV2Looping = await BalancerV2Looping.deploy()
-    await balancerV2Looping.deployed()
-
     // deploy uni v3 callback
     const UniV3Looping = await ethers.getContractFactory('UniV3Looping')
     await UniV3Looping.connect(lender)
@@ -157,11 +106,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
     await uniV3Looping.deployed()
 
     // whitelist addrs
-    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address, paxg.address], 1)
-    await expect(
-      addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
-    await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
+    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+    await expect(addressRegistry.connect(lender).setWhitelistState([uniV3Looping.address], 4)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidSender'
+    )
     await addressRegistry.connect(team).setWhitelistState([uniV3Looping.address], 4)
 
     return {
@@ -174,13 +123,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
       team,
       usdc,
       weth,
-      paxg,
-      ldo,
-      gohm,
       uniV2WethUsdc,
       lenderVault,
       lenderVaultFactory,
-      balancerV2Looping,
       uniV3Looping
     }
   }

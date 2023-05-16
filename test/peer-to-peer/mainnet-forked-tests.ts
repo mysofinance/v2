@@ -2358,6 +2358,49 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         [poolId, minSwapReceiveRepay, deadline]
       )
 
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      ).to.revertedWithCustomError(borrowerGateway, 'InvalidRepayCallbackForToken')
+
+      // revert if empty array
+      await expect(
+        addressRegistry.connect(team).setStateOfRepayCallbackForToken([], [balancerV2Looping.address], [true])
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+      // revert if arrays unequal lengths
+      await expect(
+        addressRegistry.connect(team).setStateOfRepayCallbackForToken([collTokenAddress], [], [true])
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+      // revert if arrays unequal lengths
+      await expect(
+        addressRegistry.connect(team).setStateOfRepayCallbackForToken([collTokenAddress], [balancerV2Looping.address], [])
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+      // revert if address 0 passed in
+      await expect(
+        addressRegistry
+          .connect(team)
+          .setStateOfRepayCallbackForToken([ethers.constants.AddressZero], [balancerV2Looping.address], [true])
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+      // revert if address 0 passed in
+      await expect(
+        addressRegistry
+          .connect(team)
+          .setStateOfRepayCallbackForToken([collTokenAddress], [ethers.constants.AddressZero], [true])
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+
+      // set repay callback for coll token (only needed because using a compartment)
+      await addressRegistry
+        .connect(team)
+        .setStateOfRepayCallbackForToken([collTokenAddress], [balancerV2Looping.address], [true])
+
       await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 0)
 
       await expect(

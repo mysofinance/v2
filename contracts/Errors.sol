@@ -91,5 +91,5 @@ library Errors {
     error CannotClaimOutdatedStatus();
     error DelegateReducedBalance();
     error FundingPoolAlreadyExists();
-    error InvalidCallbackForToken();
+    error InvalidRepayCallbackForToken();
 }

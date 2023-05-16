@@ -149,9 +149,12 @@ contract CurveLPStakingCompartment is BaseCompartment {
             IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
         }
 
-        // rest of rewards are always sent to borrower, not for callback
-        // if unlock then sent to vaultAddr
-        address rewardReceiver = isUnlock ? vaultAddr : borrowerAddr;
+        // if unlock then sent to vaultAddr, else if callback send directly there, else to borrower
+        address rewardReceiver = isUnlock
+            ? vaultAddr
+            : callbackAddr == address(0)
+            ? borrowerAddr
+            : callbackAddr;
         // check crv token balance
         uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
         // transfer proportion of crv token balance
