@@ -161,6 +161,16 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loanRepayInstructions.targetLoanId
         );
 
+        if (
+            callbackAddr != address(0) &&
+            !IAddressRegistry(addressRegistry).isAllowedRepayCallbackForToken(
+                loan.collToken,
+                callbackAddr
+            )
+        ) {
+            revert Errors.InvalidCallbackForToken();
+        }
+
         ILenderVaultImpl(vaultAddr).validateRepayInfo(
             msg.sender,
             loan,

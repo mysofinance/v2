@@ -21,6 +21,12 @@ interface IAddressRegistry {
         uint256 whitelistedUntil
     );
 
+    event AllowedRepayCallbackForTokenUpdated(
+        address[] tokens,
+        address[] callbackAddrs,
+        bool[] isAllowed
+    );
+
     /**
      * @notice initializes factory, gateway, and quote handler contracts
      * @param _lenderVaultFactory address of the factory for lender vaults
@@ -74,6 +80,21 @@ interface IAddressRegistry {
     function setWhitelistState(
         address[] memory addrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
+    ) external;
+
+    /**
+     * @notice Sets the repay callback state for a given token
+     * @dev Can only be called by registry owner
+     * Note: On borrow, you can still use callback if callback is whitelisted,
+     * this is just checked on repay.
+     * @param tokens Tokens for which repay callback state shall be set
+     * @param callbackAddrs Callback addresses for which repay callback state shall be set
+     * @param isAllowed The repay callback state to which tokens shall be set
+     */
+    function setStateOfRepayCallbackForToken(
+        address[] memory tokens,
+        address[] memory callbackAddrs,
+        bool[] memory isAllowed
     ) external;
 
     /**
@@ -135,4 +156,15 @@ interface IAddressRegistry {
      * @return Address of the owner
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns boolean flag indicating whether given repay callback is allowed for given token
+     * @param token Address of token to check if repay callback is allowed
+     * @param callbackAddr Address of callback to check if it is allowed for token
+     * @return isAllowed Boolean flag indicating whether repay callback implementation is allowed for token
+     */
+    function isAllowedRepayCallbackForToken(
+        address token,
+        address callbackAddr
+    ) external view returns (bool isAllowed);
 }

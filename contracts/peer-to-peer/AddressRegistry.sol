@@ -26,6 +26,9 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         internal borrowerWhitelistedUntil;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
         public whitelistState;
+    // token => callback => isAllowed
+    mapping(address => mapping(address => bool))
+        public isAllowedRepayCallbackForToken;
     address[] internal _registeredVaults;
 
     constructor() {
@@ -76,6 +79,37 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             }
         }
         emit WhitelistStateUpdated(addrs, _whitelistState);
+    }
+
+    function setStateOfRepayCallbackForToken(
+        address[] calldata tokens,
+        address[] calldata callbackAddrs,
+        bool[] calldata isAllowed
+    ) external {
+        checkSenderAndIsInitialized();
+        if (
+            tokens.length == 0 ||
+            tokens.length != callbackAddrs.length ||
+            tokens.length != isAllowed.length
+        ) {
+            revert Errors.InvalidArrayLength();
+        }
+        for (uint i = 0; i < tokens.length; ) {
+            if (tokens[i] == address(0) || callbackAddrs[i] == address(0)) {
+                revert Errors.InvalidAddress();
+            }
+            isAllowedRepayCallbackForToken[tokens[i]][
+                callbackAddrs[i]
+            ] = isAllowed[i];
+            unchecked {
+                i++;
+            }
+        }
+        emit AllowedRepayCallbackForTokenUpdated(
+            tokens,
+            callbackAddrs,
+            isAllowed
+        );
     }
 
     function addLenderVault(address addr) external {
