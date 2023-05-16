@@ -58,9 +58,10 @@ interface ILoanProposalImpl {
 
     /**
      * @notice Accept loan terms
+     * @param loanTermsUpdateTime The timestamp of the loan terms that are to be accepted
      * @dev Can only be called by the borrower
      */
-    function acceptLoanTerms() external;
+    function acceptLoanTerms(uint256 loanTermsUpdateTime) external;
 
     /**
      * @notice Finalize the loan terms and transfer final collateral amount
@@ -73,7 +74,7 @@ interface ILoanProposalImpl {
 
     /**
      * @notice Rolls back the loan proposal
-     * @dev Can be called by borrower during the unsubscribe grace period or by anyone in case the total subscribed fell below the minLoanAmount
+     * @dev Can be called by borrower during the unsubscribe grace period or by anyone in case the total totalSubscriptions fell below the minTotalSubscriptions
      */
     function rollback() external;
 
@@ -179,6 +180,15 @@ interface ILoanProposalImpl {
         );
 
     /**
+     * @notice Returns the timestamp of when loan terms were last updated
+     * @return lastLoanTermsUpdateTime The timestamp when the loan terms were last updated
+     */
+    function lastLoanTermsUpdateTime()
+        external
+        view
+        returns (uint256 lastLoanTermsUpdateTime);
+
+    /**
      * @notice Returns the current loan terms
      * @return The current loan terms
      */
@@ -202,7 +212,7 @@ interface ILoanProposalImpl {
     /**
      * @notice Returns indicative final loan terms
      * @param _tmpLoanTerms The current (or assumed) relative loan terms
-     * @param totalSubscribed The current (or assumed) total subscribed amount
+     * @param totalSubscriptions The current (or assumed) total subscription amount
      * @param loanTokenDecimals The loan token decimals
      * @return loanTerms The loan terms in absolute terms
      * @return absArrangerFee The arranger fee in absolute terms
@@ -212,7 +222,7 @@ interface ILoanProposalImpl {
      */
     function getAbsoluteLoanTerms(
         DataTypesPeerToPool.LoanTerms memory _tmpLoanTerms,
-        uint256 totalSubscribed,
+        uint256 totalSubscriptions,
         uint256 loanTokenDecimals
     )
         external

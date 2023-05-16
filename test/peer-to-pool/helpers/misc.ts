@@ -1,5 +1,5 @@
 import { ethers } from 'hardhat'
-import { LoanProposalFactory, LoanProposal, FundingPool, MyERC20 } from '../../../typechain-types'
+import { Factory, LoanProposal, FundingPool, MyERC20 } from '../../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { BigNumber } from 'ethers'
 
@@ -15,8 +15,8 @@ export const getLoanTermsTemplate = () => {
   const repaymentSchedule = getRepaymentScheduleEntry(0, 0, 0)
   const loanTerms = {
     borrower: ZERO_ADDR,
-    minLoanAmount: ZERO,
-    maxLoanAmount: ZERO,
+    minTotalSubscriptions: ZERO,
+    maxTotalSubscriptions: ZERO,
     collPerLoanToken: ZERO,
     repaymentSchedule: [repaymentSchedule]
   }
@@ -64,8 +64,8 @@ export const getDummyLoanTerms = async (daoTreasuryAddr: string) => {
   ]
   const loanTerms = {
     borrower: daoTreasuryAddr,
-    minLoanAmount: ONE_USDC.mul(10000),
-    maxLoanAmount: ONE_USDC.mul(500000),
+    minTotalSubscriptions: ONE_USDC.mul(10000),
+    maxTotalSubscriptions: ONE_USDC.mul(500000),
     collPerLoanToken: ONE_WETH.mul(2),
     repaymentSchedule: repaymentSchedule
   }
@@ -73,7 +73,7 @@ export const getDummyLoanTerms = async (daoTreasuryAddr: string) => {
 }
 
 export const createLoanProposal = async (
-  loanProposalFactory: LoanProposalFactory,
+  factory: Factory,
   arranger: SignerWithAddress,
   fundingPoolAddr: string,
   daoTokenAddr: string,
@@ -83,7 +83,7 @@ export const createLoanProposal = async (
   repaymentGracePeriod: BigNumber
 ) => {
   // arranger creates loan proposal
-  await loanProposalFactory
+  await factory
     .connect(arranger)
     .createLoanProposal(
       fundingPoolAddr,
@@ -93,7 +93,7 @@ export const createLoanProposal = async (
       conversionGracePeriod,
       repaymentGracePeriod
     )
-  const loanProposalAddr = await loanProposalFactory.loanProposals(0)
+  const loanProposalAddr = await factory.loanProposals(0)
   const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
   const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
   return loanProposal
@@ -107,9 +107,9 @@ export const addSubscriptionsToLoanProposal = async (
   fundingPool: FundingPool,
   loanProposal: LoanProposal
 ) => {
-  // 3 lenders each contribute 1/3 of maxLoanAmount
+  // 3 lenders each contribute 1/3 of maxTotalSubscriptions
   const loanTerms = await loanProposal.loanTerms()
-  const subscriptionAmount = loanTerms.maxLoanAmount.div(3)
+  const subscriptionAmount = loanTerms.maxTotalSubscriptions.div(3)
   await fundingToken.connect(lender1).approve(fundingPool.address, subscriptionAmount)
   await fundingPool.connect(lender1).deposit(subscriptionAmount, 0)
   await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionAmount)

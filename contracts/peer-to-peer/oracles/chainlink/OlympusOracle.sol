@@ -14,8 +14,6 @@ import {Errors} from "../../../Errors.sol";
  * should only be utilized with eth based oracles, not usd-based oracles
  */
 contract OlympusOracle is IOracle, ChainlinkBasic {
-    address internal constant OHM_ADDR =
-        0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
     address internal constant GOHM_ADDR =
         0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
     uint256 internal constant SOHM_DECIMALS = 9;
@@ -33,7 +31,7 @@ contract OlympusOracle is IOracle, ChainlinkBasic {
             1e18 // 18 decimals for ETH based oracles
         )
     {
-        oracleAddrs[OHM_ADDR] = ETH_OHM_ORACLE_ADDR;
+        oracleAddrs[GOHM_ADDR] = ETH_OHM_ORACLE_ADDR;
     }
 
     function getPrice(

@@ -16,6 +16,7 @@ library Errors {
     error InvalidAddress();
     error InvalidArrayLength();
     error InvalidQuote();
+    error OutdatedQuote();
     error InvalidOffChainSignature();
     error InvalidOffChainMerkleProof();
     error InvalidCollUnlock();
@@ -39,10 +40,10 @@ library Errors {
     error NonWhitelistedToken();
     error LtvHigherThanMax();
     error InsufficientVaultFunds();
-    error NegativeRepaymentAmount();
+    error InvalidInterestRateFactor();
     error OverflowUint128();
     error InconsistentUnlockTokenAddresses();
-    error ExpiresBeforeRepayAllowed();
+    error InvalidEarliestRepay();
     error InvalidNewMinNumOfSigners();
     error AlreadySigner();
     error InvalidArrayIndex();
@@ -65,13 +66,14 @@ library Errors {
     error InsufficientBalance();
     error SubscriptionAmountTooHigh();
     error BeforeEarliestUnsubscribe();
-    error TotalSubscribedTooLow();
+    error InconsistentLastLoanTermsUpdateTime();
+    error NotEnoughSubscriptions();
     error InvalidActionForCurrentStatus();
-    error TotalSubscribedNotTargetInRange();
+    error FellShortOfTotalSubscriptionTarget();
     error InvalidRollBackRequest();
     error UnsubscriptionAmountTooLarge();
-    error InvalidMinOrMaxLoanAmount();
-    error NewMaxLoanAmountBelowCurrentSubscriptions();
+    error InvalidSubscriptionRange();
+    error InvalidMaxTotalSubscriptions();
     error OutsideConversionTimeWindow();
     error OutsideRepaymentTimeWindow();
     error NoDefault();
@@ -85,4 +87,9 @@ library Errors {
     error ZeroConversionAmount();
     error InvalidNewOwnerProposal();
     error InvalidCompartmentForToken();
+    error InvalidSignature();
+    error InvalidUpdate();
+    error CannotClaimOutdatedStatus();
+    error DelegateReducedBalance();
+    error FundingPoolAlreadyExists();
 }

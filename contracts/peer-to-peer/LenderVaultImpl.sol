@@ -106,19 +106,20 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function updateLoanInfo(
-        DataTypesPeerToPeer.Loan memory _loan,
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount
+        uint256 collAmount,
+        address collTokenCompartmentAddr,
+        address collToken
     ) external {
         senderCheckGateway();
-        _loan.amountRepaidSoFar += repayAmount;
+
+        _loans[loanId].amountRepaidSoFar += repayAmount;
 
         // only update lockedAmounts when no compartment
-        if (_loan.collTokenCompartmentAddr == address(0)) {
-            lockedAmounts[_loan.collToken] -= collAmount;
+        if (collTokenCompartmentAddr == address(0)) {
+            lockedAmounts[collToken] -= collAmount;
         }
-        _loans[loanId] = _loan;
     }
 
     function processQuote(
@@ -178,8 +179,14 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan.earliestRepay = SafeCast.toUint40(
             block.timestamp + generalQuoteInfo.earliestRepayTenor
         );
-        if (_loan.expiry <= _loan.earliestRepay) {
-            revert Errors.ExpiresBeforeRepayAllowed();
+        if (
+            _loan.expiry <
+            SafeCast.toUint40(
+                _loan.earliestRepay +
+                    Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
+            )
+        ) {
+            revert Errors.InvalidEarliestRepay();
         }
 
         if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {
@@ -440,8 +447,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
         int256 _interestRateFactor = int256(Constants.BASE) +
             quoteTuple.interestRatePctInBase;
-        if (_interestRateFactor < 0) {
-            revert Errors.NegativeRepaymentAmount();
+        if (_interestRateFactor <= 0) {
+            revert Errors.InvalidInterestRateFactor();
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
         repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;

@@ -17,6 +17,9 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
 
     constructor(address _addressRegistry) {
+        if (_addressRegistry == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         addressRegistry = _addressRegistry;
     }
 
@@ -175,10 +178,7 @@ contract QuoteHandler is IQuoteHandler {
             borrower,
             offChainQuote.generalQuoteInfo
         );
-        if (
-            offChainQuote.nonce < offChainQuoteNonce[lenderVault] ||
-            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
-        ) {
+        if (offChainQuote.nonce < offChainQuoteNonce[lenderVault]) {
             revert Errors.InvalidQuote();
         }
         bytes32 offChainQuoteHash = hashOffChainQuote(
@@ -308,12 +308,18 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             revert Errors.NonWhitelistedToken();
         }
+        if (generalQuoteInfo.validUntil < block.timestamp) {
+            revert Errors.OutdatedQuote();
+        }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
             revert Errors.InvalidQuote();
         }
         if (
-            generalQuoteInfo.borrower != address(0) &&
-            generalQuoteInfo.borrower != borrower
+            generalQuoteInfo.whitelistAuthority != address(0) &&
+            !IAddressRegistry(_addressRegistry).isWhitelistedBorrower(
+                generalQuoteInfo.whitelistAuthority,
+                borrower
+            )
         ) {
             revert Errors.InvalidBorrower();
         }
@@ -362,8 +368,9 @@ contract QuoteHandler is IQuoteHandler {
                 return false;
             }
             if (
-                onChainQuote.quoteTuples[k].tenor <=
-                onChainQuote.generalQuoteInfo.earliestRepayTenor
+                onChainQuote.quoteTuples[k].tenor <
+                onChainQuote.generalQuoteInfo.earliestRepayTenor +
+                    Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
             ) {
                 return false;
             }

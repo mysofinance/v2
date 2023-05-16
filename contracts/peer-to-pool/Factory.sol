@@ -3,20 +3,29 @@
 pragma solidity 0.8.19;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {ILoanProposalFactory} from "./interfaces/ILoanProposalFactory.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 
-contract LoanProposalFactory is Ownable, ILoanProposalFactory {
-    address public immutable loanProposalImpl;
-    address[] public loanProposals;
-    mapping(address => bool) public isLoanProposal;
+contract Factory is Ownable, IFactory {
     uint256 public arrangerFeeSplit;
+    address public immutable loanProposalImpl;
+    address public immutable fundingPoolImpl;
+    address[] public loanProposals;
+    address[] public fundingPools;
+    mapping(address => bool) public isLoanProposal;
+    mapping(address => bool) public isFundingPool;
+    mapping(address => bool) internal depositTokenHasFundingPool;
 
-    constructor(address _loanProposalImpl) {
+    constructor(address _loanProposalImpl, address _fundingPoolImpl) {
+        if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         loanProposalImpl = _loanProposalImpl;
+        fundingPoolImpl = _fundingPoolImpl;
         _owner = msg.sender;
     }
 
@@ -28,6 +37,9 @@ contract LoanProposalFactory is Ownable, ILoanProposalFactory {
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external {
+        if (!isFundingPool[_fundingPool]) {
+            revert Errors.InvalidAddress();
+        }
         bytes32 salt = keccak256(
             abi.encodePacked(loanProposalImpl, msg.sender, loanProposals.length)
         );
@@ -57,6 +69,28 @@ contract LoanProposalFactory is Ownable, ILoanProposalFactory {
         );
     }
 
+    function createFundingPool(address _depositToken) external {
+        if (depositTokenHasFundingPool[_depositToken]) {
+            revert Errors.FundingPoolAlreadyExists();
+        }
+        bytes32 salt = keccak256(
+            abi.encodePacked(_depositToken, fundingPools.length)
+        );
+        address newFundingPool = Clones.cloneDeterministic(
+            fundingPoolImpl,
+            salt
+        );
+        fundingPools.push(newFundingPool);
+        isFundingPool[newFundingPool] = true;
+        depositTokenHasFundingPool[_depositToken] = true;
+        IFundingPoolImpl(newFundingPool).initialize(
+            address(this),
+            _depositToken
+        );
+
+        emit FundingPoolCreated(newFundingPool, _depositToken);
+    }
+
     function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external {
         senderCheckOwner();
         uint256 oldArrangerFeeSplit = arrangerFeeSplit;
@@ -73,7 +107,7 @@ contract LoanProposalFactory is Ownable, ILoanProposalFactory {
     function owner()
         external
         view
-        override(Ownable, ILoanProposalFactory)
+        override(Ownable, IFactory)
         returns (address)
     {
         return _owner;

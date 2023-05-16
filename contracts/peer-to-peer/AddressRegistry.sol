@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.8.19;
 
-import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
+import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 
 /**
  * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
@@ -15,11 +15,15 @@ import {Ownable} from "../Ownable.sol";
  * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
  */
 contract AddressRegistry is Ownable, IAddressRegistry {
+    using ECDSA for bytes32;
+
     bool internal isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
+    mapping(address => mapping(address => uint256))
+        internal borrowerWhitelistedUntil;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
         public whitelistState;
     // token => compartment => isAllowed
@@ -61,7 +65,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     }
 
     function setWhitelistState(
-        address[] memory addrs,
+        address[] calldata addrs,
         DataTypesPeerToPeer.WhitelistState _whitelistState
     ) external {
         checkSenderAndIsInitialized();
@@ -115,6 +119,73 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         }
         isRegisteredVault[addr] = true;
         _registeredVaults.push(addr);
+    }
+
+    function claimBorrowerWhitelistStatus(
+        address whitelistAuthority,
+        uint256 whitelistedUntil,
+        bytes memory signature,
+        bytes32 salt
+    ) external {
+        bytes32 payloadHash = keccak256(
+            abi.encode(msg.sender, whitelistedUntil, block.chainid, salt)
+        );
+        bytes32 messageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
+        );
+        address recoveredSigner = messageHash.recover(signature);
+        if (
+            whitelistAuthority == address(0) ||
+            recoveredSigner != whitelistAuthority
+        ) {
+            revert Errors.InvalidSignature();
+        }
+        if (
+            whitelistedUntil < block.timestamp ||
+            whitelistedUntil <=
+            borrowerWhitelistedUntil[whitelistAuthority][msg.sender]
+        ) {
+            revert Errors.CannotClaimOutdatedStatus();
+        }
+        borrowerWhitelistedUntil[whitelistAuthority][
+            msg.sender
+        ] = whitelistedUntil;
+        emit BorrowerWhitelistStatusClaimed(
+            whitelistAuthority,
+            msg.sender,
+            whitelistedUntil
+        );
+    }
+
+    function updateBorrowerWhitelist(
+        address[] memory borrowers,
+        uint256 whitelistedUntil
+    ) external {
+        for (uint i = 0; i < borrowers.length; ) {
+            if (
+                borrowers[i] == address(0) ||
+                whitelistedUntil ==
+                borrowerWhitelistedUntil[msg.sender][borrowers[i]]
+            ) {
+                revert Errors.InvalidUpdate();
+            }
+            borrowerWhitelistedUntil[msg.sender][
+                borrowers[i]
+            ] = whitelistedUntil;
+            unchecked {
+                i++;
+            }
+        }
+        emit BorrowerWhitelistUpdated(msg.sender, borrowers, whitelistedUntil);
+    }
+
+    function isWhitelistedBorrower(
+        address whitelistAuthority,
+        address borrower
+    ) external view returns (bool) {
+        return
+            borrowerWhitelistedUntil[whitelistAuthority][borrower] >
+            block.timestamp;
     }
 
     function registeredVaults() external view returns (address[] memory) {

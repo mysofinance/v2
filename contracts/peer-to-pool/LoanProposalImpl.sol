@@ -2,11 +2,11 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
-import {IFundingPool} from "./interfaces/IFundingPool.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
@@ -18,7 +18,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     mapping(uint256 => uint256) public collTokenConverted;
     DataTypesPeerToPool.DynamicLoanProposalData public dynamicData;
     DataTypesPeerToPool.StaticLoanProposalData public staticData;
-    uint256 internal lastLoanTermsUpdateTime;
+    uint256 public lastLoanTermsUpdateTime;
     uint256 internal totalSubscriptionsThatClaimedOnDefault;
     mapping(address => mapping(uint256 => bool))
         internal lenderExercisedConversion;
@@ -88,32 +88,26 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.WaitForLoanTermsCoolOffPeriod();
         }
         if (
-            newLoanTerms.minLoanAmount == 0 ||
-            newLoanTerms.minLoanAmount >= newLoanTerms.maxLoanAmount
+            newLoanTerms.minTotalSubscriptions == 0 ||
+            newLoanTerms.minTotalSubscriptions >=
+            newLoanTerms.maxTotalSubscriptions
         ) {
-            revert Errors.InvalidMinOrMaxLoanAmount();
+            revert Errors.InvalidSubscriptionRange();
         }
         address fundingPool = staticData.fundingPool;
         repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
-        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
-            address(this)
-        );
-        (, , uint256 _finalLoanAmount, , ) = getAbsoluteLoanTerms(
-            newLoanTerms,
-            totalSubscribed,
-            IERC20Metadata(IFundingPool(fundingPool).depositToken()).decimals()
-        );
-        if (_finalLoanAmount > newLoanTerms.maxLoanAmount) {
-            revert Errors.NewMaxLoanAmountBelowCurrentSubscriptions();
+        uint256 totalSubscriptions = IFundingPoolImpl(fundingPool)
+            .totalSubscriptions(address(this));
+        if (totalSubscriptions > newLoanTerms.maxTotalSubscriptions) {
+            revert Errors.InvalidMaxTotalSubscriptions();
         }
         _loanTerms = newLoanTerms;
         dynamicData.status = DataTypesPeerToPool.LoanStatus.IN_NEGOTIATION;
         lastLoanTermsUpdateTime = block.timestamp;
-
         emit LoanTermsProposed(newLoanTerms);
     }
 
-    function acceptLoanTerms() external {
+    function acceptLoanTerms(uint256 _loanTermsUpdateTime) external {
         if (msg.sender != _loanTerms.borrower) {
             revert Errors.InvalidSender();
         }
@@ -128,16 +122,17 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.WaitForLoanTermsCoolOffPeriod();
         }
+        if (_loanTermsUpdateTime != lastLoanTermsUpdateTime) {
+            revert Errors.InconsistentLastLoanTermsUpdateTime();
+        }
         repaymentScheduleCheck(_loanTerms.repaymentSchedule);
-        address fundingPool = staticData.fundingPool;
-        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
-            address(this)
-        );
-        // check if enough subscriptions
-        // note: no need to check if subscriptions are > maxLoanAmount as
+        uint256 totalSubscriptions = IFundingPoolImpl(staticData.fundingPool)
+            .totalSubscriptions(address(this));
+        // check if resulting final loan amount
+        // note: no need to check if subscriptions are > maxTotalSubscriptions as
         // this is already done in funding pool
-        if (totalSubscribed < _loanTerms.minLoanAmount) {
-            revert Errors.TotalSubscribedTooLow();
+        if (totalSubscriptions < _loanTerms.minTotalSubscriptions) {
+            revert Errors.NotEnoughSubscriptions();
         }
         dynamicData.loanTermsLockedTime = block.timestamp;
         dynamicData.status = DataTypesPeerToPool.LoanStatus.BORROWER_ACCEPTED;
@@ -160,14 +155,13 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         address fundingPool = staticData.fundingPool;
-        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
-            address(this)
-        );
+        uint256 totalSubscriptions = IFundingPoolImpl(fundingPool)
+            .totalSubscriptions(address(this));
         if (
-            totalSubscribed < _unfinalizedLoanTerms.minLoanAmount ||
-            totalSubscribed > _unfinalizedLoanTerms.maxLoanAmount
+            totalSubscriptions < _unfinalizedLoanTerms.minTotalSubscriptions ||
+            totalSubscriptions > _unfinalizedLoanTerms.maxTotalSubscriptions
         ) {
-            revert Errors.TotalSubscribedNotTargetInRange();
+            revert Errors.FellShortOfTotalSubscriptionTarget();
         }
         if (
             _unfinalizedLoanTerms.repaymentSchedule[0].dueTimestamp <=
@@ -189,8 +183,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             uint256 _finalCollAmountReservedForConversions
         ) = getAbsoluteLoanTerms(
                 _unfinalizedLoanTerms,
-                totalSubscribed,
-                IERC20Metadata(IFundingPool(fundingPool).depositToken())
+                totalSubscriptions,
+                IERC20Metadata(IFundingPoolImpl(fundingPool).depositToken())
                     .decimals()
             );
         for (uint256 i = 0; i < _loanTerms.repaymentSchedule.length; ) {
@@ -248,25 +242,19 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
-        uint256 totalSubscribed = IFundingPool(staticData.fundingPool)
-            .totalSubscribed(address(this));
+        uint256 totalSubscriptions = IFundingPoolImpl(staticData.fundingPool)
+            .totalSubscriptions(address(this));
         uint256 _lenderInOrOutCutoffTime = lenderInOrOutCutoffTime();
         if (
             (msg.sender == _loanTerms.borrower &&
                 block.timestamp < _lenderInOrOutCutoffTime) ||
             (block.timestamp >= _lenderInOrOutCutoffTime &&
-                totalSubscribed < _loanTerms.minLoanAmount) ||
+                totalSubscriptions < _loanTerms.minTotalSubscriptions) ||
             (block.timestamp >=
                 _lenderInOrOutCutoffTime +
                     Constants.LOAN_EXECUTION_GRACE_PERIOD)
         ) {
             dynamicData.status = DataTypesPeerToPool.LoanStatus.ROLLBACK;
-            address collToken = staticData.collToken;
-            // transfer any previously provided collToken back to borrower
-            IERC20Metadata(collToken).safeTransfer(
-                _loanTerms.borrower,
-                IERC20Metadata(collToken).balanceOf(address(this))
-            );
         } else {
             revert Errors.InvalidRollBackRequest();
         }
@@ -275,8 +263,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function checkAndupdateStatus() external {
-        address fundingPool = staticData.fundingPool;
-        if (msg.sender != fundingPool) {
+        if (msg.sender != staticData.fundingPool) {
             revert Errors.InvalidSender();
         }
         if (
@@ -292,8 +279,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
 
     function exerciseConversion() external {
         address fundingPool = staticData.fundingPool;
-        uint256 lenderContribution = IFundingPool(fundingPool)
-            .subscribedBalanceOf(address(this), msg.sender);
+        uint256 lenderContribution = IFundingPoolImpl(fundingPool)
+            .subscriptionAmountOf(address(this), msg.sender);
         if (lenderContribution == 0) {
             revert Errors.InvalidSender();
         }
@@ -308,19 +295,20 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.AlreadyConverted();
         }
         // must be after when the period of this loan is due, but before borrower can repay
+        // note: conversion can be done if blocktime is in the half-open interval of:
+        // [dueTimestamp, dueTimestamp + conversionGracePeriod)
+        DataTypesPeerToPool.Repayment memory _repayment = _loanTerms
+            .repaymentSchedule[repaymentIdx];
         if (
-            block.timestamp <
-            _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp ||
-            block.timestamp >
-            _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-                staticData.conversionGracePeriod
+            block.timestamp < _repayment.dueTimestamp ||
+            block.timestamp >=
+            _repayment.dueTimestamp + staticData.conversionGracePeriod
         ) {
             revert Errors.OutsideConversionTimeWindow();
         }
-        uint256 conversionAmount = (_loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .collTokenDueIfConverted * lenderContribution) /
-            IFundingPool(fundingPool).totalSubscribed(address(this));
+        uint256 conversionAmount = (_repayment.collTokenDueIfConverted *
+            lenderContribution) /
+            IFundingPoolImpl(fundingPool).totalSubscriptions(address(this));
         if (conversionAmount == 0) {
             revert Errors.ZeroConversionAmount();
         }
@@ -348,28 +336,27 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         checkCurrRepaymentIdx(repaymentIdx);
         // must be after when the period of this loan when lenders can convert,
         // but before default period for this period
-        uint256 currConversionCutoffTime = _loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .dueTimestamp + staticData.conversionGracePeriod;
+        // note: repayment can be done in the half-open interval of:
+        // [dueTimestamp + conversionGracePeriod, dueTimestamp + conversionGracePeriod + repaymentGracePeriod)
+        DataTypesPeerToPool.Repayment memory _repayment = _loanTerms
+            .repaymentSchedule[repaymentIdx];
+        uint256 currConversionCutoffTime = _repayment.dueTimestamp +
+            staticData.conversionGracePeriod;
         uint256 currRepaymentCutoffTime = currConversionCutoffTime +
             staticData.repaymentGracePeriod;
         if (
             (block.timestamp < currConversionCutoffTime) ||
-            (block.timestamp > currRepaymentCutoffTime)
+            (block.timestamp >= currRepaymentCutoffTime)
         ) {
             revert Errors.OutsideRepaymentTimeWindow();
         }
         address fundingPool = staticData.fundingPool;
-        address loanToken = IFundingPool(fundingPool).depositToken();
-        uint256 collTokenDueIfAllConverted = _loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .collTokenDueIfConverted;
+        address loanToken = IFundingPoolImpl(fundingPool).depositToken();
+        uint256 collTokenDueIfAllConverted = _repayment.collTokenDueIfConverted;
         uint256 collTokenLeftUnconverted = collTokenDueIfAllConverted -
             collTokenConverted[repaymentIdx];
-        uint256 remainingLoanTokenDue = (_loanTerms
-            .repaymentSchedule[repaymentIdx]
-            .loanTokenDue * collTokenLeftUnconverted) /
-            collTokenDueIfAllConverted;
+        uint256 remainingLoanTokenDue = (_repayment.loanTokenDue *
+            collTokenLeftUnconverted) / collTokenDueIfAllConverted;
         loanTokenRepaid[repaymentIdx] = remainingLoanTokenDue;
         uint256 preBal = IERC20Metadata(loanToken).balanceOf(address(this));
         IERC20Metadata(loanToken).safeTransferFrom(
@@ -397,8 +384,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
 
     function claimRepayment(uint256 repaymentIdx) external {
         address fundingPool = staticData.fundingPool;
-        uint256 lenderContribution = IFundingPool(fundingPool)
-            .subscribedBalanceOf(address(this), msg.sender);
+        uint256 lenderContribution = IFundingPoolImpl(fundingPool)
+            .subscriptionAmountOf(address(this), msg.sender);
         if (lenderContribution == 0) {
             revert Errors.InvalidSender();
         }
@@ -416,16 +403,14 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.AlreadyClaimed();
         }
         // repaid amount for that period split over those who didn't convert in that period
-        uint256 subscriptionsEntitledToRepayment = (IFundingPool(fundingPool)
-            .totalSubscribed(address(this)) -
-            totalConvertedSubscriptionsPerIdx[repaymentIdx]);
+        uint256 subscriptionsEntitledToRepayment = IFundingPoolImpl(fundingPool)
+            .totalSubscriptions(address(this)) -
+            totalConvertedSubscriptionsPerIdx[repaymentIdx];
         uint256 claimAmount = (loanTokenRepaid[repaymentIdx] *
             lenderContribution) / subscriptionsEntitledToRepayment;
         lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
-        IERC20Metadata(IFundingPool(fundingPool).depositToken()).safeTransfer(
-            msg.sender,
-            claimAmount
-        );
+        IERC20Metadata(IFundingPoolImpl(fundingPool).depositToken())
+            .safeTransfer(msg.sender, claimAmount);
 
         emit RepaymentClaimed(msg.sender, claimAmount);
     }
@@ -438,8 +423,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
         // this will check if loan has been fully repaid yet in this instance
+        // note: loan can be marked as defaulted if no repayment and blocktime is in half-open interval of:
+        // [dueTimestamp + conversionGracePeriod + repaymentGracePeriod, infty)
         checkCurrRepaymentIdx(repaymentIdx);
-        if (block.timestamp <= getRepaymentCutoffTime(repaymentIdx)) {
+        if (block.timestamp < getRepaymentCutoffTime(repaymentIdx)) {
             revert Errors.NoDefault();
         }
         dynamicData.status = DataTypesPeerToPool.LoanStatus.DEFAULTED;
@@ -451,8 +438,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         address fundingPool = staticData.fundingPool;
-        uint256 lenderContribution = IFundingPool(fundingPool)
-            .subscribedBalanceOf(address(this), msg.sender);
+        uint256 lenderContribution = IFundingPoolImpl(fundingPool)
+            .subscriptionAmountOf(address(this), msg.sender);
         if (lenderContribution == 0) {
             revert Errors.InvalidSender();
         }
@@ -461,9 +448,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         uint256 lastPeriodIdx = dynamicData.currentRepaymentIdx;
         address collToken = staticData.collToken;
-        uint256 totalSubscribed = IFundingPool(fundingPool).totalSubscribed(
-            address(this)
-        );
+        uint256 totalSubscriptions = IFundingPoolImpl(fundingPool)
+            .totalSubscriptions(address(this));
         uint256 stillToBeConvertedCollTokens = _loanTerms
             .repaymentSchedule[lastPeriodIdx]
             .collTokenDueIfConverted - collTokenConverted[lastPeriodIdx];
@@ -471,7 +457,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         // if only some lenders converted, then split 'stillToBeConvertedCollTokens'
         // fairly among lenders who didn't already convert in default period to not
         // put them at an unfair disadvantage
-        uint256 totalUnconvertedSubscriptionsFromLastIdx = totalSubscribed -
+        uint256 totalUnconvertedSubscriptionsFromLastIdx = totalSubscriptions -
             totalConvertedSubscriptionsPerIdx[lastPeriodIdx];
         uint256 totalCollTokenClaim;
         if (!lenderExercisedConversion[msg.sender][lastPeriodIdx]) {
@@ -487,7 +473,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         totalCollTokenClaim +=
             ((IERC20Metadata(collToken).balanceOf(address(this)) -
                 stillToBeConvertedCollTokens) * lenderContribution) /
-            (totalSubscribed - totalSubscriptionsThatClaimedOnDefault);
+            (totalSubscriptions - totalSubscriptionsThatClaimedOnDefault);
         lenderClaimedCollateralOnDefault[msg.sender] = true;
         totalSubscriptionsThatClaimedOnDefault += lenderContribution;
 
@@ -520,7 +506,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
 
     function getAbsoluteLoanTerms(
         DataTypesPeerToPool.LoanTerms memory _tmpLoanTerms,
-        uint256 totalSubscribed,
+        uint256 totalSubscriptions,
         uint256 loanTokenDecimals
     )
         public
@@ -533,10 +519,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             uint256
         )
     {
-        uint256 _arrangerFee = (dynamicData.arrangerFee * totalSubscribed) /
+        uint256 _arrangerFee = (dynamicData.arrangerFee * totalSubscriptions) /
             Constants.BASE;
         uint256 _finalLoanAmount = SafeCast.toUint128(
-            totalSubscribed - _arrangerFee
+            totalSubscriptions - _arrangerFee
         );
         uint256 _finalCollAmountReservedForDefault = (_finalLoanAmount *
             _tmpLoanTerms.collPerLoanToken) / (10 ** loanTokenDecimals);
