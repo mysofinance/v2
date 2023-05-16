@@ -88,7 +88,12 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
 
         lockedAmounts[collToken] -= totalUnlockableColl;
 
-        emit CollateralUnlocked(_owner, collToken, _loanIds);
+        emit CollateralUnlocked(
+            _owner,
+            collToken,
+            _loanIds,
+            totalUnlockableColl
+        );
     }
 
     function updateLoanInfo(

@@ -18,7 +18,8 @@ interface ILenderVaultImpl {
     event CollateralUnlocked(
         address indexed vaultOwner,
         address indexed collToken,
-        uint256[] loanIds
+        uint256[] loanIds,
+        uint256 amountUnlocked
     );
 
     event QuoteProcessed(
