@@ -423,6 +423,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       // make valid owner proposal
       await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.emit(lenderVault, 'NewOwnerProposed')
 
+      // check that you can't re-submit same new owner proposal
+      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidNewOwnerProposal'
+      )
+
       // claim ownership
       await expect(lenderVault.connect(team).claimOwnership()).to.emit(lenderVault, 'ClaimedOwnership')
 

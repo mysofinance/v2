@@ -35,7 +35,7 @@ contract ChainlinkBasic is IOracle {
                 revert Errors.InvalidAddress();
             }
             oracleDecimals = AggregatorV3Interface(_oracleAddrs[i]).decimals();
-            if ((10 ** oracleDecimals != baseCurrencyUnit)) {
+            if (10 ** oracleDecimals != baseCurrencyUnit) {
                 revert Errors.InvalidOracleDecimals();
             }
             version = AggregatorV3Interface(_oracleAddrs[i]).version();

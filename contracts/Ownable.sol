@@ -20,12 +20,14 @@ abstract contract Ownable {
     }
 
     function claimOwnership() external {
-        if (msg.sender != _newOwner) {
+        address tmpNewOwner = _newOwner;
+        if (msg.sender != tmpNewOwner) {
             revert Errors.InvalidSender();
         }
-        address _oldOwner = _owner;
-        _owner = _newOwner;
-        emit ClaimedOwnership(_owner, _oldOwner);
+        address oldOwner = _owner;
+        _owner = tmpNewOwner;
+        delete _newOwner;
+        emit ClaimedOwnership(tmpNewOwner, oldOwner);
     }
 
     // note: needs to be explicitly overriden by inheriting contracts
@@ -44,7 +46,8 @@ abstract contract Ownable {
     ) internal view virtual {
         if (
             _newOwnerProposal == address(0) ||
-            _newOwnerProposal == address(this)
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == _newOwner
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
