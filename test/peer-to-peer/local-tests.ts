@@ -123,7 +123,7 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, borrower, team, whitelistAuthority, signer1, signer2, signer3] = await ethers.getSigners()
+    const [lender, borrower, team, whitelistAuthority, addr1, addr2, addr3] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -268,6 +268,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       'InvalidSender'
     )
 
+    const sortedAddrs = [addr1, addr2, addr3].sort((a, b) => (ethers.BigNumber.from(a.address).lt(b.address) ? -1 : 1))
+
     return {
       addressRegistry,
       borrowerGateway,
@@ -276,9 +278,9 @@ describe('Peer-to-Peer: Local Tests', function () {
       borrower,
       team,
       whitelistAuthority,
-      signer1,
-      signer2,
-      signer3,
+      signer1: sortedAddrs[0],
+      signer2: sortedAddrs[1],
+      signer3: sortedAddrs[2],
       usdc,
       weth,
       lenderVault
@@ -1691,6 +1693,16 @@ describe('Peer-to-Peer: Local Tests', function () {
       offChainQuote.v = [sig1.v, sig2.v, sig3.v]
       offChainQuote.r = [sig1.r, sig2.r, sig3.r]
       offChainQuote.s = [sig2.s, sig3.s]
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
+
+      // check revert if correct number of valid sigs but wrong order
+      offChainQuote.v = [sig2.v, sig1.v, sig3.v]
+      offChainQuote.r = [sig2.r, sig1.r, sig3.r]
+      offChainQuote.s = [sig2.s, sig1.s, sig3.s]
       await expect(
         borrowerGateway
           .connect(borrower)
