@@ -86,7 +86,7 @@ interface IAddressRegistry {
      * @notice Sets the repay callback state for a given token
      * @dev Can only be called by registry owner
      * Note: On borrow, you can still use callback if callback is whitelisted,
-     * this is just checked on repay.
+     * this is just checked on repay and only if there is a compartment.
      * @param tokens Tokens for which repay callback state shall be set
      * @param callbackAddrs Callback addresses for which repay callback state shall be set
      * @param isAllowed The repay callback state to which tokens shall be set
