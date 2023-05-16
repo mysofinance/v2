@@ -46,9 +46,9 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         address _vaultOwner,
         address _addressRegistry
     ) external initializer {
-        _owner = _vaultOwner;
         addressRegistry = _addressRegistry;
         minNumOfSigners = 1;
+        initialize(_vaultOwner);
     }
 
     function unlockCollateral(

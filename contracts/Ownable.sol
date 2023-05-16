@@ -12,6 +12,10 @@ abstract contract Ownable {
 
     event ClaimedOwnership(address indexed owner, address oldOwner);
 
+    constructor() {
+        initialize(msg.sender);
+    }
+
     function proposeNewOwner(address _newOwnerProposal) external {
         senderCheckOwner();
         newOwnerProposalCheck(_newOwnerProposal);
@@ -34,6 +38,10 @@ abstract contract Ownable {
     // (e.g., AddressRegistry) to avoid ambiguities regarding owner()
     // definitions in corresponding interfaces (e.g., IAddressRegistry)
     function owner() external view virtual returns (address);
+
+    function initialize(address initOwner) internal {
+        _owner = initOwner;
+    }
 
     function senderCheckOwner() internal view {
         if (msg.sender != _owner) {
