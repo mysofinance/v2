@@ -365,8 +365,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             remainingLoanTokenDue + expectedTransferFee
         );
         if (
-            IERC20Metadata(loanToken).balanceOf(address(this)) - preBal !=
-            remainingLoanTokenDue
+            IERC20Metadata(loanToken).balanceOf(address(this)) !=
+            remainingLoanTokenDue + preBal
         ) {
             revert Errors.InvalidSendAmount();
         }
@@ -474,9 +474,11 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             ((IERC20Metadata(collToken).balanceOf(address(this)) -
                 stillToBeConvertedCollTokens) * lenderContribution) /
             (totalSubscriptions - totalSubscriptionsThatClaimedOnDefault);
+        if (totalCollTokenClaim == 0) {
+            revert Errors.AlreadyClaimed();
+        }
         lenderClaimedCollateralOnDefault[msg.sender] = true;
         totalSubscriptionsThatClaimedOnDefault += lenderContribution;
-
         IERC20Metadata(collToken).safeTransfer(msg.sender, totalCollTokenClaim);
 
         emit DefaultProceedsClaimed(msg.sender);
