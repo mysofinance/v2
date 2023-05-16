@@ -53,6 +53,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         liqGaugeAddr = _liqGaugeAddr;
         IERC20(loan.collToken).approve(_liqGaugeAddr, amount);
         IStakingHelper(_liqGaugeAddr).deposit(amount, address(this));
+        emit Staked(gaugeIndex, liqGaugeAddr, amount);
     }
 
     function toggleApprovedStaker(address _staker) external {
@@ -62,7 +63,9 @@ contract CurveLPStakingCompartment is BaseCompartment {
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }
-        approvedStaker[_staker] = !approvedStaker[_staker];
+        bool currStakingState = approvedStaker[_staker];
+        approvedStaker[_staker] = !currStakingState;
+        emit UpdatedApprovedStaker(_staker, !currStakingState);
     }
 
     // transfer coll on repays

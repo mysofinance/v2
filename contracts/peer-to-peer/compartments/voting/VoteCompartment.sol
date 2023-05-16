@@ -27,6 +27,7 @@ contract VoteCompartment is BaseCompartment {
             revert Errors.InvalidDelegatee();
         }
         IVotes(loan.collToken).delegate(_delegatee);
+        emit Delegated(msg.sender, _delegatee);
     }
 
     function toggleApprovedDelegator(address _delegate) external {
@@ -36,7 +37,9 @@ contract VoteCompartment is BaseCompartment {
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }
-        approvedDelegator[_delegate] = !approvedDelegator[_delegate];
+        bool currDelegateState = approvedDelegator[_delegate];
+        approvedDelegator[_delegate] = !currDelegateState;
+        emit UpdatedApprovedDelegator(_delegate, !currDelegateState);
     }
 
     // transfer coll on repays
