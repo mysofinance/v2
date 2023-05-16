@@ -211,25 +211,23 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.Loan memory loan,
         uint256 upfrontFee
     ) internal {
-        if (borrowInstructions.callbackAddr == address(0)) {
-            ILenderVaultImpl(lenderVault).transferTo(
-                loan.loanToken,
-                loan.borrower,
-                loan.initLoanAmount
-            );
-        } else {
-            if (
-                IAddressRegistry(addressRegistry).whitelistState(
-                    borrowInstructions.callbackAddr
-                ) != DataTypesPeerToPeer.WhitelistState.CALLBACK
-            ) {
-                revert Errors.NonWhitelistedCallback();
-            }
-            ILenderVaultImpl(lenderVault).transferTo(
-                loan.loanToken,
-                borrowInstructions.callbackAddr,
-                loan.initLoanAmount
-            );
+        if (
+            borrowInstructions.callbackAddr != address(0) &&
+            IAddressRegistry(addressRegistry).whitelistState(
+                borrowInstructions.callbackAddr
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.CALLBACK
+        ) {
+            revert Errors.NonWhitelistedCallback();
+        }
+        ILenderVaultImpl(lenderVault).transferTo(
+            loan.loanToken,
+            borrowInstructions.callbackAddr == address(0)
+                ? loan.borrower
+                : borrowInstructions.callbackAddr,
+            loan.initLoanAmount
+        );
+        if (borrowInstructions.callbackAddr != address(0)) {
             IVaultCallback(borrowInstructions.callbackAddr).borrowCallback(
                 loan,
                 borrowInstructions.callbackData
