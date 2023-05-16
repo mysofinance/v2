@@ -23,6 +23,9 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
         address _vaultAddr,
         uint256 _loanIdx
     ) external initializer {
+        if (_vaultAddr == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         vaultAddr = _vaultAddr;
         loanIdx = _loanIdx;
     }
