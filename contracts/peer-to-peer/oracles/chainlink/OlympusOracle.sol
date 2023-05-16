@@ -54,10 +54,10 @@ contract OlympusOracle is IOracle, ChainlinkBasic {
         uint256 index = IOlympus(GOHM_ADDR).index();
 
         collTokenPriceInLoanToken = collToken == GOHM_ADDR
-            ? (priceOfCollToken * 10 ** loanTokenDecimals * index) /
-                (priceOfLoanToken * 10 ** SOHM_DECIMALS)
+            ? (priceOfCollToken * (10 ** loanTokenDecimals) * index) /
+                (priceOfLoanToken * (10 ** SOHM_DECIMALS))
             : (priceOfCollToken *
-                10 ** loanTokenDecimals *
-                10 ** SOHM_DECIMALS) / (priceOfLoanToken * index);
+                (10 ** loanTokenDecimals) *
+                (10 ** SOHM_DECIMALS)) / (priceOfLoanToken * index);
     }
 }
