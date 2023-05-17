@@ -35,6 +35,8 @@ library DataTypesPeerToPool {
         address collToken;
         // Address of arranger who can manage the loan proposal contract
         address arranger;
+        // Address of whitelist authority who can manage the lender whitelist (optional)
+        address whitelistAuthority;
         // Unsubscribe grace period (in seconds), i.e., after acceptance by borrower lenders can unsubscribe and
         // remove liquidity for this duration before being locked-in
         uint256 unsubscribeGracePeriod;

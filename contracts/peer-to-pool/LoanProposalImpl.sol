@@ -36,6 +36,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         address _arranger,
         address _fundingPool,
         address _collToken,
+        address _whitelistAuthority,
         uint256 _arrangerFee,
         uint256 _unsubscribeGracePeriod,
         uint256 _conversionGracePeriod,
@@ -62,6 +63,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         staticData.fundingPool = _fundingPool;
         staticData.collToken = _collToken;
         staticData.arranger = _arranger;
+        staticData.whitelistAuthority = _whitelistAuthority;
         staticData.unsubscribeGracePeriod = _unsubscribeGracePeriod;
         staticData.conversionGracePeriod = _conversionGracePeriod;
         staticData.repaymentGracePeriod = _repaymentGracePeriod;

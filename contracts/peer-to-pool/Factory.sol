@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.19;
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
@@ -11,6 +12,8 @@ import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 
 contract Factory is Ownable, IFactory {
+    using ECDSA for bytes32;
+
     uint256 public arrangerFeeSplit;
     address public immutable loanProposalImpl;
     address public immutable fundingPoolImpl;
@@ -19,6 +22,8 @@ contract Factory is Ownable, IFactory {
     mapping(address => bool) public isLoanProposal;
     mapping(address => bool) public isFundingPool;
     mapping(address => bool) internal depositTokenHasFundingPool;
+    mapping(address => mapping(address => uint256))
+        internal lenderWhitelistedUntil;
 
     constructor(address _loanProposalImpl, address _fundingPoolImpl) Ownable() {
         if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
@@ -31,6 +36,7 @@ contract Factory is Ownable, IFactory {
     function createLoanProposal(
         address _fundingPool,
         address _collToken,
+        address _whitelistAuthority,
         uint256 _arrangerFee,
         uint256 _unsubscribeGracePeriod,
         uint256 _conversionGracePeriod,
@@ -52,6 +58,7 @@ contract Factory is Ownable, IFactory {
             msg.sender,
             _fundingPool,
             _collToken,
+            _whitelistAuthority,
             _arrangerFee,
             _unsubscribeGracePeriod,
             _conversionGracePeriod,
@@ -103,6 +110,71 @@ contract Factory is Ownable, IFactory {
         emit ArrangerFeeSplitUpdated(oldArrangerFeeSplit, _newArrangerFeeSplit);
     }
 
+    function claimLenderWhitelistStatus(
+        address whitelistAuthority,
+        uint256 whitelistedUntil,
+        bytes memory signature,
+        bytes32 salt
+    ) external {
+        bytes32 payloadHash = keccak256(
+            abi.encode(msg.sender, whitelistedUntil, block.chainid, salt)
+        );
+        bytes32 messageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
+        );
+        address recoveredSigner = messageHash.recover(signature);
+        if (
+            whitelistAuthority == address(0) ||
+            recoveredSigner != whitelistAuthority
+        ) {
+            revert Errors.InvalidSignature();
+        }
+        if (
+            whitelistedUntil < block.timestamp ||
+            whitelistedUntil <=
+            lenderWhitelistedUntil[whitelistAuthority][msg.sender]
+        ) {
+            revert Errors.CannotClaimOutdatedStatus();
+        }
+        lenderWhitelistedUntil[whitelistAuthority][
+            msg.sender
+        ] = whitelistedUntil;
+        emit LenderWhitelistStatusClaimed(
+            whitelistAuthority,
+            msg.sender,
+            whitelistedUntil
+        );
+    }
+
+    function updateLenderWhitelist(
+        address[] memory lenders,
+        uint256 whitelistedUntil
+    ) external {
+        for (uint i = 0; i < lenders.length; ) {
+            if (
+                lenders[i] == address(0) ||
+                whitelistedUntil ==
+                lenderWhitelistedUntil[msg.sender][lenders[i]]
+            ) {
+                revert Errors.InvalidUpdate();
+            }
+            lenderWhitelistedUntil[msg.sender][lenders[i]] = whitelistedUntil;
+            unchecked {
+                i++;
+            }
+        }
+        emit LenderWhitelistUpdated(msg.sender, lenders, whitelistedUntil);
+    }
+
+    function isWhitelistedBorrower(
+        address whitelistAuthority,
+        address borrower
+    ) external view returns (bool) {
+        return
+            lenderWhitelistedUntil[whitelistAuthority][borrower] >
+            block.timestamp;
+    }
+
     function owner()
         external
         view
@@ -110,5 +182,14 @@ contract Factory is Ownable, IFactory {
         returns (address)
     {
         return _owner;
+    }
+
+    function isWhitelistedLender(
+        address whitelistAuthority,
+        address lender
+    ) external view returns (bool) {
+        return
+            lenderWhitelistedUntil[whitelistAuthority][lender] >
+            block.timestamp;
     }
 }
