@@ -23,6 +23,28 @@ const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 
 describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
+  before(async function () {
+    await hre.network.provider.request({
+      method: 'hardhat_reset',
+      params: [
+        {
+          forking: {
+            jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
+            blockNumber: BLOCK_NUMBER
+          }
+        }
+      ]
+    })
+  })
+
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot')
+  })
+
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId])
+  })
+
   async function setupTest() {
     const [lender, borrower, team] = await ethers.getSigners()
     /* ************************************ */
@@ -186,28 +208,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests re Looping', function () {
   }
 
   describe('On-Chain Quote Testing', function () {
-    before(async function () {
-      await hre.network.provider.request({
-        method: 'hardhat_reset',
-        params: [
-          {
-            forking: {
-              jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-              blockNumber: BLOCK_NUMBER
-            }
-          }
-        ]
-      })
-    })
-
-    beforeEach(async () => {
-      snapshotId = await hre.network.provider.send('evm_snapshot')
-    })
-
-    afterEach(async () => {
-      await hre.network.provider.send('evm_revert', [snapshotId])
-    })
-
     it('Uni V3 Looping Test', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault, uniV3Looping } = await setupTest()
 

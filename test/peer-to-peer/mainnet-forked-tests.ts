@@ -56,6 +56,28 @@ function getLoopingSendAmount(
 }
 
 describe('Peer-to-Peer: Forked Mainnet Tests', function () {
+  before(async function () {
+    await hre.network.provider.request({
+      method: 'hardhat_reset',
+      params: [
+        {
+          forking: {
+            jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
+            blockNumber: BLOCK_NUMBER
+          }
+        }
+      ]
+    })
+  })
+
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot')
+  })
+
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId])
+  })
+
   async function setupTest() {
     const [lender, borrower, team, whitelistAuthority] = await ethers.getSigners()
     /* ************************************ */
@@ -201,28 +223,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       balancerV2Looping
     }
   }
-
-  before(async function () {
-    await hre.network.provider.request({
-      method: 'hardhat_reset',
-      params: [
-        {
-          forking: {
-            jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-            blockNumber: BLOCK_NUMBER
-          }
-        }
-      ]
-    })
-  })
-
-  beforeEach(async () => {
-    snapshotId = await hre.network.provider.send('evm_snapshot')
-  })
-
-  afterEach(async () => {
-    await hre.network.provider.send('evm_revert', [snapshotId])
-  })
 
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
