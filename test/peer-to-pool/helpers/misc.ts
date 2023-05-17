@@ -1,5 +1,6 @@
+import { expect } from 'chai'
 import { ethers } from 'hardhat'
-import { Factory, LoanProposal, FundingPool, MyERC20 } from '../../../typechain-types'
+import { Factory, LoanProposalImpl, FundingPoolImpl, MyERC20 } from '../../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { BigNumber } from 'ethers'
 
@@ -10,6 +11,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
+const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 
 export const getLoanTermsTemplate = () => {
   const repaymentSchedule = getRepaymentScheduleEntry(0, 0, 0)
@@ -77,6 +79,7 @@ export const createLoanProposal = async (
   arranger: SignerWithAddress,
   fundingPoolAddr: string,
   daoTokenAddr: string,
+  whitelistAuthorityAddr: string,
   relArrangerFee: BigNumber,
   unsubscribeGracePeriod: BigNumber,
   conversionGracePeriod: BigNumber,
@@ -88,6 +91,7 @@ export const createLoanProposal = async (
     .createLoanProposal(
       fundingPoolAddr,
       daoTokenAddr,
+      whitelistAuthorityAddr,
       relArrangerFee,
       unsubscribeGracePeriod,
       conversionGracePeriod,
@@ -104,8 +108,8 @@ export const addSubscriptionsToLoanProposal = async (
   lender2: SignerWithAddress,
   lender3: SignerWithAddress,
   fundingToken: MyERC20,
-  fundingPool: FundingPool,
-  loanProposal: LoanProposal
+  fundingPool: FundingPoolImpl,
+  loanProposal: LoanProposalImpl
 ) => {
   // 3 lenders each contribute 1/3 of maxTotalSubscriptions
   const loanTerms = await loanProposal.loanTerms()
@@ -121,4 +125,31 @@ export const addSubscriptionsToLoanProposal = async (
   await fundingToken.connect(lender3).approve(fundingPool.address, subscriptionAmount)
   await fundingPool.connect(lender3).deposit(subscriptionAmount, 0)
   await fundingPool.connect(lender3).subscribe(loanProposal.address, subscriptionAmount)
+}
+
+export const whitelistLender = async (
+  factory: Factory,
+  whitelistAuthority: SignerWithAddress,
+  lender: SignerWithAddress,
+  whitelistedUntil?: any
+) => {
+  // get chain id
+  const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
+
+  // get salt
+  const salt = ZERO_BYTES32
+
+  // construct payload and sign
+  const payload = ethers.utils.defaultAbiCoder.encode(
+    ['address', 'uint256', 'uint256', 'bytes32'],
+    [lender.address, whitelistedUntil, chainId, salt]
+  )
+  const payloadHash = ethers.utils.keccak256(payload)
+  const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+  const sig = ethers.utils.splitSignature(signature)
+  const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+  expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+  // have lender claim whitelist status
+  await factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
 }

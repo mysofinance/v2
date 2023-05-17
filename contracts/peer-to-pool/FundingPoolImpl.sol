@@ -20,7 +20,8 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public totalSubscriptions;
     mapping(address => mapping(address => uint256)) public subscriptionAmountOf;
-    // note: earliest unsubscribe time is to prevent griefing accept loans through atomic flashborrow, deposit, subscribe, unsubscribe, and withdraw
+    // note: earliest unsubscribe time is to prevent griefing accept loans through atomic flashborrow,
+    // deposit, subscribe, unsubscribe, and withdraw
     mapping(address => mapping(address => uint256))
         internal earliestUnsubscribe;
 
@@ -81,6 +82,18 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         }
         if (!ILoanProposalImpl(loanProposal).canSubscribe()) {
             revert Errors.NotInSubscriptionPhase();
+        }
+        (, , , address whitelistAuthority, , , ) = ILoanProposalImpl(
+            loanProposal
+        ).staticData();
+        if (
+            whitelistAuthority != address(0) &&
+            !IFactory(factory).isWhitelistedLender(
+                whitelistAuthority,
+                msg.sender
+            )
+        ) {
+            revert Errors.InvalidLender();
         }
         uint256 _balanceOf = balanceOf[msg.sender];
         if (amount > _balanceOf) {
@@ -154,7 +167,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             loanTerms.borrower,
             finalLoanAmount
         );
-        (, , address arranger, , , ) = ILoanProposalImpl(loanProposal)
+        (, , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
         uint256 protocolFeeShare = (arrangerFee *
             IFactory(factory).arrangerFeeSplit()) / Constants.BASE;

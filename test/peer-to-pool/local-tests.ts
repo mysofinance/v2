@@ -5,7 +5,8 @@ import {
   getRepaymentScheduleEntry,
   createLoanProposal,
   getDummyLoanTerms,
-  addSubscriptionsToLoanProposal
+  addSubscriptionsToLoanProposal,
+  whitelistLender
 } from './helpers/misc'
 import { ADDRESS_ZERO } from '@uniswap/v3-sdk'
 
@@ -29,7 +30,7 @@ const MIN_TIME_BETWEEN_DUE_DATES = ONE_DAY.mul(7)
 const MIN_CONVERSION_GRACE_PERIOD = ONE_DAY
 const MIN_REPAYMENT_GRACE_PERIOD = ONE_DAY
 const MIN_LOAN_EXECUTION_GRACE_PERIOD = ONE_DAY
-const MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD = ONE_DAY.mul(5)
+const MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD = ONE_DAY.mul(30)
 const MIN_TIME_UNTIL_FIRST_DUE_DATE = ONE_DAY
 const LOAN_EXECUTION_GRACE_PERIOD = ONE_DAY
 const MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE = 60 // 60s
@@ -50,7 +51,8 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   async function setupTest() {
-    const [lender0, lender1, lender2, lender3, arranger, daoTreasury, team, anyUser] = await ethers.getSigners()
+    const [lender0, lender1, lender2, lender3, arranger, daoTreasury, team, whitelistAuthority, anyUser] =
+      await ethers.getSigners()
 
     // deploy test tokens
     const MyERC20 = await ethers.getContractFactory('MyERC20')
@@ -116,7 +118,16 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // reverts if trying to initialize base contract
     await expect(
-      loanProposalImpl.initialize(arranger.address, fundingPool.address, daoToken.address, 1, ONE_DAY, ONE_DAY, ONE_DAY)
+      loanProposalImpl.initialize(
+        arranger.address,
+        fundingPool.address,
+        daoToken.address,
+        ADDRESS_ZERO,
+        1,
+        ONE_DAY,
+        ONE_DAY,
+        ONE_DAY
+      )
     ).to.be.revertedWith('Initializable: contract is already initialized')
 
     // reverts if trying to initialize base contract
@@ -136,6 +147,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       daoTreasury,
       team,
+      whitelistAuthority,
       anyUser
     }
   }
@@ -149,6 +161,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -162,6 +175,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           ADDRESS_ZERO,
           daoToken.address,
+          ADDRESS_ZERO,
           BASE.mul(10).div(100),
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
@@ -173,6 +187,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .connect(arranger)
         .createLoanProposal(
           fundingPool.address,
+          ADDRESS_ZERO,
           ADDRESS_ZERO,
           BASE.mul(10).div(100),
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
@@ -187,6 +202,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           0,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
@@ -199,6 +215,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MIN_ARRANGER_FEE.sub(1),
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
@@ -211,6 +228,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MAX_ARRANGER_FEE.add(1),
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
@@ -224,6 +242,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MIN_ARRANGER_FEE,
           0,
           MIN_CONVERSION_GRACE_PERIOD,
@@ -236,6 +255,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MIN_ARRANGER_FEE,
           MIN_UNSUBSCRIBE_GRACE_PERIOD.sub(1),
           MIN_CONVERSION_GRACE_PERIOD,
@@ -248,6 +268,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MIN_ARRANGER_FEE,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD.sub(1),
@@ -260,6 +281,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MIN_ARRANGER_FEE,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
@@ -272,6 +294,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MIN_ARRANGER_FEE,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
@@ -284,6 +307,7 @@ describe('Peer-to-Pool: Local Tests', function () {
         .createLoanProposal(
           fundingPool.address,
           daoToken.address,
+          ADDRESS_ZERO,
           MIN_ARRANGER_FEE,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_REPAYMENT_GRACE_PERIOD).add(1),
@@ -301,6 +325,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       .createLoanProposal(
         fundingPool.address,
         daoToken.address,
+        ADDRESS_ZERO,
         REL_ARRANGER_FEE,
         UNSUBSCRIBE_GRACE_PERIOD,
         CONVERSION_GRACE_PERIOD,
@@ -470,6 +495,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -756,6 +782,118 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(dynamicData.status).to.be.equal(3)
   })
 
+  it('Should handle lender whitelist correctly', async function () {
+    const {
+      fundingPool,
+      factory,
+      daoToken,
+      arranger,
+      daoTreasury,
+      usdc,
+      lender0,
+      lender1,
+      lender2,
+      lender3,
+      whitelistAuthority
+    } = await setupTest()
+    // arranger creates loan proposal
+    const loanProposal = await createLoanProposal(
+      factory,
+      arranger,
+      fundingPool.address,
+      daoToken.address,
+      whitelistAuthority.address,
+      REL_ARRANGER_FEE,
+      UNSUBSCRIBE_GRACE_PERIOD,
+      CONVERSION_GRACE_PERIOD,
+      REPAYMENT_GRACE_PERIOD
+    )
+
+    const loanTerms = await getDummyLoanTerms(daoTreasury.address)
+    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+
+    // move forward past loan terms update cool off period
+    let blocknum = await ethers.provider.getBlockNumber()
+    let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
+    // lender 1 deposits
+    let bal = await usdc.balanceOf(lender1.address)
+    await usdc.connect(lender1).approve(fundingPool.address, bal)
+    await fundingPool.connect(lender1).deposit(bal, 0)
+
+    // lender 2 deposits
+    bal = await usdc.balanceOf(lender2.address)
+    await usdc.connect(lender2).approve(fundingPool.address, bal)
+    await fundingPool.connect(lender2).deposit(bal, 0)
+
+    // lender 3 deposits
+    bal = await usdc.balanceOf(lender3.address)
+    await usdc.connect(lender3).approve(fundingPool.address, bal)
+    await fundingPool.connect(lender3).deposit(bal, 0)
+
+    // lenders that aren't on whitelist can't subscribe
+    bal = await fundingPool.balanceOf(lender1.address)
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, bal)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidLender'
+    )
+    bal = await fundingPool.balanceOf(lender1.address)
+    await expect(fundingPool.connect(lender2).subscribe(loanProposal.address, bal)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidLender'
+    )
+    bal = await fundingPool.balanceOf(lender1.address)
+    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, bal)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidLender'
+    )
+
+    // whitelist lender 1
+    await whitelistLender(factory, whitelistAuthority, lender1, MAX_UINT256)
+    // check subscription now works
+    await fundingPool.connect(lender1).subscribe(loanProposal.address, 1)
+    let subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
+    expect(subscriptionAmountOf).to.be.equal(1)
+    expect(totalSubscriptions).to.be.equal(1)
+
+    // whitelist lender 2
+    await whitelistLender(factory, whitelistAuthority, lender2, MAX_UINT256)
+    // check subscription now works
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, 1)
+    subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
+    totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
+    expect(subscriptionAmountOf).to.be.equal(1)
+    expect(totalSubscriptions).to.be.equal(2)
+
+    // whitelist lender 3
+    await whitelistLender(factory, whitelistAuthority, lender3, MAX_UINT256)
+    // check subscription now works
+    await fundingPool.connect(lender3).subscribe(loanProposal.address, 1)
+    subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
+    totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
+    expect(subscriptionAmountOf).to.be.equal(1)
+    expect(totalSubscriptions).to.be.equal(3)
+
+    // de-whitelist lenders
+    await factory.connect(whitelistAuthority).updateLenderWhitelist([lender1.address, lender2.address, lender3.address], 0)
+
+    // check lenders can't subscribe anymore
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 1)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidLender'
+    )
+    await expect(fundingPool.connect(lender2).subscribe(loanProposal.address, 1)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidLender'
+    )
+    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, 1)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidLender'
+    )
+  })
+
   it('Should revert on invalid loan acceptance', async function () {
     const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } = await setupTest()
 
@@ -765,6 +903,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -807,6 +946,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -874,6 +1014,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -953,6 +1094,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1035,6 +1177,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1092,6 +1235,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1214,6 +1358,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1277,6 +1422,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1335,6 +1481,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1452,6 +1599,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1525,6 +1673,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1609,6 +1758,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1781,6 +1931,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1865,6 +2016,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -1950,6 +2102,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -2042,6 +2195,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -2180,6 +2334,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
@@ -2312,6 +2467,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       arranger,
       fundingPool.address,
       daoToken.address,
+      ADDRESS_ZERO,
       REL_ARRANGER_FEE,
       UNSUBSCRIBE_GRACE_PERIOD,
       CONVERSION_GRACE_PERIOD,
