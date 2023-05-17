@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
@@ -17,6 +18,9 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
 
     constructor(address _addressRegistry) {
+        if (_addressRegistry == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         addressRegistry = _addressRegistry;
     }
 
@@ -121,7 +125,9 @@ contract QuoteHandler is IQuoteHandler {
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert Errors.InvalidSender();
         }
-        offChainQuoteNonce[lenderVault] += 1;
+        uint256 newNonce = offChainQuoteNonce[lenderVault] + 1;
+        offChainQuoteNonce[lenderVault] = newNonce;
+        emit OffChainQuoteNonceIncremented(lenderVault, newNonce);
     }
 
     function invalidateOffChainQuote(
@@ -173,10 +179,7 @@ contract QuoteHandler is IQuoteHandler {
             borrower,
             offChainQuote.generalQuoteInfo
         );
-        if (
-            offChainQuote.nonce < offChainQuoteNonce[lenderVault] ||
-            offChainQuote.generalQuoteInfo.validUntil < block.timestamp
-        ) {
+        if (offChainQuote.nonce < offChainQuoteNonce[lenderVault]) {
             revert Errors.InvalidQuote();
         }
         bytes32 offChainQuoteHash = hashOffChainQuote(
@@ -226,6 +229,10 @@ contract QuoteHandler is IQuoteHandler {
         );
     }
 
+    /**
+     * @dev The passed signatures must be sorted such that
+     * recovered addresses (cast to uint160) are increasing.
+     */
     function areValidSignatures(
         address lenderVault,
         bytes32 offChainQuoteHash,
@@ -246,21 +253,18 @@ contract QuoteHandler is IQuoteHandler {
                 offChainQuoteHash
             )
         );
-        uint256 tmp;
         address recoveredSigner;
-        uint256 newHash;
+        uint160 prevSignerCastToUint160;
         for (uint256 i = 0; i < v.length; ) {
-            recoveredSigner = ecrecover(messageHash, v[i], r[i], s[i]);
-            // use hash instead of address to spread out over 256 bits and reduce false positives
-            newHash = uint256(keccak256(abi.encode(recoveredSigner)));
-            if (tmp == tmp | newHash) {
-                return false;
-            }
-
+            recoveredSigner = ECDSA.recover(messageHash, v[i], r[i], s[i]);
             if (!ILenderVaultImpl(lenderVault).isSigner(recoveredSigner)) {
                 return false;
             }
-            tmp |= newHash;
+            uint160 recoveredSignerCastToUint160 = uint160(recoveredSigner);
+            if (recoveredSignerCastToUint160 <= prevSignerCastToUint160) {
+                return false;
+            }
+            prevSignerCastToUint160 = recoveredSignerCastToUint160;
             unchecked {
                 i++;
             }
@@ -306,12 +310,18 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             revert Errors.NonWhitelistedToken();
         }
+        if (generalQuoteInfo.validUntil < block.timestamp) {
+            revert Errors.OutdatedQuote();
+        }
         if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
             revert Errors.InvalidQuote();
         }
         if (
-            generalQuoteInfo.borrower != address(0) &&
-            generalQuoteInfo.borrower != borrower
+            generalQuoteInfo.whitelistAuthority != address(0) &&
+            !IAddressRegistry(_addressRegistry).isWhitelistedBorrower(
+                generalQuoteInfo.whitelistAuthority,
+                borrower
+            )
         ) {
             revert Errors.InvalidBorrower();
         }
@@ -360,8 +370,9 @@ contract QuoteHandler is IQuoteHandler {
                 return false;
             }
             if (
-                onChainQuote.quoteTuples[k].tenor <=
-                onChainQuote.generalQuoteInfo.earliestRepayTenor
+                onChainQuote.quoteTuples[k].tenor <
+                onChainQuote.generalQuoteInfo.earliestRepayTenor +
+                    Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
             ) {
                 return false;
             }

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { BigNumber as BN } from 'bignumber.js'
 import { ethers } from 'hardhat'
-import { LenderVaultImpl, QuoteHandler } from '../typechain-types'
+import { LenderVaultImpl, QuoteHandler, AddressRegistry } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { chainlinkAggregatorAbi, collTokenAbi, uniV2Abi } from './abi'
 
@@ -19,7 +19,8 @@ export const createOnChainRequest = async ({
   borrowerCompartmentImplementation,
   lenderVault,
   quoteHandler,
-  loanPerCollUnit
+  loanPerCollUnit,
+  validUntil
 }: {
   lender: SignerWithAddress
   collToken: string
@@ -28,9 +29,13 @@ export const createOnChainRequest = async ({
   lenderVault: LenderVaultImpl
   quoteHandler: QuoteHandler
   loanPerCollUnit: BigNumber
+  validUntil?: BigNumber
 }) => {
   const blocknum = await ethers.provider.getBlockNumber()
-  const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+  const _validUntil =
+    typeof validUntil == 'undefined'
+      ? ethers.BigNumber.from((await ethers.provider.getBlock(blocknum)).timestamp + 60)
+      : validUntil
   let quoteTuples = [
     {
       loanPerCollUnitOrLtv: loanPerCollUnit,
@@ -41,13 +46,13 @@ export const createOnChainRequest = async ({
   ]
   let onChainQuote = {
     generalQuoteInfo: {
-      borrower: ZERO_ADDR,
+      whitelistAuthority: ZERO_ADDR,
       collToken: collToken,
       loanToken: loanToken,
       oracleAddr: ZERO_ADDR,
       minLoan: 0,
       maxLoan: MAX_UINT256,
-      validUntil: timestamp + 60,
+      validUntil: _validUntil,
       earliestRepayTenor: 0,
       borrowerCompartmentImplementation: borrowerCompartmentImplementation,
       isSingleUse: false
@@ -59,7 +64,6 @@ export const createOnChainRequest = async ({
     quoteHandler,
     'OnChainQuoteAdded'
   )
-
   return onChainQuote
 }
 
@@ -255,4 +259,41 @@ type FairReservesPriceAndEthValue = {
   fairReserve1: BigNumber
   totalFairReserveEthValue: BigNumber
   fairPriceOfLpToken: BigNumber
+}
+
+export const setupBorrowerWhitelist = async ({
+  addressRegistry,
+  borrower,
+  whitelistAuthority,
+  chainIdFromTest = 0,
+  whitelistedUntil = 0
+}: {
+  addressRegistry: AddressRegistry
+  borrower: SignerWithAddress
+  whitelistAuthority: SignerWithAddress
+  chainIdFromTest?: number
+  whitelistedUntil?: any
+}) => {
+  // get chain id
+
+  const chainId = chainIdFromTest == 0 ? (await ethers.getDefaultProvider().getNetwork()).chainId : chainIdFromTest
+
+  // get salt
+  const salt = ZERO_BYTES32
+
+  // construct payload and sign
+  const payload = ethers.utils.defaultAbiCoder.encode(
+    ['address', 'uint256', 'uint256', 'bytes32'],
+    [borrower.address, whitelistedUntil, chainId, salt]
+  )
+  const payloadHash = ethers.utils.keccak256(payload)
+  const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+  const sig = ethers.utils.splitSignature(signature)
+  const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+  expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+  // have borrower claim whitelist status
+  await addressRegistry
+    .connect(borrower)
+    .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
 }

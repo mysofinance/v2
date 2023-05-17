@@ -14,10 +14,10 @@ library DataTypesPeerToPool {
     }
 
     struct LoanTerms {
-        // Min loan amount (in loan token) that the borrower intends to borrow
-        uint128 minLoanAmount;
-        // Max loan amount (in loan token) that the borrower intends to borrow
-        uint128 maxLoanAmount;
+        // Min subscription amount (in loan token) that the borrower deems acceptable
+        uint128 minTotalSubscriptions;
+        // Max subscription amount (in loan token) that the borrower deems acceptable
+        uint128 maxTotalSubscriptions;
         // The number of collateral tokens the borrower pledges per loan token borrowed as collateral for default
         // case
         uint128 collPerLoanToken;
@@ -35,6 +35,8 @@ library DataTypesPeerToPool {
         address collToken;
         // Address of arranger who can manage the loan proposal contract
         address arranger;
+        // Address of whitelist authority who can manage the lender whitelist (optional)
+        address whitelistAuthority;
         // Unsubscribe grace period (in seconds), i.e., after acceptance by borrower lenders can unsubscribe and
         // remove liquidity for this duration before being locked-in
         uint256 unsubscribeGracePeriod;

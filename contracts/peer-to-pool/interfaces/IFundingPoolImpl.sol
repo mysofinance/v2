@@ -1,10 +1,33 @@
 // SPDX-License-Identifier: agpl-3.0
 pragma solidity 0.8.19;
 
-interface IFundingPool {
-    event LoanProposalExecuted(address indexed loanProposalAddr);
-    event Subscribed(address indexed loanProposalAddr, uint256 amount);
-    event Unsubscribed(address indexed loanProposalAddr, uint256 amount);
+interface IFundingPoolImpl {
+    event Deposited(address user, uint256 amount);
+    event Withdrawn(address user, uint256 amount);
+    event Subscribed(
+        address indexed user,
+        address indexed loanProposalAddr,
+        uint256 amount
+    );
+    event Unsubscribed(
+        address indexed user,
+        address indexed loanProposalAddr,
+        uint256 amount
+    );
+    event LoanProposalExecuted(
+        address indexed loanProposal,
+        address indexed borrower,
+        uint256 finalLoanAmount,
+        uint256 arrangerFee,
+        uint256 protocolFee
+    );
+
+    /**
+     * @notice Initializes funding pool
+     * @param _factory Address of the factory contract spawning the given funding pool
+     * @param _depositToken Address of the deposit token for the given funding pool
+     */
+    function initialize(address _factory, address _depositToken) external;
 
     /**
      * @notice function allows users to deposit into funding pool
@@ -42,9 +65,9 @@ interface IFundingPool {
     function executeLoanProposal(address loanProposal) external;
 
     /**
-     * @notice function returns factory address for loan proposals
+     * @notice function returns factory address
      */
-    function loanProposalFactory() external view returns (address);
+    function factory() external view returns (address);
 
     /**
      * @notice function returns address of deposit token for pool
@@ -61,17 +84,12 @@ interface IFundingPool {
     /**
      * @notice function tracks total subscription amount for a given proposal address
      */
-    function totalSubscribed(address) external view returns (uint256);
-
-    /**
-     * @notice function tracks if subscription is deployed for a given proposal address
-     */
-    function totalSubscribedIsDeployed(address) external view returns (bool);
+    function totalSubscriptions(address) external view returns (uint256);
 
     /**
      * @notice function tracks subscription amounts for a given proposal address and subsciber address
      */
-    function subscribedBalanceOf(
+    function subscriptionAmountOf(
         address,
         address
     ) external view returns (uint256);
