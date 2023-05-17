@@ -114,23 +114,43 @@ contract CurveLPStakingCompartment is BaseCompartment {
 
         IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
 
-        uint256 index = 0;
-        while (index < 8) {
-            try IStakingHelper(_liqGaugeAddr).reward_tokens(index) returns (
-                address rewardTokenAddr
-            ) {
-                _rewardTokenAddr[index] = rewardTokenAddr;
-            } catch {
-                break;
+        uint256 index;
+
+        try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
+            address rewardTokenAddrZeroIndex
+        ) {
+            // versions 2, 3, 4, or 5
+            _rewardTokenAddr[0] = rewardTokenAddrZeroIndex;
+            index = 1;
+            address rewardTokenAddr;
+            while (index < 8) {
+                rewardTokenAddr = IStakingHelper(_liqGaugeAddr).reward_tokens(
+                    index
+                );
+                if (rewardTokenAddr != address(0)) {
+                    _rewardTokenAddr[index] = rewardTokenAddr;
+                } else {
+                    break;
+                }
+                unchecked {
+                    index++;
+                }
             }
-            unchecked {
-                index++;
-            }
+        } catch {
+            // version 1 gauge
+            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         }
         if (index > 0) {
-            IStakingHelper(_liqGaugeAddr).claim_rewards();
+            try IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount, true) {
+                // version 3, 4, or 5 gauge
+            } catch {
+                // version 2 gauge
+                if (_rewardTokenAddr[0] != address(0)) {
+                    IStakingHelper(_liqGaugeAddr).claim_rewards();
+                }
+                IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+            }
         }
-        IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
     }
 
     function _collAccountingHelper(
