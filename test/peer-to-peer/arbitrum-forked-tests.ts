@@ -375,7 +375,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       addressRegistry,
       borrower,
       whitelistAuthority,
-      chainId: CHAIN_ID,
+      chainIdFromTest: CHAIN_ID,
       whitelistedUntil
     })
 
