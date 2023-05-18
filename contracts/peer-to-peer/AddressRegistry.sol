@@ -21,6 +21,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
+    address public mysoTokenManager;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => uint256))
         internal borrowerWhitelistedUntil;
@@ -114,6 +115,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             tokens,
             isWhitelisted
         );
+    }
+
+    function setMysoTokenManager(address newTokenManager) external {
+        senderCheckOwner();
+        address oldTokenManager = mysoTokenManager;
+        if (oldTokenManager == newTokenManager) {
+            revert Errors.InvalidAddress();
+        }
+        mysoTokenManager = newTokenManager;
+        emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
     function addLenderVault(address addr) external {

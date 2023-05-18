@@ -11,6 +11,7 @@ import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
+import {IMysoTokenManager} from "./interfaces/IMysoTokenManager.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
@@ -235,10 +236,24 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
+        uint256 currProtocolFee = protocolFee;
+        address mysoTokenManager = IAddressRegistry(addressRegistry)
+            .mysoTokenManager();
+        uint256 applicableProtocolFee = mysoTokenManager == address(0)
+            ? currProtocolFee
+            : IMysoTokenManager(mysoTokenManager).processP2PLoan(
+                currProtocolFee,
+                borrowInstructions,
+                loan,
+                lenderVault
+            );
+        if (applicableProtocolFee > currProtocolFee) {
+            revert Errors.InvalidFee();
+        }
+
         // protocol fees on whole sendAmount
         // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
-        uint256 protocolFeeAmount = (borrowInstructions.collSendAmount *
-            protocolFee *
+        uint256 protocolFeeAmount = (applicableProtocolFee *
             (loan.expiry - block.timestamp)) /
             (Constants.BASE * Constants.YEAR_IN_SECONDS);
 
