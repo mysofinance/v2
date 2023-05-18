@@ -131,11 +131,9 @@ export const whitelistLender = async (
   factory: Factory,
   whitelistAuthority: SignerWithAddress,
   lender: SignerWithAddress,
+  chainId: number,
   whitelistedUntil?: any
 ) => {
-  // get chain id
-  const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
-
   // get salt
   const salt = ZERO_BYTES32
 
