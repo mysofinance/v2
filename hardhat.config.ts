@@ -20,33 +20,36 @@ const getForkingConfig = () => {
   _|      _|      _|            _|  _|    _|  
   _|      _|      _|      _|_|_|      _|_|    
   `)
-  if (HARDHAT_CONFIG_NAME === undefined) {
-    console.log('NOTE: `HARDHAT_CONFIG_NAME` is undefined!')
-    console.log('Using default/empty `hardhat` parameter in hardhat.config.ts!')
-    console.log(
-      'If you want to run hardhat with forking, please set `HARDHAT_CONFIG_NAME` environment variable and check hardhat.config.ts!\n'
-    )
-    console.log('Running npx hardhat test with the following config:')
-    console.log('hardhat: {}')
-    return { chainId: 31337 }
-  } else if (HARDHAT_CONFIG_NAME === 'mainnet') {
-    const INFURA_API_KEY = process.env.INFURA_API_KEY
-    if (INFURA_API_KEY === undefined) {
-      throw new Error('Invalid hardhat.config.ts! Need to set `INFURA_API_KEY`!')
-    }
-    chainId = 1
-    url = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`
-    blockNumber = 16640270 // 2023-02-16
-  } else if (HARDHAT_CONFIG_NAME === 'arbitrum') {
-    const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
-    if (ALCHEMY_API_KEY === undefined) {
-      throw new Error('Invalid hardhat.config.ts! Need to set `ALCHEMY_API_KEY`!')
-    }
-    chainId = 42161
-    url = `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-    blockNumber = 63771760 // 2023-02-23
-  } else {
-    throw new Error(`Invalid hardhat.config.ts! Unknown HARDHAT_CONFIG_NAME '${HARDHAT_CONFIG_NAME}'!`)
+  switch (HARDHAT_CONFIG_NAME) {
+    case undefined:
+      console.log('NOTE: `HARDHAT_CONFIG_NAME` is undefined!')
+      console.log('Using default/empty `hardhat` parameter in hardhat.config.ts!')
+      console.log(
+        'If you want to run hardhat with forking, please set `HARDHAT_CONFIG_NAME` environment variable and check hardhat.config.ts!\n'
+      )
+      console.log('Running npx hardhat test with the following config:')
+      console.log('hardhat: {}')
+      return { chainId: 31337 }
+    case 'mainnet':
+      const INFURA_API_KEY = process.env.INFURA_API_KEY
+      if (INFURA_API_KEY === undefined) {
+        throw new Error('Invalid hardhat.config.ts! Need to set `INFURA_API_KEY`!')
+      }
+      chainId = 1
+      url = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`
+      blockNumber = 16640270 // 2023-02-16
+      break
+    case 'arbitrum':
+      const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
+      if (ALCHEMY_API_KEY === undefined) {
+        throw new Error('Invalid hardhat.config.ts! Need to set `ALCHEMY_API_KEY`!')
+      }
+      chainId = 42161
+      url = `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+      blockNumber = 63771760 // 2023-02-23
+      break
+    default:
+      throw new Error(`Invalid hardhat.config.ts! Unknown HARDHAT_CONFIG_NAME '${HARDHAT_CONFIG_NAME}'!`)
   }
   console.log('Running npx hardhat test with the following config...')
   console.log('hardhat:')
