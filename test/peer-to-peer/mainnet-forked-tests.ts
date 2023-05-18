@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
-import { INFURA_API_KEY, MAINNET_BLOCK_NUMBER } from '../../hardhat.config'
+import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
 import {
   balancerV2VaultAbi,
   balancerV2PoolAbi,
@@ -14,6 +14,8 @@ import {
   uniV2RouterAbi,
   payloadScheme
 } from './helpers/abi'
+import { fromReadableAmount, toReadableAmount, getOptimCollSendAndFlashBorrowAmount } from './helpers/uniV3'
+import { SupportedChainId, Token } from '@uniswap/sdk-core'
 import {
   createOnChainRequest,
   transferFeeHelper,
@@ -25,7 +27,6 @@ import {
 } from './helpers/misc'
 
 // test config constants & vars
-const BLOCK_NUMBER = MAINNET_BLOCK_NUMBER
 let snapshotId: String // use snapshot id to reset state before each test
 
 // constants
@@ -56,6 +57,22 @@ function getLoopingSendAmount(
 }
 
 describe('Peer-to-Peer: Forked Mainnet Tests', function () {
+  before(async () => {
+    console.log('Note: Running mainnet tests with the following forking config:')
+    console.log(HARDHAT_CHAIN_ID_AND_FORKING_CONFIG)
+    if (HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId !== 1) {
+      throw new Error('Invalid hardhat forking config! Expected `HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId` to be 1!')
+    }
+  })
+
+  beforeEach(async () => {
+    snapshotId = await hre.network.provider.send('evm_snapshot')
+  })
+
+  afterEach(async () => {
+    await hre.network.provider.send('evm_revert', [snapshotId])
+  })
+
   async function setupTest() {
     const [lender, borrower, team, whitelistAuthority] = await ethers.getSigners()
     /* ************************************ */
@@ -202,27 +219,92 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     }
   }
 
-  before(async function () {
+  async function setupUniV3Test() {
+    const [lender, borrower, team] = await ethers.getSigners()
+    /* ************************************ */
+    /* DEPLOYMENT OF SYSTEM CONTRACTS START */
+    /* ************************************ */
+    // deploy address registry
+    const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
+    const addressRegistry = await AddressRegistry.connect(team).deploy()
+    await addressRegistry.deployed()
+
+    // deploy borrower gate way
+    const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
+    const borrowerGateway = await BorrowerGateway.connect(team).deploy(addressRegistry.address)
+    await borrowerGateway.deployed()
+
+    // deploy quote handler
+    const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
+    const quoteHandler = await QuoteHandler.connect(team).deploy(addressRegistry.address)
+    await quoteHandler.deployed()
+
+    // deploy lender vault implementation
+    const LenderVaultImplementation = await ethers.getContractFactory('LenderVaultImpl')
+    const lenderVaultImplementation = await LenderVaultImplementation.connect(team).deploy()
+    await lenderVaultImplementation.deployed()
+
+    // deploy LenderVaultFactory
+    const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
+    const lenderVaultFactory = await LenderVaultFactory.connect(team).deploy(
+      addressRegistry.address,
+      lenderVaultImplementation.address
+    )
+    await lenderVaultFactory.deployed()
+
+    // initialize address registry
+    await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
+
+    /* ********************************** */
+    /* DEPLOYMENT OF SYSTEM CONTRACTS END */
+    /* ********************************** */
+
+    // create a vault
+    await lenderVaultFactory.connect(lender).createVault()
+    const lenderVaultAddrs = await addressRegistry.registeredVaults()
+    const lenderVaultAddr = lenderVaultAddrs[0]
+    const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
+
+    // prepare USDC balances
+    const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+    const USDC_MASTER_MINTER = '0xe982615d461dd5cd06575bbea87624fda4e3de17'
+    const usdc = await ethers.getContractAt('IUSDC', USDC_ADDRESS)
+    await ethers.provider.send('hardhat_setBalance', [USDC_MASTER_MINTER, '0x56BC75E2D63100000'])
     await hre.network.provider.request({
-      method: 'hardhat_reset',
-      params: [
-        {
-          forking: {
-            jsonRpcUrl: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-            blockNumber: BLOCK_NUMBER
-          }
-        }
-      ]
+      method: 'hardhat_impersonateAccount',
+      params: [USDC_MASTER_MINTER]
     })
-  })
+    const masterMinter = await ethers.getSigner(USDC_MASTER_MINTER)
+    await usdc.connect(masterMinter).configureMinter(masterMinter.address, MAX_UINT128)
+    await usdc.connect(masterMinter).mint(lender.address, MAX_UINT128)
 
-  beforeEach(async () => {
-    snapshotId = await hre.network.provider.send('evm_snapshot')
-  })
+    // prepare WETH balance
+    const WETH_ADDRESS = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+    const weth = await ethers.getContractAt('IWETH', WETH_ADDRESS)
+    await ethers.provider.send('hardhat_setBalance', [borrower.address, '0x204FCE5E3E25026110000000'])
+    await weth.connect(borrower).deposit({ value: ONE_WETH.mul(10) })
 
-  afterEach(async () => {
-    await hre.network.provider.send('evm_revert', [snapshotId])
-  })
+    // deploy uni v3 callback
+    const UniV3Looping = await ethers.getContractFactory('UniV3Looping')
+    await UniV3Looping.connect(lender)
+    const uniV3Looping = await UniV3Looping.deploy()
+    await uniV3Looping.deployed()
+
+    // whitelist addrs
+    await addressRegistry.connect(team).setWhitelistState([USDC_ADDRESS, WETH_ADDRESS], 1)
+    await addressRegistry.connect(team).setWhitelistState([uniV3Looping.address], 4)
+
+    return {
+      borrowerGateway,
+      quoteHandler,
+      lender,
+      borrower,
+      usdc,
+      weth,
+      lenderVault,
+      uniV3Looping
+    }
+  }
 
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
@@ -830,10 +912,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -928,10 +1011,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -1104,10 +1188,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // top up weth balance
@@ -1253,10 +1338,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // top up weth balance
@@ -1395,10 +1481,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -1573,8 +1660,151 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteDeleted'
       )
     })
+  })
 
-    it('Should process atomic balancer swap correctly', async function () {
+  describe('Callback Testing', function () {
+    it('Should handle looping via Uni V3 correctly', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault, uniV3Looping } =
+        await setupUniV3Test()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          whitelistAuthority: ZERO_ADDR,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // prepare looping
+      const dexSwapTokenIn = new Token(SupportedChainId.MAINNET, usdc.address, 6, 'USDC', 'USD//C')
+      const dexSwapTokenOut = new Token(SupportedChainId.MAINNET, weth.address, 18, 'WETH', 'Wrapped Ether')
+      const initCollUnits = 10
+      const transferFee = 0
+      const poolFee = 3000 // assume "medium" uni v3 swap fee
+      const { finalTotalPledgeAmount, minSwapReceive, finalFlashBorrowAmount } = await getOptimCollSendAndFlashBorrowAmount(
+        initCollUnits,
+        transferFee,
+        toReadableAmount(quoteTuples[0].loanPerCollUnitOrLtv.toString(), dexSwapTokenIn.decimals),
+        dexSwapTokenIn,
+        dexSwapTokenOut,
+        poolFee
+      )
+
+      // check balance pre borrow
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
+
+      // borrower approves and executes quote
+      const collSendAmountBn = fromReadableAmount(initCollUnits + minSwapReceive, dexSwapTokenOut.decimals)
+      const slippage = 0.01
+      const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
+      const quoteTupleIdx = 0
+      const expectedTransferFee = 0
+      const deadline = MAX_UINT128
+      const callbackAddr = uniV3Looping.address
+
+      const callbackData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'uint256', 'uint24'],
+        [minSwapReceiveBn, deadline, poolFee]
+      )
+      const borrowInstructions = {
+        collSendAmount: collSendAmountBn,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // check balance post borrow
+      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      const borrowerWethBalDiffActual = borrowerWethBalPre.add(borrowerWethBalPost)
+      const borrowerWethBalDiffExpected = borrowerWethBalPre.sub(collSendAmountBn)
+      const PRECISION = 10000
+      const borrowerWethBalDiffComparison = Math.abs(
+        Number(
+          borrowerWethBalDiffActual
+            .sub(borrowerWethBalDiffExpected)
+            .mul(PRECISION)
+            .div(borrowerWethBalDiffActual)
+            .div(ONE_WETH)
+            .toString()
+        ) / PRECISION
+      )
+      expect(borrowerWethBalDiffComparison).to.be.lessThan(0.01)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(0) // borrower: no usdc change as all swapped for weth
+      expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(collSendAmountBn)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(
+        onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmountBn).div(ONE_WETH)
+      )
+
+      // check repay
+      const loan = await lenderVault.loan(0)
+      const minSwapReceiveLoanToken = 0
+      const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'uint256', 'uint24'],
+        [minSwapReceiveLoanToken, deadline, poolFee]
+      )
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: 0,
+            targetRepayAmount: loan.initRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackDataRepay
+        )
+      )
+    })
+
+    it('Should handle looping via Balancer correctly', async function () {
       const {
         addressRegistry,
         borrowerGateway,
@@ -1689,10 +1919,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // borrower approves and executes quote
@@ -3881,10 +4112,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // borrower approves and executes quote

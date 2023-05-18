@@ -9,6 +9,7 @@ import {
   whitelistLender
 } from './helpers/misc'
 import { ADDRESS_ZERO } from '@uniswap/v3-sdk'
+import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -42,6 +43,16 @@ const REPAYMENT_GRACE_PERIOD = MIN_REPAYMENT_GRACE_PERIOD
 const REL_ARRANGER_FEE = BASE.mul(50).div(10000)
 
 describe('Peer-to-Pool: Local Tests', function () {
+  before(async () => {
+    console.log('Note: Running local tests with the following hardhat chain id config:')
+    console.log(HARDHAT_CHAIN_ID_AND_FORKING_CONFIG)
+    if (HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId !== 31337) {
+      throw new Error(
+        `Invalid hardhat forking config! Expected 'HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId' to be 31337 but it is '${HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId}'!`
+      )
+    }
+  })
+
   beforeEach(async () => {
     snapshotId = await hre.network.provider.send('evm_snapshot')
   })
@@ -850,7 +861,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // whitelist lender 1
-    await whitelistLender(factory, whitelistAuthority, lender1, MAX_UINT256)
+    await whitelistLender(factory, whitelistAuthority, lender1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, MAX_UINT256)
     // check subscription now works
     await fundingPool.connect(lender1).subscribe(loanProposal.address, 1)
     let subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
@@ -859,7 +870,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(totalSubscriptions).to.be.equal(1)
 
     // whitelist lender 2
-    await whitelistLender(factory, whitelistAuthority, lender2, MAX_UINT256)
+    await whitelistLender(factory, whitelistAuthority, lender2, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, MAX_UINT256)
     // check subscription now works
     await fundingPool.connect(lender2).subscribe(loanProposal.address, 1)
     subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
@@ -868,7 +879,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(totalSubscriptions).to.be.equal(2)
 
     // whitelist lender 3
-    await whitelistLender(factory, whitelistAuthority, lender3, MAX_UINT256)
+    await whitelistLender(factory, whitelistAuthority, lender3, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, MAX_UINT256)
     // check subscription now works
     await fundingPool.connect(lender3).subscribe(loanProposal.address, 1)
     subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
