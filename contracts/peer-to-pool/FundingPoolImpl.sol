@@ -186,7 +186,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
-        ILoanProposalImpl(loanProposal).checkAndupdateStatus();
+        ILoanProposalImpl(loanProposal).checkAndUpdateStatus();
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
             finalLoanAmount

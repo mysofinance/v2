@@ -114,7 +114,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     }
 
     function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external {
-        senderCheckOwner();
+        _senderCheckOwner();
         uint256 oldArrangerFeeSplit = arrangerFeeSplit;
         if (
             _newArrangerFeeSplit > Constants.MAX_ARRANGER_SPLIT ||
