@@ -35,4 +35,23 @@ interface IMysoTokenManager {
         uint256 totalSubscriptions,
         DataTypesPeerToPool.LoanTerms calldata loanTerms
     ) external;
+
+    function processP2PoolLoanFinalization(
+        address loanProposal,
+        address fundingPool,
+        address collToken,
+        address arranger,
+        address borrower,
+        uint256 finalLoanAmount,
+        uint256 finalCollAmountReservedForDefault,
+        uint256 finalCollAmountReservedForConversions
+    ) external;
+
+    function processP2PoolCreateLoanProposal(
+        address fundingPool,
+        address proposalCreator,
+        address collToken,
+        uint256 arrangerFee,
+        uint256 numLoanProposals
+    ) external;
 }

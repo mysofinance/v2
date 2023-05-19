@@ -8,8 +8,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
 import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     using SafeERC20 for IERC20Metadata;
@@ -33,6 +35,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function initialize(
+        address _factory,
         address _arranger,
         address _fundingPool,
         address _collToken,
@@ -42,7 +45,11 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external initializer {
-        if (_fundingPool == address(0) || _collToken == address(0)) {
+        if (
+            _factory == address(0) ||
+            _fundingPool == address(0) ||
+            _collToken == address(0)
+        ) {
             revert Errors.InvalidAddress();
         }
         if (
@@ -60,6 +67,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidGracePeriod();
         }
+        staticData.factory = _factory;
         staticData.fundingPool = _fundingPool;
         staticData.collToken = _collToken;
         staticData.arranger = _arranger;
@@ -208,6 +216,21 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             .finalCollAmountReservedForDefault = _finalCollAmountReservedForDefault;
         dynamicData
             .finalCollAmountReservedForConversions = _finalCollAmountReservedForConversions;
+        address mysoTokenManager = IFactory(staticData.factory)
+            .mysoTokenManager();
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager).processP2PoolLoanFinalization(
+                address(this),
+                staticData.fundingPool,
+                staticData.collToken,
+                staticData.arranger,
+                _finalizedLoanTerms.borrower,
+                _finalLoanAmount,
+                _finalCollAmountReservedForDefault,
+                _finalCollAmountReservedForConversions
+            );
+        }
+
         // note: final collToken amount that borrower needs to transfer is sum of:
         // 1) amount reserved for lenders in case of default, and
         // 2) amount reserved for lenders in case all convert

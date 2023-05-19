@@ -47,8 +47,9 @@ contract Factory is Ownable, IFactory {
         if (!isFundingPool[_fundingPool]) {
             revert Errors.InvalidAddress();
         }
+        uint256 numLoanProposals = loanProposals.length;
         bytes32 salt = keccak256(
-            abi.encodePacked(loanProposalImpl, msg.sender, loanProposals.length)
+            abi.encodePacked(loanProposalImpl, msg.sender, numLoanProposals)
         );
         address newLoanProposal = Clones.cloneDeterministic(
             loanProposalImpl,
@@ -56,7 +57,19 @@ contract Factory is Ownable, IFactory {
         );
         loanProposals.push(newLoanProposal);
         isLoanProposal[newLoanProposal] = true;
+        address _mysoTokenManager = mysoTokenManager;
+        if (_mysoTokenManager != address(0)) {
+            IMysoTokenManager(_mysoTokenManager)
+                .processP2PoolCreateLoanProposal(
+                    _fundingPool,
+                    msg.sender,
+                    _collToken,
+                    _arrangerFee,
+                    numLoanProposals
+                );
+        }
         ILoanProposalImpl(newLoanProposal).initialize(
+            address(this),
             msg.sender,
             _fundingPool,
             _collToken,

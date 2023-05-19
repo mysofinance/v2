@@ -28,6 +28,8 @@ library DataTypesPeerToPool {
     }
 
     struct StaticLoanProposalData {
+        // Factory address from which the loan proposal is created
+        address factory;
         // Funding pool address that is associated with given loan proposal and from which loan liquidity can be
         // sourced
         address fundingPool;

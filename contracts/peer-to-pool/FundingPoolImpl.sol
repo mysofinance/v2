@@ -93,7 +93,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         if (!ILoanProposalImpl(loanProposal).canSubscribe()) {
             revert Errors.NotInSubscriptionPhase();
         }
-        (, , , address whitelistAuthority, , , ) = ILoanProposalImpl(
+        (, , , , address whitelistAuthority, , , ) = ILoanProposalImpl(
             loanProposal
         ).staticData();
         if (
@@ -188,7 +188,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             loanTerms.borrower,
             finalLoanAmount
         );
-        (, , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
+        (, , , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
         uint256 protocolFeeShare = (arrangerFee *
             IFactory(factory).arrangerFeeSplit()) / Constants.BASE;
