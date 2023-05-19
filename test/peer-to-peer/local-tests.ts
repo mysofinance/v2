@@ -5,6 +5,7 @@ import { LenderVaultImpl, MyERC20 } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist } from './helpers/misc'
+import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -63,7 +64,6 @@ async function generateOffChainQuote({
     ['uint256', 'uint256', 'uint256', 'uint256']
   )
   const quoteTuplesRoot = quoteTuplesTree.root
-  const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
   let offChainQuote = {
     generalQuoteInfo: {
       whitelistAuthority: whitelistAuthority.address,
@@ -93,7 +93,7 @@ async function generateOffChainQuote({
     offChainQuote.salt,
     offChainQuote.nonce,
     lenderVault.address,
-    chainId
+    HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId
   ])
 
   const payloadHash = ethers.utils.keccak256(payload)
@@ -114,6 +114,16 @@ async function generateOffChainQuote({
 }
 
 describe('Peer-to-Peer: Local Tests', function () {
+  before(async () => {
+    console.log('Note: Running local tests with the following hardhat chain id config:')
+    console.log(HARDHAT_CHAIN_ID_AND_FORKING_CONFIG)
+    if (HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId !== 31337) {
+      throw new Error(
+        `Invalid hardhat forking config! Expected 'HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId' to be 31337 but it is '${HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId}'!`
+      )
+    }
+  })
+
   beforeEach(async () => {
     snapshotId = await hre.network.provider.send('evm_snapshot')
   })
@@ -296,16 +306,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil1 = Number(timestamp.toString()) + 60 * 60 * 365
 
-      // get chain id
-      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
-
       // get salt
       const salt = ZERO_BYTES32
 
       // construct payload and sign
       let payload = ethers.utils.defaultAbiCoder.encode(
         ['address', 'uint256', 'uint256', 'bytes32'],
-        [borrower.address, whitelistedUntil1, chainId, salt]
+        [borrower.address, whitelistedUntil1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
       )
       let payloadHash = ethers.utils.keccak256(payload)
       const signature1 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
@@ -345,7 +352,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const whitelistedUntil2 = Number(timestamp.toString()) + 60 * 60 * 365
       payload = ethers.utils.defaultAbiCoder.encode(
         ['address', 'uint256', 'uint256', 'bytes32'],
-        [borrower.address, whitelistedUntil2, chainId, salt]
+        [borrower.address, whitelistedUntil2, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
       )
       payloadHash = ethers.utils.keccak256(payload)
       const signature2 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
@@ -632,10 +639,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // borrower approves gateway and executes quote
@@ -930,10 +938,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
       // generate off chain quote
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
@@ -1065,10 +1074,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // lender produces quote
@@ -1136,10 +1146,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
@@ -1204,10 +1215,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
@@ -1268,10 +1280,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
@@ -1335,10 +1348,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // generate offchain quote where earliest repay is after loan expiry/tenor
@@ -1402,10 +1416,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
@@ -1472,10 +1487,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
@@ -1539,10 +1555,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
@@ -1559,14 +1576,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await lenderVault.connect(lender).setMinNumOfSigners(3)
 
       // prepare signatures
-      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
       const payload = ethers.utils.defaultAbiCoder.encode(payloadScheme as any, [
         offChainQuote.generalQuoteInfo,
         offChainQuote.quoteTuplesRoot,
         offChainQuote.salt,
         offChainQuote.nonce,
         lenderVault.address,
-        chainId
+        HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId
       ])
       const payloadHash = ethers.utils.keccak256(payload)
 
@@ -1778,7 +1794,6 @@ describe('Peer-to-Peer: Local Tests', function () {
         ['uint256', 'int256', 'uint256', 'uint256']
       )
       const badQuoteTuplesRoot = badQuoteTuplesTree.root
-      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
 
       let offChainQuoteWithBadTuples = {
         generalQuoteInfo: {
@@ -1807,7 +1822,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         offChainQuoteWithBadTuples.salt,
         offChainQuoteWithBadTuples.nonce,
         lenderVault.address,
-        chainId
+        HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId
       ])
 
       const payloadHash = ethers.utils.keccak256(payload)
@@ -1831,10 +1846,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // borrower approves gateway and executes quote
@@ -1943,10 +1959,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // check balance pre borrow
@@ -2076,10 +2093,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       // get borrower whitelisted
       const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
       await setupBorrowerWhitelist({
-        addressRegistry,
-        borrower,
-        whitelistAuthority,
-        whitelistedUntil
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
       })
 
       // borrower approves gateway and executes quote

@@ -265,19 +265,15 @@ export const setupBorrowerWhitelist = async ({
   addressRegistry,
   borrower,
   whitelistAuthority,
-  chainIdFromTest = 0,
+  chainId,
   whitelistedUntil = 0
 }: {
   addressRegistry: AddressRegistry
   borrower: SignerWithAddress
   whitelistAuthority: SignerWithAddress
-  chainIdFromTest?: number
+  chainId: number
   whitelistedUntil?: any
 }) => {
-  // get chain id
-
-  const chainId = chainIdFromTest == 0 ? (await ethers.getDefaultProvider().getNetwork()).chainId : chainIdFromTest
-
   // get salt
   const salt = ZERO_BYTES32
 
