@@ -24,7 +24,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     // note: earliest unsubscribe time is to prevent griefing accept loans through atomic flashborrow,
     // deposit, subscribe, unsubscribe, and withdraw
     mapping(address => mapping(address => uint256))
-        internal earliestUnsubscribe;
+        internal _earliestUnsubscribe;
 
     constructor() {
         _disableInitializers();
@@ -133,7 +133,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         balanceOf[msg.sender] = _balanceOf - amount;
         totalSubscriptions[loanProposal] = _totalSubscriptions + amount;
         subscriptionAmountOf[loanProposal][msg.sender] += amount;
-        earliestUnsubscribe[loanProposal][msg.sender] =
+        _earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
             Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
 
@@ -156,7 +156,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         if (amount > _subscriptionAmountOf) {
             revert Errors.UnsubscriptionAmountTooLarge();
         }
-        if (block.timestamp < earliestUnsubscribe[loanProposal][msg.sender]) {
+        if (block.timestamp < _earliestUnsubscribe[loanProposal][msg.sender]) {
             revert Errors.BeforeEarliestUnsubscribe();
         }
         balanceOf[msg.sender] += amount;
@@ -164,7 +164,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         subscriptionAmountOf[loanProposal][msg.sender] =
             _subscriptionAmountOf -
             amount;
-        earliestUnsubscribe[loanProposal][msg.sender] = 0;
+        _earliestUnsubscribe[loanProposal][msg.sender] = 0;
 
         emit Unsubscribed(msg.sender, loanProposal, amount);
     }

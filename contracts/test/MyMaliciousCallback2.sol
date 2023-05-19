@@ -3,27 +3,27 @@
 pragma solidity 0.8.19;
 
 contract MyMaliciousCallback2 {
-    address internal vaultVictim;
-    address internal withdrawToken;
-    uint256 internal withdrawAmount;
+    address internal _vaultVictim;
+    address internal _withdrawToken;
+    uint256 internal _withdrawAmount;
 
     constructor(
-        address _vaultVictim,
-        address _withdrawToken,
-        uint256 _withdrawAmount
+        address vaultVictim,
+        address withdrawToken,
+        uint256 withdrawAmount
     ) {
-        vaultVictim = _vaultVictim;
-        withdrawToken = _withdrawToken;
-        withdrawAmount = _withdrawAmount;
+        _vaultVictim = vaultVictim;
+        _withdrawToken = withdrawToken;
+        _withdrawAmount = withdrawAmount;
     }
 
     function balanceOf(address) external returns (uint256) {
         // Try hijacking control flow by calling back into vault and trying to withdraw again
-        (bool success, bytes memory result) = vaultVictim.call(
+        (bool success, bytes memory result) = _vaultVictim.call(
             abi.encodeWithSignature(
                 "withdraw(address,uint256)",
-                withdrawToken,
-                withdrawAmount
+                _withdrawToken,
+                _withdrawAmount
             )
         );
         /* The delegate call is expected to fail because of mutex in _withdrawCheck()

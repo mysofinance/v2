@@ -272,15 +272,14 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         uint256 totalSubscriptions = IFundingPoolImpl(staticData.fundingPool)
             .totalSubscriptions(address(this));
-        uint256 _lenderInOrOutCutoffTime = _lenderInOrOutCutoffTime();
+        uint256 lenderInOrOutCutoffTime = _lenderInOrOutCutoffTime();
         if (
             (msg.sender == _loanTerms.borrower &&
-                block.timestamp < _lenderInOrOutCutoffTime) ||
-            (block.timestamp >= _lenderInOrOutCutoffTime &&
+                block.timestamp < lenderInOrOutCutoffTime) ||
+            (block.timestamp >= lenderInOrOutCutoffTime &&
                 totalSubscriptions < _loanTerms.minTotalSubscriptions) ||
             (block.timestamp >=
-                _lenderInOrOutCutoffTime +
-                    Constants.LOAN_EXECUTION_GRACE_PERIOD)
+                lenderInOrOutCutoffTime + Constants.LOAN_EXECUTION_GRACE_PERIOD)
         ) {
             dynamicData.status = DataTypesPeerToPool.LoanStatus.ROLLBACK;
         } else {
