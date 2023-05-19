@@ -4,12 +4,13 @@ pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {IFactory} from "./interfaces/IFactory.sol";
-import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
-import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
+import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 contract Factory is Ownable, IFactory {
     using ECDSA for bytes32;
@@ -17,6 +18,7 @@ contract Factory is Ownable, IFactory {
     uint256 public arrangerFeeSplit;
     address public immutable loanProposalImpl;
     address public immutable fundingPoolImpl;
+    address public mysoTokenManager;
     address[] public loanProposals;
     address[] public fundingPools;
     mapping(address => bool) public isLoanProposal;
@@ -164,6 +166,16 @@ contract Factory is Ownable, IFactory {
             }
         }
         emit LenderWhitelistUpdated(msg.sender, lenders, whitelistedUntil);
+    }
+
+    function setMysoTokenManager(address newTokenManager) external {
+        senderCheckOwner();
+        address oldTokenManager = mysoTokenManager;
+        if (oldTokenManager == newTokenManager) {
+            revert Errors.InvalidAddress();
+        }
+        mysoTokenManager = newTokenManager;
+        emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
     function isWhitelistedBorrower(

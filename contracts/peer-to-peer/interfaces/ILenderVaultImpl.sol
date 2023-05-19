@@ -90,7 +90,7 @@ interface ILenderVaultImpl {
     )
         external
         returns (
-            DataTypesPeerToPeer.Loan memory loan,
+            DataTypesPeerToPeer.Loan calldata loan,
             uint256 loanId,
             uint256 upfrontFee,
             address collReceiver

@@ -42,9 +42,9 @@ interface IAddressRegistry {
     ) external;
 
     /**
-     * @notice Sets a new newTokenManager
+     * @notice Sets a new MYSO token manager contract
      * @dev Can only be called by registry owner
-     * @param newTokenManager Address of the new MYSO token manager
+     * @param newTokenManager Address of the new MYSO token manager contract
      */
     function setMysoTokenManager(address newTokenManager) external;
 

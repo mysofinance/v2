@@ -5,12 +5,13 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
-import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
-import {IFactory} from "./interfaces/IFactory.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
+import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     using SafeERC20 for IERC20Metadata;
@@ -46,6 +47,15 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     ) external nonReentrant {
         if (amount == 0) {
             revert Errors.InvalidSendAmount();
+        }
+        address mysoTokenManager = IFactory(factory).mysoTokenManager();
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager).processP2PoolDeposit(
+                address(this),
+                msg.sender,
+                amount,
+                transferFee
+            );
         }
         uint256 preBal = IERC20Metadata(depositToken).balanceOf(address(this));
         IERC20Metadata(depositToken).safeTransferFrom(
@@ -105,6 +115,17 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         uint256 _totalSubscriptions = totalSubscriptions[loanProposal];
         if (amount + _totalSubscriptions > loanTerms.maxTotalSubscriptions) {
             revert Errors.SubscriptionAmountTooHigh();
+        }
+        address mysoTokenManager = IFactory(factory).mysoTokenManager();
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager).processP2PoolSubscribe(
+                address(this),
+                msg.sender,
+                loanProposal,
+                amount,
+                _totalSubscriptions,
+                loanTerms
+            );
         }
         balanceOf[msg.sender] = _balanceOf - amount;
         totalSubscriptions[loanProposal] = _totalSubscriptions + amount;

@@ -4,9 +4,10 @@ pragma solidity 0.8.19;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Errors} from "../Errors.sol";
-import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
-import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
+import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 contract LenderVaultFactory is ILenderVaultFactory {
     address public immutable addressRegistry;
@@ -28,6 +29,15 @@ contract LenderVaultFactory is ILenderVaultFactory {
             abi.encodePacked(lenderVaultImpl, msg.sender, numRegisteredVaults)
         );
         newLenderVaultAddr = Clones.cloneDeterministic(lenderVaultImpl, salt);
+        address mysoTokenManager = IAddressRegistry(addressRegistry)
+            .mysoTokenManager();
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager).processP2PCreateVault(
+                numRegisteredVaults,
+                msg.sender,
+                newLenderVaultAddr
+            );
+        }
         ILenderVaultImpl(newLenderVaultAddr).initialize(
             msg.sender,
             addressRegistry

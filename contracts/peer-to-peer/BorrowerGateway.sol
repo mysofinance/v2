@@ -11,9 +11,9 @@ import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
-import {IMysoTokenManager} from "./interfaces/IMysoTokenManager.sol";
-import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
+import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 
 contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     using SafeERC20 for IERC20Metadata;
@@ -237,23 +237,27 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         }
 
         uint256 currProtocolFee = protocolFee;
+        uint256 applicableProtocolFee = currProtocolFee;
+
         address mysoTokenManager = IAddressRegistry(addressRegistry)
             .mysoTokenManager();
-        uint256 applicableProtocolFee = mysoTokenManager == address(0)
-            ? currProtocolFee
-            : IMysoTokenManager(mysoTokenManager).processP2PLoan(
-                currProtocolFee,
-                borrowInstructions,
-                loan,
-                lenderVault
-            );
-        if (applicableProtocolFee > currProtocolFee) {
-            revert Errors.InvalidFee();
+        if (mysoTokenManager != address(0)) {
+            applicableProtocolFee = IMysoTokenManager(mysoTokenManager)
+                .processP2PBorrow(
+                    currProtocolFee,
+                    borrowInstructions,
+                    loan,
+                    lenderVault
+                );
+            if (applicableProtocolFee > currProtocolFee) {
+                revert Errors.InvalidFee();
+            }
         }
 
         // protocol fees on whole sendAmount
         // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
-        uint256 protocolFeeAmount = (applicableProtocolFee *
+        uint256 protocolFeeAmount = (borrowInstructions.collSendAmount *
+            applicableProtocolFee *
             (loan.expiry - block.timestamp)) /
             (Constants.BASE * Constants.YEAR_IN_SECONDS);
 
