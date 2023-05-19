@@ -36,7 +36,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] calldata proof
     ) external nonReentrant {
-        checkDeadlineAndRegisteredVault(
+        _checkDeadlineAndRegisteredVault(
             borrowInstructions.deadline,
             lenderVault
         );
@@ -64,7 +64,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 quoteTuple
             );
 
-        processTransfers(
+        _processTransfers(
             lenderVault,
             collReceiver,
             borrowInstructions,
@@ -99,7 +99,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // 2. BorrowGateway then pulls collToken from borrower to lender vault
         // 3. Finally, BorrowGateway updates lender vault storage state
 
-        checkDeadlineAndRegisteredVault(
+        _checkDeadlineAndRegisteredVault(
             borrowInstructions.deadline,
             lenderVault
         );
@@ -127,7 +127,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 quoteTuple
             );
 
-        processTransfers(
+        _processTransfers(
             lenderVault,
             collReceiver,
             borrowInstructions,
@@ -167,7 +167,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loanRepayInstructions
         );
 
-        uint256 reclaimCollAmount = processRepayTransfers(
+        uint256 reclaimCollAmount = _processRepayTransfers(
             vaultAddr,
             loanRepayInstructions,
             loan,
@@ -204,7 +204,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         emit ProtocolFeeSet(_newFee);
     }
 
-    function processTransfers(
+    function _processTransfers(
         address lenderVault,
         address collReceiver,
         DataTypesPeerToPeer.BorrowTransferInstructions
@@ -292,7 +292,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         }
     }
 
-    function processRepayTransfers(
+    function _processRepayTransfers(
         address lenderVault,
         DataTypesPeerToPeer.LoanRepayInstructions memory loanRepayInstructions,
         DataTypesPeerToPeer.Loan memory loan,
@@ -348,7 +348,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         }
     }
 
-    function checkDeadlineAndRegisteredVault(
+    function _checkDeadlineAndRegisteredVault(
         uint256 deadline,
         address lenderVault
     ) internal view {

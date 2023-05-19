@@ -36,7 +36,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address _borrowerGateway,
         address _quoteHandler
     ) external {
-        senderCheckOwner();
+        _senderCheckOwner();
         if (isInitialized) {
             revert Errors.AlreadyInitialized();
         }
@@ -216,7 +216,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     }
 
     function checkSenderAndIsInitialized() internal view {
-        senderCheckOwner();
+        _senderCheckOwner();
         if (!isInitialized) {
             revert Errors.Uninitialized();
         }

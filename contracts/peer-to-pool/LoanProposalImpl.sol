@@ -97,7 +97,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidSubscriptionRange();
         }
         address fundingPool = staticData.fundingPool;
-        repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
+        _repaymentScheduleCheck(newLoanTerms.repaymentSchedule);
         uint256 totalSubscriptions = IFundingPoolImpl(fundingPool)
             .totalSubscriptions(address(this));
         if (totalSubscriptions > newLoanTerms.maxTotalSubscriptions) {
@@ -127,7 +127,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (_loanTermsUpdateTime != lastLoanTermsUpdateTime) {
             revert Errors.InconsistentLastLoanTermsUpdateTime();
         }
-        repaymentScheduleCheck(_loanTerms.repaymentSchedule);
+        _repaymentScheduleCheck(_loanTerms.repaymentSchedule);
         uint256 totalSubscriptions = IFundingPoolImpl(staticData.fundingPool)
             .totalSubscriptions(address(this));
         // check if resulting final loan amount
@@ -152,7 +152,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (
             dynamicData.status !=
             DataTypesPeerToPool.LoanStatus.BORROWER_ACCEPTED ||
-            block.timestamp < lenderInOrOutCutoffTime()
+            block.timestamp < _lenderInOrOutCutoffTime()
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
@@ -246,7 +246,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         uint256 totalSubscriptions = IFundingPoolImpl(staticData.fundingPool)
             .totalSubscriptions(address(this));
-        uint256 _lenderInOrOutCutoffTime = lenderInOrOutCutoffTime();
+        uint256 _lenderInOrOutCutoffTime = _lenderInOrOutCutoffTime();
         if (
             (msg.sender == _loanTerms.borrower &&
                 block.timestamp < _lenderInOrOutCutoffTime) ||
@@ -264,7 +264,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         emit Rolledback();
     }
 
-    function checkAndupdateStatus() external {
+    function checkAndUpdateStatus() external {
         if (msg.sender != staticData.fundingPool) {
             revert Errors.InvalidSender();
         }
@@ -292,7 +292,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
-        checkCurrRepaymentIdx(repaymentIdx);
+        _checkCurrRepaymentIdx(repaymentIdx);
         if (lenderExercisedConversion[msg.sender][repaymentIdx]) {
             revert Errors.AlreadyConverted();
         }
@@ -335,7 +335,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidActionForCurrentStatus();
         }
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx++;
-        checkCurrRepaymentIdx(repaymentIdx);
+        _checkCurrRepaymentIdx(repaymentIdx);
         // must be after when the period of this loan when lenders can convert,
         // but before default period for this period
         // note: repayment can be done in the half-open interval of:
@@ -397,7 +397,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (repaymentIdx >= dynamicData.currentRepaymentIdx) {
             revert Errors.RepaymentIdxTooLarge();
         }
-        // note: users can claim as soon as repaid, no need to check getRepaymentCutoffTime(...)
+        // note: users can claim as soon as repaid, no need to check _getRepaymentCutoffTime(...)
         if (
             lenderClaimedRepayment[msg.sender][repaymentIdx] ||
             lenderExercisedConversion[msg.sender][repaymentIdx]
@@ -427,8 +427,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         // this will check if loan has been fully repaid yet in this instance
         // note: loan can be marked as defaulted if no repayment and blocktime is in half-open interval of:
         // [dueTimestamp + conversionGracePeriod + repaymentGracePeriod, infty)
-        checkCurrRepaymentIdx(repaymentIdx);
-        if (block.timestamp < getRepaymentCutoffTime(repaymentIdx)) {
+        _checkCurrRepaymentIdx(repaymentIdx);
+        if (block.timestamp < _getRepaymentCutoffTime(repaymentIdx)) {
             revert Errors.NoDefault();
         }
         dynamicData.status = DataTypesPeerToPool.LoanStatus.DEFAULTED;
@@ -505,7 +505,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             DataTypesPeerToPool.LoanStatus.IN_NEGOTIATION ||
             (dynamicData.status ==
                 DataTypesPeerToPool.LoanStatus.BORROWER_ACCEPTED &&
-                block.timestamp < lenderInOrOutCutoffTime()));
+                block.timestamp < _lenderInOrOutCutoffTime()));
     }
 
     function getAbsoluteLoanTerms(
@@ -566,7 +566,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         );
     }
 
-    function checkCurrRepaymentIdx(uint256 repaymentIdx) internal view {
+    function _checkCurrRepaymentIdx(uint256 repaymentIdx) internal view {
         // currentRepaymentIdx increments on every repay;
         // if and only if loan was fully repaid, then currentRepaymentIdx == _loanTerms.repaymentSchedule.length
         if (repaymentIdx == _loanTerms.repaymentSchedule.length) {
@@ -574,12 +574,12 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
     }
 
-    function lenderInOrOutCutoffTime() internal view returns (uint256) {
+    function _lenderInOrOutCutoffTime() internal view returns (uint256) {
         return
             dynamicData.loanTermsLockedTime + staticData.unsubscribeGracePeriod;
     }
 
-    function repaymentScheduleCheck(
+    function _repaymentScheduleCheck(
         DataTypesPeerToPool.Repayment[] memory repaymentSchedule
     ) internal view {
         if (repaymentSchedule.length == 0) {
@@ -616,7 +616,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
     }
 
-    function getRepaymentCutoffTime(
+    function _getRepaymentCutoffTime(
         uint256 repaymentIdx
     ) internal view returns (uint256 repaymentCutoffTime) {
         repaymentCutoffTime =
