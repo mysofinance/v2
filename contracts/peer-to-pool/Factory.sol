@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
@@ -12,7 +13,7 @@ import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
-contract Factory is Ownable, IFactory {
+contract Factory is Ownable, ReentrancyGuard, IFactory {
     using ECDSA for bytes32;
 
     uint256 public arrangerFeeSplit;
@@ -43,7 +44,7 @@ contract Factory is Ownable, IFactory {
         uint256 _unsubscribeGracePeriod,
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
-    ) external {
+    ) external nonReentrant {
         if (!isFundingPool[_fundingPool]) {
             revert Errors.InvalidAddress();
         }

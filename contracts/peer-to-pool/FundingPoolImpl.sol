@@ -83,7 +83,10 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function subscribe(address loanProposal, uint256 amount) external {
+    function subscribe(
+        address loanProposal,
+        uint256 amount
+    ) external nonReentrant {
         if (amount == 0) {
             revert Errors.InvalidAmount();
         }

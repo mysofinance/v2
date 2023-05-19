@@ -3,13 +3,14 @@
 pragma solidity 0.8.19;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultFactory} from "./interfaces/ILenderVaultFactory.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
-contract LenderVaultFactory is ILenderVaultFactory {
+contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
     address public immutable addressRegistry;
     address public immutable lenderVaultImpl;
 
@@ -21,7 +22,11 @@ contract LenderVaultFactory is ILenderVaultFactory {
         lenderVaultImpl = _lenderVaultImpl;
     }
 
-    function createVault() external returns (address newLenderVaultAddr) {
+    function createVault()
+        external
+        nonReentrant
+        returns (address newLenderVaultAddr)
+    {
         uint256 numRegisteredVaults = IAddressRegistry(addressRegistry)
             .registeredVaults()
             .length;
