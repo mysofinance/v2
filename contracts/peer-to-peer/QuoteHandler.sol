@@ -53,12 +53,12 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.NonWhitelistedToken();
         }
         mapping(bytes32 => bool)
-            storage onChainQuoteHashPerVault = isOnChainQuote[lenderVault];
+            storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
-        if (onChainQuoteHashPerVault[onChainQuoteHash]) {
+        if (isOnChainQuoteFromVault[onChainQuoteHash]) {
             revert Errors.OnChainQuoteAlreadyAdded();
         }
-        onChainQuoteHashPerVault[onChainQuoteHash] = true;
+        isOnChainQuoteFromVault[onChainQuoteHash] = true;
         emit OnChainQuoteAdded(lenderVault, onChainQuote, onChainQuoteHash);
     }
 
@@ -92,15 +92,15 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.NonWhitelistedToken();
         }
         mapping(bytes32 => bool)
-            storage onChainQuoteHashPerVault = isOnChainQuote[lenderVault];
+            storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
-        if (!onChainQuoteHashPerVault[onChainQuoteHash]) {
+        if (!isOnChainQuoteFromVault[onChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
-        onChainQuoteHashPerVault[onChainQuoteHash] = false;
+        isOnChainQuoteFromVault[onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
         onChainQuoteHash = _hashOnChainQuote(newOnChainQuote);
-        onChainQuoteHashPerVault[onChainQuoteHash] = true;
+        isOnChainQuoteFromVault[onChainQuoteHash] = true;
         emit OnChainQuoteAdded(lenderVault, newOnChainQuote, onChainQuoteHash);
     }
 
@@ -115,12 +115,12 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.InvalidSender();
         }
         mapping(bytes32 => bool)
-            storage onChainQuoteHashPerVault = isOnChainQuote[lenderVault];
+            storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
-        if (!onChainQuoteHashPerVault[onChainQuoteHash]) {
+        if (!isOnChainQuoteFromVault[onChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
-        onChainQuoteHashPerVault[onChainQuoteHash] = false;
+        isOnChainQuoteFromVault[onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
     }
 
@@ -161,13 +161,13 @@ contract QuoteHandler is IQuoteHandler {
             onChainQuote.generalQuoteInfo
         );
         mapping(bytes32 => bool)
-            storage onChainQuoteHashPerVault = isOnChainQuote[lenderVault];
+            storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
-        if (!onChainQuoteHashPerVault[onChainQuoteHash]) {
+        if (!isOnChainQuoteFromVault[onChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
         if (onChainQuote.generalQuoteInfo.isSingleUse) {
-            onChainQuoteHashPerVault[onChainQuoteHash] = false;
+            isOnChainQuoteFromVault[onChainQuoteHash] = false;
             emit OnChainQuoteInvalidated(lenderVault, onChainQuoteHash);
         }
         uint256 nextLoanIdx = ILenderVaultImpl(lenderVault).totalNumLoans();
@@ -194,14 +194,14 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
-            storage offChainQuoteHashPerVault = offChainQuoteIsInvalidated[
+            storage offChainQuoteFromVaultIsInvalidated = offChainQuoteIsInvalidated[
                 lenderVault
             ];
         bytes32 offChainQuoteHash = _hashOffChainQuote(
             offChainQuote,
             lenderVault
         );
-        if (offChainQuoteHashPerVault[offChainQuoteHash]) {
+        if (offChainQuoteFromVaultIsInvalidated[offChainQuoteHash]) {
             revert Errors.OffChainQuoteHasBeenInvalidated();
         }
         if (
@@ -232,7 +232,7 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.InvalidOffChainMerkleProof();
         }
         if (offChainQuote.generalQuoteInfo.isSingleUse) {
-            offChainQuoteHashPerVault[offChainQuoteHash] = true;
+            offChainQuoteFromVaultIsInvalidated[offChainQuoteHash] = true;
             emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
         }
         uint256 nextLoanIdx = ILenderVaultImpl(lenderVault).totalNumLoans();
