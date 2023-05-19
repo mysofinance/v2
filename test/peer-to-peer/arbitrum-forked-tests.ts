@@ -1,15 +1,13 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
-import { ALCHEMY_API_KEY, ARBITRUM_BLOCK_NUMBER, ARBITRUM_CHAIN_ID } from '../../hardhat.config'
+import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
 import { collTokenAbi, gmxRewardRouterAbi } from './helpers/abi'
-import { createOnChainRequest } from './helpers/misc'
+import { createOnChainRequest, setupBorrowerWhitelist } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
 
 // test config constants & vars
-const BLOCK_NUMBER = ARBITRUM_BLOCK_NUMBER
-const CHAIN_ID = ARBITRUM_CHAIN_ID
 let snapshotId: String // use snapshot id to reset state before each test
 
 // constants
@@ -24,20 +22,12 @@ const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 
 describe('Peer-to-Peer: Arbitrum Tests', function () {
-  before(async function () {
-    // reset/overwrite arbitrum endpoint from hardhat.config to allow running eth and arbitrum tests in one go
-    await hre.network.provider.request({
-      method: 'hardhat_reset',
-      params: [
-        {
-          chainId: CHAIN_ID,
-          forking: {
-            jsonRpcUrl: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
-            blockNumber: BLOCK_NUMBER
-          }
-        }
-      ]
-    })
+  before(async () => {
+    console.log('Note: Running arbitrum tests with the following forking config:')
+    console.log(HARDHAT_CHAIN_ID_AND_FORKING_CONFIG)
+    if (HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId !== 42161) {
+      throw new Error('Invalid hardhat forking config! Expected `HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId` to be 42161!')
+    }
   })
 
   beforeEach(async () => {
@@ -49,7 +39,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, borrower, team] = await ethers.getSigners()
+    const [lender, borrower, team, whitelistAuthority] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -139,6 +129,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       lender,
       borrower,
       team,
+      whitelistAuthority,
       usdc,
       weth,
       lenderVault,
@@ -159,13 +150,20 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const glpStakingCompartmentImplementation = await GlpStakingCompartmentImplementation.deploy()
     await glpStakingCompartmentImplementation.deployed()
 
-    await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
-
     // increase borrower GLP balance
     const collTokenAddress = '0x5402B5F40310bDED796c7D0F3FF6683f5C0cFfdf' // GLP
     const rewardRouterAddress = '0xB95DB5B167D75e6d04227CfFFA61069348d271F5' // GMX: Reward Router V2
     const glpManagerAddress = '0x3963FfC9dff443c2A94f21b129D429891E32ec18' // GLP Manager
     const collInstance = new ethers.Contract(collTokenAddress, collTokenAbi, borrower.provider)
+
+    // whitelist tokens
+    await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
+    // whitelist compartment
+    await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
+    // whitelist tokens for compartment
+    await addressRegistry
+      .connect(team)
+      .setWhitelistedTokensForCompartment(glpStakingCompartmentImplementation.address, [collTokenAddress], true)
 
     const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewardRouterAbi, borrower.provider)
 
@@ -187,9 +185,6 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     expect(borrowerCollBalPre).to.be.above(BigNumber.from(0))
     expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
-
-    // whitelist token pair
-    await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -297,20 +292,35 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     expect(lenderCollBalPre).to.equal(BigNumber.from(0))
 
-    await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId], true)
+    const lenderVaultCollBalPre = await collInstance.balanceOf(lenderVault.address)
+
+    await lenderVault.connect(lender).unlockCollateral(collTokenAddress, [loanId])
 
     const lenderVaultWethBalPost = await weth.balanceOf(lenderVault.address)
     const lenderCollBalPost = await collInstance.balanceOf(lender.address)
+    const lenderVaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
 
     expect(lenderVaultWethBalPost).to.be.above(lenderVaultWethBalPre)
     // note that unlockCollateral() causes the entire "available collateral balance" to be withdrawn,
     // NOT only the amount(s) associated from defaulted loans with unclaimed collateral
-    expect(lenderCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
+    expect(lenderCollBalPost).to.equal(lenderCollBalPre)
+    expect(lenderVaultCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
   })
 
   it('Uni V3 Looping Test', async function () {
-    const { quoteHandler, lender, borrower, usdc, weth, lenderVault, addressRegistry, team, uniV3Looping, borrowerGateway } =
-      await setupTest()
+    const {
+      quoteHandler,
+      lender,
+      borrower,
+      whitelistAuthority,
+      usdc,
+      weth,
+      lenderVault,
+      addressRegistry,
+      team,
+      uniV3Looping,
+      borrowerGateway
+    } = await setupTest()
 
     // lenderVault owner deposits usdc
     await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -334,7 +344,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     ]
     let onChainQuote = {
       generalQuoteInfo: {
-        borrower: borrower.address,
+        whitelistAuthority: whitelistAuthority.address,
         collToken: weth.address,
         loanToken: usdc.address,
         oracleAddr: ZERO_ADDR,
@@ -348,6 +358,16 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       quoteTuples: quoteTuples,
       salt: ZERO_BYTES32
     }
+
+    // get borrower whitelisted
+    const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
+    await setupBorrowerWhitelist({
+      addressRegistry,
+      borrower,
+      whitelistAuthority,
+      chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+      whitelistedUntil
+    })
 
     // whitelist token pair
     await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)

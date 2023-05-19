@@ -14,17 +14,41 @@ import {Errors} from "../../../Errors.sol";
 contract VoteCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
 
+    mapping(address => bool) public approvedDelegator;
+
     function delegate(address _delegatee) external {
+        DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
+            loanIdx
+        );
+        if (msg.sender != loan.borrower && !approvedDelegator[msg.sender]) {
+            revert Errors.InvalidSender();
+        }
+        if (_delegatee == address(0)) {
+            revert Errors.InvalidDelegatee();
+        }
+        uint256 preDelegateCompartmentBal = IERC20(loan.collToken).balanceOf(
+            address(this)
+        );
+        IVotes(loan.collToken).delegate(_delegatee);
+        if (
+            preDelegateCompartmentBal >
+            IERC20(loan.collToken).balanceOf(address(this))
+        ) {
+            revert Errors.DelegateReducedBalance();
+        }
+        emit Delegated(msg.sender, _delegatee);
+    }
+
+    function toggleApprovedDelegator(address _delegate) external {
         DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
             loanIdx
         );
         if (msg.sender != loan.borrower) {
             revert Errors.InvalidSender();
         }
-        if (_delegatee == address(0)) {
-            revert Errors.InvalidDelegatee();
-        }
-        IVotes(loan.collToken).delegate(_delegatee);
+        bool currDelegateState = approvedDelegator[_delegate];
+        approvedDelegator[_delegate] = !currDelegateState;
+        emit UpdatedApprovedDelegator(_delegate, !currDelegateState);
     }
 
     // transfer coll on repays

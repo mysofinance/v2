@@ -12,20 +12,26 @@ abstract contract Ownable {
 
     event ClaimedOwnership(address indexed owner, address oldOwner);
 
+    constructor() {
+        _initialize(msg.sender);
+    }
+
     function proposeNewOwner(address _newOwnerProposal) external {
-        senderCheckOwner();
-        newOwnerProposalCheck(_newOwnerProposal);
+        _senderCheckOwner();
+        _newOwnerProposalCheck(_newOwnerProposal);
         _newOwner = _newOwnerProposal;
         emit NewOwnerProposed(_owner, _newOwnerProposal);
     }
 
     function claimOwnership() external {
-        if (msg.sender != _newOwner) {
+        address tmpNewOwner = _newOwner;
+        if (msg.sender != tmpNewOwner) {
             revert Errors.InvalidSender();
         }
-        address _oldOwner = _owner;
-        _owner = _newOwner;
-        emit ClaimedOwnership(_owner, _oldOwner);
+        address oldOwner = _owner;
+        _owner = tmpNewOwner;
+        delete _newOwner;
+        emit ClaimedOwnership(tmpNewOwner, oldOwner);
     }
 
     // note: needs to be explicitly overriden by inheriting contracts
@@ -33,18 +39,23 @@ abstract contract Ownable {
     // definitions in corresponding interfaces (e.g., IAddressRegistry)
     function owner() external view virtual returns (address);
 
-    function senderCheckOwner() internal view {
+    function _initialize(address initOwner) internal {
+        _owner = initOwner;
+    }
+
+    function _senderCheckOwner() internal view {
         if (msg.sender != _owner) {
             revert Errors.InvalidSender();
         }
     }
 
-    function newOwnerProposalCheck(
+    function _newOwnerProposalCheck(
         address _newOwnerProposal
     ) internal view virtual {
         if (
             _newOwnerProposal == address(0) ||
-            _newOwnerProposal == address(this)
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == _newOwner
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }

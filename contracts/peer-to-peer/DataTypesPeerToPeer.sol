@@ -42,8 +42,8 @@ library DataTypesPeerToPeer {
     }
 
     struct GeneralQuoteInfo {
-        // address of borrower (if address(0), open to any borrowers)
-        address borrower;
+        // address of a borrower whitelist authority (optional)
+        address whitelistAuthority;
         // address of collateral token
         address collToken;
         // address of loan token

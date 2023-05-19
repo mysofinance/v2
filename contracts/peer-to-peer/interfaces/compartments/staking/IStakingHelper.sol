@@ -6,15 +6,23 @@ interface IStakingHelper {
     /**
      * @notice Deposit `value` LP tokens, curve type take pools
      * @param value Number of tokens to deposit
-     * @param depositAddr Address to deposit for
      */
-    function deposit(uint256 value, address depositAddr) external;
+    function deposit(uint256 value) external;
 
     /**
      * @notice Withdraw `value` LP tokens, curve type take pools
+     * @dev This withdraw function is for gauges v1 and v2
      * @param value Number of tokens to withdraw
      */
     function withdraw(uint256 value) external;
+
+    /**
+     * @notice Withdraw `value` LP tokens, curve type take pools
+     * @dev This withdraw function is for gauges v3, v4 and v5
+     * @param value Number of tokens to withdraw
+     * @param withdrawRewards true if withdrawing rewards
+     */
+    function withdraw(uint256 value, bool withdrawRewards) external;
 
     /**
      * @notice Claim all available reward tokens for msg.sender

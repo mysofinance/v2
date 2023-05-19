@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { BigNumber as BN } from 'bignumber.js'
 import { ethers } from 'hardhat'
-import { LenderVaultImpl, QuoteHandler } from '../typechain-types'
+import { LenderVaultImpl, QuoteHandler, AddressRegistry } from '../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { chainlinkAggregatorAbi, collTokenAbi, uniV2Abi } from './abi'
 
@@ -32,7 +32,10 @@ export const createOnChainRequest = async ({
   validUntil?: BigNumber
 }) => {
   const blocknum = await ethers.provider.getBlockNumber()
-  const _validUntil = typeof validUntil == 'undefined' ? ethers.BigNumber.from((await ethers.provider.getBlock(blocknum)).timestamp + 60) : validUntil
+  const _validUntil =
+    typeof validUntil == 'undefined'
+      ? ethers.BigNumber.from((await ethers.provider.getBlock(blocknum)).timestamp + 60)
+      : validUntil
   let quoteTuples = [
     {
       loanPerCollUnitOrLtv: loanPerCollUnit,
@@ -43,7 +46,7 @@ export const createOnChainRequest = async ({
   ]
   let onChainQuote = {
     generalQuoteInfo: {
-      borrower: ZERO_ADDR,
+      whitelistAuthority: ZERO_ADDR,
       collToken: collToken,
       loanToken: loanToken,
       oracleAddr: ZERO_ADDR,
@@ -256,4 +259,37 @@ type FairReservesPriceAndEthValue = {
   fairReserve1: BigNumber
   totalFairReserveEthValue: BigNumber
   fairPriceOfLpToken: BigNumber
+}
+
+export const setupBorrowerWhitelist = async ({
+  addressRegistry,
+  borrower,
+  whitelistAuthority,
+  chainId,
+  whitelistedUntil = 0
+}: {
+  addressRegistry: AddressRegistry
+  borrower: SignerWithAddress
+  whitelistAuthority: SignerWithAddress
+  chainId: number
+  whitelistedUntil?: any
+}) => {
+  // get salt
+  const salt = ZERO_BYTES32
+
+  // construct payload and sign
+  const payload = ethers.utils.defaultAbiCoder.encode(
+    ['address', 'uint256', 'uint256', 'bytes32'],
+    [borrower.address, whitelistedUntil, chainId, salt]
+  )
+  const payloadHash = ethers.utils.keccak256(payload)
+  const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+  const sig = ethers.utils.splitSignature(signature)
+  const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+  expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+  // have borrower claim whitelist status
+  await addressRegistry
+    .connect(borrower)
+    .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
 }

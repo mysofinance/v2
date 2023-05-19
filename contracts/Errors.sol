@@ -43,7 +43,7 @@ library Errors {
     error InvalidInterestRateFactor();
     error OverflowUint128();
     error InconsistentUnlockTokenAddresses();
-    error ExpiresBeforeRepayAllowed();
+    error InvalidEarliestRepay();
     error InvalidNewMinNumOfSigners();
     error AlreadySigner();
     error InvalidArrayIndex();
@@ -87,4 +87,11 @@ library Errors {
     error ZeroConversionAmount();
     error InvalidNewOwnerProposal();
     error CollateralMustBeCompartmentalized();
+    error InvalidCompartmentForToken();
+    error InvalidSignature();
+    error InvalidUpdate();
+    error CannotClaimOutdatedStatus();
+    error DelegateReducedBalance();
+    error FundingPoolAlreadyExists();
+    error InvalidLender();
 }

@@ -6,42 +6,9 @@ import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extens
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
 import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
-
-interface IBalancerAsset {
-    // solhint-disable-previous-line no-empty-blocks
-}
-
-interface IBalancerVault {
-    function swap(
-        BalancerDataTypes.SingleSwap memory singleSwap,
-        BalancerDataTypes.FundManagement memory funds,
-        uint256 limit,
-        uint256 deadline
-    ) external payable returns (uint256);
-}
-
-library BalancerDataTypes {
-    enum SwapKind {
-        GIVEN_IN,
-        GIVEN_OUT
-    }
-
-    struct FundManagement {
-        address sender;
-        bool fromInternalBalance;
-        address payable recipient;
-        bool toInternalBalance;
-    }
-
-    struct SingleSwap {
-        bytes32 poolId;
-        SwapKind kind;
-        IBalancerAsset assetIn;
-        IBalancerAsset assetOut;
-        uint256 amount;
-        bytes userData;
-    }
-}
+import {IBalancerAsset} from "../interfaces/callbacks/IBalancerAsset.sol";
+import {BalancerDataTypes} from "../interfaces/callbacks/BalancerDataTypes.sol";
+import {IBalancerVault} from "../interfaces/callbacks/IBalancerVault.sol";
 
 contract BalancerV2Looping is IVaultCallback {
     using SafeERC20 for IERC20Metadata;
@@ -54,12 +21,12 @@ contract BalancerV2Looping is IVaultCallback {
         bytes calldata data
     ) external {
         BalancerDataTypes.FundManagement
-            memory fundManagement = BalancerDataTypes.FundManagement(
-                address(this), // swap payer
-                false, // use payer's internal balance
-                payable(loan.borrower), // swap receiver
-                false // user receiver's internal balance
-            );
+            memory fundManagement = BalancerDataTypes.FundManagement({
+                sender: address(this), // swap payer
+                fromInternalBalance: false, // use payer's internal balance
+                recipient: payable(loan.borrower), // swap receiver
+                toInternalBalance: false // user receiver's internal balance
+            });
         (bytes32 poolId, uint256 minSwapReceive, uint256 deadline) = abi.decode(
             data,
             (bytes32, uint256, uint256)
@@ -67,14 +34,14 @@ contract BalancerV2Looping is IVaultCallback {
         // underflow if loan token transfer fees from vault to callbackAddr...?
         // maybe need a loanTokenBalBefore var passed in?
         BalancerDataTypes.SingleSwap memory singleSwap = BalancerDataTypes
-            .SingleSwap(
-                poolId,
-                BalancerDataTypes.SwapKind.GIVEN_IN,
-                IBalancerAsset(loan.loanToken),
-                IBalancerAsset(loan.collToken),
-                loan.initLoanAmount,
-                "0x"
-            );
+            .SingleSwap({
+                poolId: poolId,
+                kind: BalancerDataTypes.SwapKind.GIVEN_IN,
+                assetIn: IBalancerAsset(loan.loanToken),
+                assetOut: IBalancerAsset(loan.collToken),
+                amount: loan.initLoanAmount,
+                userData: "0x"
+            });
         IERC20Metadata(loan.loanToken).approve(BALANCER_V2_VAULT, 0);
         IERC20Metadata(loan.loanToken).approve(
             BALANCER_V2_VAULT,
@@ -94,12 +61,12 @@ contract BalancerV2Looping is IVaultCallback {
         bytes calldata data
     ) external {
         BalancerDataTypes.FundManagement
-            memory fundManagement = BalancerDataTypes.FundManagement(
-                address(this), // swap payer
-                false, // use payer's internal balance
-                payable(loan.borrower), // swap receiver
-                false // user receiver's internal balance
-            );
+            memory fundManagement = BalancerDataTypes.FundManagement({
+                sender: address(this), // swap payer
+                fromInternalBalance: false, // use payer's internal balance
+                recipient: payable(loan.borrower), // swap receiver
+                toInternalBalance: false // user receiver's internal balance
+            });
         (bytes32 poolId, uint256 minSwapReceive, uint256 deadline) = abi.decode(
             data,
             (bytes32, uint256, uint256)
@@ -107,14 +74,14 @@ contract BalancerV2Looping is IVaultCallback {
         // swap whole coll token balance received from borrower gateway
         uint256 collBalance = IERC20(loan.collToken).balanceOf(address(this));
         BalancerDataTypes.SingleSwap memory singleSwap = BalancerDataTypes
-            .SingleSwap(
-                poolId,
-                BalancerDataTypes.SwapKind.GIVEN_IN,
-                IBalancerAsset(loan.collToken),
-                IBalancerAsset(loan.loanToken),
-                collBalance,
-                "0x"
-            );
+            .SingleSwap({
+                poolId: poolId,
+                kind: BalancerDataTypes.SwapKind.GIVEN_IN,
+                assetIn: IBalancerAsset(loan.collToken),
+                assetOut: IBalancerAsset(loan.loanToken),
+                amount: collBalance,
+                userData: "0x"
+            });
         IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, 0);
         IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, collBalance);
         IBalancerVault(BALANCER_V2_VAULT).swap(
@@ -123,6 +90,6 @@ contract BalancerV2Looping is IVaultCallback {
             minSwapReceive,
             deadline
         );
-        IERC20Metadata(loan.collToken).safeApprove(BALANCER_V2_VAULT, 0);
+        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, 0);
     }
 }

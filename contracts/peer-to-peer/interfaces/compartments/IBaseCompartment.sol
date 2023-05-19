@@ -3,6 +3,14 @@
 pragma solidity ^0.8.19;
 
 interface IBaseCompartment {
+    event Staked(uint256 gaugeIndex, address liqGaugeAddr, uint256 amount);
+
+    event Delegated(address delegator, address delegatee);
+
+    event UpdatedApprovedStaker(address staker, bool approvalState);
+
+    event UpdatedApprovedDelegator(address delegator, bool approvalState);
+
     /**
      * @notice function to initialize collateral compartment
      * @dev factory creates clone and then initializes implementation contract
