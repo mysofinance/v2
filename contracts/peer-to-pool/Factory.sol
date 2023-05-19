@@ -4,26 +4,29 @@ pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {IFactory} from "./interfaces/IFactory.sol";
-import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
-import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
+import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
-contract Factory is Ownable, IFactory {
+contract Factory is Ownable, ReentrancyGuard, IFactory {
     using ECDSA for bytes32;
 
     uint256 public arrangerFeeSplit;
     address public immutable loanProposalImpl;
     address public immutable fundingPoolImpl;
+    address public mysoTokenManager;
     address[] public loanProposals;
     address[] public fundingPools;
     mapping(address => bool) public isLoanProposal;
     mapping(address => bool) public isFundingPool;
-    mapping(address => bool) internal depositTokenHasFundingPool;
+    mapping(address => bool) internal _depositTokenHasFundingPool;
     mapping(address => mapping(address => uint256))
-        internal lenderWhitelistedUntil;
+        internal _lenderWhitelistedUntil;
 
     constructor(address _loanProposalImpl, address _fundingPoolImpl) Ownable() {
         if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
@@ -41,12 +44,13 @@ contract Factory is Ownable, IFactory {
         uint256 _unsubscribeGracePeriod,
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
-    ) external {
+    ) external nonReentrant {
         if (!isFundingPool[_fundingPool]) {
             revert Errors.InvalidAddress();
         }
+        uint256 numLoanProposals = loanProposals.length;
         bytes32 salt = keccak256(
-            abi.encodePacked(loanProposalImpl, msg.sender, loanProposals.length)
+            abi.encodePacked(loanProposalImpl, msg.sender, numLoanProposals)
         );
         address newLoanProposal = Clones.cloneDeterministic(
             loanProposalImpl,
@@ -54,7 +58,19 @@ contract Factory is Ownable, IFactory {
         );
         loanProposals.push(newLoanProposal);
         isLoanProposal[newLoanProposal] = true;
+        address _mysoTokenManager = mysoTokenManager;
+        if (_mysoTokenManager != address(0)) {
+            IMysoTokenManager(_mysoTokenManager)
+                .processP2PoolCreateLoanProposal(
+                    _fundingPool,
+                    msg.sender,
+                    _collToken,
+                    _arrangerFee,
+                    numLoanProposals
+                );
+        }
         ILoanProposalImpl(newLoanProposal).initialize(
+            address(this),
             msg.sender,
             _fundingPool,
             _collToken,
@@ -76,7 +92,7 @@ contract Factory is Ownable, IFactory {
     }
 
     function createFundingPool(address _depositToken) external {
-        if (depositTokenHasFundingPool[_depositToken]) {
+        if (_depositTokenHasFundingPool[_depositToken]) {
             revert Errors.FundingPoolAlreadyExists();
         }
         bytes32 salt = keccak256(
@@ -88,7 +104,7 @@ contract Factory is Ownable, IFactory {
         );
         fundingPools.push(newFundingPool);
         isFundingPool[newFundingPool] = true;
-        depositTokenHasFundingPool[_depositToken] = true;
+        _depositTokenHasFundingPool[_depositToken] = true;
         IFundingPoolImpl(newFundingPool).initialize(
             address(this),
             _depositToken
@@ -132,11 +148,11 @@ contract Factory is Ownable, IFactory {
         if (
             whitelistedUntil < block.timestamp ||
             whitelistedUntil <=
-            lenderWhitelistedUntil[whitelistAuthority][msg.sender]
+            _lenderWhitelistedUntil[whitelistAuthority][msg.sender]
         ) {
             revert Errors.CannotClaimOutdatedStatus();
         }
-        lenderWhitelistedUntil[whitelistAuthority][
+        _lenderWhitelistedUntil[whitelistAuthority][
             msg.sender
         ] = whitelistedUntil;
         emit LenderWhitelistStatusClaimed(
@@ -154,11 +170,11 @@ contract Factory is Ownable, IFactory {
             if (
                 lenders[i] == address(0) ||
                 whitelistedUntil ==
-                lenderWhitelistedUntil[msg.sender][lenders[i]]
+                _lenderWhitelistedUntil[msg.sender][lenders[i]]
             ) {
                 revert Errors.InvalidUpdate();
             }
-            lenderWhitelistedUntil[msg.sender][lenders[i]] = whitelistedUntil;
+            _lenderWhitelistedUntil[msg.sender][lenders[i]] = whitelistedUntil;
             unchecked {
                 i++;
             }
@@ -166,12 +182,22 @@ contract Factory is Ownable, IFactory {
         emit LenderWhitelistUpdated(msg.sender, lenders, whitelistedUntil);
     }
 
+    function setMysoTokenManager(address newTokenManager) external {
+        _senderCheckOwner();
+        address oldTokenManager = mysoTokenManager;
+        if (oldTokenManager == newTokenManager) {
+            revert Errors.InvalidAddress();
+        }
+        mysoTokenManager = newTokenManager;
+        emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
+    }
+
     function isWhitelistedBorrower(
         address whitelistAuthority,
         address borrower
     ) external view returns (bool) {
         return
-            lenderWhitelistedUntil[whitelistAuthority][borrower] >
+            _lenderWhitelistedUntil[whitelistAuthority][borrower] >
             block.timestamp;
     }
 
@@ -189,7 +215,7 @@ contract Factory is Ownable, IFactory {
         address lender
     ) external view returns (bool) {
         return
-            lenderWhitelistedUntil[whitelistAuthority][lender] >
+            _lenderWhitelistedUntil[whitelistAuthority][lender] >
             block.timestamp;
     }
 }

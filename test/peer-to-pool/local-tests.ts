@@ -130,6 +130,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // reverts if trying to initialize base contract
     await expect(
       loanProposalImpl.initialize(
+        factory.address,
         arranger.address,
         fundingPool.address,
         daoToken.address,

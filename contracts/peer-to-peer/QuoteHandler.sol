@@ -5,10 +5,10 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
+import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
-import {Errors} from "../Errors.sol";
 
 contract QuoteHandler is IQuoteHandler {
     address public immutable addressRegistry;

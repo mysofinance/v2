@@ -29,6 +29,7 @@ interface ILoanProposalImpl {
 
     /**
      * @notice Initializes loan proposal
+     * @param _factory Address of the factory contract from which proposal is created
      * @param _arranger Address of the arranger of the proposal
      * @param _fundingPool Address of the funding pool to be used to source liquidity, if successful
      * @param _collToken Address of collateral token to be used in loan
@@ -40,6 +41,7 @@ interface ILoanProposalImpl {
      * @param _repaymentGracePeriod The grace period during which borrowers can repay
      */
     function initialize(
+        address _factory,
         address _arranger,
         address _fundingPool,
         address _collToken,
@@ -163,6 +165,7 @@ interface ILoanProposalImpl {
 
     /**
      * @notice Returns core static data for given loan proposal
+     * @return factory The address of the factory contract from which the proposal was created
      * @return fundingPool The address of the funding pool from which lenders can subscribe, and from which 
      -upon acceptance- the final loan amount gets sourced
      * @return collToken The address of the collateral token to be provided by the borrower
@@ -179,6 +182,7 @@ interface ILoanProposalImpl {
         external
         view
         returns (
+            address factory,
             address fundingPool,
             address collToken,
             address arranger,

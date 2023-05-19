@@ -24,6 +24,10 @@ interface IAddressRegistry {
         address[] indexed borrower,
         uint256 whitelistedUntil
     );
+    event MysoTokenManagerUpdated(
+        address oldTokenManager,
+        address newTokenManager
+    );
 
     /**
      * @notice initializes factory, gateway, and quote handler contracts
@@ -36,6 +40,13 @@ interface IAddressRegistry {
         address _borrowerGateway,
         address _quoteHandler
     ) external;
+
+    /**
+     * @notice Sets a new MYSO token manager contract
+     * @dev Can only be called by registry owner
+     * @param newTokenManager Address of the new MYSO token manager contract
+     */
+    function setMysoTokenManager(address newTokenManager) external;
 
     /**
      * @notice adds new lender vault to registry
@@ -121,6 +132,12 @@ interface IAddressRegistry {
      * @return Address of the quote handler contract
      */
     function quoteHandler() external view returns (address);
+
+    /**
+     * @notice Returns the address of the MYSO token manager
+     * @return Address of the MYSO token manager contract
+     */
+    function mysoTokenManager() external view returns (address);
 
     /**
      * @notice Returns boolean flag indicating whether given address is a registered vault

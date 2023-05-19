@@ -29,6 +29,10 @@ interface IFactory {
         address[] indexed lender,
         uint256 whitelistedUntil
     );
+    event MysoTokenManagerUpdated(
+        address oldTokenManager,
+        address newTokenManager
+    );
 
     /**
      * @notice Creates a new loan proposal
@@ -89,6 +93,13 @@ interface IFactory {
     ) external;
 
     /**
+     * @notice Sets a new MYSO token manager contract
+     * @dev Can only be called by registry owner
+     * @param newTokenManager Address of the new MYSO token manager contract
+     */
+    function setMysoTokenManager(address newTokenManager) external;
+
+    /**
      * @notice Returns the address of the funding pool implementation
      * @return The address of the funding pool implementation
      */
@@ -139,6 +150,12 @@ interface IFactory {
      * @return The address of the owner of this contract
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns the address of the MYSO token manager
+     * @return Address of the MYSO token manager contract
+     */
+    function mysoTokenManager() external view returns (address);
 
     /**
      * @notice Returns boolean flag indicating whether the lender has been whitelisted by whitelistAuthority

@@ -5,12 +5,13 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
-import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
-import {IFactory} from "./interfaces/IFactory.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPool} from "./DataTypesPeerToPool.sol";
 import {Errors} from "../Errors.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
+import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     using SafeERC20 for IERC20Metadata;
@@ -23,7 +24,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     // note: earliest unsubscribe time is to prevent griefing accept loans through atomic flashborrow,
     // deposit, subscribe, unsubscribe, and withdraw
     mapping(address => mapping(address => uint256))
-        internal earliestUnsubscribe;
+        internal _earliestUnsubscribe;
 
     constructor() {
         _disableInitializers();
@@ -46,6 +47,15 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     ) external nonReentrant {
         if (amount == 0) {
             revert Errors.InvalidSendAmount();
+        }
+        address mysoTokenManager = IFactory(factory).mysoTokenManager();
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager).processP2PoolDeposit(
+                address(this),
+                msg.sender,
+                amount,
+                transferFee
+            );
         }
         uint256 preBal = IERC20Metadata(depositToken).balanceOf(address(this));
         IERC20Metadata(depositToken).safeTransferFrom(
@@ -73,7 +83,10 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function subscribe(address loanProposal, uint256 amount) external {
+    function subscribe(
+        address loanProposal,
+        uint256 amount
+    ) external nonReentrant {
         if (amount == 0) {
             revert Errors.InvalidAmount();
         }
@@ -83,7 +96,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         if (!ILoanProposalImpl(loanProposal).canSubscribe()) {
             revert Errors.NotInSubscriptionPhase();
         }
-        (, , , address whitelistAuthority, , , ) = ILoanProposalImpl(
+        (, , , , address whitelistAuthority, , , ) = ILoanProposalImpl(
             loanProposal
         ).staticData();
         if (
@@ -106,10 +119,21 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         if (amount + _totalSubscriptions > loanTerms.maxTotalSubscriptions) {
             revert Errors.SubscriptionAmountTooHigh();
         }
+        address mysoTokenManager = IFactory(factory).mysoTokenManager();
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager).processP2PoolSubscribe(
+                address(this),
+                msg.sender,
+                loanProposal,
+                amount,
+                _totalSubscriptions,
+                loanTerms
+            );
+        }
         balanceOf[msg.sender] = _balanceOf - amount;
         totalSubscriptions[loanProposal] = _totalSubscriptions + amount;
         subscriptionAmountOf[loanProposal][msg.sender] += amount;
-        earliestUnsubscribe[loanProposal][msg.sender] =
+        _earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
             Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
 
@@ -132,7 +156,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         if (amount > _subscriptionAmountOf) {
             revert Errors.UnsubscriptionAmountTooLarge();
         }
-        if (block.timestamp < earliestUnsubscribe[loanProposal][msg.sender]) {
+        if (block.timestamp < _earliestUnsubscribe[loanProposal][msg.sender]) {
             revert Errors.BeforeEarliestUnsubscribe();
         }
         balanceOf[msg.sender] += amount;
@@ -140,7 +164,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         subscriptionAmountOf[loanProposal][msg.sender] =
             _subscriptionAmountOf -
             amount;
-        earliestUnsubscribe[loanProposal][msg.sender] = 0;
+        _earliestUnsubscribe[loanProposal][msg.sender] = 0;
 
         emit Unsubscribed(msg.sender, loanProposal, amount);
     }
@@ -167,7 +191,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             loanTerms.borrower,
             finalLoanAmount
         );
-        (, , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
+        (, , , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
         uint256 protocolFeeShare = (arrangerFee *
             IFactory(factory).arrangerFeeSplit()) / Constants.BASE;
