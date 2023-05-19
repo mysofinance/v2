@@ -27,7 +27,8 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             _tokenAddrs,
             _oracleAddrs,
             0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weth address
-            1e18 // 18 decimals for ETH based oracles
+            1e18, // 18 decimals for ETH based oracles
+            1 // no undercollateralization allowed
         )
     {
         if (_lpAddrs.length == 0) {

@@ -5,6 +5,7 @@ library Constants {
     uint256 internal constant YEAR_IN_SECONDS = 365 days;
     uint256 internal constant BASE = 1e18;
     uint256 internal constant MAX_FEE_PER_ANNUM = 0.05e18; // 5% max in base
+    uint256 internal constant MAX_ORACLE_COLLATERALIZATION_FACTOR = 100; // 1% min collateralized
     uint256 internal constant MAX_ARRANGER_SPLIT = 0.5e18; // 50% max in base
     uint256 internal constant MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY =
         1 days;

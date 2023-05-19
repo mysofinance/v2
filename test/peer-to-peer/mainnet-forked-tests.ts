@@ -318,7 +318,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
         weth.address,
-        BASE
+        BASE,
+        1
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -3716,14 +3717,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
       // deploy errors on base oracles
       await expect(
-        ChainlinkBasicImplementation.connect(team).deploy([], [usdcEthChainlinkAddr], weth.address, BASE)
+        ChainlinkBasicImplementation.connect(team).deploy([], [usdcEthChainlinkAddr], weth.address, BASE, 1)
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcEthChainlinkAddr],
           weth.address,
-          BASE
+          BASE,
+          1
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
@@ -3731,7 +3733,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [ZERO_ADDR, paxgEthChainlinkAddr],
           weth.address,
-          BASE
+          BASE,
+          1
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
       await expect(
@@ -3739,7 +3742,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [ZERO_ADDR, '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          BASE
+          BASE,
+          1
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
       await expect(
@@ -3747,7 +3751,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcUsdChainlinkAddr, paxgEthChainlinkAddr],
           weth.address,
-          BASE
+          BASE,
+          1
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
       await expect(
@@ -3755,16 +3760,36 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcUsdChainlinkAddr, paxgEthChainlinkAddr],
           ZERO_ADDR,
-          BASE
+          BASE,
+          1
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          weth.address,
+          BASE,
+          0
+        )
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidUnderCollateralizationFactor')
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
+          [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
+          weth.address,
+          BASE,
+          1000
+        )
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidUnderCollateralizationFactor')
 
       // correct deploy
       const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(team).deploy(
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
         [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
         weth.address,
-        BASE
+        BASE,
+        1
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -3939,7 +3964,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         weth.address,
-        BASE
+        BASE,
+        1
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -4055,7 +4081,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         weth.address,
-        BASE
+        BASE,
+        1
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -4170,7 +4197,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         [usdc.address],
         [usdcEthChainlinkAddr],
         weth.address,
-        BASE
+        BASE,
+        1
       )
       await chainlinkBasicImplementation.deployed()
 
@@ -4915,7 +4943,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             linkEthChainlinkAddr
           ],
           weth.address,
-          BASE
+          BASE,
+          1
         )
         await chainlinkBasicImplementation.deployed()
 
@@ -4982,7 +5011,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         const ChainlinkBasicWbtcUSDImplementation = await ethers.getContractFactory('ChainlinkBasicWithWbtc')
         const chainlinkBasicWbtcUSDImplementation = await ChainlinkBasicWbtcUSDImplementation.connect(team).deploy(
           [usdc.address, aaveAddr, crvAddr, linkAddr, weth.address],
-          [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr]
+          [usdcUsdChainlinkAddr, aaveUsdChainlinkAddr, crvUsdChainlinkAddr, linkUsdChainlinkAddr, ethUsdChainlinkAddr],
+          1
         )
         await chainlinkBasicWbtcUSDImplementation.deployed()
 
@@ -5207,7 +5237,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address, usdtAddr],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
           weth.address,
-          BASE
+          BASE,
+          1
         )
         await chainlinkBasicImplementation.deployed()
 

@@ -93,4 +93,5 @@ library Errors {
     error DelegateReducedBalance();
     error FundingPoolAlreadyExists();
     error InvalidLender();
+    error InvalidUnderCollateralizationFactor();
 }

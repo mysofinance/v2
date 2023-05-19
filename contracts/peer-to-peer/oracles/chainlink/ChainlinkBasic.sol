@@ -5,6 +5,7 @@ pragma solidity 0.8.19;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
+import {Constants} from "../../../Constants.sol";
 import {Errors} from "../../../Errors.sol";
 
 /**
@@ -15,18 +16,27 @@ contract ChainlinkBasic is IOracle {
 
     address public immutable BASE_CURRENCY;
     uint256 public immutable BASE_CURRENCY_UNIT;
+    uint256 public immutable underCollateralizationFactor;
     mapping(address => address) public oracleAddrs;
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address baseCurrency,
-        uint256 baseCurrencyUnit
+        uint256 baseCurrencyUnit,
+        uint256 _underCollateralizationFactor
     ) {
         if (
             _tokenAddrs.length == 0 || _tokenAddrs.length != _oracleAddrs.length
         ) {
             revert Errors.InvalidArrayLength();
+        }
+        if (
+            _underCollateralizationFactor == 0 ||
+            _underCollateralizationFactor >
+            Constants.MAX_ORACLE_COLLATERALIZATION_FACTOR
+        ) {
+            revert Errors.InvalidUnderCollateralizationFactor();
         }
         uint8 oracleDecimals;
         uint256 version;
@@ -49,6 +59,7 @@ contract ChainlinkBasic is IOracle {
         }
         BASE_CURRENCY = baseCurrency;
         BASE_CURRENCY_UNIT = baseCurrencyUnit;
+        underCollateralizationFactor = _underCollateralizationFactor;
     }
 
     function getPrice(
@@ -59,7 +70,9 @@ contract ChainlinkBasic is IOracle {
         uint256 priceOfLoanToken = getPriceOfToken(loanToken);
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         collTokenPriceInLoanToken =
-            (priceOfCollToken * 10 ** loanTokenDecimals) /
+            (underCollateralizationFactor *
+                priceOfCollToken *
+                10 ** loanTokenDecimals) /
             priceOfLoanToken;
     }
 

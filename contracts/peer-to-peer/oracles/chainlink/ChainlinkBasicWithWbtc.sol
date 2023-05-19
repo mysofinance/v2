@@ -20,13 +20,15 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
 
     constructor(
         address[] memory _tokenAddrs,
-        address[] memory _oracleAddrs
+        address[] memory _oracleAddrs,
+        uint256 _underCollateralizationFactor
     )
         ChainlinkBasic(
             _tokenAddrs,
             _oracleAddrs,
             0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599, // wbtc address
-            1e8 // 8 decimals for USD based oracles
+            1e8, // 8 decimals for USD based oracles
+            _underCollateralizationFactor
         )
     {}
 
