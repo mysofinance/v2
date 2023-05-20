@@ -21,9 +21,9 @@ contract Factory is Ownable, IFactory {
     address[] public fundingPools;
     mapping(address => bool) public isLoanProposal;
     mapping(address => bool) public isFundingPool;
-    mapping(address => bool) internal depositTokenHasFundingPool;
+    mapping(address => bool) internal _depositTokenHasFundingPool;
     mapping(address => mapping(address => uint256))
-        internal lenderWhitelistedUntil;
+        internal _lenderWhitelistedUntil;
 
     constructor(address _loanProposalImpl, address _fundingPoolImpl) Ownable() {
         if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
@@ -76,7 +76,7 @@ contract Factory is Ownable, IFactory {
     }
 
     function createFundingPool(address _depositToken) external {
-        if (depositTokenHasFundingPool[_depositToken]) {
+        if (_depositTokenHasFundingPool[_depositToken]) {
             revert Errors.FundingPoolAlreadyExists();
         }
         bytes32 salt = keccak256(
@@ -88,7 +88,7 @@ contract Factory is Ownable, IFactory {
         );
         fundingPools.push(newFundingPool);
         isFundingPool[newFundingPool] = true;
-        depositTokenHasFundingPool[_depositToken] = true;
+        _depositTokenHasFundingPool[_depositToken] = true;
         IFundingPoolImpl(newFundingPool).initialize(
             address(this),
             _depositToken
@@ -132,11 +132,11 @@ contract Factory is Ownable, IFactory {
         if (
             whitelistedUntil < block.timestamp ||
             whitelistedUntil <=
-            lenderWhitelistedUntil[whitelistAuthority][msg.sender]
+            _lenderWhitelistedUntil[whitelistAuthority][msg.sender]
         ) {
             revert Errors.CannotClaimOutdatedStatus();
         }
-        lenderWhitelistedUntil[whitelistAuthority][
+        _lenderWhitelistedUntil[whitelistAuthority][
             msg.sender
         ] = whitelistedUntil;
         emit LenderWhitelistStatusClaimed(
@@ -154,11 +154,11 @@ contract Factory is Ownable, IFactory {
             if (
                 lenders[i] == address(0) ||
                 whitelistedUntil ==
-                lenderWhitelistedUntil[msg.sender][lenders[i]]
+                _lenderWhitelistedUntil[msg.sender][lenders[i]]
             ) {
                 revert Errors.InvalidUpdate();
             }
-            lenderWhitelistedUntil[msg.sender][lenders[i]] = whitelistedUntil;
+            _lenderWhitelistedUntil[msg.sender][lenders[i]] = whitelistedUntil;
             unchecked {
                 i++;
             }
@@ -171,7 +171,7 @@ contract Factory is Ownable, IFactory {
         address borrower
     ) external view returns (bool) {
         return
-            lenderWhitelistedUntil[whitelistAuthority][borrower] >
+            _lenderWhitelistedUntil[whitelistAuthority][borrower] >
             block.timestamp;
     }
 
@@ -189,7 +189,7 @@ contract Factory is Ownable, IFactory {
         address lender
     ) external view returns (bool) {
         return
-            lenderWhitelistedUntil[whitelistAuthority][lender] >
+            _lenderWhitelistedUntil[whitelistAuthority][lender] >
             block.timestamp;
     }
 }

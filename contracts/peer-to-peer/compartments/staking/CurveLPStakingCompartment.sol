@@ -98,7 +98,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         );
     }
 
-    function withdrawCollFromGauge(
+    function _withdrawCollFromGauge(
         uint256 repayAmount,
         uint256 repayAmountLeft
     ) internal returns (address[8] memory _rewardTokenAddr) {
@@ -167,7 +167,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         // check staked balance in gauge if gaugeAddr has been set
         // if not staked, then liqGaugeAddr = 0 and will not withdraw or have a reward address
         address[8] memory _rewardTokenAddr = _liqGaugeAddr != address(0)
-            ? withdrawCollFromGauge(repayAmount, repayAmountLeft)
+            ? _withdrawCollFromGauge(repayAmount, repayAmountLeft)
             : [
                 address(0),
                 address(0),

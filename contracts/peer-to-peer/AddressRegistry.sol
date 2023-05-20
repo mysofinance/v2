@@ -17,18 +17,18 @@ import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 contract AddressRegistry is Ownable, IAddressRegistry {
     using ECDSA for bytes32;
 
-    bool internal isInitialized;
+    bool internal _isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => uint256))
-        internal borrowerWhitelistedUntil;
+        internal _borrowerWhitelistedUntil;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
         public whitelistState;
     // compartment => token => active
     mapping(address => mapping(address => bool))
-        internal isTokenWhitelistedForCompartment;
+        internal _isTokenWhitelistedForCompartment;
     address[] internal _registeredVaults;
 
     function initialize(
@@ -37,7 +37,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address _quoteHandler
     ) external {
         _senderCheckOwner();
-        if (isInitialized) {
+        if (_isInitialized) {
             revert Errors.AlreadyInitialized();
         }
         if (
@@ -57,14 +57,14 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         lenderVaultFactory = _lenderVaultFactory;
         borrowerGateway = _borrowerGateway;
         quoteHandler = _quoteHandler;
-        isInitialized = true;
+        _isInitialized = true;
     }
 
     function setWhitelistState(
         address[] calldata addrs,
         DataTypesPeerToPeer.WhitelistState _whitelistState
     ) external {
-        checkSenderAndIsInitialized();
+        _checkSenderAndIsInitialized();
         for (uint i = 0; i < addrs.length; ) {
             if (addrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
@@ -82,7 +82,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address[] calldata tokens,
         bool allowTokensForCompartment
     ) external {
-        checkSenderAndIsInitialized();
+        _checkSenderAndIsInitialized();
         // check that tokens can only be whitelisted for valid compartment (whereas de-whitelisting is always possible)
         if (
             allowTokensForCompartment &&
@@ -98,7 +98,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             if (allowTokensForCompartment && !isWhitelistedToken(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
-            isTokenWhitelistedForCompartment[compartmentImpl][
+            _isTokenWhitelistedForCompartment[compartmentImpl][
                 tokens[i]
             ] = allowTokensForCompartment;
             unchecked {
@@ -143,11 +143,11 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         if (
             whitelistedUntil < block.timestamp ||
             whitelistedUntil <=
-            borrowerWhitelistedUntil[whitelistAuthority][msg.sender]
+            _borrowerWhitelistedUntil[whitelistAuthority][msg.sender]
         ) {
             revert Errors.CannotClaimOutdatedStatus();
         }
-        borrowerWhitelistedUntil[whitelistAuthority][
+        _borrowerWhitelistedUntil[whitelistAuthority][
             msg.sender
         ] = whitelistedUntil;
         emit BorrowerWhitelistStatusClaimed(
@@ -165,11 +165,11 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             if (
                 borrowers[i] == address(0) ||
                 whitelistedUntil ==
-                borrowerWhitelistedUntil[msg.sender][borrowers[i]]
+                _borrowerWhitelistedUntil[msg.sender][borrowers[i]]
             ) {
                 revert Errors.InvalidUpdate();
             }
-            borrowerWhitelistedUntil[msg.sender][
+            _borrowerWhitelistedUntil[msg.sender][
                 borrowers[i]
             ] = whitelistedUntil;
             unchecked {
@@ -184,7 +184,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address borrower
     ) external view returns (bool) {
         return
-            borrowerWhitelistedUntil[whitelistAuthority][borrower] >
+            _borrowerWhitelistedUntil[whitelistAuthority][borrower] >
             block.timestamp;
     }
 
@@ -195,7 +195,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         return
             whitelistState[compartment] ==
             DataTypesPeerToPeer.WhitelistState.COMPARTMENT &&
-            isTokenWhitelistedForCompartment[compartment][token];
+            _isTokenWhitelistedForCompartment[compartment][token];
     }
 
     function registeredVaults() external view returns (address[] memory) {
@@ -221,9 +221,9 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT;
     }
 
-    function checkSenderAndIsInitialized() internal view {
+    function _checkSenderAndIsInitialized() internal view {
         _senderCheckOwner();
-        if (!isInitialized) {
+        if (!_isInitialized) {
             revert Errors.Uninitialized();
         }
     }

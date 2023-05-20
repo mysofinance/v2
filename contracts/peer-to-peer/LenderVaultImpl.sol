@@ -36,7 +36,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     bool public withdrawEntered;
 
     mapping(address => uint256) public lockedAmounts;
-    DataTypesPeerToPeer.Loan[] internal _loans; // stores loans
+    DataTypesPeerToPeer.Loan[] internal _loans;
 
     constructor() {
         _disableInitializers();
