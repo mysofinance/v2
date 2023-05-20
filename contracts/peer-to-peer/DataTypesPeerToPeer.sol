@@ -120,13 +120,17 @@ library DataTypesPeerToPeer {
     enum WhitelistState {
         // not whitelisted
         NOT_WHITELISTED,
-        // whitelisted as token
+        // can be used as loan or collateral token
         TOKEN,
-        // whitelisted as oracle
+        // can be be used as oracle
         ORACLE,
-        // whitelisted as compartment
+        // can be used as compartment
         COMPARTMENT,
-        // whitelisted as callback contract
-        CALLBACK
+        // can be used as callback contract
+        CALLBACK,
+        // can be used as loan or collateral token, but if collateral then must
+        // be used in conjunction with a compartment (e.g., for stETH with possible
+        // negative rebase that could otherwise affect other borrowers in the vault)
+        TOKEN_REQUIRING_COMPARTMENT
     }
 }
