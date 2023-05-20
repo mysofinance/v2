@@ -1109,6 +1109,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         .getTokenBalancesAndLockedAmounts([weth.address])
       expect(tokenBalanceAndLockedAmountsPostRepay._lockedAmounts[0]).to.equal(0)
 
+      // set whitelist state to compartmentalized token and should still go through
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 5)
+
+      await lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([weth.address])
+      expect(tokenBalanceAndLockedAmountsPostRepay._lockedAmounts[0]).to.equal(0)
+
       // since did not autowithdraw, no change in collateral balance
       expect(collBalPostUnlock).to.equal(collBalPostRepayVault)
       // all coll has been unlocked
