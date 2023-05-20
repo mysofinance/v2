@@ -40,18 +40,12 @@ contract QuoteHandler is IQuoteHandler {
         if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
-        if (
-            IAddressRegistry(_addressRegistry).whitelistState(
-                onChainQuote.generalQuoteInfo.collToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN ||
-            IAddressRegistry(_addressRegistry).whitelistState(
-                onChainQuote.generalQuoteInfo.loanToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN
-        ) {
-            revert Errors.NonWhitelistedToken();
-        }
+        _checkTokensAndCompartmentWhitelist(
+            onChainQuote.generalQuoteInfo.collToken,
+            onChainQuote.generalQuoteInfo.loanToken,
+            _addressRegistry,
+            onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation
+        );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
@@ -79,18 +73,12 @@ contract QuoteHandler is IQuoteHandler {
         if (!_isValidOnChainQuote(newOnChainQuote)) {
             revert Errors.InvalidQuote();
         }
-        if (
-            IAddressRegistry(_addressRegistry).whitelistState(
-                newOnChainQuote.generalQuoteInfo.collToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN ||
-            IAddressRegistry(_addressRegistry).whitelistState(
-                newOnChainQuote.generalQuoteInfo.loanToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN
-        ) {
-            revert Errors.NonWhitelistedToken();
-        }
+        _checkTokensAndCompartmentWhitelist(
+            newOnChainQuote.generalQuoteInfo.collToken,
+            newOnChainQuote.generalQuoteInfo.loanToken,
+            _addressRegistry,
+            newOnChainQuote.generalQuoteInfo.borrowerCompartmentImplementation
+        );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
@@ -313,18 +301,12 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             revert Errors.InvalidSender();
         }
-        if (
-            IAddressRegistry(_addressRegistry).whitelistState(
-                generalQuoteInfo.collToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN ||
-            IAddressRegistry(_addressRegistry).whitelistState(
-                generalQuoteInfo.loanToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN
-        ) {
-            revert Errors.NonWhitelistedToken();
-        }
+        _checkTokensAndCompartmentWhitelist(
+            generalQuoteInfo.collToken,
+            generalQuoteInfo.loanToken,
+            _addressRegistry,
+            generalQuoteInfo.borrowerCompartmentImplementation
+        );
         if (generalQuoteInfo.validUntil < block.timestamp) {
             revert Errors.OutdatedQuote();
         }
@@ -396,6 +378,52 @@ contract QuoteHandler is IQuoteHandler {
             }
         }
         return true;
+    }
+
+    function _checkTokensAndCompartmentWhitelist(
+        address collToken,
+        address loanToken,
+        address _addressRegistry,
+        address compartmentImpl
+    ) internal view {
+        DataTypesPeerToPeer.WhitelistState collWhitelistState = IAddressRegistry(
+                _addressRegistry
+            ).whitelistState(collToken);
+        DataTypesPeerToPeer.WhitelistState loanWhitelistState = IAddressRegistry(
+                _addressRegistry
+            ).whitelistState(loanToken);
+        if (
+            (collWhitelistState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
+                collWhitelistState !=
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL) ||
+            (loanWhitelistState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
+                loanWhitelistState !=
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL)
+        ) {
+            revert Errors.NonWhitelistedToken();
+        }
+        if (
+            collWhitelistState ==
+            DataTypesPeerToPeer
+                .WhitelistState
+                .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL &&
+            compartmentImpl == address(0)
+        ) {
+            revert Errors.CollateralMustBeCompartmentalized();
+        }
+        if (
+            compartmentImpl != address(0) &&
+            !IAddressRegistry(_addressRegistry).isWhitelistedCompartment(
+                compartmentImpl,
+                collToken
+            )
+        ) {
+            revert Errors.InvalidCompartmentForToken();
+        }
     }
 
     function _hashOnChainQuote(

@@ -184,14 +184,6 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             collReceiver = address(this);
             lockedAmounts[_loan.collToken] += _loan.initCollAmount;
         } else {
-            if (
-                !IAddressRegistry(addressRegistry).isWhitelistedCompartment(
-                    generalQuoteInfo.borrowerCompartmentImplementation,
-                    _loan.collToken
-                )
-            ) {
-                revert Errors.InvalidCompartmentForToken();
-            }
             collReceiver = _createCollCompartment(
                 generalQuoteInfo.borrowerCompartmentImplementation,
                 _loans.length

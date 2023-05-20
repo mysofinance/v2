@@ -508,6 +508,13 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     // whitelist token pair
     await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
+    // whitelist compartment
+    await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
+
+    // whitelist tokens for compartment
+    await addressRegistry
+      .connect(team)
+      .setWhitelistedTokensForCompartment(glpStakingCompartmentImplementation.address, [collTokenAddress], true)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)

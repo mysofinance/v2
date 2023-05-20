@@ -95,10 +95,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             revert Errors.InvalidArrayLength();
         }
         for (uint i = 0; i < tokens.length; ) {
+            DataTypesPeerToPeer.WhitelistState tokenState = whitelistState[
+                tokens[i]
+            ];
             if (
                 isWhitelisted &&
-                whitelistState[tokens[i]] !=
-                DataTypesPeerToPeer.WhitelistState.TOKEN
+                tokenState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
+                tokenState !=
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL
             ) {
                 revert Errors.NonWhitelistedToken();
             }

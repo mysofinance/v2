@@ -2456,7 +2456,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } =
         await setupTest()
 
-      // create curve staking implementation
+      // create aave staking implementation
       const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
       await AaveStakingCompartmentImplementation.connect(team)
       const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
@@ -2531,6 +2531,23 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
+      await expect(
+        createOnChainRequest({
+          lender,
+          collToken: collTokenAddress,
+          loanToken: usdc.address,
+          borrowerCompartmentImplementation: team.address,
+          lenderVault,
+          quoteHandler,
+          loanPerCollUnit: ONE_USDC.mul(1000)
+        })
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidCompartmentForToken')
+
+      // whitelist team.address as a valid compartment implementation
+      await addressRegistry.connect(team).setWhitelistState([team.address], 3)
+      // whitelist compartment for token
+      await addressRegistry.connect(team).setWhitelistedTokensForCompartment(team.address, [collTokenAddress], true)
+
       const badCompartmentOnChainQuote = await createOnChainRequest({
         lender,
         collToken: collTokenAddress,
@@ -2540,6 +2557,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteHandler,
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
+
+      // whitelist compartment for token
+      await addressRegistry.connect(team).setWhitelistedTokensForCompartment(team.address, [collTokenAddress], false)
 
       // borrow with on chain quote
       const collSendAmount = BigNumber.from(10).pow(18)
@@ -2557,11 +2577,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
 
       // borrow with bad compartment before token-compartment-pair is whitelisted should fail
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badCompartmentOnChainQuote, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidCompartmentForToken')
+      // await expect(
+      //   borrowerGateway
+      //     .connect(borrower)
+      //     .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badCompartmentOnChainQuote, quoteTupleIdx)
+      // ).to.be.revertedWithCustomError(quoteHandler, 'InvalidCompartmentForToken')
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -2684,6 +2704,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // whitelist token pair
       await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address], 1)
 
+      // whitelist compartment for token
+      await addressRegistry
+        .connect(team)
+        .setWhitelistedTokensForCompartment(votingCompartmentImplementation.address, [collTokenAddress], true)
+
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
@@ -2713,10 +2738,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
-
-      await addressRegistry
-        .connect(team)
-        .setWhitelistedTokensForCompartment(votingCompartmentImplementation.address, [collTokenAddress], true)
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -2888,6 +2909,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // whitelist token pair
       await addressRegistry.connect(team).setWhitelistState([collTokenAddress, weth.address], 1)
 
+      // whitelist compartment for token
+      await addressRegistry
+        .connect(team)
+        .setWhitelistedTokensForCompartment(votingCompartmentImplementation.address, [collTokenAddress], true)
+
       expect(await addressRegistry.connect(team).whitelistState(collTokenAddress)).to.be.equal(1)
       expect(await addressRegistry.connect(team).whitelistState(weth.address)).to.be.equal(1)
 
@@ -2932,10 +2958,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
-
-      await addressRegistry
-        .connect(team)
-        .setWhitelistedTokensForCompartment(votingCompartmentImplementation.address, [collTokenAddress], true)
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -3140,6 +3162,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // whitelist token pair
       await addressRegistry.connect(team).setWhitelistState([collTokenAddress, usdc.address, paxg.address], 1)
 
+      // whitelist compartment for tokens
+      await addressRegistry
+        .connect(team)
+        .setWhitelistedTokensForCompartment(
+          aaveStakingCompartmentImplementation.address,
+          [paxg.address, collTokenAddress],
+          true
+        )
+
       // borrower approves borrower gateway
       await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -3182,14 +3213,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
-
-      await addressRegistry
-        .connect(team)
-        .setWhitelistedTokensForCompartment(
-          aaveStakingCompartmentImplementation.address,
-          [paxg.address, collTokenAddress],
-          true
-        )
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
