@@ -28,6 +28,16 @@ interface IAddressRegistry {
         address oldTokenManager,
         address newTokenManager
     );
+    event TokenWrapperContractUpdated(
+        address oldTokenWrapper,
+        address newTokenWrapper
+    );
+    event NonFungibleTokensWrapped(
+        DataTypesPeerToPeer.NftAddressAndIds[] wrappers,
+        string name,
+        string symbol,
+        address newErc20Addr
+    );
 
     /**
      * @notice initializes factory, gateway, and quote handler contracts
@@ -47,6 +57,13 @@ interface IAddressRegistry {
      * @param newTokenManager Address of the new MYSO token manager contract
      */
     function setMysoTokenManager(address newTokenManager) external;
+
+    /**
+     * @notice Sets a new ERC721 token wrapper contract
+     * @dev Can only be called by registry owner
+     * @param newTokenWrapper Address of the new ERC721 token wrapper contract
+     */
+    function setTokenWrapperContract(address newTokenWrapper) external;
 
     /**
      * @notice adds new lender vault to registry

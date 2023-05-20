@@ -117,6 +117,13 @@ library DataTypesPeerToPeer {
         bytes callbackData;
     }
 
+    struct NftAddressAndIds {
+        // address of the NFT
+        address nftAddress;
+        // array of NFT ids
+        uint256[] nftIds;
+    }
+
     enum WhitelistState {
         // not whitelisted
         NOT_WHITELISTED,
@@ -127,6 +134,8 @@ library DataTypesPeerToPeer {
         // whitelisted as compartment
         COMPARTMENT,
         // whitelisted as callback contract
-        CALLBACK
+        CALLBACK,
+        // whitelisted as non-fungible token (ERC-721 standard)
+        NFT
     }
 }

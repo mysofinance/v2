@@ -6,6 +6,7 @@ import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {INftWrapper} from "./interfaces/wrappers/ERC721/INftWrapper.sol";
 
 /**
  * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
@@ -22,6 +23,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public borrowerGateway;
     address public quoteHandler;
     address public mysoTokenManager;
+    address public erc721TokenWrapper;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => uint256))
         internal _borrowerWhitelistedUntil;
@@ -127,6 +129,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
+    function setTokenWrapperContract(address newTokenWrapper) external {
+        _senderCheckOwner();
+        address oldTokenWrapper = erc721TokenWrapper;
+        if (oldTokenWrapper == newTokenWrapper) {
+            revert Errors.InvalidAddress();
+        }
+        erc721TokenWrapper = newTokenWrapper;
+        emit TokenWrapperContractUpdated(oldTokenWrapper, newTokenWrapper);
+    }
+
     function addLenderVault(address addr) external {
         // catches case where address registry is uninitialized (lenderVaultFactory == address(0))
         if (msg.sender != lenderVaultFactory) {
@@ -170,6 +182,56 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             msg.sender,
             whitelistedUntil
         );
+    }
+
+    function createWrappedNftToken(
+        DataTypesPeerToPeer.NftAddressAndIds[] calldata tokenInfo,
+        string calldata name,
+        string calldata symbol
+    ) external {
+        address _erc721TokenWrapper = erc721TokenWrapper;
+        if (_erc721TokenWrapper == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        if (tokenInfo.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        uint160 prevNftAddressCastToUint160;
+        uint160 nftAddressCastToUint160;
+        uint256 prevId;
+        for (uint i = 0; i < tokenInfo.length; ) {
+            if (tokenInfo[i].nftIds.length == 0) {
+                revert Errors.InvalidArrayLength();
+            }
+            if (
+                whitelistState[tokenInfo[i].nftAddress] !=
+                DataTypesPeerToPeer.WhitelistState.NFT
+            ) {
+                revert Errors.NonWhitelistedToken();
+            }
+            nftAddressCastToUint160 = uint160(tokenInfo[i].nftAddress);
+            if (nftAddressCastToUint160 <= prevNftAddressCastToUint160) {
+                revert Errors.NonIncreasingTokenAddrs();
+            }
+            prevId = 0;
+            for (uint j = 0; j < tokenInfo[i].nftIds.length; ) {
+                if (tokenInfo[i].nftIds[j] <= prevId && j != 0) {
+                    revert Errors.NonIncreasingNonFungibleTokenIds();
+                }
+                prevId = tokenInfo[i].nftIds[j];
+                unchecked {
+                    j++;
+                }
+            }
+            prevNftAddressCastToUint160 = nftAddressCastToUint160;
+            unchecked {
+                i++;
+            }
+        }
+        address newERC20Addr = INftWrapper(_erc721TokenWrapper)
+            .createWrappedNftToken(msg.sender, tokenInfo, name, symbol);
+        whitelistState[newERC20Addr] = DataTypesPeerToPeer.WhitelistState.TOKEN;
+        emit NonFungibleTokensWrapped(tokenInfo, name, symbol, newERC20Addr);
     }
 
     function updateBorrowerWhitelist(
