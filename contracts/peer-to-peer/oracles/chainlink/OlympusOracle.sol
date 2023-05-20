@@ -46,8 +46,8 @@ contract OlympusOracle is IOracle, ChainlinkBasic {
         if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {
             revert Errors.NeitherTokenIsGOHM();
         }
-        uint256 priceOfCollToken = getPriceOfToken(collToken);
-        uint256 priceOfLoanToken = getPriceOfToken(loanToken);
+        uint256 priceOfCollToken = _getPriceOfToken(collToken);
+        uint256 priceOfLoanToken = _getPriceOfToken(loanToken);
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         uint256 index = IOlympus(GOHM_ADDR).index();
 

