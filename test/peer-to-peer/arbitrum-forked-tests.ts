@@ -163,7 +163,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     // whitelist tokens for compartment
     await addressRegistry
       .connect(team)
-      .setWhitelistedTokensForCompartment(glpStakingCompartmentImplementation.address, [collTokenAddress], true)
+      .setAllowedTokensForCompartment(glpStakingCompartmentImplementation.address, [collTokenAddress], true)
 
     const rewardRouterInstance = new ethers.Contract(rewardRouterAddress, gmxRewardRouterAbi, borrower.provider)
 
@@ -514,7 +514,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     // whitelist tokens for compartment
     await addressRegistry
       .connect(team)
-      .setWhitelistedTokensForCompartment(glpStakingCompartmentImplementation.address, [collTokenAddress], true)
+      .setAllowedTokensForCompartment(glpStakingCompartmentImplementation.address, [collTokenAddress], true)
 
     // borrower approves borrower gateway
     await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)

@@ -77,15 +77,15 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         emit WhitelistStateUpdated(addrs, _whitelistState);
     }
 
-    function setWhitelistedTokensForCompartment(
+    function setAllowedTokensForCompartment(
         address compartmentImpl,
         address[] calldata tokens,
-        bool isWhitelisted
+        bool allowTokensForCompartment
     ) external {
         checkSenderAndIsInitialized();
         // check that tokens can only be whitelisted for valid compartment (whereas de-whitelisting is always possible)
         if (
-            isWhitelisted &&
+            allowTokensForCompartment &&
             whitelistState[compartmentImpl] !=
             DataTypesPeerToPeer.WhitelistState.COMPARTMENT
         ) {
@@ -95,30 +95,20 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             revert Errors.InvalidArrayLength();
         }
         for (uint i = 0; i < tokens.length; ) {
-            DataTypesPeerToPeer.WhitelistState tokenState = whitelistState[
-                tokens[i]
-            ];
-            if (
-                isWhitelisted &&
-                tokenState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
-                tokenState !=
-                DataTypesPeerToPeer
-                    .WhitelistState
-                    .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL
-            ) {
+            if (allowTokensForCompartment && !isWhitelistedToken(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
             isTokenWhitelistedForCompartment[compartmentImpl][
                 tokens[i]
-            ] = isWhitelisted;
+            ] = allowTokensForCompartment;
             unchecked {
                 i++;
             }
         }
-        emit TokenWhitelistForCompartmentUpdated(
+        emit AllowedTokensForCompartmentUpdated(
             compartmentImpl,
             tokens,
-            isWhitelisted
+            allowTokensForCompartment
         );
     }
 
@@ -219,6 +209,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         returns (address)
     {
         return _owner;
+    }
+
+    function isWhitelistedToken(address token) public view returns (bool) {
+        DataTypesPeerToPeer.WhitelistState tokenWhitelistState = whitelistState[
+            token
+        ];
+        return
+            tokenWhitelistState == DataTypesPeerToPeer.WhitelistState.TOKEN ||
+            tokenWhitelistState ==
+            DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT;
     }
 
     function checkSenderAndIsInitialized() internal view {

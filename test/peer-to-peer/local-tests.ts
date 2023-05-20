@@ -2239,14 +2239,17 @@ describe('Peer-to-Peer: Local Tests', function () {
       // set earliest repay back to value that is consistent with tenors
       onChainQuote.generalQuoteInfo.earliestRepayTenor = ethers.BigNumber.from(0)
 
-      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 5)
+      // set loan and coll token whitelist states
+      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 5)
 
       // quote cannot be added with coll token must be compartmentalized and no compartment
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'CollateralMustBeCompartmentalized')
 
-      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+      // update coll token whitelist state
+      await addressRegistry.connect(team).setWhitelistState([weth.address], 1)
 
       // add valid onchain quote
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
@@ -2305,7 +2308,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
       await addressRegistry
         .connect(team)
-        .setWhitelistedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
+        .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
 
       // add new valid onchain quote with compartment
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(

@@ -386,43 +386,29 @@ contract QuoteHandler is IQuoteHandler {
         address _addressRegistry,
         address compartmentImpl
     ) internal view {
-        DataTypesPeerToPeer.WhitelistState collWhitelistState = IAddressRegistry(
-                _addressRegistry
-            ).whitelistState(collToken);
-        DataTypesPeerToPeer.WhitelistState loanWhitelistState = IAddressRegistry(
-                _addressRegistry
-            ).whitelistState(loanToken);
+        IAddressRegistry registry = IAddressRegistry(_addressRegistry);
         if (
-            (collWhitelistState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
-                collWhitelistState !=
-                DataTypesPeerToPeer
-                    .WhitelistState
-                    .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL) ||
-            (loanWhitelistState != DataTypesPeerToPeer.WhitelistState.TOKEN &&
-                loanWhitelistState !=
-                DataTypesPeerToPeer
-                    .WhitelistState
-                    .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL)
+            !registry.isWhitelistedToken(loanToken) ||
+            !registry.isWhitelistedToken(collToken)
         ) {
             revert Errors.NonWhitelistedToken();
         }
-        if (
-            collWhitelistState ==
-            DataTypesPeerToPeer
-                .WhitelistState
-                .TOKEN_COMPARTMENTALIZE_IF_COLLATERAL &&
-            compartmentImpl == address(0)
-        ) {
-            revert Errors.CollateralMustBeCompartmentalized();
-        }
-        if (
-            compartmentImpl != address(0) &&
-            !IAddressRegistry(_addressRegistry).isWhitelistedCompartment(
-                compartmentImpl,
-                collToken
-            )
-        ) {
-            revert Errors.InvalidCompartmentForToken();
+
+        DataTypesPeerToPeer.WhitelistState collTokenWhitelistState = registry
+            .whitelistState(collToken);
+        if (compartmentImpl == address(0)) {
+            if (
+                collTokenWhitelistState ==
+                DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT
+            ) {
+                revert Errors.CollateralMustBeCompartmentalized();
+            }
+        } else {
+            if (
+                !registry.isWhitelistedCompartment(compartmentImpl, collToken)
+            ) {
+                revert Errors.InvalidCompartmentForToken();
+            }
         }
     }
 
