@@ -2558,7 +2558,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
-      // whitelist compartment for token
+      // de-whitelist compartment for token
       await addressRegistry.connect(team).setWhitelistedTokensForCompartment(team.address, [collTokenAddress], false)
 
       // borrow with on chain quote
@@ -2576,12 +2576,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
-      // borrow with bad compartment before token-compartment-pair is whitelisted should fail
-      // await expect(
-      //   borrowerGateway
-      //     .connect(borrower)
-      //     .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badCompartmentOnChainQuote, quoteTupleIdx)
-      // ).to.be.revertedWithCustomError(quoteHandler, 'InvalidCompartmentForToken')
+      //borrow with bad compartment before token-compartment-pair is whitelisted should fail
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, badCompartmentOnChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidCompartmentForToken')
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
