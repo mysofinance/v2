@@ -78,15 +78,15 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         emit WhitelistStateUpdated(addrs, _whitelistState);
     }
 
-    function setWhitelistedTokensForCompartment(
+    function setAllowedTokensForCompartment(
         address compartmentImpl,
         address[] calldata tokens,
-        bool isWhitelisted
+        bool allowTokensForCompartment
     ) external {
         _checkSenderAndIsInitialized();
         // check that tokens can only be whitelisted for valid compartment (whereas de-whitelisting is always possible)
         if (
-            isWhitelisted &&
+            allowTokensForCompartment &&
             whitelistState[compartmentImpl] !=
             DataTypesPeerToPeer.WhitelistState.COMPARTMENT
         ) {
@@ -96,24 +96,20 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             revert Errors.InvalidArrayLength();
         }
         for (uint i = 0; i < tokens.length; ) {
-            if (
-                isWhitelisted &&
-                whitelistState[tokens[i]] !=
-                DataTypesPeerToPeer.WhitelistState.TOKEN
-            ) {
+            if (allowTokensForCompartment && !isWhitelistedToken(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
             _isTokenWhitelistedForCompartment[compartmentImpl][
                 tokens[i]
-            ] = isWhitelisted;
+            ] = allowTokensForCompartment;
             unchecked {
                 i++;
             }
         }
-        emit TokenWhitelistForCompartmentUpdated(
+        emit AllowedTokensForCompartmentUpdated(
             compartmentImpl,
             tokens,
-            isWhitelisted
+            allowTokensForCompartment
         );
     }
 
@@ -224,6 +220,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         returns (address)
     {
         return _owner;
+    }
+
+    function isWhitelistedToken(address token) public view returns (bool) {
+        DataTypesPeerToPeer.WhitelistState tokenWhitelistState = whitelistState[
+            token
+        ];
+        return
+            tokenWhitelistState == DataTypesPeerToPeer.WhitelistState.TOKEN ||
+            tokenWhitelistState ==
+            DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT;
     }
 
     function _checkSenderAndIsInitialized() internal view {

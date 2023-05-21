@@ -36,7 +36,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     bool public withdrawEntered;
 
     mapping(address => uint256) public lockedAmounts;
-    DataTypesPeerToPeer.Loan[] internal _loans; // stores loans
+    DataTypesPeerToPeer.Loan[] internal _loans;
 
     constructor() {
         _disableInitializers();
@@ -184,14 +184,6 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             collReceiver = address(this);
             lockedAmounts[_loan.collToken] += _loan.initCollAmount;
         } else {
-            if (
-                !IAddressRegistry(addressRegistry).isWhitelistedCompartment(
-                    generalQuoteInfo.borrowerCompartmentImplementation,
-                    _loan.collToken
-                )
-            ) {
-                revert Errors.InvalidCompartmentForToken();
-            }
             collReceiver = _createCollCompartment(
                 generalQuoteInfo.borrowerCompartmentImplementation,
                 _loans.length
@@ -350,11 +342,11 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
         balances = new uint256[](tokens.length);
         _lockedAmounts = new uint256[](tokens.length);
+        IAddressRegistry _addressRegistry = IAddressRegistry(addressRegistry);
         for (uint256 i = 0; i < tokens.length; ) {
             if (
                 tokens[i] == address(0) ||
-                IAddressRegistry(addressRegistry).whitelistState(tokens[i]) !=
-                DataTypesPeerToPeer.WhitelistState.TOKEN
+                !_addressRegistry.isWhitelistedToken(tokens[i])
             ) {
                 revert Errors.InvalidAddress();
             }
