@@ -55,15 +55,15 @@ contract ChainlinkBasic is IOracle {
         address collToken,
         address loanToken
     ) external view virtual returns (uint256 collTokenPriceInLoanToken) {
-        uint256 priceOfCollToken = getPriceOfToken(collToken);
-        uint256 priceOfLoanToken = getPriceOfToken(loanToken);
+        uint256 priceOfCollToken = _getPriceOfToken(collToken);
+        uint256 priceOfLoanToken = _getPriceOfToken(loanToken);
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         collTokenPriceInLoanToken =
             (priceOfCollToken * 10 ** loanTokenDecimals) /
             priceOfLoanToken;
     }
 
-    function getPriceOfToken(
+    function _getPriceOfToken(
         address token
     ) internal view virtual returns (uint256 tokenPriceRaw) {
         if (token == BASE_CURRENCY) {
@@ -73,11 +73,11 @@ contract ChainlinkBasic is IOracle {
             if (oracleAddr == address(0)) {
                 revert Errors.NoOracle();
             }
-            tokenPriceRaw = checkAndReturnLatestRoundData(oracleAddr);
+            tokenPriceRaw = _checkAndReturnLatestRoundData(oracleAddr);
         }
     }
 
-    function checkAndReturnLatestRoundData(
+    function _checkAndReturnLatestRoundData(
         address oracleAddr
     ) internal view returns (uint256 tokenPriceRaw) {
         (

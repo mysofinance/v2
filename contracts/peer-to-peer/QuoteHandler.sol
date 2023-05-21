@@ -40,18 +40,12 @@ contract QuoteHandler is IQuoteHandler {
         if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
-        if (
-            IAddressRegistry(_addressRegistry).whitelistState(
-                onChainQuote.generalQuoteInfo.collToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN ||
-            IAddressRegistry(_addressRegistry).whitelistState(
-                onChainQuote.generalQuoteInfo.loanToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN
-        ) {
-            revert Errors.NonWhitelistedToken();
-        }
+        _checkTokensAndCompartmentWhitelist(
+            onChainQuote.generalQuoteInfo.collToken,
+            onChainQuote.generalQuoteInfo.loanToken,
+            _addressRegistry,
+            onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation
+        );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
@@ -79,18 +73,12 @@ contract QuoteHandler is IQuoteHandler {
         if (!_isValidOnChainQuote(newOnChainQuote)) {
             revert Errors.InvalidQuote();
         }
-        if (
-            IAddressRegistry(_addressRegistry).whitelistState(
-                newOnChainQuote.generalQuoteInfo.collToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN ||
-            IAddressRegistry(_addressRegistry).whitelistState(
-                newOnChainQuote.generalQuoteInfo.loanToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN
-        ) {
-            revert Errors.NonWhitelistedToken();
-        }
+        _checkTokensAndCompartmentWhitelist(
+            newOnChainQuote.generalQuoteInfo.collToken,
+            newOnChainQuote.generalQuoteInfo.loanToken,
+            _addressRegistry,
+            newOnChainQuote.generalQuoteInfo.borrowerCompartmentImplementation
+        );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
@@ -313,18 +301,12 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             revert Errors.InvalidSender();
         }
-        if (
-            IAddressRegistry(_addressRegistry).whitelistState(
-                generalQuoteInfo.collToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN ||
-            IAddressRegistry(_addressRegistry).whitelistState(
-                generalQuoteInfo.loanToken
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.TOKEN
-        ) {
-            revert Errors.NonWhitelistedToken();
-        }
+        _checkTokensAndCompartmentWhitelist(
+            generalQuoteInfo.collToken,
+            generalQuoteInfo.loanToken,
+            _addressRegistry,
+            generalQuoteInfo.borrowerCompartmentImplementation
+        );
         if (generalQuoteInfo.validUntil < block.timestamp) {
             revert Errors.OutdatedQuote();
         }
@@ -396,6 +378,38 @@ contract QuoteHandler is IQuoteHandler {
             }
         }
         return true;
+    }
+
+    function _checkTokensAndCompartmentWhitelist(
+        address collToken,
+        address loanToken,
+        address _addressRegistry,
+        address compartmentImpl
+    ) internal view {
+        IAddressRegistry registry = IAddressRegistry(_addressRegistry);
+        if (
+            !registry.isWhitelistedToken(loanToken) ||
+            !registry.isWhitelistedToken(collToken)
+        ) {
+            revert Errors.NonWhitelistedToken();
+        }
+
+        DataTypesPeerToPeer.WhitelistState collTokenWhitelistState = registry
+            .whitelistState(collToken);
+        if (compartmentImpl == address(0)) {
+            if (
+                collTokenWhitelistState ==
+                DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT
+            ) {
+                revert Errors.CollateralMustBeCompartmentalized();
+            }
+        } else {
+            if (
+                !registry.isWhitelistedCompartment(compartmentImpl, collToken)
+            ) {
+                revert Errors.InvalidCompartmentForToken();
+            }
+        }
     }
 
     function _hashOnChainQuote(

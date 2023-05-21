@@ -9,7 +9,7 @@ interface IAddressRegistry {
         address[] indexed whitelistAddrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
     );
-    event TokenWhitelistForCompartmentUpdated(
+    event AllowedTokensForCompartmentUpdated(
         address compartmentImpl,
         address[] tokens,
         bool isWhitelisted
@@ -84,7 +84,8 @@ interface IAddressRegistry {
      * @notice Sets the whitelist state for a given address
      * @dev Can only be called by registry owner
      * @param addrs Addresses for which whitelist state shall be set
-     * @param whitelistState The whitelist state to which addresses shall be set (NOT_WHITELISTED, TOKEN, ORACLE, COMPARTMENT, or CALLBACK)
+     * @param whitelistState The whitelist state to which addresses shall be set (NOT_WHITELISTED, TOKEN, 
+     ORACLE, COMPARTMENT, CALLBACK, or TOKEN_REQUIRING_COMPARTMENT)
      */
     function setWhitelistState(
         address[] memory addrs,
@@ -92,16 +93,17 @@ interface IAddressRegistry {
     ) external;
 
     /**
-     * @notice Sets the token whitelist for a given compartment implementation
+     * @notice Sets the allowed tokens for a given compartment implementation
      * @dev Can only be called by registry owner
-     * @param compartmentImpl Compartment implementations for which token whitelist shall be set
-     * @param tokens Tokens for which whitelist state shall be set
-     * @param isWhitelisted Boolean flag indicating whether tokens are whitelisted for compartment implementation
+     * @param compartmentImpl Compartment implementations for which allowed tokens shall be set
+     * @param tokens List of tokens that shall be allowed for given compartment implementation
+     * @param allowTokensForCompartment Boolean flag indicating whether tokens shall be allowed for compartment 
+     implementation
      */
-    function setWhitelistedTokensForCompartment(
+    function setAllowedTokensForCompartment(
         address compartmentImpl,
         address[] memory tokens,
-        bool isWhitelisted
+        bool allowTokensForCompartment
     ) external;
 
     /**
@@ -114,6 +116,13 @@ interface IAddressRegistry {
         address whitelistAuthority,
         address borrower
     ) external view returns (bool);
+
+    /**
+     * @notice Returns boolean flag indicating whether token is whitelisted
+     * @param token Addresses of the given token to check
+     * @return Boolean flag indicating whether the token is whitelisted
+     */
+    function isWhitelistedToken(address token) external view returns (bool);
 
     /**
      * @notice Returns the address of the vault factory
@@ -149,7 +158,8 @@ interface IAddressRegistry {
     /**
      * @notice Returns whitelist state for given address
      * @param addr Address to check whitelist state for
-     * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, TOKEN, ORACLE, COMPARTMENT, or CALLBACK)
+     * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, TOKEN, 
+     ORACLE, COMPARTMENT, CALLBACK, or TOKEN_REQUIRING_COMPARTMENT)
      */
     function whitelistState(
         address addr
