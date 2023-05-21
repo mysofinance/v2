@@ -13,7 +13,7 @@ import {IWrappedNftERC20Impl} from "../../interfaces/wrappers/ERC721/IWrappedNft
 
 contract ERC721Wrapper is ReentrancyGuard, INftWrapper {
     address public immutable addressRegistry;
-    IERC20 public immutable wrappedNftErc20Impl;
+    address public immutable wrappedNftErc20Impl;
     IERC20[] public wrappedERC20Instances;
 
     constructor(address _addressRegistry, address _wrappedErc20Impl) {
@@ -21,7 +21,7 @@ contract ERC721Wrapper is ReentrancyGuard, INftWrapper {
             revert Errors.InvalidAddress();
         }
         addressRegistry = _addressRegistry;
-        wrappedNftErc20Impl = IERC20(_wrappedErc20Impl);
+        wrappedNftErc20Impl = _wrappedErc20Impl;
     }
 
     function createWrappedNftToken(
@@ -36,10 +36,7 @@ contract ERC721Wrapper is ReentrancyGuard, INftWrapper {
         bytes32 salt = keccak256(
             abi.encodePacked(wrappedERC20Instances.length)
         );
-        newErc20Addr = Clones.cloneDeterministic(
-            address(wrappedNftErc20Impl),
-            salt
-        );
+        newErc20Addr = Clones.cloneDeterministic(wrappedNftErc20Impl, salt);
         for (uint256 i = 0; i < tokenInfo.length; i++) {
             for (uint256 j = 0; j < tokenInfo[i].nftIds.length; j++) {
                 try

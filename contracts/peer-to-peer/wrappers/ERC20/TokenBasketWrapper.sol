@@ -13,7 +13,7 @@ import {ITokenBasketWrapperERC20Impl} from "../../interfaces/wrappers/ERC20/ITok
 contract TokenBasketWrapper is ReentrancyGuard, ITokenBasketWrapper {
     using SafeERC20 for IERC20;
     address public immutable addressRegistry;
-    IERC20 public immutable tokenBasketWrapperErc20Impl;
+    address public immutable tokenBasketWrapperErc20Impl;
     IERC20[] public wrappedERC20Instances;
 
     constructor(
@@ -27,7 +27,7 @@ contract TokenBasketWrapper is ReentrancyGuard, ITokenBasketWrapper {
             revert Errors.InvalidAddress();
         }
         addressRegistry = _addressRegistry;
-        tokenBasketWrapperErc20Impl = IERC20(_tokenBasketWrapperErc20Impl);
+        tokenBasketWrapperErc20Impl = _tokenBasketWrapperErc20Impl;
     }
 
     function createWrappedTokenBasket(
@@ -45,7 +45,7 @@ contract TokenBasketWrapper is ReentrancyGuard, ITokenBasketWrapper {
             abi.encodePacked(wrappedERC20Instances.length)
         );
         newErc20Addr = Clones.cloneDeterministic(
-            address(tokenBasketWrapperErc20Impl),
+            tokenBasketWrapperErc20Impl,
             salt
         );
         for (uint256 i = 0; i < tokenAddrs.length; i++) {
