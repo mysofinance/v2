@@ -61,10 +61,10 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         uint256 collTokenPriceRaw = isCollTokenLpToken
             ? getLpTokenPrice(collToken)
-            : getPriceOfToken(collToken);
+            : _getPriceOfToken(collToken);
         uint256 loanTokenPriceRaw = isLoanTokenLpToken
             ? getLpTokenPrice(loanToken)
-            : getPriceOfToken(loanToken);
+            : _getPriceOfToken(loanToken);
 
         collTokenPriceInLoanToken =
             (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
@@ -92,8 +92,8 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             IUniV2(lpToken).token1()
         );
         uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
-        uint256 priceToken0 = getPriceOfToken(token0);
-        uint256 priceToken1 = getPriceOfToken(token1);
+        uint256 priceToken0 = _getPriceOfToken(token0);
+        uint256 priceToken1 = _getPriceOfToken(token1);
 
         // calculate fair LP token price based on "fair reserves" as described in
         // https://blog.alphaventuredao.io/fair-lp-token-pricing/

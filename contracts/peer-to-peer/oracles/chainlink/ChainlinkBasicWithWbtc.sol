@@ -30,19 +30,19 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
         )
     {}
 
-    function getPriceOfToken(
+    function _getPriceOfToken(
         address token
     ) internal view override(ChainlinkBasic) returns (uint256 tokenPriceRaw) {
         if (token == BASE_CURRENCY) {
-            uint256 answer1 = checkAndReturnLatestRoundData(WBTC_BTC_ORACLE);
-            uint256 answer2 = checkAndReturnLatestRoundData(BTC_USD_ORACLE);
+            uint256 answer1 = _checkAndReturnLatestRoundData(WBTC_BTC_ORACLE);
+            uint256 answer2 = _checkAndReturnLatestRoundData(BTC_USD_ORACLE);
             tokenPriceRaw = (answer1 * answer2) / BASE_CURRENCY_UNIT;
         } else {
             address oracleAddr = oracleAddrs[token];
             if (oracleAddr == address(0)) {
                 revert Errors.NoOracle();
             }
-            tokenPriceRaw = checkAndReturnLatestRoundData(oracleAddr);
+            tokenPriceRaw = _checkAndReturnLatestRoundData(oracleAddr);
         }
     }
 }
