@@ -148,6 +148,17 @@ export const whitelistLender = async (
   const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
   expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
+  // expects to revert on invalid whitelist authority
+  await expect(
+    factory.connect(lender).claimLenderWhitelistStatus(ZERO_ADDR, whitelistedUntil, signature, salt)
+  ).to.be.revertedWithCustomError(factory, 'InvalidSignature')
+
+  // expects to revert on invalid signature
+  const invalidSignature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+  await expect(
+    factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, invalidSignature, salt)
+  ).to.be.revertedWithCustomError(factory, 'InvalidSignature')
+
   // have lender claim whitelist status
   await factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
 }
