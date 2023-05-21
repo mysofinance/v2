@@ -144,13 +144,13 @@ library DataTypesPeerToPeer {
         ORACLE,
         // can be used as compartment
         COMPARTMENT,
-        // whitelisted as non-fungible token (ERC-721 standard)
-        NFT
         // can be used as callback contract
         CALLBACK,
         // can be used as loan or collateral token, but if collateral then must
         // be used in conjunction with a compartment (e.g., for stETH with possible
         // negative rebase that could otherwise affect other borrowers in the vault)
-        TOKEN_REQUIRING_COMPARTMENT
+        TOKEN_REQUIRING_COMPARTMENT,
+        // whitelisted as non-fungible token (ERC-721 standard)
+        NFT
     }
 }
