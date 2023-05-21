@@ -147,6 +147,12 @@ describe('Peer-to-Pool: Local Tests', function () {
       'Initializable: contract is already initialized'
     )
 
+    // reverts if trying to set same MYSO token manager (initially zero)
+    await expect(factory.connect(team).setMysoTokenManager(ADDRESS_ZERO)).to.be.revertedWithCustomError(
+      factory,
+      'InvalidAddress'
+    )
+
     return {
       fundingPool,
       factory,
