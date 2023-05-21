@@ -10,7 +10,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ITokenBasketWrapperERC20Impl} from "../../interfaces/wrappers/ERC20/ITokenBasketWrapperERC20Impl.sol";
 
-contract TokenBasketWrapperERC20 is
+contract TokenBasketWrapperERC20Impl is
     ERC20,
     Initializable,
     ReentrancyGuard,
