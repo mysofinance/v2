@@ -35,6 +35,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         bytes32 salt = keccak256(
             abi.encodePacked(wrappedERC20Instances.length)
         );
+
         newErc20Addr = Clones.cloneDeterministic(
             address(wrappedNftErc20Impl),
             salt

@@ -151,6 +151,8 @@ library DataTypesPeerToPeer {
         // negative rebase that could otherwise affect other borrowers in the vault)
         TOKEN_REQUIRING_COMPARTMENT,
         // whitelisted as non-fungible token (ERC-721 standard)
-        NFT
+        NFT,
+        // whitelisted in Address Registry
+        CONTRACT_IN_ADDRESS_REGISTRY
     }
 }

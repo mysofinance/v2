@@ -63,6 +63,18 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         borrowerGateway = _borrowerGateway;
         quoteHandler = _quoteHandler;
         _isInitialized = true;
+        whitelistState[address(this)] = DataTypesPeerToPeer
+            .WhitelistState
+            .CONTRACT_IN_ADDRESS_REGISTRY;
+        whitelistState[_lenderVaultFactory] = DataTypesPeerToPeer
+            .WhitelistState
+            .CONTRACT_IN_ADDRESS_REGISTRY;
+        whitelistState[_borrowerGateway] = DataTypesPeerToPeer
+            .WhitelistState
+            .CONTRACT_IN_ADDRESS_REGISTRY;
+        whitelistState[_quoteHandler] = DataTypesPeerToPeer
+            .WhitelistState
+            .CONTRACT_IN_ADDRESS_REGISTRY;
     }
 
     function setWhitelistState(
@@ -73,6 +85,12 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         for (uint i = 0; i < addrs.length; ) {
             if (addrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
+            }
+            if (
+                whitelistState[addrs[i]] ==
+                DataTypesPeerToPeer.WhitelistState.CONTRACT_IN_ADDRESS_REGISTRY
+            ) {
+                revert Errors.ContractInAddressRegistry();
             }
             whitelistState[addrs[i]] = _whitelistState;
             unchecked {
@@ -120,10 +138,25 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     function setMysoTokenManager(address newTokenManager) external {
         _senderCheckOwner();
         address oldTokenManager = mysoTokenManager;
+        // allow newTokenManager to be reset to address(0) to remove any token manager
         if (oldTokenManager == newTokenManager) {
             revert Errors.InvalidAddress();
         }
+        if (
+            whitelistState[newTokenManager] !=
+            DataTypesPeerToPeer.WhitelistState.NOT_WHITELISTED
+        ) {
+            revert Errors.AlreadyWhitelisted();
+        }
         mysoTokenManager = newTokenManager;
+        if (newTokenManager != address(0)) {
+            whitelistState[newTokenManager] = DataTypesPeerToPeer
+                .WhitelistState
+                .CONTRACT_IN_ADDRESS_REGISTRY;
+        }
+        whitelistState[oldTokenManager] = DataTypesPeerToPeer
+            .WhitelistState
+            .NOT_WHITELISTED;
         emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
@@ -135,14 +168,29 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address oldTokenWrapper = isNftWrapper
             ? erc721TokenWrapper
             : tokenBasketWrapper;
+        // allow reset to address(0) to remove token wrapper
         if (oldTokenWrapper == newTokenWrapper) {
             revert Errors.InvalidAddress();
+        }
+        if (
+            whitelistState[newTokenWrapper] !=
+            DataTypesPeerToPeer.WhitelistState.NOT_WHITELISTED
+        ) {
+            revert Errors.AlreadyWhitelisted();
         }
         if (isNftWrapper) {
             erc721TokenWrapper = newTokenWrapper;
         } else {
             tokenBasketWrapper = newTokenWrapper;
         }
+        if (newTokenWrapper != address(0)) {
+            whitelistState[newTokenWrapper] = DataTypesPeerToPeer
+                .WhitelistState
+                .CONTRACT_IN_ADDRESS_REGISTRY;
+        }
+        whitelistState[oldTokenWrapper] = DataTypesPeerToPeer
+            .WhitelistState
+            .NOT_WHITELISTED;
         emit TokenWrapperContractUpdated(
             oldTokenWrapper,
             newTokenWrapper,
