@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
-import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
+import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG, getMainnetForkingConfig } from '../../hardhat.config'
 import {
   balancerV2VaultAbi,
   balancerV2PoolAbi,
@@ -61,7 +61,28 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     console.log('Note: Running mainnet tests with the following forking config:')
     console.log(HARDHAT_CHAIN_ID_AND_FORKING_CONFIG)
     if (HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId !== 1) {
-      throw new Error('Invalid hardhat forking config! Expected `HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId` to be 1!')
+      console.warn('Invalid hardhat forking config! Expected `HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId` to be 1!')
+
+      console.warn('Assuming that current test run is using `npx hardhat coverage`!')
+
+      console.warn('Re-importing mainnet forking config from `hardhat.config.ts`...')
+      const mainnetForkingConfig = getMainnetForkingConfig()
+
+      console.warn('Overwriting chainId to hardhat default `31337` to make off-chain signing consistent...')
+      HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId = 31337
+
+      console.warn('Trying to manually switch network to forked mainnet for this test file...')
+      await hre.network.provider.request({
+        method: 'hardhat_reset',
+        params: [
+          {
+            forking: {
+              jsonRpcUrl: mainnetForkingConfig.url,
+              blockNumber: mainnetForkingConfig.blockNumber
+            }
+          }
+        ]
+      })
     }
   })
 
@@ -4223,7 +4244,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['uint256', 'int256', 'uint256', 'uint256']
       )
       const badQuoteTuplesRoot = badQuoteTuplesTree.root
-      const chainId = (await ethers.getDefaultProvider().getNetwork()).chainId
 
       let offChainQuoteWithBadTuples = {
         generalQuoteInfo: {
@@ -4252,7 +4272,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         offChainQuoteWithBadTuples.salt,
         offChainQuoteWithBadTuples.nonce,
         lenderVault.address,
-        chainId
+        HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId
       ])
 
       const payloadHash = ethers.utils.keccak256(payload)

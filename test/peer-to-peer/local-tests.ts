@@ -196,6 +196,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       'Uninitialized'
     )
 
+    // reverts if trying to set same MYSO token manager (initially zero)
+    await expect(addressRegistry.connect(team).setMysoTokenManager(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidAddress'
+    )
+
     // initialize address registry
     await expect(
       addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)

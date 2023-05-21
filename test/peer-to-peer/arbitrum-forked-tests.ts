@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
-import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
+import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG, getArbitrumForkingConfig } from '../../hardhat.config'
 import { collTokenAbi, gmxRewardRouterAbi } from './helpers/abi'
 import { createOnChainRequest, setupBorrowerWhitelist } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
@@ -26,7 +26,28 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     console.log('Note: Running arbitrum tests with the following forking config:')
     console.log(HARDHAT_CHAIN_ID_AND_FORKING_CONFIG)
     if (HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId !== 42161) {
-      throw new Error('Invalid hardhat forking config! Expected `HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId` to be 42161!')
+      console.warn('Invalid hardhat forking config! Expected `HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId` to be 42161!')
+
+      console.warn('Assuming that current test run is using `npx hardhat coverage`!')
+
+      console.warn('Re-importing arbitrum forking config from `hardhat.config.ts`...')
+      const arbitrumForkingConfig = getArbitrumForkingConfig()
+
+      console.warn('Overwriting chainId to hardhat default `31337` to make off-chain signing consistent...')
+      HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId = 31337
+
+      console.warn('Trying to manually switch network to forked arbitrum for this test file...')
+      await hre.network.provider.request({
+        method: 'hardhat_reset',
+        params: [
+          {
+            forking: {
+              jsonRpcUrl: arbitrumForkingConfig.url,
+              blockNumber: arbitrumForkingConfig.blockNumber
+            }
+          }
+        ]
+      })
     }
   })
 
