@@ -10,7 +10,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IWrappedNftERC20Impl} from "../../interfaces/wrappers/ERC721/IWrappedNftERC20Impl.sol";
 
-contract WrappedNftERC20 is
+contract WrappedNftERC20Impl is
     ERC20,
     Initializable,
     ReentrancyGuard,

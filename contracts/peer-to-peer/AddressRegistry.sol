@@ -262,13 +262,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         uint160 currAddressCastToUint160;
         uint256 minTokenAmount = type(uint256).max;
         for (uint i = 0; i < tokenInfo.tokenAddrs.length; ) {
-            //change later to isWhitelisted function, but not merged in yet
-            if (
-                whitelistState[tokenInfo.tokenAddrs[i]] !=
-                DataTypesPeerToPeer.WhitelistState.TOKEN //||
-                // whitelistState[tokenAddrs[i]] !=
-                // DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT
-            ) {
+            if (!isWhitelistedToken(tokenInfo.tokenAddrs[i])) {
                 revert Errors.NonWhitelistedToken();
             }
             currAddressCastToUint160 = uint160(tokenInfo.tokenAddrs[i]);
