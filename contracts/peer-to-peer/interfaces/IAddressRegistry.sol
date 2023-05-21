@@ -30,10 +30,19 @@ interface IAddressRegistry {
     );
     event TokenWrapperContractUpdated(
         address oldTokenWrapper,
-        address newTokenWrapper
+        address newTokenWrapper,
+        bool isNftWrapper
     );
     event NonFungibleTokensWrapped(
         DataTypesPeerToPeer.NftAddressAndIds[] wrappers,
+        string name,
+        string symbol,
+        address newErc20Addr
+    );
+    event TokenBasketWrapped(
+        address[] tokens,
+        uint256[] amounts,
+        uint256 totalInitialSupply,
         string name,
         string symbol,
         address newErc20Addr
@@ -62,8 +71,12 @@ interface IAddressRegistry {
      * @notice Sets a new ERC721 token wrapper contract
      * @dev Can only be called by registry owner
      * @param newTokenWrapper Address of the new ERC721 token wrapper contract
+     * @param isNftWrapper Boolean flag indicating whether new token wrapper is NFT or erc20 basket wrapper
      */
-    function setTokenWrapperContract(address newTokenWrapper) external;
+    function setTokenWrapperContract(
+        address newTokenWrapper,
+        bool isNftWrapper
+    ) external;
 
     /**
      * @notice adds new lender vault to registry
@@ -84,6 +97,26 @@ interface IAddressRegistry {
         uint256 whitelistedUntil,
         bytes memory signature,
         bytes32 salt
+    ) external;
+
+    /**
+     * @notice Allows user to create wrapped NFT token
+     * @param tokenInfo Array of NFT addresses and ids to be wrapped
+     * @param name new wrapped token name
+     * @param symbol new wrapped token symbol
+     */
+    function createWrappedNftToken(
+        DataTypesPeerToPeer.NftAddressAndIds[] calldata tokenInfo,
+        string calldata name,
+        string calldata symbol
+    ) external;
+
+    /**
+     * @notice Allows user to create basket of whiteliestERC20 tokens
+     * @param tokenInfo Information for token wrapper to use for basket
+     */
+    function createWrappedTokenBasket(
+        DataTypesPeerToPeer.TokenBasketWrapperInfo calldata tokenInfo
     ) external;
 
     /**

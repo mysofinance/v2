@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 
 import {DataTypesPeerToPeer} from "../../../DataTypesPeerToPeer.sol";
 
-interface IWrappedNftErc20Impl {
+interface IWrappedNftERC20Impl {
     function initialize(
         address tokenOwner,
         DataTypesPeerToPeer.NftAddressAndIds[] calldata tokenInfo,
@@ -13,4 +13,6 @@ interface IWrappedNftErc20Impl {
     ) external;
 
     function redeem() external;
+
+    function getAllTokenAddrs() external view returns (address[] memory);
 }

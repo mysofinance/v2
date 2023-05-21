@@ -7,6 +7,7 @@ import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {INftWrapper} from "./interfaces/wrappers/ERC721/INftWrapper.sol";
+import {ITokenBasketWrapper} from "./interfaces/wrappers/ERC20/ITokenBasketWrapper.sol";
 
 /**
  * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
@@ -24,6 +25,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public quoteHandler;
     address public mysoTokenManager;
     address public erc721TokenWrapper;
+    address public tokenBasketWrapper;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => uint256))
         internal _borrowerWhitelistedUntil;
@@ -129,14 +131,27 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
-    function setTokenWrapperContract(address newTokenWrapper) external {
+    function setTokenWrapperContract(
+        address newTokenWrapper,
+        bool isNftWrapper
+    ) external {
         _senderCheckOwner();
-        address oldTokenWrapper = erc721TokenWrapper;
+        address oldTokenWrapper = isNftWrapper
+            ? erc721TokenWrapper
+            : tokenBasketWrapper;
         if (oldTokenWrapper == newTokenWrapper) {
             revert Errors.InvalidAddress();
         }
-        erc721TokenWrapper = newTokenWrapper;
-        emit TokenWrapperContractUpdated(oldTokenWrapper, newTokenWrapper);
+        if (isNftWrapper) {
+            erc721TokenWrapper = newTokenWrapper;
+        } else {
+            tokenBasketWrapper = newTokenWrapper;
+        }
+        emit TokenWrapperContractUpdated(
+            oldTokenWrapper,
+            newTokenWrapper,
+            isNftWrapper
+        );
     }
 
     function addLenderVault(address addr) external {
@@ -232,6 +247,67 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             .createWrappedNftToken(msg.sender, tokenInfo, name, symbol);
         whitelistState[newERC20Addr] = DataTypesPeerToPeer.WhitelistState.TOKEN;
         emit NonFungibleTokensWrapped(tokenInfo, name, symbol, newERC20Addr);
+    }
+
+    function createWrappedTokenBasket(
+        DataTypesPeerToPeer.TokenBasketWrapperInfo calldata tokenInfo
+    ) external {
+        address _tokenBasketWrapper = tokenBasketWrapper;
+        if (_tokenBasketWrapper == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        if (
+            tokenInfo.tokenAddrs.length == 0 ||
+            tokenInfo.tokenAddrs.length != tokenInfo.tokenAmounts.length
+        ) {
+            revert Errors.InvalidArrayLength();
+        }
+        uint160 prevTokenAddressCastToUint160;
+        uint160 currAddressCastToUint160;
+        uint256 minTokenAmount = type(uint256).max;
+        for (uint i = 0; i < tokenInfo.tokenAddrs.length; ) {
+            //change later to isWhitelisted function, but not merged in yet
+            if (
+                whitelistState[tokenInfo.tokenAddrs[i]] !=
+                DataTypesPeerToPeer.WhitelistState.TOKEN //||
+                // whitelistState[tokenAddrs[i]] !=
+                // DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT
+            ) {
+                revert Errors.NonWhitelistedToken();
+            }
+            currAddressCastToUint160 = uint160(tokenInfo.tokenAddrs[i]);
+            if (currAddressCastToUint160 <= prevTokenAddressCastToUint160) {
+                revert Errors.NonIncreasingTokenAddrs();
+            }
+            if (tokenInfo.tokenAmounts[i] == 0) {
+                revert Errors.InvalidSendAmount();
+            }
+            if (minTokenAmount > tokenInfo.tokenAmounts[i]) {
+                minTokenAmount = tokenInfo.tokenAmounts[i];
+            }
+            prevTokenAddressCastToUint160 = currAddressCastToUint160;
+            unchecked {
+                i++;
+            }
+        }
+        address newERC20Addr = ITokenBasketWrapper(_tokenBasketWrapper)
+            .createWrappedTokenBasket(
+                msg.sender,
+                tokenInfo.tokenAddrs,
+                tokenInfo.tokenAmounts,
+                minTokenAmount,
+                tokenInfo.name,
+                tokenInfo.symbol
+            );
+        whitelistState[newERC20Addr] = DataTypesPeerToPeer.WhitelistState.TOKEN;
+        emit TokenBasketWrapped(
+            tokenInfo.tokenAddrs,
+            tokenInfo.tokenAmounts,
+            minTokenAmount,
+            tokenInfo.name,
+            tokenInfo.symbol,
+            newERC20Addr
+        );
     }
 
     function updateBorrowerWhitelist(

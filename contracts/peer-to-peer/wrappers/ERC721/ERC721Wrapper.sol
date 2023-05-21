@@ -9,9 +9,9 @@ import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {INftWrapper} from "../../interfaces/wrappers/ERC721/INftWrapper.sol";
-import {IWrappedNftErc20Impl} from "../../interfaces/wrappers/ERC721/IWrappedNftErc20Impl.sol";
+import {IWrappedNftERC20Impl} from "../../interfaces/wrappers/ERC721/IWrappedNftERC20Impl.sol";
 
-contract AddressRegistry is ReentrancyGuard, INftWrapper {
+contract ERC721Wrapper is ReentrancyGuard, INftWrapper {
     address public immutable addressRegistry;
     IERC20 public immutable wrappedNftErc20Impl;
     IERC20[] public wrappedERC20Instances;
@@ -53,14 +53,14 @@ contract AddressRegistry is ReentrancyGuard, INftWrapper {
                         j++;
                     }
                 } catch {
-                    revert Errors.NftTransferToWrapperFailed();
+                    revert Errors.TransferToWrappedTokenFailed();
                 }
             }
             unchecked {
                 i++;
             }
         }
-        IWrappedNftErc20Impl(newErc20Addr).initialize(
+        IWrappedNftERC20Impl(newErc20Addr).initialize(
             tokenOwner,
             tokenInfo,
             name,

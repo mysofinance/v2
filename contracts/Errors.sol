@@ -95,5 +95,5 @@ library Errors {
     error InvalidLender();
     error NonIncreasingTokenAddrs();
     error NonIncreasingNonFungibleTokenIds();
-    error NftTransferToWrapperFailed();
+    error TransferToWrappedTokenFailed();
 }

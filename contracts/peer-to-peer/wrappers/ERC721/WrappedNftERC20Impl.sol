@@ -8,8 +8,14 @@ import {Errors} from "../../../Errors.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IWrappedNftERC20Impl} from "../../interfaces/wrappers/ERC721/IWrappedNftERC20Impl.sol";
 
-contract WrappedNftErc20 is ERC20, Initializable, ReentrancyGuard {
+contract WrappedNftERC20 is
+    ERC20,
+    Initializable,
+    ReentrancyGuard,
+    IWrappedNftERC20Impl
+{
     string internal tokenName;
     string internal tokenSymbol;
     address[] internal nftAddresses;
@@ -56,7 +62,7 @@ contract WrappedNftErc20 is ERC20, Initializable, ReentrancyGuard {
                         j++;
                     }
                 } catch {
-                    revert Errors.NftTransferToWrapperFailed();
+                    revert Errors.TransferToWrappedTokenFailed();
                 }
             }
             unchecked {
@@ -66,7 +72,7 @@ contract WrappedNftErc20 is ERC20, Initializable, ReentrancyGuard {
         _burn(msg.sender, 1);
     }
 
-    function getAllTokenAddress() external view returns (address[] memory) {
+    function getAllTokenAddrs() external view returns (address[] memory) {
         return nftAddresses;
     }
 

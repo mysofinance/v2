@@ -124,6 +124,17 @@ library DataTypesPeerToPeer {
         uint256[] nftIds;
     }
 
+    struct TokenBasketWrapperInfo {
+        // array of token addresses
+        address[] tokenAddrs;
+        // array of token amounts
+        uint256[] tokenAmounts;
+        // name of wrapped token
+        string name;
+        // symbol of wrapped token
+        string symbol;
+    }
+
     enum WhitelistState {
         // not whitelisted
         NOT_WHITELISTED,
