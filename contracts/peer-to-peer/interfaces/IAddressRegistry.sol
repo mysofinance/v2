@@ -34,7 +34,7 @@ interface IAddressRegistry {
         bool isNftWrapper
     );
     event NonFungibleTokensWrapped(
-        DataTypesPeerToPeer.NftAddressAndIds[] wrappers,
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] wrappers,
         string name,
         string symbol,
         address newErc20Addr
@@ -100,13 +100,13 @@ interface IAddressRegistry {
     ) external;
 
     /**
-     * @notice Allows user to create wrapped NFT token
-     * @param tokenInfo Array of NFT addresses and ids to be wrapped
-     * @param name new wrapped token name
-     * @param symbol new wrapped token symbol
+     * @notice Allows user to create wrapped token for ERC721s
+     * @param tokensToBeWrapped Array of WrappedERC721TokenInfo
+     * @param name New wrapped token name
+     * @param symbol New wrapped token symbol
      */
-    function createWrappedNftToken(
-        DataTypesPeerToPeer.NftAddressAndIds[] calldata tokenInfo,
+    function createWrappedTokenForERC721s(
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
         string calldata symbol
     ) external;
