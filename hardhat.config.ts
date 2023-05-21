@@ -59,7 +59,7 @@ const getForkingConfig = () => {
       blockNumber = mainnetForkingConfig.blockNumber
       break
     case 'arbitrum':
-      const arbitrumForkingConfig = getMainnetForkingConfig()
+      const arbitrumForkingConfig = getArbitrumForkingConfig()
       chainId = arbitrumForkingConfig.chainId
       url = arbitrumForkingConfig.url
       blockNumber = arbitrumForkingConfig.blockNumber
