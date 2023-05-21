@@ -5,28 +5,27 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Errors} from "../../../Errors.sol";
-import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {INftWrapper} from "../../interfaces/wrappers/ERC721/INftWrapper.sol";
-import {IWrappedNftERC20Impl} from "../../interfaces/wrappers/ERC721/IWrappedNftERC20Impl.sol";
+import {IERC721Wrapper} from "../../interfaces/wrappers/ERC721/IERC721Wrapper.sol";
+import {IWrappedERC721Impl} from "../../interfaces/wrappers/ERC721/IWrappedERC721Impl.sol";
 
-contract ERC721Wrapper is ReentrancyGuard, INftWrapper {
+contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
     address public immutable addressRegistry;
-    IERC20 public immutable wrappedNftErc20Impl;
-    IERC20[] public wrappedERC20Instances;
+    address public immutable wrappedNftErc20Impl;
+    address[] public wrappedERC20Instances;
 
     constructor(address _addressRegistry, address _wrappedErc20Impl) {
         if (_addressRegistry == address(0) || _wrappedErc20Impl == address(0)) {
             revert Errors.InvalidAddress();
         }
         addressRegistry = _addressRegistry;
-        wrappedNftErc20Impl = IERC20(_wrappedErc20Impl);
+        wrappedNftErc20Impl = _wrappedErc20Impl;
     }
 
-    function createWrappedNftToken(
-        address tokenOwner,
-        DataTypesPeerToPeer.NftAddressAndIds[] calldata tokenInfo,
+    function createWrappedToken(
+        address minter,
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
         string calldata symbol
     ) external nonReentrant returns (address newErc20Addr) {
@@ -40,13 +39,13 @@ contract ERC721Wrapper is ReentrancyGuard, INftWrapper {
             address(wrappedNftErc20Impl),
             salt
         );
-        for (uint256 i = 0; i < tokenInfo.length; i++) {
-            for (uint256 j = 0; j < tokenInfo[i].nftIds.length; j++) {
+        for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
+            for (uint256 j = 0; j < tokensToBeWrapped[i].tokenIds.length; ) {
                 try
-                    IERC721(tokenInfo[i].nftAddress).safeTransferFrom(
-                        tokenOwner,
+                    IERC721(tokensToBeWrapped[i].tokenAddr).safeTransferFrom(
+                        minter,
                         newErc20Addr,
-                        tokenInfo[i].nftIds[j]
+                        tokensToBeWrapped[i].tokenIds[j]
                     )
                 {
                     unchecked {
@@ -60,12 +59,12 @@ contract ERC721Wrapper is ReentrancyGuard, INftWrapper {
                 i++;
             }
         }
-        IWrappedNftERC20Impl(newErc20Addr).initialize(
-            tokenOwner,
-            tokenInfo,
+        IWrappedERC721Impl(newErc20Addr).initialize(
+            minter,
+            tokensToBeWrapped,
             name,
             symbol
         );
-        wrappedERC20Instances.push(IERC20(newErc20Addr));
+        wrappedERC20Instances.push(newErc20Addr);
     }
 }

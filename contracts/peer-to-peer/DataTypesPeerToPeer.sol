@@ -117,11 +117,11 @@ library DataTypesPeerToPeer {
         bytes callbackData;
     }
 
-    struct NftAddressAndIds {
+    struct WrappedERC721TokenInfo {
         // address of the NFT
-        address nftAddress;
+        address tokenAddr;
         // array of NFT ids
-        uint256[] nftIds;
+        uint256[] tokenIds;
     }
 
     struct TokenBasketWrapperInfo {
