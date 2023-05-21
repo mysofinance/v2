@@ -12,21 +12,13 @@ import {ITokenBasketWrapperERC20Impl} from "../../interfaces/wrappers/ERC20/ITok
 
 contract TokenBasketWrapper is ReentrancyGuard, ITokenBasketWrapper {
     using SafeERC20 for IERC20;
-    address public immutable addressRegistry;
     address public immutable tokenBasketWrapperErc20Impl;
     IERC20[] public wrappedERC20Instances;
 
-    constructor(
-        address _addressRegistry,
-        address _tokenBasketWrapperErc20Impl
-    ) {
-        if (
-            _addressRegistry == address(0) ||
-            _tokenBasketWrapperErc20Impl == address(0)
-        ) {
+    constructor(address _tokenBasketWrapperErc20Impl) {
+        if (_tokenBasketWrapperErc20Impl == address(0)) {
             revert Errors.InvalidAddress();
         }
-        addressRegistry = _addressRegistry;
         tokenBasketWrapperErc20Impl = _tokenBasketWrapperErc20Impl;
     }
 
@@ -38,9 +30,6 @@ contract TokenBasketWrapper is ReentrancyGuard, ITokenBasketWrapper {
         string calldata name,
         string calldata symbol
     ) external nonReentrant returns (address newErc20Addr) {
-        if (msg.sender != addressRegistry) {
-            revert Errors.InvalidSender();
-        }
         bytes32 salt = keccak256(
             abi.encodePacked(wrappedERC20Instances.length)
         );

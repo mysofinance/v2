@@ -11,15 +11,13 @@ import {IERC721Wrapper} from "../../interfaces/wrappers/ERC721/IERC721Wrapper.so
 import {IWrappedERC721Impl} from "../../interfaces/wrappers/ERC721/IWrappedERC721Impl.sol";
 
 contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
-    address public immutable addressRegistry;
     address public immutable wrappedNftErc20Impl;
     address[] public wrappedERC20Instances;
 
-    constructor(address _addressRegistry, address _wrappedErc20Impl) {
-        if (_addressRegistry == address(0) || _wrappedErc20Impl == address(0)) {
+    constructor(address _wrappedErc20Impl) {
+        if (_wrappedErc20Impl == address(0)) {
             revert Errors.InvalidAddress();
         }
-        addressRegistry = _addressRegistry;
         wrappedNftErc20Impl = _wrappedErc20Impl;
     }
 
@@ -29,9 +27,6 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         string calldata name,
         string calldata symbol
     ) external nonReentrant returns (address newErc20Addr) {
-        if (msg.sender != addressRegistry) {
-            revert Errors.InvalidSender();
-        }
         bytes32 salt = keccak256(
             abi.encodePacked(wrappedERC20Instances.length)
         );
