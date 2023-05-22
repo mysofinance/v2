@@ -177,8 +177,8 @@ interface ILenderVaultImpl {
      */
     function validateRepayInfo(
         address borrower,
-        DataTypesPeerToPeer.Loan memory loan,
-        DataTypesPeerToPeer.LoanRepayInstructions memory loanRepayInstructions
+        DataTypesPeerToPeer.Loan calldata loan,
+        DataTypesPeerToPeer.LoanRepayInstructions calldata loanRepayInstructions
     ) external view;
 
     /**
@@ -194,7 +194,7 @@ interface ILenderVaultImpl {
      * @return _lockedAmounts the vault locked amounts of the token addresses
      */
     function getTokenBalancesAndLockedAmounts(
-        address[] memory tokens
+        address[] calldata tokens
     )
         external
         view

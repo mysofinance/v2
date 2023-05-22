@@ -42,7 +42,7 @@ contract Factory is Ownable, IFactory {
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external {
-        if (!isFundingPool[_fundingPool]) {
+        if (!isFundingPool[_fundingPool] || _collToken == address(0)) {
             revert Errors.InvalidAddress();
         }
         bytes32 salt = keccak256(
@@ -129,16 +129,17 @@ contract Factory is Ownable, IFactory {
         ) {
             revert Errors.InvalidSignature();
         }
+        mapping(address => uint256)
+            storage whitelistedUntilPerLender = _lenderWhitelistedUntil[
+                whitelistAuthority
+            ];
         if (
             whitelistedUntil < block.timestamp ||
-            whitelistedUntil <=
-            _lenderWhitelistedUntil[whitelistAuthority][msg.sender]
+            whitelistedUntil <= whitelistedUntilPerLender[msg.sender]
         ) {
             revert Errors.CannotClaimOutdatedStatus();
         }
-        _lenderWhitelistedUntil[whitelistAuthority][
-            msg.sender
-        ] = whitelistedUntil;
+        whitelistedUntilPerLender[msg.sender] = whitelistedUntil;
         emit LenderWhitelistStatusClaimed(
             whitelistAuthority,
             msg.sender,
@@ -147,18 +148,21 @@ contract Factory is Ownable, IFactory {
     }
 
     function updateLenderWhitelist(
-        address[] memory lenders,
+        address[] calldata lenders,
         uint256 whitelistedUntil
     ) external {
         for (uint i = 0; i < lenders.length; ) {
+            mapping(address => uint256)
+                storage whitelistedUntilPerLender = _lenderWhitelistedUntil[
+                    msg.sender
+                ];
             if (
                 lenders[i] == address(0) ||
-                whitelistedUntil ==
-                _lenderWhitelistedUntil[msg.sender][lenders[i]]
+                whitelistedUntil == whitelistedUntilPerLender[lenders[i]]
             ) {
                 revert Errors.InvalidUpdate();
             }
-            _lenderWhitelistedUntil[msg.sender][lenders[i]] = whitelistedUntil;
+            whitelistedUntilPerLender[lenders[i]] = whitelistedUntil;
             unchecked {
                 i++;
             }

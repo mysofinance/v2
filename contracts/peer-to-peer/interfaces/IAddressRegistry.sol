@@ -65,7 +65,7 @@ interface IAddressRegistry {
      * @param whitelistedUntil Timestamp until which borrowers shall be whitelisted under given whitelist authority
      */
     function updateBorrowerWhitelist(
-        address[] memory borrowers,
+        address[] calldata borrowers,
         uint256 whitelistedUntil
     ) external;
 
