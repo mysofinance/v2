@@ -223,10 +223,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (mysoTokenManager != address(0)) {
             IMysoTokenManager(mysoTokenManager).processP2PoolLoanFinalization(
                 address(this),
-                staticData.fundingPool,
+                fundingPool,
                 staticData.collToken,
                 staticData.arranger,
-                _finalizedLoanTerms.borrower,
+                msg.sender,
                 _finalLoanAmount,
                 _finalCollAmountReservedForDefault,
                 _finalCollAmountReservedForConversions

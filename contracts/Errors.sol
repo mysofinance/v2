@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 library Errors {
     error AlreadyInitialized();
-    error AlreadyRegisteredVault();
     error UnregisteredVault();
     error InvalidDelegatee();
     error InvalidSender();
@@ -42,7 +41,6 @@ library Errors {
     error LtvHigherThanMax();
     error InsufficientVaultFunds();
     error InvalidInterestRateFactor();
-    error OverflowUint128();
     error InconsistentUnlockTokenAddresses();
     error InvalidEarliestRepay();
     error InvalidNewMinNumOfSigners();
@@ -59,7 +57,6 @@ library Errors {
     error Uninitialized();
     error EmptyRepaymentSchedule();
     error FirstDueDateTooCloseOrPassed();
-    error DueDatesTooClose();
     error InvalidGracePeriod();
     error UnregisteredLoanProposal();
     error NotInSubscriptionPhase();

@@ -6,6 +6,28 @@ require('hardhat-contract-sizer')
 require('dotenv').config()
 require('solidity-coverage')
 
+export const getMainnetForkingConfig = () => {
+  const INFURA_API_KEY = process.env.INFURA_API_KEY
+  if (INFURA_API_KEY === undefined) {
+    throw new Error('Invalid hardhat.config.ts! Need to set `INFURA_API_KEY`!')
+  }
+  const chainId = 1
+  const url = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`
+  const blockNumber = 16640270 // 2023-02-16
+  return { chainId: chainId, url: url, blockNumber: blockNumber }
+}
+
+export const getArbitrumForkingConfig = () => {
+  const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
+  if (ALCHEMY_API_KEY === undefined) {
+    throw new Error('Invalid hardhat.config.ts! Need to set `ALCHEMY_API_KEY`!')
+  }
+  const chainId = 42161
+  const url = `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
+  const blockNumber = 63771760 // 2023-02-23
+  return { chainId: chainId, url: url, blockNumber: blockNumber }
+}
+
 const getForkingConfig = () => {
   // en var HARDHAT_CONFIG_NAME is used to run tests with different forking environments
   const HARDHAT_CONFIG_NAME = process.env.HARDHAT_CONFIG_NAME
@@ -31,22 +53,16 @@ const getForkingConfig = () => {
       console.log('hardhat: {}')
       return { chainId: 31337 }
     case 'mainnet':
-      const INFURA_API_KEY = process.env.INFURA_API_KEY
-      if (INFURA_API_KEY === undefined) {
-        throw new Error('Invalid hardhat.config.ts! Need to set `INFURA_API_KEY`!')
-      }
-      chainId = 1
-      url = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`
-      blockNumber = 16640270 // 2023-02-16
+      const mainnetForkingConfig = getMainnetForkingConfig()
+      chainId = mainnetForkingConfig.chainId
+      url = mainnetForkingConfig.url
+      blockNumber = mainnetForkingConfig.blockNumber
       break
     case 'arbitrum':
-      const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
-      if (ALCHEMY_API_KEY === undefined) {
-        throw new Error('Invalid hardhat.config.ts! Need to set `ALCHEMY_API_KEY`!')
-      }
-      chainId = 42161
-      url = `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`
-      blockNumber = 63771760 // 2023-02-23
+      const arbitrumForkingConfig = getArbitrumForkingConfig()
+      chainId = arbitrumForkingConfig.chainId
+      url = arbitrumForkingConfig.url
+      blockNumber = arbitrumForkingConfig.blockNumber
       break
     default:
       throw new Error(`Invalid hardhat.config.ts! Unknown HARDHAT_CONFIG_NAME '${HARDHAT_CONFIG_NAME}'!`)
