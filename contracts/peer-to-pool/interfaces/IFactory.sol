@@ -73,7 +73,7 @@ interface IFactory {
     function claimLenderWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes memory signature,
+        bytes calldata signature,
         bytes32 salt
     ) external;
 
@@ -84,7 +84,7 @@ interface IFactory {
      * @param whitelistedUntil Timestamp until which lenders shall be whitelisted under given whitelist authority
      */
     function updateLenderWhitelist(
-        address[] memory lenders,
+        address[] calldata lenders,
         uint256 whitelistedUntil
     ) external;
 

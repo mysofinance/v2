@@ -292,7 +292,11 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
         _checkCurrRepaymentIdx(repaymentIdx);
-        if (_lenderExercisedConversion[msg.sender][repaymentIdx]) {
+        mapping(uint256 => bool)
+            storage lenderExercisedConversionPerRepaymentIdx = _lenderExercisedConversion[
+                msg.sender
+            ];
+        if (lenderExercisedConversionPerRepaymentIdx[repaymentIdx]) {
             revert Errors.AlreadyConverted();
         }
         // must be after when the period of this loan is due, but before borrower can repay
@@ -315,7 +319,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         collTokenConverted[repaymentIdx] += conversionAmount;
         totalConvertedSubscriptionsPerIdx[repaymentIdx] += lenderContribution;
-        _lenderExercisedConversion[msg.sender][repaymentIdx] = true;
+        lenderExercisedConversionPerRepaymentIdx[repaymentIdx] = true;
         IERC20Metadata(staticData.collToken).safeTransfer(
             msg.sender,
             conversionAmount
@@ -397,8 +401,12 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.RepaymentIdxTooLarge();
         }
         // note: users can claim as soon as repaid, no need to check _getRepaymentCutoffTime(...)
+        mapping(uint256 => bool)
+            storage lenderClaimedRepaymentPerRepaymentIdx = _lenderClaimedRepayment[
+                msg.sender
+            ];
         if (
-            _lenderClaimedRepayment[msg.sender][repaymentIdx] ||
+            lenderClaimedRepaymentPerRepaymentIdx[repaymentIdx] ||
             _lenderExercisedConversion[msg.sender][repaymentIdx]
         ) {
             revert Errors.AlreadyClaimed();
@@ -409,7 +417,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             totalConvertedSubscriptionsPerIdx[repaymentIdx];
         uint256 claimAmount = (_loanTokenRepaid[repaymentIdx] *
             lenderContribution) / subscriptionsEntitledToRepayment;
-        _lenderClaimedRepayment[msg.sender][repaymentIdx] = true;
+        lenderClaimedRepaymentPerRepaymentIdx[repaymentIdx] = true;
         IERC20Metadata(IFundingPoolImpl(fundingPool).depositToken())
             .safeTransfer(msg.sender, claimAmount);
 

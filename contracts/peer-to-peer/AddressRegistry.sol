@@ -124,7 +124,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes memory signature,
+        bytes calldata signature,
         bytes32 salt
     ) external {
         bytes32 payloadHash = keccak256(
@@ -140,16 +140,17 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         ) {
             revert Errors.InvalidSignature();
         }
+        mapping(address => uint256)
+            storage whitelistedUntilPerBorrower = _borrowerWhitelistedUntil[
+                whitelistAuthority
+            ];
         if (
             whitelistedUntil < block.timestamp ||
-            whitelistedUntil <=
-            _borrowerWhitelistedUntil[whitelistAuthority][msg.sender]
+            whitelistedUntil <= whitelistedUntilPerBorrower[msg.sender]
         ) {
             revert Errors.CannotClaimOutdatedStatus();
         }
-        _borrowerWhitelistedUntil[whitelistAuthority][
-            msg.sender
-        ] = whitelistedUntil;
+        whitelistedUntilPerBorrower[msg.sender] = whitelistedUntil;
         emit BorrowerWhitelistStatusClaimed(
             whitelistAuthority,
             msg.sender,
@@ -158,20 +159,21 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     }
 
     function updateBorrowerWhitelist(
-        address[] memory borrowers,
+        address[] calldata borrowers,
         uint256 whitelistedUntil
     ) external {
         for (uint i = 0; i < borrowers.length; ) {
+            mapping(address => uint256)
+                storage whitelistedUntilPerBorrower = _borrowerWhitelistedUntil[
+                    msg.sender
+                ];
             if (
                 borrowers[i] == address(0) ||
-                whitelistedUntil ==
-                _borrowerWhitelistedUntil[msg.sender][borrowers[i]]
+                whitelistedUntil == whitelistedUntilPerBorrower[borrowers[i]]
             ) {
                 revert Errors.InvalidUpdate();
             }
-            _borrowerWhitelistedUntil[msg.sender][
-                borrowers[i]
-            ] = whitelistedUntil;
+            whitelistedUntilPerBorrower[borrowers[i]] = whitelistedUntil;
             unchecked {
                 i++;
             }
