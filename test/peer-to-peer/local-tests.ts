@@ -204,6 +204,12 @@ describe('Peer-to-Peer: Local Tests', function () {
     )
     await erc721WrapperWithoutRegistry.deployed()
 
+    // should revert on zero address in implementation
+    await expect(ERC721Wrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      erc721Wrapper,
+      'InvalidAddress'
+    )
+
     // deploy token basket wrapper implementation
     const TokenBasketWrapperERC20Implementaion = await ethers.getContractFactory('TokenBasketWrapperERC20Impl')
     const tokenBasketWrapperERC20Implementation = await TokenBasketWrapperERC20Implementaion.connect(team).deploy()
@@ -223,6 +229,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       tokenBasketWrapperERC20Implementation.address
     )
     await tokenBasketWrapperWithoutRegistry.deployed()
+
+    // should revert on zero address in implementation
+    await expect(
+      TokenBasketWrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)
+    ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidAddress')
 
     // reverts if user tries to create vault before initialized because address registry doesn't have lender vault factory set yet
     await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(
@@ -2600,8 +2611,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
           { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
         ],
-        '',
-        ''
+        'testName',
+        'testSymbol'
       )
 
       const newWrappedTokenAddr = await erc721Wrapper.wrappedERC20Instances(0)
@@ -2622,6 +2633,18 @@ describe('Peer-to-Peer: Local Tests', function () {
       const totalSupply = await wrappedToken.totalSupply()
 
       expect(totalSupply).to.equal(1)
+
+      // check wrapped token name, symbol and decimal overrides
+      const wrappedTokenName = await wrappedToken.name()
+      const wrappedTokenSymbol = await wrappedToken.symbol()
+      const wrappedTokenDecimals = await wrappedToken.decimals()
+      expect(wrappedTokenName).to.equal('testName')
+      expect(wrappedTokenSymbol).to.equal('testSymbol')
+      expect(wrappedTokenDecimals).to.equal(0)
+
+      const wrappedTokenArr = await wrappedToken.getWrappedTokens()
+
+      expect(wrappedTokenArr.length).to.equal(2)
 
       // check ownership of all NFTs has shifted to new wrapped token
       const currOwnerFirstNFTIdx1 = await myFirstNFT.ownerOf(1)
@@ -2748,8 +2771,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       await addressRegistry.connect(borrower).createWrappedTokenBasket({
         tokenAddrs: [sortedTokenAddrs[0], sortedTokenAddrs[1]],
         tokenAmounts: [ONE_USDC.div(10), ONE_USDC.div(100)],
-        name: '',
-        symbol: ''
+        name: 'testName',
+        symbol: 'testSymbol'
       })
 
       const newWrappedTokenAddr = await tokenBasketWrapper.wrappedERC20Instances(0)
@@ -2757,6 +2780,20 @@ describe('Peer-to-Peer: Local Tests', function () {
       const wrappedToken = await ethers.getContractAt('TokenBasketWrapperERC20Impl', newWrappedTokenAddr)
 
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
+
+      // check name, symbol, and decimal overrides
+      const wrappedTokenName = await wrappedToken.name()
+      const wrappedTokenSymbol = await wrappedToken.symbol()
+      const wrappedTokenDecimals = await wrappedToken.decimals()
+      expect(wrappedTokenName).to.equal('testName')
+      expect(wrappedTokenSymbol).to.equal('testSymbol')
+      expect(wrappedTokenDecimals).to.equal(6)
+
+      // check that tokens were stored in instance storage correctly
+      const tokenAddrs = await wrappedToken.getAllTokenAddrs()
+
+      expect(tokenAddrs[0]).to.equal(sortedTokenAddrs[0])
+      expect(tokenAddrs[1]).to.equal(sortedTokenAddrs[1])
 
       // new token should be whitelisted as TOKEN
       expect(whitelistTokenState).to.equal(1)
