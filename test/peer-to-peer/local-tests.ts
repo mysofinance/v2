@@ -202,6 +202,28 @@ describe('Peer-to-Peer: Local Tests', function () {
       'InvalidAddress'
     )
 
+    // reverts if trying to set same tokenWrapper contract (initially zero)
+    await expect(addressRegistry.connect(team).setTokenWrapperContract(ZERO_ADDRESS, true)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidAddress'
+    )
+    await expect(addressRegistry.connect(team).setTokenWrapperContract(ZERO_ADDRESS, false)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidAddress'
+    )
+
+    // reverts if nft wrapper contract address is zero
+    await expect(
+      addressRegistry.connect(team).createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '')
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+
+    // reverts if token basket wrapper contract address is zero
+    await expect(
+      addressRegistry
+        .connect(team)
+        .createWrappedTokenBasket({ tokenAddrs: [ZERO_ADDRESS], tokenAmounts: [1000], name: '', symbol: '' })
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+
     // initialize address registry
     await expect(
       addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
@@ -233,6 +255,37 @@ describe('Peer-to-Peer: Local Tests', function () {
     await expect(
       addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+
+    await addressRegistry.connect(team).setWhitelistState([borrower.address], 4)
+
+    // reverts  if trying to set already whitelisted address as MYSO token manager
+    await expect(addressRegistry.connect(team).setMysoTokenManager(borrower.address)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'AlreadyWhitelisted'
+    )
+
+    // reverts if trying to set already whitelisted address as token wrapper
+    await expect(
+      addressRegistry.connect(team).setTokenWrapperContract(borrower.address, true)
+    ).to.be.revertedWithCustomError(addressRegistry, 'AlreadyWhitelisted')
+
+    await addressRegistry.connect(team).setWhitelistState([borrower.address], 0)
+
+    // successfully set MYSO token manager
+    await addressRegistry.connect(team).setMysoTokenManager(team.address)
+
+    // cannot set MYSO token manager address to another state
+    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 1)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'ContractInAddressRegistry'
+    )
+
+    await addressRegistry.connect(team).setMysoTokenManager(ZERO_ADDRESS)
+
+    // now should be able to set old Myso token manager address to another state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 1)
+    // reset team address state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 0)
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
