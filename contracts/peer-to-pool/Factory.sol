@@ -113,7 +113,7 @@ contract Factory is Ownable, IFactory {
     function claimLenderWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes memory signature,
+        bytes calldata signature,
         bytes32 salt
     ) external {
         bytes32 payloadHash = keccak256(

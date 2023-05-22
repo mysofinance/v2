@@ -54,7 +54,7 @@ interface IAddressRegistry {
     function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes memory signature,
+        bytes calldata signature,
         bytes32 salt
     ) external;
 
