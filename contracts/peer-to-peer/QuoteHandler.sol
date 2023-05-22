@@ -403,7 +403,9 @@ contract QuoteHandler is IQuoteHandler {
         if (compartmentImpl == address(0)) {
             if (
                 collTokenWhitelistState ==
-                DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .ERC20_TOKEN_REQUIRING_COMPARTMENT
             ) {
                 revert Errors.CollateralMustBeCompartmentalized();
             }

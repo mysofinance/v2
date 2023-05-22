@@ -16,9 +16,9 @@ contract WrappedERC721Impl is
     ReentrancyGuard,
     IWrappedERC721Impl
 {
-    string internal tokenName;
-    string internal tokenSymbol;
-    DataTypesPeerToPeer.WrappedERC721TokenInfo[] internal wrappedTokens;
+    string internal _tokenName;
+    string internal _tokenSymbol;
+    DataTypesPeerToPeer.WrappedERC721TokenInfo[] internal _wrappedTokens;
 
     constructor() ERC20("Wrapped ERC721 Impl", "Wrapped ERC721 Impl") {
         _disableInitializers();
@@ -26,18 +26,18 @@ contract WrappedERC721Impl is
 
     function initialize(
         address minter,
-        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata _tokenInfo,
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata wrappedTokens,
         string calldata _name,
         string calldata _symbol
     ) external initializer {
-        for (uint256 i = 0; i < _tokenInfo.length; ) {
-            wrappedTokens.push(_tokenInfo[i]);
+        for (uint256 i = 0; i < wrappedTokens.length; ) {
+            _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
                 i++;
             }
         }
-        tokenName = _name;
-        tokenSymbol = _symbol;
+        _tokenName = _name;
+        _tokenSymbol = _symbol;
         _mint(minter, 1);
     }
 
@@ -45,13 +45,13 @@ contract WrappedERC721Impl is
         if (balanceOf(msg.sender) != 1) {
             revert Errors.InvalidSender();
         }
-        for (uint256 i = 0; i < wrappedTokens.length; ) {
-            for (uint256 j = 0; j < wrappedTokens[i].tokenIds.length; ) {
+        for (uint256 i = 0; i < _wrappedTokens.length; ) {
+            for (uint256 j = 0; j < _wrappedTokens[i].tokenIds.length; ) {
                 try
-                    IERC721(wrappedTokens[i].tokenAddr).transferFrom(
+                    IERC721(_wrappedTokens[i].tokenAddr).transferFrom(
                         address(this),
                         msg.sender,
-                        wrappedTokens[i].tokenIds[j]
+                        _wrappedTokens[i].tokenIds[j]
                     )
                 {
                     unchecked {
@@ -68,22 +68,20 @@ contract WrappedERC721Impl is
         _burn(msg.sender, 1);
     }
 
-    function getWrappedTokens()
+    function getWrappedTokensInfo()
         external
         view
-        returns (
-            DataTypesPeerToPeer.WrappedERC721TokenInfo[] memory _wrappedTokens
-        )
+        returns (DataTypesPeerToPeer.WrappedERC721TokenInfo[] memory)
     {
-        return wrappedTokens;
+        return _wrappedTokens;
     }
 
     function name() public view virtual override returns (string memory) {
-        return tokenName;
+        return _tokenName;
     }
 
     function symbol() public view virtual override returns (string memory) {
-        return tokenSymbol;
+        return _tokenSymbol;
     }
 
     function decimals() public view virtual override returns (uint8) {

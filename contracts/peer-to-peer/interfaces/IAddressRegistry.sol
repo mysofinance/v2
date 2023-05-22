@@ -7,7 +7,7 @@ import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 interface IAddressRegistry {
     event WhitelistStateUpdated(
         address[] indexed whitelistAddrs,
-        DataTypesPeerToPeer.WhitelistState whitelistState
+        DataTypesPeerToPeer.WhitelistState indexed whitelistState
     );
     event AllowedTokensForCompartmentUpdated(
         address compartmentImpl,
@@ -24,27 +24,17 @@ interface IAddressRegistry {
         address[] indexed borrower,
         uint256 whitelistedUntil
     );
-    event MysoTokenManagerUpdated(
-        address oldTokenManager,
-        address newTokenManager
-    );
-    event TokenWrapperContractUpdated(
-        address oldTokenWrapper,
-        address newTokenWrapper,
-        bool isNftWrapper
-    );
-    event NonFungibleTokensWrapped(
-        DataTypesPeerToPeer.WrappedERC721TokenInfo[] wrappers,
+    event CreatedWrappedTokenForERC721s(
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] wrappedTokensInfo,
         string name,
         string symbol,
         address newErc20Addr
     );
-    event TokenBasketWrapped(
-        address[] tokens,
-        uint256[] amounts,
+    event CreatedWrappedTokenForERC20s(
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] wrappedTokensInfo,
         string name,
         string symbol,
-        address newErc20Addr
+        address newERC20Addr
     );
 
     /**
@@ -57,24 +47,6 @@ interface IAddressRegistry {
         address _lenderVaultFactory,
         address _borrowerGateway,
         address _quoteHandler
-    ) external;
-
-    /**
-     * @notice Sets a new MYSO token manager contract
-     * @dev Can only be called by registry owner
-     * @param newTokenManager Address of the new MYSO token manager contract
-     */
-    function setMysoTokenManager(address newTokenManager) external;
-
-    /**
-     * @notice Sets a new ERC721 token wrapper contract
-     * @dev Can only be called by registry owner
-     * @param newTokenWrapper Address of the new ERC721 token wrapper contract
-     * @param isNftWrapper Boolean flag indicating whether new token wrapper is NFT or erc20 basket wrapper
-     */
-    function setTokenWrapperContract(
-        address newTokenWrapper,
-        bool isNftWrapper
     ) external;
 
     /**
@@ -99,10 +71,10 @@ interface IAddressRegistry {
     ) external;
 
     /**
-     * @notice Allows user to create wrapped token for ERC721s
+     * @notice Allows user to wrap (multiple) ERC721 into one ERC20
      * @param tokensToBeWrapped Array of WrappedERC721TokenInfo
-     * @param name New wrapped token name
-     * @param symbol New wrapped token symbol
+     * @param name Name of the new wrapper token
+     * @param symbol Symbol of the new wrapper token
      */
     function createWrappedTokenForERC721s(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
@@ -111,11 +83,15 @@ interface IAddressRegistry {
     ) external;
 
     /**
-     * @notice Allows user to create basket of whiteliestERC20 tokens
-     * @param tokenInfo Information for token wrapper to use for basket
+     * @notice Allows user to wrap multiple ERC20 into one ERC20
+     * @param tokensToBeWrapped Array of WrappedERC20TokenInfo
+     * @param name Name of the new wrapper token
+     * @param symbol Symbol of the new wrapper token
      */
-    function createWrappedTokenBasket(
-        DataTypesPeerToPeer.TokenBasketWrapperInfo calldata tokenInfo
+    function createWrappedTokenForERC20s(
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
+        string calldata name,
+        string calldata symbol
     ) external;
 
     /**
@@ -133,11 +109,11 @@ interface IAddressRegistry {
      * @notice Sets the whitelist state for a given address
      * @dev Can only be called by registry owner
      * @param addrs Addresses for which whitelist state shall be set
-     * @param whitelistState The whitelist state to which addresses shall be set (NOT_WHITELISTED, TOKEN, 
-     ORACLE, COMPARTMENT, CALLBACK, or TOKEN_REQUIRING_COMPARTMENT)
+     * @param whitelistState The whitelist state to which addresses shall be set (NOT_WHITELISTED, ERC20_TOKEN, 
+     ORACLE, COMPARTMENT, CALLBACK, or ERC20_TOKEN_REQUIRING_COMPARTMENT)
      */
     function setWhitelistState(
-        address[] memory addrs,
+        address[] calldata addrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
     ) external;
 
@@ -151,7 +127,7 @@ interface IAddressRegistry {
      */
     function setAllowedTokensForCompartment(
         address compartmentImpl,
-        address[] memory tokens,
+        address[] calldata tokens,
         bool allowTokensForCompartment
     ) external;
 
@@ -174,9 +150,9 @@ interface IAddressRegistry {
     function isWhitelistedToken(address token) external view returns (bool);
 
     /**
-     * @notice Returns boolean flag indicating whether token is whitelisted NFT
+     * @notice Returns boolean flag indicating whether token is whitelisted ERC721_TOKEN
      * @param token Addresses of the given token to check
-     * @return Boolean flag indicating whether the token is whitelisted NFT
+     * @return Boolean flag indicating whether the token is whitelisted ERC721_TOKEN
      */
     function isWhitelistedNft(address token) external view returns (bool);
 
@@ -214,8 +190,8 @@ interface IAddressRegistry {
     /**
      * @notice Returns whitelist state for given address
      * @param addr Address to check whitelist state for
-     * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, TOKEN, 
-     ORACLE, COMPARTMENT, CALLBACK, or TOKEN_REQUIRING_COMPARTMENT)
+     * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, ERC20_TOKEN, 
+     ORACLE, COMPARTMENT, CALLBACK, or ERC20_TOKEN_REQUIRING_COMPARTMENT)
      */
     function whitelistState(
         address addr

@@ -7,7 +7,7 @@ import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IERC721Wrapper} from "./interfaces/wrappers/ERC721/IERC721Wrapper.sol";
-import {ITokenBasketWrapper} from "./interfaces/wrappers/ERC20/ITokenBasketWrapper.sol";
+import {IERC20Wrapper} from "./interfaces/wrappers/ERC20/IERC20Wrapper.sol";
 
 /**
  * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
@@ -24,8 +24,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public borrowerGateway;
     address public quoteHandler;
     address public mysoTokenManager;
-    address public erc721TokenWrapper;
-    address public tokenBasketWrapper;
+    address public erc721Wrapper;
+    address public erc20Wrapper;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => uint256))
         internal _borrowerWhitelistedUntil;
@@ -63,18 +63,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         borrowerGateway = _borrowerGateway;
         quoteHandler = _quoteHandler;
         _isInitialized = true;
-        whitelistState[address(this)] = DataTypesPeerToPeer
-            .WhitelistState
-            .CONTRACT_IN_ADDRESS_REGISTRY;
-        whitelistState[_lenderVaultFactory] = DataTypesPeerToPeer
-            .WhitelistState
-            .CONTRACT_IN_ADDRESS_REGISTRY;
-        whitelistState[_borrowerGateway] = DataTypesPeerToPeer
-            .WhitelistState
-            .CONTRACT_IN_ADDRESS_REGISTRY;
-        whitelistState[_quoteHandler] = DataTypesPeerToPeer
-            .WhitelistState
-            .CONTRACT_IN_ADDRESS_REGISTRY;
     }
 
     function setWhitelistState(
@@ -82,19 +70,46 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState _whitelistState
     ) external {
         _checkSenderAndIsInitialized();
-        for (uint i = 0; i < addrs.length; ) {
-            if (addrs[i] == address(0)) {
-                revert Errors.InvalidAddress();
-            }
-            if (
-                whitelistState[addrs[i]] ==
-                DataTypesPeerToPeer.WhitelistState.CONTRACT_IN_ADDRESS_REGISTRY
-            ) {
-                revert Errors.ContractInAddressRegistry();
-            }
-            whitelistState[addrs[i]] = _whitelistState;
-            unchecked {
-                i++;
+        if (addrs.length < 1) {
+            revert Errors.InvalidArrayLength();
+        }
+        if (
+            _whitelistState == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER
+        ) {
+            updateSingletonWhitelistState(
+                addrs,
+                erc721Wrapper,
+                DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER
+            );
+            erc721Wrapper = addrs[0];
+        } else if (
+            _whitelistState == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER
+        ) {
+            updateSingletonWhitelistState(
+                addrs,
+                erc20Wrapper,
+                DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER
+            );
+            erc20Wrapper = addrs[0];
+        } else if (
+            _whitelistState ==
+            DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
+        ) {
+            updateSingletonWhitelistState(
+                addrs,
+                mysoTokenManager,
+                DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
+            );
+            mysoTokenManager = addrs[0];
+        } else {
+            for (uint i = 0; i < addrs.length; ) {
+                if (addrs[i] == address(0)) {
+                    revert Errors.InvalidAddress();
+                }
+                whitelistState[addrs[i]] = _whitelistState;
+                unchecked {
+                    i++;
+                }
             }
         }
         emit WhitelistStateUpdated(addrs, _whitelistState);
@@ -132,69 +147,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             compartmentImpl,
             tokens,
             allowTokensForCompartment
-        );
-    }
-
-    function setMysoTokenManager(address newTokenManager) external {
-        _senderCheckOwner();
-        address oldTokenManager = mysoTokenManager;
-        // allow newTokenManager to be reset to address(0) to remove any token manager
-        if (oldTokenManager == newTokenManager) {
-            revert Errors.InvalidAddress();
-        }
-        if (
-            whitelistState[newTokenManager] !=
-            DataTypesPeerToPeer.WhitelistState.NOT_WHITELISTED
-        ) {
-            revert Errors.AlreadyWhitelisted();
-        }
-        mysoTokenManager = newTokenManager;
-        if (newTokenManager != address(0)) {
-            whitelistState[newTokenManager] = DataTypesPeerToPeer
-                .WhitelistState
-                .CONTRACT_IN_ADDRESS_REGISTRY;
-        }
-        whitelistState[oldTokenManager] = DataTypesPeerToPeer
-            .WhitelistState
-            .NOT_WHITELISTED;
-        emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
-    }
-
-    function setTokenWrapperContract(
-        address newTokenWrapper,
-        bool isNftWrapper
-    ) external {
-        _senderCheckOwner();
-        address oldTokenWrapper = isNftWrapper
-            ? erc721TokenWrapper
-            : tokenBasketWrapper;
-        // allow reset to address(0) to remove token wrapper
-        if (oldTokenWrapper == newTokenWrapper) {
-            revert Errors.InvalidAddress();
-        }
-        if (
-            whitelistState[newTokenWrapper] !=
-            DataTypesPeerToPeer.WhitelistState.NOT_WHITELISTED
-        ) {
-            revert Errors.AlreadyWhitelisted();
-        }
-        if (isNftWrapper) {
-            erc721TokenWrapper = newTokenWrapper;
-        } else {
-            tokenBasketWrapper = newTokenWrapper;
-        }
-        if (newTokenWrapper != address(0)) {
-            whitelistState[newTokenWrapper] = DataTypesPeerToPeer
-                .WhitelistState
-                .CONTRACT_IN_ADDRESS_REGISTRY;
-        }
-        whitelistState[oldTokenWrapper] = DataTypesPeerToPeer
-            .WhitelistState
-            .NOT_WHITELISTED;
-        emit TokenWrapperContractUpdated(
-            oldTokenWrapper,
-            newTokenWrapper,
-            isNftWrapper
         );
     }
 
@@ -249,14 +201,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         string calldata name,
         string calldata symbol
     ) external {
-        address _erc721TokenWrapper = erc721TokenWrapper;
-        if (_erc721TokenWrapper == address(0)) {
+        address _erc721Wrapper = erc721Wrapper;
+        if (_erc721Wrapper == address(0)) {
             revert Errors.InvalidAddress();
         }
-        address newERC20Addr = IERC721Wrapper(_erc721TokenWrapper)
+        address newERC20Addr = IERC721Wrapper(_erc721Wrapper)
             .createWrappedToken(msg.sender, tokensToBeWrapped, name, symbol);
-        whitelistState[newERC20Addr] = DataTypesPeerToPeer.WhitelistState.TOKEN;
-        emit NonFungibleTokensWrapped(
+        whitelistState[newERC20Addr] = DataTypesPeerToPeer
+            .WhitelistState
+            .ERC20_TOKEN;
+        emit CreatedWrappedTokenForERC721s(
             tokensToBeWrapped,
             name,
             symbol,
@@ -264,21 +218,28 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         );
     }
 
-    function createWrappedTokenBasket(
-        DataTypesPeerToPeer.TokenBasketWrapperInfo calldata tokenInfo
+    function createWrappedTokenForERC20s(
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
+        string calldata name,
+        string calldata symbol
     ) external {
-        address _tokenBasketWrapper = tokenBasketWrapper;
-        if (_tokenBasketWrapper == address(0)) {
+        address _erc20Wrapper = erc20Wrapper;
+        if (_erc20Wrapper == address(0)) {
             revert Errors.InvalidAddress();
         }
-        address newERC20Addr = ITokenBasketWrapper(_tokenBasketWrapper)
-            .createWrappedTokenBasket(msg.sender, tokenInfo);
-        whitelistState[newERC20Addr] = DataTypesPeerToPeer.WhitelistState.TOKEN;
-        emit TokenBasketWrapped(
-            tokenInfo.tokenAddrs,
-            tokenInfo.tokenAmounts,
-            tokenInfo.name,
-            tokenInfo.symbol,
+        address newERC20Addr = IERC20Wrapper(_erc20Wrapper).createWrappedToken(
+            msg.sender,
+            tokensToBeWrapped,
+            name,
+            symbol
+        );
+        whitelistState[newERC20Addr] = DataTypesPeerToPeer
+            .WhitelistState
+            .ERC20_TOKEN;
+        emit CreatedWrappedTokenForERC20s(
+            tokensToBeWrapped,
+            name,
+            symbol,
             newERC20Addr
         );
     }
@@ -343,13 +304,37 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             token
         ];
         return
-            tokenWhitelistState == DataTypesPeerToPeer.WhitelistState.TOKEN ||
             tokenWhitelistState ==
-            DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT;
+            DataTypesPeerToPeer.WhitelistState.ERC20_TOKEN ||
+            tokenWhitelistState ==
+            DataTypesPeerToPeer
+                .WhitelistState
+                .ERC20_TOKEN_REQUIRING_COMPARTMENT;
     }
 
     function isWhitelistedNft(address token) public view returns (bool) {
-        return whitelistState[token] == DataTypesPeerToPeer.WhitelistState.NFT;
+        return
+            whitelistState[token] ==
+            DataTypesPeerToPeer.WhitelistState.ERC721_TOKEN;
+    }
+
+    function updateSingletonWhitelistState(
+        address[] calldata newAddrToBeWhitelisted,
+        address oldAddrToBeDeWhitelisted,
+        DataTypesPeerToPeer.WhitelistState newWhitelistState
+    ) internal {
+        if (newAddrToBeWhitelisted.length != 1) {
+            revert Errors.InvalidArrayLength();
+        }
+        if (oldAddrToBeDeWhitelisted == newAddrToBeWhitelisted[0]) {
+            revert Errors.InvalidAddress();
+        }
+        whitelistState[oldAddrToBeDeWhitelisted] = DataTypesPeerToPeer
+            .WhitelistState
+            .NOT_WHITELISTED;
+        if (newAddrToBeWhitelisted[0] != address(0)) {
+            whitelistState[newAddrToBeWhitelisted[0]] = newWhitelistState;
+        }
     }
 
     function _checkSenderAndIsInitialized() internal view {
