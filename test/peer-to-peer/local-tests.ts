@@ -184,6 +184,25 @@ describe('Peer-to-Peer: Local Tests', function () {
     )
     await lenderVaultFactory.deployed()
 
+    // deploy wrapped ERC721 Implementation
+    const WrappedERC721Implementation = await ethers.getContractFactory('WrappedERC721Impl')
+    const wrappedERC721Implementation = await WrappedERC721Implementation.connect(team).deploy()
+    await wrappedERC721Implementation.deployed()
+
+    // deploy ERC721 wrapper
+    const ERC721Wrapper = await ethers.getContractFactory('ERC721Wrapper')
+    const erc721Wrapper = await ERC721Wrapper.connect(team).deploy(
+      addressRegistry.address,
+      wrappedERC721Implementation.address
+    )
+    await erc721Wrapper.deployed()
+
+    const erc721WrapperWithoutRegistry = await ERC721Wrapper.connect(team).deploy(
+      ZERO_ADDRESS,
+      wrappedERC721Implementation.address
+    )
+    await erc721WrapperWithoutRegistry.deployed()
+
     // reverts if user tries to create vault before initialized because address registry doesn't have lender vault factory set yet
     await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(
       addressRegistry,
@@ -304,6 +323,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // deploy test tokens
     const MyERC20 = await ethers.getContractFactory('MyERC20')
+    const MyERC721 = await ethers.getContractFactory('MyERC721')
 
     const USDC = await MyERC20.connect(team)
     const usdc = await USDC.deploy('USDC', 'USDC', 6)
@@ -312,6 +332,14 @@ describe('Peer-to-Peer: Local Tests', function () {
     const WETH = await MyERC20.connect(team)
     const weth = await WETH.deploy('WETH', 'WETH', 18)
     await weth.deployed()
+
+    const MyFirstNFT = await MyERC721.connect(team)
+    const myFirstNFT = await MyFirstNFT.deploy('MyFirstNFT', 'MFNFT')
+    await myFirstNFT.deployed()
+
+    const MySecondNFT = await MyERC721.connect(team)
+    const mySecondNFT = await MySecondNFT.deploy('MySecondNFT', 'MSNFT')
+    await mySecondNFT.deployed()
 
     // transfer some test tokens
     await usdc.mint(lender.address, ONE_USDC.mul(100000))
@@ -352,7 +380,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       signer3: sortedAddrs[2],
       usdc,
       weth,
-      lenderVault
+      lenderVault,
+      wrappedERC721Implementation,
+      erc721Wrapper,
+      erc721WrapperWithoutRegistry,
+      myFirstNFT,
+      mySecondNFT
     }
   }
 
@@ -2436,6 +2469,170 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler,
         'OnChainQuoteDeleted'
       )
+    })
+  })
+
+  describe('Wrapped ERC721 Testing', function () {
+    it('Should revert on invalid minter', async function () {
+      const { addressRegistry, borrower, team, erc721Wrapper, erc721WrapperWithoutRegistry, myFirstNFT, mySecondNFT } =
+        await setupTest()
+
+      // should revert if minter is zero address
+      await expect(
+        erc721Wrapper
+          .connect(borrower)
+          .createWrappedToken(ZERO_ADDRESS, [{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidAddress')
+
+      // should revert if tokenInfo array has length 0
+      await expect(erc721Wrapper.connect(team).createWrappedToken(team.address, [], '', '')).to.be.revertedWithCustomError(
+        erc721Wrapper,
+        'InvalidArrayLength'
+      )
+
+      // should revert if tokenIds array has length 0
+      await expect(
+        erc721Wrapper
+          .connect(team)
+          .createWrappedToken(team.address, [{ tokenAddr: mySecondNFT.address, tokenIds: [] }], '', '')
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidArrayLength')
+
+      // should revert if address registry is non-zero and token is not whitelisted
+      await expect(
+        erc721Wrapper
+          .connect(team)
+          .createWrappedToken(team.address, [{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonWhitelistedToken')
+
+      // should pass through all the way until transfer, where it will revert
+      await expect(
+        erc721WrapperWithoutRegistry
+          .connect(team)
+          .createWrappedToken(team.address, [{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
+      ).to.be.revertedWithCustomError(erc721WrapperWithoutRegistry, 'TransferToWrappedTokenFailed')
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setTokenWrapperContract(erc721Wrapper.address, true)
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([myFirstNFT.address, mySecondNFT.address], 6)
+      // mint tokens
+      await myFirstNFT.connect(team).safeMint(borrower.address, 1)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 2)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 1)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 2)
+      // check owner is borrower
+      const ownerOFMyFirstNFT = await myFirstNFT.ownerOf(1)
+      const ownerOFMySecondNFT = await mySecondNFT.ownerOf(1)
+      expect(ownerOFMyFirstNFT).to.equal(borrower.address)
+      expect(ownerOFMySecondNFT).to.equal(borrower.address)
+      const ownerSecondOfMyFirstNFT = await myFirstNFT.ownerOf(2)
+      const ownerSecondOfMySecondNFT = await mySecondNFT.ownerOf(2)
+      expect(ownerSecondOfMyFirstNFT).to.equal(borrower.address)
+      expect(ownerSecondOfMySecondNFT).to.equal(borrower.address)
+      // set approval for wrapper contract
+      await myFirstNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+      await mySecondNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+
+      // sort NFT token addresses
+      const sortedNFTAddrs = [myFirstNFT.address, mySecondNFT.address].sort((a, b) =>
+        ethers.BigNumber.from(a).lte(b) ? -1 : 1
+      )
+
+      // check approvals
+      const isApprovedForAll = await myFirstNFT.isApprovedForAll(borrower.address, erc721Wrapper.address)
+      expect(isApprovedForAll).to.equal(true)
+      const isApprovedForAll2 = await mySecondNFT.isApprovedForAll(borrower.address, erc721Wrapper.address)
+      expect(isApprovedForAll2).to.equal(true)
+
+      // should revert with token address array out of order
+      await expect(
+        erc721Wrapper.connect(borrower).createWrappedToken(
+          borrower.address,
+          [
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] },
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] }
+          ],
+          '',
+          ''
+        )
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingTokenAddrs')
+
+      // should revert with token id array out of order
+      await expect(
+        erc721Wrapper.connect(borrower).createWrappedToken(
+          borrower.address,
+          [
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [2, 1] },
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+          ],
+          '',
+          ''
+        )
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingNonFungibleTokenIds')
+
+      // create wrapped token
+      await addressRegistry.connect(borrower).createWrappedTokenForERC721s(
+        [
+          { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+          { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+        ],
+        '',
+        ''
+      )
+
+      const newWrappedTokenAddr = await erc721Wrapper.wrappedERC20Instances(0)
+
+      const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr)
+
+      const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
+
+      // new token should be whitelisted as TOKEN
+      expect(whitelistTokenState).to.equal(1)
+
+      // check borrower has balance of 1
+      const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
+
+      expect(borrowerWrappedTokenBalance).to.equal(1)
+
+      // check total supply is 1
+      const totalSupply = await wrappedToken.totalSupply()
+
+      expect(totalSupply).to.equal(1)
+
+      // check ownership of all NFTs has shifted to new wrapped token
+      const currOwnerFirstNFTIdx1 = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2 = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1 = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2 = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1).to.equal(wrappedToken.address)
+      expect(currOwnerFirstNFTIdx2).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2).to.equal(wrappedToken.address)
+
+      // should revert if not owner of wrapped token
+      await expect(wrappedToken.connect(team).redeem()).to.be.revertedWithCustomError(wrappedToken, 'InvalidSender')
+
+      await wrappedToken.connect(borrower).redeem()
+
+      // check ownership of all NFTs has shifted back to borrower
+      const currOwnerFirstNFTIdx1PostRedeem = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostRedeem = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostRedeem = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostRedeem = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerFirstNFTIdx2PostRedeem).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx2PostRedeem).to.equal(borrower.address)
+
+      // check borrower has balance of 0
+      const borrowerWrappedTokenBalancePostRedeem = await wrappedToken.balanceOf(borrower.address)
+      expect(borrowerWrappedTokenBalancePostRedeem).to.equal(0)
+
+      // check total supply is 0
+      const totalSupplyPostRedeem = await wrappedToken.totalSupply()
+      expect(totalSupplyPostRedeem).to.equal(0)
     })
   })
 })

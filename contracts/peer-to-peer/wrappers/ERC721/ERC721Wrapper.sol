@@ -75,7 +75,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
                 }
                 checkedId = tokensToBeWrapped[i].tokenIds[j];
                 try
-                    IERC721(tokensToBeWrapped[i].tokenAddr).safeTransferFrom(
+                    IERC721(tokensToBeWrapped[i].tokenAddr).transferFrom(
                         minter,
                         newErc20Addr,
                         checkedId

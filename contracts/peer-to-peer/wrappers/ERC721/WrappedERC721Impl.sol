@@ -48,7 +48,7 @@ contract WrappedERC721Impl is
         for (uint256 i = 0; i < wrappedTokens.length; ) {
             for (uint256 j = 0; j < wrappedTokens[i].tokenIds.length; ) {
                 try
-                    IERC721(wrappedTokens[i].tokenAddr).safeTransferFrom(
+                    IERC721(wrappedTokens[i].tokenAddr).transferFrom(
                         address(this),
                         msg.sender,
                         wrappedTokens[i].tokenIds[j]
