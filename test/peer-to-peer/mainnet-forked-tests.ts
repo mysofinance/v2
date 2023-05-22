@@ -328,7 +328,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   }
 
   describe('On-Chain Quote Testing', function () {
-    it('Should validate correctly the wrong quote loanPerCollUnitOrLtv ', async function () {
+    it('Should validate correctly the quote loanPerCollUnitOrLtv', async function () {
       const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // deploy chainlinkOracleContract
@@ -360,7 +360,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       let quoteTuples = [
         {
-          loanPerCollUnitOrLtv: BASE,
+          loanPerCollUnitOrLtv: BASE.add(1),
           interestRatePctInBase: BASE.mul(10).div(100),
           upfrontFeePctInBase: BASE.mul(1).div(100),
           tenor: ONE_DAY.mul(365)
@@ -394,6 +394,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+      onChainQuote.generalQuoteInfo.whitelistAuthority = team.address
+
+      // now non-overcollateralized loan should work since whitelist authority is non-zero
+      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
     })
 
     it('Should validate correctly the wrong quote interestRatePctInBase', async function () {

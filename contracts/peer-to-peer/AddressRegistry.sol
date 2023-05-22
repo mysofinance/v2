@@ -6,6 +6,8 @@ import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {IERC721Wrapper} from "./interfaces/wrappers/ERC721/IERC721Wrapper.sol";
+import {IERC20Wrapper} from "./interfaces/wrappers/ERC20/IERC20Wrapper.sol";
 
 /**
  * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
@@ -22,6 +24,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public borrowerGateway;
     address public quoteHandler;
     address public mysoTokenManager;
+    address public erc721Wrapper;
+    address public erc20Wrapper;
     mapping(address => bool) public isRegisteredVault;
     mapping(address => mapping(address => uint256))
         internal _borrowerWhitelistedUntil;
@@ -63,19 +67,59 @@ contract AddressRegistry is Ownable, IAddressRegistry {
 
     function setWhitelistState(
         address[] calldata addrs,
-        DataTypesPeerToPeer.WhitelistState _whitelistState
+        DataTypesPeerToPeer.WhitelistState state
     ) external {
         _checkSenderAndIsInitialized();
-        for (uint i = 0; i < addrs.length; ) {
-            if (addrs[i] == address(0)) {
+
+        if (addrs.length < 1) {
+            revert Errors.InvalidArrayLength();
+        }
+
+        (
+            address _erc721Wrapper,
+            address _erc20Wrapper,
+            address _mysoTokenManager
+        ) = (erc721Wrapper, erc20Wrapper, mysoTokenManager);
+        // note (1/2): ERC721WRAPPER, ERC20WRAPPER and MYSO_TOKEN_MANAGER state can only be "occupied" by
+        // one addresses ("singleton state")
+        if (
+            state == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER ||
+            state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER ||
+            state == DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
+        ) {
+            if (addrs.length != 1) {
+                revert Errors.InvalidArrayLength();
+            }
+            if (addrs[0] == address(0)) {
                 revert Errors.InvalidAddress();
             }
-            whitelistState[addrs[i]] = _whitelistState;
-            unchecked {
-                i++;
+            _updateSingletonState(
+                addrs[0],
+                state,
+                _erc721Wrapper,
+                _erc20Wrapper,
+                _mysoTokenManager
+            );
+        } else {
+            // note (2/2): all other states can be "occupied" by multiple addresses
+            for (uint i = 0; i < addrs.length; i++) {
+                if (addrs[i] == address(0)) {
+                    revert Errors.InvalidAddress();
+                }
+                if (whitelistState[addrs[i]] == state) {
+                    revert Errors.StateAlreadySet();
+                }
+                // reset previous state
+                _resetAddrState(
+                    addrs[i],
+                    _erc721Wrapper,
+                    _erc20Wrapper,
+                    _mysoTokenManager
+                );
+                whitelistState[addrs[i]] = state;
             }
         }
-        emit WhitelistStateUpdated(addrs, _whitelistState);
+        emit WhitelistStateUpdated(addrs, state);
     }
 
     function setAllowedTokensForCompartment(
@@ -96,7 +140,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             revert Errors.InvalidArrayLength();
         }
         for (uint i = 0; i < tokens.length; ) {
-            if (allowTokensForCompartment && !isWhitelistedToken(tokens[i])) {
+            if (allowTokensForCompartment && !isWhitelistedERC20(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
             _isTokenWhitelistedForCompartment[compartmentImpl][
@@ -111,16 +155,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             tokens,
             allowTokensForCompartment
         );
-    }
-
-    function setMysoTokenManager(address newTokenManager) external {
-        _senderCheckOwner();
-        address oldTokenManager = mysoTokenManager;
-        if (oldTokenManager == newTokenManager) {
-            revert Errors.InvalidAddress();
-        }
-        mysoTokenManager = newTokenManager;
-        emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
     function addLenderVault(address addr) external {
@@ -166,6 +200,54 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             whitelistAuthority,
             msg.sender,
             whitelistedUntil
+        );
+    }
+
+    function createWrappedTokenForERC721s(
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
+        string calldata name,
+        string calldata symbol
+    ) external {
+        address _erc721Wrapper = erc721Wrapper;
+        if (_erc721Wrapper == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        address newERC20Addr = IERC721Wrapper(_erc721Wrapper)
+            .createWrappedToken(msg.sender, tokensToBeWrapped, name, symbol);
+        whitelistState[newERC20Addr] = DataTypesPeerToPeer
+            .WhitelistState
+            .ERC20_TOKEN;
+        emit CreatedWrappedTokenForERC721s(
+            tokensToBeWrapped,
+            name,
+            symbol,
+            newERC20Addr
+        );
+    }
+
+    function createWrappedTokenForERC20s(
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
+        string calldata name,
+        string calldata symbol
+    ) external {
+        address _erc20Wrapper = erc20Wrapper;
+        if (_erc20Wrapper == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        address newERC20Addr = IERC20Wrapper(_erc20Wrapper).createWrappedToken(
+            msg.sender,
+            tokensToBeWrapped,
+            name,
+            symbol
+        );
+        whitelistState[newERC20Addr] = DataTypesPeerToPeer
+            .WhitelistState
+            .ERC20_TOKEN;
+        emit CreatedWrappedTokenForERC20s(
+            tokensToBeWrapped,
+            name,
+            symbol,
+            newERC20Addr
         );
     }
 
@@ -224,14 +306,61 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         return _owner;
     }
 
-    function isWhitelistedToken(address token) public view returns (bool) {
+    function isWhitelistedERC20(address token) public view returns (bool) {
         DataTypesPeerToPeer.WhitelistState tokenWhitelistState = whitelistState[
             token
         ];
         return
-            tokenWhitelistState == DataTypesPeerToPeer.WhitelistState.TOKEN ||
             tokenWhitelistState ==
-            DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT;
+            DataTypesPeerToPeer.WhitelistState.ERC20_TOKEN ||
+            tokenWhitelistState ==
+            DataTypesPeerToPeer
+                .WhitelistState
+                .ERC20_TOKEN_REQUIRING_COMPARTMENT;
+    }
+
+    function _updateSingletonState(
+        address newAddr,
+        DataTypesPeerToPeer.WhitelistState state,
+        address _erc721Wrapper,
+        address _erc20Wrapper,
+        address _mysoTokenManager
+    ) internal {
+        if (whitelistState[newAddr] == state) {
+            revert Errors.StateAlreadySet();
+        }
+        _resetAddrState(
+            newAddr,
+            _erc721Wrapper,
+            _erc20Wrapper,
+            _mysoTokenManager
+        );
+        if (state == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER) {
+            erc721Wrapper = newAddr;
+        } else if (state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER) {
+            erc20Wrapper = newAddr;
+        } else {
+            mysoTokenManager = newAddr;
+        }
+        whitelistState[newAddr] = state;
+    }
+
+    function _resetAddrState(
+        address addr,
+        address _erc721Wrapper,
+        address _erc20Wrapper,
+        address _mysoTokenManager
+    ) internal {
+        if (addr == _erc721Wrapper) {
+            delete erc721Wrapper;
+        } else if (addr == _erc20Wrapper) {
+            delete erc20Wrapper;
+        } else if (addr == _mysoTokenManager) {
+            delete mysoTokenManager;
+        }
+        whitelistState[addr] = DataTypesPeerToPeer
+            .WhitelistState
+            .NOT_WHITELISTED;
     }
 
     function _checkSenderAndIsInitialized() internal view {

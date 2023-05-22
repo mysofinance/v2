@@ -91,4 +91,9 @@ library Errors {
     error DelegateReducedBalance();
     error FundingPoolAlreadyExists();
     error InvalidLender();
+    error NonIncreasingTokenAddrs();
+    error NonIncreasingNonFungibleTokenIds();
+    error TransferToWrappedTokenFailed();
+    error TransferFromWrappedTokenFailed();
+    error StateAlreadySet();
 }

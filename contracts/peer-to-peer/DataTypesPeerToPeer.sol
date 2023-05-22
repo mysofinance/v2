@@ -117,11 +117,25 @@ library DataTypesPeerToPeer {
         bytes callbackData;
     }
 
+    struct WrappedERC721TokenInfo {
+        // address of the ERC721_TOKEN
+        address tokenAddr;
+        // array of ERC721_TOKEN ids
+        uint256[] tokenIds;
+    }
+
+    struct WrappedERC20TokenInfo {
+        // token addresse
+        address tokenAddr;
+        // token amounts
+        uint256 tokenAmount;
+    }
+
     enum WhitelistState {
         // not whitelisted
         NOT_WHITELISTED,
         // can be used as loan or collateral token
-        TOKEN,
+        ERC20_TOKEN,
         // can be be used as oracle
         ORACLE,
         // can be used as compartment
@@ -131,6 +145,14 @@ library DataTypesPeerToPeer {
         // can be used as loan or collateral token, but if collateral then must
         // be used in conjunction with a compartment (e.g., for stETH with possible
         // negative rebase that could otherwise affect other borrowers in the vault)
-        TOKEN_REQUIRING_COMPARTMENT
+        ERC20_TOKEN_REQUIRING_COMPARTMENT,
+        // can be used in conjunction with an ERC721 wrapper
+        ERC721_TOKEN,
+        // can be used as ERC721 wrapper contract
+        ERC721WRAPPER,
+        // can be used as ERC20 wrapper contract
+        ERC20WRAPPER,
+        // can be used as MYSO token manager contract
+        MYSO_TOKEN_MANAGER
     }
 }

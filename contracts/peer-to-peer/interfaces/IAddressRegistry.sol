@@ -7,7 +7,7 @@ import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 interface IAddressRegistry {
     event WhitelistStateUpdated(
         address[] indexed whitelistAddrs,
-        DataTypesPeerToPeer.WhitelistState whitelistState
+        DataTypesPeerToPeer.WhitelistState indexed whitelistState
     );
     event AllowedTokensForCompartmentUpdated(
         address compartmentImpl,
@@ -24,9 +24,17 @@ interface IAddressRegistry {
         address[] indexed borrower,
         uint256 whitelistedUntil
     );
-    event MysoTokenManagerUpdated(
-        address oldTokenManager,
-        address newTokenManager
+    event CreatedWrappedTokenForERC721s(
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] wrappedTokensInfo,
+        string name,
+        string symbol,
+        address newErc20Addr
+    );
+    event CreatedWrappedTokenForERC20s(
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] wrappedTokensInfo,
+        string name,
+        string symbol,
+        address newERC20Addr
     );
 
     /**
@@ -40,13 +48,6 @@ interface IAddressRegistry {
         address _borrowerGateway,
         address _quoteHandler
     ) external;
-
-    /**
-     * @notice Sets a new MYSO token manager contract
-     * @dev Can only be called by registry owner
-     * @param newTokenManager Address of the new MYSO token manager contract
-     */
-    function setMysoTokenManager(address newTokenManager) external;
 
     /**
      * @notice adds new lender vault to registry
@@ -70,6 +71,30 @@ interface IAddressRegistry {
     ) external;
 
     /**
+     * @notice Allows user to wrap (multiple) ERC721 into one ERC20
+     * @param tokensToBeWrapped Array of WrappedERC721TokenInfo
+     * @param name Name of the new wrapper token
+     * @param symbol Symbol of the new wrapper token
+     */
+    function createWrappedTokenForERC721s(
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
+        string calldata name,
+        string calldata symbol
+    ) external;
+
+    /**
+     * @notice Allows user to wrap multiple ERC20 into one ERC20
+     * @param tokensToBeWrapped Array of WrappedERC20TokenInfo
+     * @param name Name of the new wrapper token
+     * @param symbol Symbol of the new wrapper token
+     */
+    function createWrappedTokenForERC20s(
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
+        string calldata name,
+        string calldata symbol
+    ) external;
+
+    /**
      * @notice Allows a whitelist authority to set the whitelistedUntil state for a given borrower
      * @dev Anyone can create their own whitelist, and lenders can decide if and which whitelist they want to use
      * @param borrowers Array of borrower addresses
@@ -84,11 +109,10 @@ interface IAddressRegistry {
      * @notice Sets the whitelist state for a given address
      * @dev Can only be called by registry owner
      * @param addrs Addresses for which whitelist state shall be set
-     * @param whitelistState The whitelist state to which addresses shall be set (NOT_WHITELISTED, TOKEN, 
-     ORACLE, COMPARTMENT, CALLBACK, or TOKEN_REQUIRING_COMPARTMENT)
+     * @param whitelistState The whitelist state to which addresses shall be set
      */
     function setWhitelistState(
-        address[] memory addrs,
+        address[] calldata addrs,
         DataTypesPeerToPeer.WhitelistState whitelistState
     ) external;
 
@@ -102,7 +126,7 @@ interface IAddressRegistry {
      */
     function setAllowedTokensForCompartment(
         address compartmentImpl,
-        address[] memory tokens,
+        address[] calldata tokens,
         bool allowTokensForCompartment
     ) external;
 
@@ -122,7 +146,7 @@ interface IAddressRegistry {
      * @param token Addresses of the given token to check
      * @return Boolean flag indicating whether the token is whitelisted
      */
-    function isWhitelistedToken(address token) external view returns (bool);
+    function isWhitelistedERC20(address token) external view returns (bool);
 
     /**
      * @notice Returns the address of the vault factory
@@ -158,8 +182,7 @@ interface IAddressRegistry {
     /**
      * @notice Returns whitelist state for given address
      * @param addr Address to check whitelist state for
-     * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, TOKEN, 
-     ORACLE, COMPARTMENT, CALLBACK, or TOKEN_REQUIRING_COMPARTMENT)
+     * @return whitelistState Whitelist state for given address
      */
     function whitelistState(
         address addr

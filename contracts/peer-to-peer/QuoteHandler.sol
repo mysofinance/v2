@@ -352,10 +352,14 @@ contract QuoteHandler is IQuoteHandler {
             ) {
                 return false;
             }
+            // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
+            // when there is a specified whitelist authority address.
+            // Otherwise, the LTV must be set to a value <= 100% (overcollateralized).
             if (
                 onChainQuote.generalQuoteInfo.oracleAddr != address(0) &&
-                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >=
-                Constants.BASE
+                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >
+                Constants.BASE &&
+                onChainQuote.generalQuoteInfo.whitelistAuthority == address(0)
             ) {
                 return false;
             }
@@ -388,8 +392,8 @@ contract QuoteHandler is IQuoteHandler {
     ) internal view {
         IAddressRegistry registry = IAddressRegistry(_addressRegistry);
         if (
-            !registry.isWhitelistedToken(loanToken) ||
-            !registry.isWhitelistedToken(collToken)
+            !registry.isWhitelistedERC20(loanToken) ||
+            !registry.isWhitelistedERC20(collToken)
         ) {
             revert Errors.NonWhitelistedToken();
         }
@@ -399,7 +403,9 @@ contract QuoteHandler is IQuoteHandler {
         if (compartmentImpl == address(0)) {
             if (
                 collTokenWhitelistState ==
-                DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .ERC20_TOKEN_REQUIRING_COMPARTMENT
             ) {
                 revert Errors.CollateralMustBeCompartmentalized();
             }

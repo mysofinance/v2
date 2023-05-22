@@ -347,7 +347,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         for (uint256 i = 0; i < tokens.length; ) {
             if (
                 tokens[i] == address(0) ||
-                !_addressRegistry.isWhitelistedToken(tokens[i])
+                !_addressRegistry.isWhitelistedERC20(tokens[i])
             ) {
                 revert Errors.InvalidAddress();
             }
@@ -400,8 +400,11 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             ) {
                 revert Errors.NonWhitelistedOracle();
             }
-            // arbitrage protection if LTV > 100%
-            if (quoteTuple.loanPerCollUnitOrLtv > Constants.BASE) {
+            // arbitrage protection if LTV > 100% and no whitelist authority
+            if (
+                quoteTuple.loanPerCollUnitOrLtv > Constants.BASE &&
+                generalQuoteInfo.whitelistAuthority == address(0)
+            ) {
                 revert Errors.LtvHigherThanMax();
             }
             loanPerCollUnit =
