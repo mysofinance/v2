@@ -37,7 +37,6 @@ library Errors {
     error NonWhitelistedCompartment();
     error NonWhitelistedCallback();
     error NonWhitelistedToken();
-    error ContractInAddressRegistry();
     error LtvHigherThanMax();
     error InsufficientVaultFunds();
     error InvalidInterestRateFactor();
@@ -79,7 +78,6 @@ library Errors {
     error RepaymentIdxTooLarge();
     error AlreadyClaimed();
     error AlreadyConverted();
-    error AlreadyWhitelisted();
     error InvalidDueDates();
     error LoanTokenDueIsZero();
     error WaitForLoanTermsCoolOffPeriod();
@@ -97,4 +95,5 @@ library Errors {
     error NonIncreasingNonFungibleTokenIds();
     error TransferToWrappedTokenFailed();
     error TransferFromWrappedTokenFailed();
+    error StateAlreadySet();
 }

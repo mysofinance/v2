@@ -2,19 +2,19 @@
 
 pragma solidity 0.8.19;
 
-import {DataTypesPeerToPeer} from "../../../DataTypesPeerToPeer.sol";
+import {DataTypesPeerToPeer} from "../../../../peer-to-peer/DataTypesPeerToPeer.sol";
 
-interface IERC721Wrapper {
+interface IERC20Wrapper {
     /**
-     * @notice Allows user to wrap (multiple) ERC721 into one ERC20
+     * @notice Allows user to wrap multiple ERC20 into one ERC20
      * @param minter Address of the minter
-     * @param tokensToBeWrapped Array of WrappedERC721TokenInfo
+     * @param tokensToBeWrapped Array of WrappedERC20TokenInfo
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
      */
     function createWrappedToken(
         address minter,
-        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
         string calldata symbol
     ) external returns (address);

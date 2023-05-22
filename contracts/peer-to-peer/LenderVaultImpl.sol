@@ -347,7 +347,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         for (uint256 i = 0; i < tokens.length; ) {
             if (
                 tokens[i] == address(0) ||
-                !_addressRegistry.isWhitelistedToken(tokens[i])
+                !_addressRegistry.isWhitelistedERC20(tokens[i])
             ) {
                 revert Errors.InvalidAddress();
             }

@@ -6,7 +6,6 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist } from './helpers/misc'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
-import BigNumber from 'bignumber.js'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -189,6 +188,9 @@ describe('Peer-to-Peer: Local Tests', function () {
     const WrappedERC721Implementation = await ethers.getContractFactory('WrappedERC721Impl')
     const wrappedERC721Implementation = await WrappedERC721Implementation.connect(team).deploy()
     await wrappedERC721Implementation.deployed()
+    await expect(
+      wrappedERC721Implementation.initialize(team.address, [{ tokenAddr: ZERO_ADDRESS, tokenIds: [0] }], '', '')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
 
     // deploy ERC721 wrapper
     const ERC721Wrapper = await ethers.getContractFactory('ERC721Wrapper')
@@ -211,29 +213,24 @@ describe('Peer-to-Peer: Local Tests', function () {
     )
 
     // deploy token basket wrapper implementation
-    const TokenBasketWrapperERC20Implementaion = await ethers.getContractFactory('TokenBasketWrapperERC20Impl')
-    const tokenBasketWrapperERC20Implementation = await TokenBasketWrapperERC20Implementaion.connect(team).deploy()
-    await tokenBasketWrapperERC20Implementation.deployed()
+    const WrappedERC20Impl = await ethers.getContractFactory('WrappedERC20Impl')
+    const wrappedERC20Impl = await WrappedERC20Impl.connect(team).deploy()
+    await wrappedERC20Impl.deployed()
 
     // deploy token basket wrapper
-    const TokenBasketWrapper = await ethers.getContractFactory('TokenBasketWrapper')
-    const tokenBasketWrapper = await TokenBasketWrapper.connect(team).deploy(
-      addressRegistry.address,
-      tokenBasketWrapperERC20Implementation.address
-    )
-    await tokenBasketWrapper.deployed()
+    const ERC20Wrapper = await ethers.getContractFactory('ERC20Wrapper')
+    const erc20Wrapper = await ERC20Wrapper.connect(team).deploy(addressRegistry.address, wrappedERC20Impl.address)
+    await erc20Wrapper.deployed()
 
     // deploy token basket wrapper without registry
-    const tokenBasketWrapperWithoutRegistry = await TokenBasketWrapper.connect(team).deploy(
-      ZERO_ADDRESS,
-      tokenBasketWrapperERC20Implementation.address
-    )
+    const tokenBasketWrapperWithoutRegistry = await ERC20Wrapper.connect(team).deploy(ZERO_ADDRESS, wrappedERC20Impl.address)
     await tokenBasketWrapperWithoutRegistry.deployed()
 
     // should revert on zero address in implementation
-    await expect(
-      TokenBasketWrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)
-    ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidAddress')
+    await expect(ERC20Wrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      erc20Wrapper,
+      'InvalidAddress'
+    )
 
     // reverts if user tries to create vault before initialized because address registry doesn't have lender vault factory set yet
     await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(
@@ -246,34 +243,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       addressRegistry,
       'Uninitialized'
     )
-
-    // reverts if trying to set same MYSO token manager (initially zero)
-    await expect(addressRegistry.connect(team).setMysoTokenManager(ZERO_ADDRESS)).to.be.revertedWithCustomError(
-      addressRegistry,
-      'InvalidAddress'
-    )
-
-    // reverts if trying to set same tokenWrapper contract (initially zero)
-    await expect(addressRegistry.connect(team).setTokenWrapperContract(ZERO_ADDRESS, true)).to.be.revertedWithCustomError(
-      addressRegistry,
-      'InvalidAddress'
-    )
-    await expect(addressRegistry.connect(team).setTokenWrapperContract(ZERO_ADDRESS, false)).to.be.revertedWithCustomError(
-      addressRegistry,
-      'InvalidAddress'
-    )
-
-    // reverts if nft wrapper contract address is zero
-    await expect(
-      addressRegistry.connect(team).createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '')
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
-
-    // reverts if token basket wrapper contract address is zero
-    await expect(
-      addressRegistry
-        .connect(team)
-        .createWrappedTokenBasket({ tokenAddrs: [ZERO_ADDRESS], tokenAmounts: [1000], name: '', symbol: '' })
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
 
     // initialize address registry
     await expect(
@@ -307,36 +276,121 @@ describe('Peer-to-Peer: Local Tests', function () {
       addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
 
-    await addressRegistry.connect(team).setWhitelistState([borrower.address], 4)
+    // test erc721 wrapper whitelisting
+    let whitelistState
+    let erc721WrapperAddr
 
-    // reverts  if trying to set already whitelisted address as MYSO token manager
-    await expect(addressRegistry.connect(team).setMysoTokenManager(borrower.address)).to.be.revertedWithCustomError(
+    // reverts if trying to set zero address as ERC721 wrapper contract
+    await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 7)).to.be.revertedWithCustomError(
       addressRegistry,
-      'AlreadyWhitelisted'
+      'InvalidAddress'
     )
 
-    // reverts if trying to set already whitelisted address as token wrapper
-    await expect(
-      addressRegistry.connect(team).setTokenWrapperContract(borrower.address, true)
-    ).to.be.revertedWithCustomError(addressRegistry, 'AlreadyWhitelisted')
-
-    await addressRegistry.connect(team).setWhitelistState([borrower.address], 0)
-
-    // successfully set MYSO token manager
-    await addressRegistry.connect(team).setMysoTokenManager(team.address)
-
-    // cannot set MYSO token manager address to another state
-    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 1)).to.be.revertedWithCustomError(
+    // successfully set some ERC721 wrapper contract
+    await addressRegistry.connect(team).setWhitelistState([team.address], 7)
+    erc721WrapperAddr = await addressRegistry.erc721Wrapper()
+    expect(erc721WrapperAddr).to.be.equal(team.address)
+    whitelistState = await addressRegistry.whitelistState(team.address)
+    expect(whitelistState).to.be.equal(7)
+    // reverts if trying to set same ERC721 wrapper contract
+    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 7)).to.be.revertedWithCustomError(
       addressRegistry,
-      'ContractInAddressRegistry'
+      'StateAlreadySet'
     )
 
-    await addressRegistry.connect(team).setMysoTokenManager(ZERO_ADDRESS)
-
-    // now should be able to set old Myso token manager address to another state
-    await addressRegistry.connect(team).setWhitelistState([team.address], 1)
-    // reset team address state
+    // successfully unset ERC721 wrapper contract
     await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+    erc721WrapperAddr = await addressRegistry.erc721Wrapper()
+    expect(erc721WrapperAddr).to.be.equal(ZERO_ADDRESS)
+    whitelistState = await addressRegistry.whitelistState(team.address)
+    expect(whitelistState).to.be.equal(0)
+
+    // test ERC20 wrapper whitelisting
+    let erc20WrapperAddr
+
+    // reverts if trying to set zero address as ERC20 wrapper contract
+    await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 8)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidAddress'
+    )
+
+    // successfully set some ERC20 wrapper contract
+    await addressRegistry.connect(team).setWhitelistState([team.address], 8)
+    erc20WrapperAddr = await addressRegistry.erc20Wrapper()
+    expect(erc20WrapperAddr).to.be.equal(team.address)
+    whitelistState = await addressRegistry.whitelistState(team.address)
+    expect(whitelistState).to.be.equal(8)
+    // reverts if trying to set same ERC20 wrapper contract
+    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 8)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'StateAlreadySet'
+    )
+
+    // successfully unset ERC20 wrapper contract
+    await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+    erc20WrapperAddr = await addressRegistry.erc20Wrapper()
+    expect(erc20WrapperAddr).to.be.equal(ZERO_ADDRESS)
+    whitelistState = await addressRegistry.whitelistState(team.address)
+    expect(whitelistState).to.be.equal(0)
+
+    // test myso token manager whitelisting
+    let mysoTokenManagerAddr
+
+    // reverts if trying to set zero address as myso token manager
+    await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 9)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidAddress'
+    )
+
+    // successfully set some myso token manager
+    await addressRegistry.connect(team).setWhitelistState([team.address], 9)
+    mysoTokenManagerAddr = await addressRegistry.mysoTokenManager()
+    expect(mysoTokenManagerAddr).to.be.equal(team.address)
+    whitelistState = await addressRegistry.whitelistState(team.address)
+    expect(whitelistState).to.be.equal(9)
+    // reverts if trying to set same myso token manager
+    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 9)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'StateAlreadySet'
+    )
+
+    // successfully unset myso token manager contract
+    await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+    mysoTokenManagerAddr = await addressRegistry.mysoTokenManager()
+    expect(mysoTokenManagerAddr).to.be.equal(ZERO_ADDRESS)
+    whitelistState = await addressRegistry.whitelistState(team.address)
+    expect(whitelistState).to.be.equal(0)
+
+    // successfully set some myso token manager
+    await addressRegistry.connect(team).setWhitelistState([team.address], 9)
+    // check that updating to non-singleton state resets myso token manager to zero
+    await addressRegistry.connect(team).setWhitelistState([team.address], 1)
+    mysoTokenManagerAddr = await addressRegistry.mysoTokenManager()
+    expect(mysoTokenManagerAddr).to.be.equal(ZERO_ADDRESS)
+    // reset address whitelist state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+
+    // successfully set some myso token manager
+    await addressRegistry.connect(team).setWhitelistState([team.address], 9)
+    // check that updating to a different singleton state resets myso token manager to zero
+    await addressRegistry.connect(team).setWhitelistState([team.address], 8)
+    mysoTokenManagerAddr = await addressRegistry.mysoTokenManager()
+    expect(mysoTokenManagerAddr).to.be.equal(ZERO_ADDRESS)
+    // reset address whitelist state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+
+    // reverts if nft wrapper contract address is zero
+    await expect(
+      addressRegistry.connect(team).createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '')
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+
+    // reverts if token basket wrapper contract address is zero
+    await expect(
+      addressRegistry.connect(team).createWrappedTokenForERC20s([{ tokenAddr: ZERO_ADDRESS, tokenAmount: 1000 }], '', '')
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
+
+    await addressRegistry.connect(team).setWhitelistState([borrower.address], 4)
+    await addressRegistry.connect(team).setWhitelistState([borrower.address], 0)
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
@@ -416,8 +470,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       wrappedERC721Implementation,
       erc721Wrapper,
       erc721WrapperWithoutRegistry,
-      tokenBasketWrapperERC20Implementation,
-      tokenBasketWrapper,
+      wrappedERC20Impl,
+      erc20Wrapper,
       tokenBasketWrapperWithoutRegistry,
       myFirstNFT,
       mySecondNFT
@@ -631,9 +685,6 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault,
         'InvalidWithdrawAmount'
       )
-
-      // whitelisting shouldn't affect withdrawability
-      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
 
       // lender can withdraw valid token and amount
       withdrawAmount = depositAmount.div(3)
@@ -2263,15 +2314,12 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).setWhitelistState([weth.address], 0)
-
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
-      await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
       await addressRegistry.connect(team).setWhitelistState([weth.address], 1)
 
       await expect(
@@ -2367,7 +2415,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       onChainQuote.generalQuoteInfo.earliestRepayTenor = ethers.BigNumber.from(0)
 
       // set loan and coll token whitelist states
-      await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
       await addressRegistry.connect(team).setWhitelistState([weth.address], 5)
 
       // quote cannot be added with coll token must be compartmentalized and no compartment
@@ -2547,7 +2594,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(erc721WrapperWithoutRegistry, 'TransferToWrappedTokenFailed')
 
       // set token wrapper contract in address registry
-      await addressRegistry.connect(team).setTokenWrapperContract(erc721Wrapper.address, true)
+      await addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
       // whitelist tokens
       await addressRegistry.connect(team).setWhitelistState([myFirstNFT.address, mySecondNFT.address], 6)
       // mint tokens
@@ -2568,7 +2615,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await myFirstNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
       await mySecondNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
 
-      // sort NFT token addresses
+      // sort ERC721_TOKEN token addresses
       const sortedNFTAddrs = [myFirstNFT.address, mySecondNFT.address].sort((a, b) =>
         ethers.BigNumber.from(a).lte(b) ? -1 : 1
       )
@@ -2615,13 +2662,13 @@ describe('Peer-to-Peer: Local Tests', function () {
         'testSymbol'
       )
 
-      const newWrappedTokenAddr = await erc721Wrapper.wrappedERC20Instances(0)
+      const newWrappedTokenAddr = await erc721Wrapper.tokensCreated(0)
 
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr)
 
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
 
-      // new token should be whitelisted as TOKEN
+      // new token should be whitelisted as ERC20_TOKEN
       expect(whitelistTokenState).to.equal(1)
 
       // check borrower has balance of 1
@@ -2642,9 +2689,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(wrappedTokenSymbol).to.equal('testSymbol')
       expect(wrappedTokenDecimals).to.equal(0)
 
-      const wrappedTokenArr = await wrappedToken.getWrappedTokens()
-
-      expect(wrappedTokenArr.length).to.equal(2)
+      const wrappedTokensInfo = await wrappedToken.getWrappedTokensInfo()
+      expect(wrappedTokensInfo.length).to.equal(2)
 
       // check ownership of all NFTs has shifted to new wrapped token
       const currOwnerFirstNFTIdx1 = await myFirstNFT.ownerOf(1)
@@ -2685,100 +2731,112 @@ describe('Peer-to-Peer: Local Tests', function () {
 
   describe('Wrapped Token Basket Testing', function () {
     it('Should handle wrapping and redeeming of token basket correctly', async function () {
-      const { addressRegistry, borrower, team, lender, usdc, weth, tokenBasketWrapper, tokenBasketWrapperWithoutRegistry } =
+      const { addressRegistry, borrower, team, usdc, weth, erc20Wrapper, tokenBasketWrapperWithoutRegistry } =
         await setupTest()
 
       // should revert if minter is zero address
       await expect(
-        tokenBasketWrapper.connect(borrower).createWrappedTokenBasket(ZERO_ADDRESS, {
-          tokenAddrs: [weth.address, usdc.address],
-          tokenAmounts: [ONE_WETH, ONE_USDC],
-          name: '',
-          symbol: ''
-        })
-      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidAddress')
-
-      // should revert if tokenAddrs array has length 0 or unequal lengths
-      await expect(
-        tokenBasketWrapper.connect(team).createWrappedTokenBasket(team.address, {
-          tokenAddrs: [],
-          tokenAmounts: [ONE_WETH],
-          name: '',
-          symbol: ''
-        })
-      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidArrayLength')
-
-      await expect(
-        tokenBasketWrapper.connect(team).createWrappedTokenBasket(team.address, {
-          tokenAddrs: [weth.address, usdc.address],
-          tokenAmounts: [ONE_WETH],
-          name: '',
-          symbol: ''
-        })
-      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidArrayLength')
+        erc20Wrapper.connect(borrower).createWrappedToken(
+          ZERO_ADDRESS,
+          [
+            { tokenAddr: weth.address, tokenAmount: ONE_WETH },
+            { tokenAddr: usdc.address, tokenAmount: ONE_USDC }
+          ],
+          '',
+          ''
+        )
+      ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidAddress')
 
       // should revert if address registry is non-zero and token is not whitelisted
       await expect(
-        tokenBasketWrapper.connect(team).createWrappedTokenBasket(team.address, {
-          tokenAddrs: [team.address, usdc.address],
-          tokenAmounts: [ONE_WETH, ONE_USDC],
-          name: '',
-          symbol: ''
-        })
-      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'NonWhitelistedToken')
+        erc20Wrapper.connect(team).createWrappedToken(
+          team.address,
+          [
+            { tokenAddr: team.address, tokenAmount: ONE_WETH },
+            { tokenAddr: usdc.address, tokenAmount: ONE_USDC }
+          ],
+          '',
+          ''
+        )
+      ).to.be.revertedWithCustomError(erc20Wrapper, 'NonWhitelistedToken')
 
       // should pass through all the way until transfer, where it will revert because of no approval
       await expect(
-        tokenBasketWrapperWithoutRegistry.connect(team).createWrappedTokenBasket(team.address, {
-          tokenAddrs: [weth.address],
-          tokenAmounts: [ONE_WETH],
-          name: '',
-          symbol: ''
-        })
+        tokenBasketWrapperWithoutRegistry
+          .connect(team)
+          .createWrappedToken(team.address, [{ tokenAddr: weth.address, tokenAmount: ONE_WETH }], '', '')
       ).to.be.revertedWith('ERC20: insufficient allowance')
 
-      const sortedTokenAddrs = [weth.address, usdc.address].sort((a, b) => (ethers.BigNumber.from(a).lte(b) ? -1 : 1))
+      const wrappedUsdcAmount = ONE_USDC.mul(876)
+      const wrappedEthAmount = ONE_WETH.mul(8)
+      await usdc.mint(borrower.address, wrappedUsdcAmount)
+      await weth.mint(borrower.address, wrappedEthAmount)
+      await usdc.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
+      await weth.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
+
+      const sortedTokenInfo = [
+        { tokenAddr: weth.address, tokenAmount: wrappedEthAmount },
+        { tokenAddr: usdc.address, tokenAmount: wrappedUsdcAmount }
+      ].sort((a, b) => (ethers.BigNumber.from(a.tokenAddr).lte(b.tokenAddr) ? -1 : 1))
 
       // set token wrapper contract in address registry
-      await addressRegistry.connect(team).setTokenWrapperContract(tokenBasketWrapper.address, false)
+      await addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address], 8)
 
-      await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(100))
-
-      await usdc.connect(borrower).approve(tokenBasketWrapper.address, MAX_UINT256)
-      await weth.connect(borrower).approve(tokenBasketWrapper.address, MAX_UINT256)
-
-      //should revert if token addrs are out of order
+      // should revert if token addrs are out of order
       await expect(
-        tokenBasketWrapper.connect(borrower).createWrappedTokenBasket(borrower.address, {
-          tokenAddrs: [sortedTokenAddrs[1], sortedTokenAddrs[0]],
-          tokenAmounts: [ONE_USDC, ONE_WETH],
-          name: '',
-          symbol: ''
-        })
-      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'NonIncreasingTokenAddrs')
+        erc20Wrapper.connect(borrower).createWrappedToken(
+          borrower.address,
+          [
+            { tokenAddr: sortedTokenInfo[1].tokenAddr, tokenAmount: 1 },
+            { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 }
+          ],
+          '',
+          ''
+        )
+      ).to.be.revertedWithCustomError(erc20Wrapper, 'NonIncreasingTokenAddrs')
 
-      //should revert if token amount is equal to 0
+      // should revert if any token amount is equal to 0
       await expect(
-        tokenBasketWrapper.connect(borrower).createWrappedTokenBasket(borrower.address, {
-          tokenAddrs: [sortedTokenAddrs[0], sortedTokenAddrs[1]],
-          tokenAmounts: [0, ONE_WETH],
-          name: '',
-          symbol: ''
-        })
-      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidSendAmount')
+        erc20Wrapper.connect(borrower).createWrappedToken(
+          borrower.address,
+          [
+            { tokenAddr: sortedTokenInfo[1].tokenAddr, tokenAmount: 0 },
+            { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 }
+          ],
+          '',
+          ''
+        )
+      ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidSendAmount')
+      await expect(
+        erc20Wrapper.connect(borrower).createWrappedToken(
+          borrower.address,
+          [
+            { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 },
+            { tokenAddr: sortedTokenInfo[1].tokenAddr, tokenAmount: 0 }
+          ],
+          '',
+          ''
+        )
+      ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidSendAmount')
 
       // create wrapped token basket
-      await addressRegistry.connect(borrower).createWrappedTokenBasket({
-        tokenAddrs: [sortedTokenAddrs[0], sortedTokenAddrs[1]],
-        tokenAmounts: [ONE_USDC.div(10), ONE_USDC.div(100)],
-        name: 'testName',
-        symbol: 'testSymbol'
-      })
+      await addressRegistry.connect(borrower).createWrappedTokenForERC20s(
+        [
+          {
+            tokenAddr: sortedTokenInfo[0].tokenAddr,
+            tokenAmount: sortedTokenInfo[0].tokenAmount
+          },
+          {
+            tokenAddr: sortedTokenInfo[1].tokenAddr,
+            tokenAmount: sortedTokenInfo[1].tokenAmount
+          }
+        ],
+        'testName',
+        'testSymbol'
+      )
 
-      const newWrappedTokenAddr = await tokenBasketWrapper.wrappedERC20Instances(0)
-
-      const wrappedToken = await ethers.getContractAt('TokenBasketWrapperERC20Impl', newWrappedTokenAddr)
-
+      const newWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
+      const wrappedToken = await ethers.getContractAt('WrappedERC20Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
 
       // check name, symbol, and decimal overrides
@@ -2790,42 +2848,43 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(wrappedTokenDecimals).to.equal(6)
 
       // check that tokens were stored in instance storage correctly
-      const tokenAddrs = await wrappedToken.getAllTokenAddrs()
+      const tokenAddrs = await wrappedToken.getWrappedTokensInfo()
 
-      expect(tokenAddrs[0]).to.equal(sortedTokenAddrs[0])
-      expect(tokenAddrs[1]).to.equal(sortedTokenAddrs[1])
+      expect(tokenAddrs[0].tokenAddr).to.equal(sortedTokenInfo[0].tokenAddr)
+      expect(tokenAddrs[1].tokenAddr).to.equal(sortedTokenInfo[1].tokenAddr)
 
-      // new token should be whitelisted as TOKEN
+      // new token should be whitelisted as ERC20_TOKEN
       expect(whitelistTokenState).to.equal(1)
 
-      // check borrower has balance of ONE_USDC.div(100) (minimum of two amounts,and both less than 10 ** 6)
+      // check borrower has balance of minimum of two amounts, but no more than 10 ** 6
       const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
-      expect(borrowerWrappedTokenBalance).to.equal(ONE_USDC.div(100))
+      const wrappedTokenSupplyCap = ethers.BigNumber.from(1000000)
+      const minOfWrappedUsdcAndEthAmounts = wrappedUsdcAmount.lt(wrappedEthAmount) ? wrappedUsdcAmount : wrappedEthAmount
+      const expectedWrappedTokenBalance = minOfWrappedUsdcAndEthAmounts.lt(wrappedTokenSupplyCap)
+        ? minOfWrappedUsdcAndEthAmounts
+        : wrappedTokenSupplyCap
+      expect(borrowerWrappedTokenBalance).to.equal(expectedWrappedTokenBalance)
 
-      // check total supply is ONE_USDC.div(100)
+      // check total supply
       const totalSupply = await wrappedToken.totalSupply()
-      expect(totalSupply).to.equal(ONE_USDC.div(100))
+      expect(totalSupply).to.equal(expectedWrappedTokenBalance)
 
       // check ownership of all tokens has shifted to new wrapped token
       const usdcBalanceOfWrappedToken = await usdc.balanceOf(wrappedToken.address)
       const wethBalanceOfWrappedToken = await weth.balanceOf(wrappedToken.address)
 
-      expect(usdcBalanceOfWrappedToken).to.equal(ONE_USDC.div(10))
-      expect(wethBalanceOfWrappedToken).to.equal(ONE_USDC.div(100))
+      expect(usdcBalanceOfWrappedToken).to.equal(wrappedUsdcAmount)
+      expect(wethBalanceOfWrappedToken).to.equal(wrappedEthAmount)
 
       const preRedeemUsdcBalance = await usdc.balanceOf(borrower.address)
       const preRedeemWethBalance = await weth.balanceOf(borrower.address)
 
       // should revert if redeem more than balance
-      await expect(wrappedToken.connect(borrower).redeem(ONE_USDC)).to.be.revertedWithCustomError(
+      await expect(wrappedToken.connect(borrower).redeem(borrowerWrappedTokenBalance.add(1))).to.be.revertedWithCustomError(
         wrappedToken,
         'InvalidSendAmount'
       )
-
-      await expect(wrappedToken.connect(team).redeem(ONE_USDC.div(100))).to.be.revertedWithCustomError(
-        wrappedToken,
-        'InvalidSendAmount'
-      )
+      await expect(wrappedToken.connect(team).redeem(0)).to.be.revertedWithCustomError(wrappedToken, 'InvalidSendAmount')
 
       // redeem half the balance
       await wrappedToken.connect(borrower).redeem(totalSupply.div(2))

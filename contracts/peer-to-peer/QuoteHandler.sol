@@ -392,8 +392,8 @@ contract QuoteHandler is IQuoteHandler {
     ) internal view {
         IAddressRegistry registry = IAddressRegistry(_addressRegistry);
         if (
-            !registry.isWhitelistedToken(loanToken) ||
-            !registry.isWhitelistedToken(collToken)
+            !registry.isWhitelistedERC20(loanToken) ||
+            !registry.isWhitelistedERC20(collToken)
         ) {
             revert Errors.NonWhitelistedToken();
         }
@@ -403,7 +403,9 @@ contract QuoteHandler is IQuoteHandler {
         if (compartmentImpl == address(0)) {
             if (
                 collTokenWhitelistState ==
-                DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .ERC20_TOKEN_REQUIRING_COMPARTMENT
             ) {
                 revert Errors.CollateralMustBeCompartmentalized();
             }
