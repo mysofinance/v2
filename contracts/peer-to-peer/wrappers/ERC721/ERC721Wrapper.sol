@@ -58,9 +58,10 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
             }
             if (
                 addressRegistry != address(0) &&
-                !IAddressRegistry(addressRegistry).isWhitelistedNft(
+                IAddressRegistry(addressRegistry).whitelistState(
                     tokensToBeWrapped[i].tokenAddr
-                )
+                ) !=
+                DataTypesPeerToPeer.WhitelistState.ERC721_TOKEN
             ) {
                 revert Errors.NonWhitelistedToken();
             }

@@ -76,7 +76,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         if (
             _whitelistState == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER
         ) {
-            updateSingletonWhitelistState(
+            _updateSingletonWhitelistState(
                 addrs,
                 erc721Wrapper,
                 DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER
@@ -85,7 +85,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         } else if (
             _whitelistState == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER
         ) {
-            updateSingletonWhitelistState(
+            _updateSingletonWhitelistState(
                 addrs,
                 erc20Wrapper,
                 DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER
@@ -95,7 +95,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             _whitelistState ==
             DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
         ) {
-            updateSingletonWhitelistState(
+            _updateSingletonWhitelistState(
                 addrs,
                 mysoTokenManager,
                 DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
@@ -312,13 +312,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 .ERC20_TOKEN_REQUIRING_COMPARTMENT;
     }
 
-    function isWhitelistedNft(address token) public view returns (bool) {
-        return
-            whitelistState[token] ==
-            DataTypesPeerToPeer.WhitelistState.ERC721_TOKEN;
-    }
-
-    function updateSingletonWhitelistState(
+    function _updateSingletonWhitelistState(
         address[] calldata newAddrToBeWhitelisted,
         address oldAddrToBeDeWhitelisted,
         DataTypesPeerToPeer.WhitelistState newWhitelistState

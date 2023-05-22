@@ -109,8 +109,7 @@ interface IAddressRegistry {
      * @notice Sets the whitelist state for a given address
      * @dev Can only be called by registry owner
      * @param addrs Addresses for which whitelist state shall be set
-     * @param whitelistState The whitelist state to which addresses shall be set (NOT_WHITELISTED, ERC20_TOKEN, 
-     ORACLE, COMPARTMENT, CALLBACK, or ERC20_TOKEN_REQUIRING_COMPARTMENT)
+     * @param whitelistState The whitelist state to which addresses shall be set
      */
     function setWhitelistState(
         address[] calldata addrs,
@@ -150,13 +149,6 @@ interface IAddressRegistry {
     function isWhitelistedToken(address token) external view returns (bool);
 
     /**
-     * @notice Returns boolean flag indicating whether token is whitelisted ERC721_TOKEN
-     * @param token Addresses of the given token to check
-     * @return Boolean flag indicating whether the token is whitelisted ERC721_TOKEN
-     */
-    function isWhitelistedNft(address token) external view returns (bool);
-
-    /**
      * @notice Returns the address of the vault factory
      * @return Address of the vault factory contract
      */
@@ -190,8 +182,7 @@ interface IAddressRegistry {
     /**
      * @notice Returns whitelist state for given address
      * @param addr Address to check whitelist state for
-     * @return whitelistState Whitelist state for given address (NOT_WHITELISTED, ERC20_TOKEN, 
-     ORACLE, COMPARTMENT, CALLBACK, or ERC20_TOKEN_REQUIRING_COMPARTMENT)
+     * @return whitelistState Whitelist state for given address
      */
     function whitelistState(
         address addr
