@@ -54,10 +54,9 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
             if (
                 addressRegistry != address(0) &&
-                IAddressRegistry(addressRegistry).whitelistState(
+                !IAddressRegistry(addressRegistry).isWhitelistedERC20(
                     tokensToBeWrapped[i].tokenAddr
-                ) !=
-                DataTypesPeerToPeer.WhitelistState.ERC20_TOKEN
+                )
             ) {
                 revert Errors.NonWhitelistedToken();
             }
