@@ -18,6 +18,8 @@ npx hardhat test
 ## Contract Files
 ```
 contracts/
+┣ interfaces/
+┃ ┗ IMysoTokenManager.sol
 ┣ peer-to-peer/
 ┃ ┣ callbacks/
 ┃ ┃ ┣ BalancerV2Looping.sol
@@ -45,6 +47,13 @@ contracts/
 ┃ ┃ ┃ ┃ ┗ AggregatorV3Interface.sol
 ┃ ┃ ┃ ┣ IOlympus.sol
 ┃ ┃ ┃ ┗ IUniV2.sol
+┃ ┃ ┣ wrappers/
+┃ ┃ ┃ ┣ ERC20/
+┃ ┃ ┃ ┃ ┣ IERC20Wrapper.sol
+┃ ┃ ┃ ┃ ┗ IWrappedERC20Impl.sol
+┃ ┃ ┃ ┗ ERC721/
+┃ ┃ ┃   ┣ IERC721Wrapper.sol
+┃ ┃ ┃   ┗ IWrappedERC721Impl.sol
 ┃ ┃ ┣ IAddressRegistry.sol
 ┃ ┃ ┣ IBorrowerGateway.sol
 ┃ ┃ ┣ ILenderVaultFactory.sol
@@ -58,6 +67,13 @@ contracts/
 ┃ ┃   ┣ ChainlinkBasicWithWbtc.sol
 ┃ ┃   ┣ OlympusOracle.sol
 ┃ ┃   ┗ UniV2Chainlink.sol
+┃ ┣ wrappers/
+┃ ┃ ┣ ERC20/
+┃ ┃ ┃ ┣ ERC20Wrapper.sol
+┃ ┃ ┃ ┗ WrappedERC20Impl.sol
+┃ ┃ ┗ ERC721/
+┃ ┃   ┣ ERC721Wrapper.sol
+┃ ┃   ┗ WrappedERC721Impl.sol
 ┃ ┣ AddressRegistry.sol
 ┃ ┣ BorrowerGateway.sol
 ┃ ┣ DataTypesPeerToPeer.sol
@@ -78,6 +94,7 @@ contracts/
 ┃ ┣ IUSDC.sol
 ┃ ┣ IWETH.sol
 ┃ ┣ MyERC20.sol
+┃ ┣ MyERC721.sol
 ┃ ┣ MyMaliciousCallback1.sol
 ┃ ┣ MyMaliciousCallback2.sol
 ┃ ┗ MyMaliciousERC20.sol
@@ -110,7 +127,6 @@ test/
 ┃ ┃ ┗ uniV3.ts
 ┃ ┣ arbitrum-forked-tests.ts
 ┃ ┣ local-tests.ts
-┃ ┣ mainnet-forked-looping-tests.ts
 ┃ ┗ mainnet-forked-tests.ts
 ┗ peer-to-pool/
   ┣ helpers/
@@ -127,21 +143,23 @@ File                                                     |  % Stmts | % Branch |
   Constants.sol                                          |      100 |      100 |      100 |      100 |                |
   Errors.sol                                             |      100 |      100 |      100 |      100 |                |
   Ownable.sol                                            |      100 |      100 |      100 |      100 |                |
- contracts\peer-to-peer\                                 |      100 |    98.08 |      100 |    99.51 |                |
-  AddressRegistry.sol                                    |      100 |      100 |      100 |      100 |                |
-  BorrowerGateway.sol                                    |      100 |       90 |      100 |    98.53 |            251 |
+ contracts\interfaces\                                   |      100 |      100 |      100 |      100 |                |
+  IMysoTokenManager.sol                                  |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\                                 |    99.31 |    95.61 |      100 |    97.88 |                |
+  AddressRegistry.sol                                    |      100 |    95.71 |      100 |    96.91 |       73,83,96 |
+  BorrowerGateway.sol                                    |    98.08 |    84.09 |      100 |    94.67 |245,252,253,270 |
   DataTypesPeerToPeer.sol                                |      100 |      100 |      100 |      100 |                |
-  LenderVaultFactory.sol                                 |      100 |      100 |      100 |      100 |                |
-  LenderVaultImpl.sol                                    |      100 |    98.81 |      100 |    99.31 |            287 |
+  LenderVaultFactory.sol                                 |    88.89 |       75 |      100 |    92.31 |             40 |
+  LenderVaultImpl.sol                                    |      100 |    98.78 |      100 |    98.62 |        279,280 |
   QuoteHandler.sol                                       |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\callbacks\                       |      100 |      100 |      100 |      100 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
   UniV3Looping.sol                                       |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\compartments\                    |      100 |    91.67 |      100 |    94.44 |                |
   BaseCompartment.sol                                    |      100 |    91.67 |      100 |    94.44 |             27 |
- contracts\peer-to-peer\compartments\staking\            |      100 |     87.5 |      100 |      100 |                |
+ contracts\peer-to-peer\compartments\staking\            |      100 |    83.33 |      100 |    96.25 |                |
   AaveStakingCompartment.sol                             |      100 |      100 |      100 |      100 |                |
-  CurveLPStakingCompartment.sol                          |      100 |     87.5 |      100 |      100 |                |
+  CurveLPStakingCompartment.sol                          |      100 |    83.33 |      100 |    95.65 |    131,135,136 |
   GLPStakingCompartment.sol                              |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\compartments\voting\             |      100 |     87.5 |      100 |    94.44 |                |
   VoteCompartment.sol                                    |      100 |     87.5 |      100 |    94.44 |             37 |
@@ -157,25 +175,52 @@ File                                                     |  % Stmts | % Branch |
   BalancerDataTypes.sol                                  |      100 |      100 |      100 |      100 |                |
   IBalancerAsset.sol                                     |      100 |      100 |      100 |      100 |                |
   IBalancerVault.sol                                     |      100 |      100 |      100 |      100 |                |
+  ISwapRouter.sol                                        |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\interfaces\compartments\         |      100 |      100 |      100 |      100 |                |
+  IBaseCompartment.sol                                   |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\interfaces\compartments\staking\ |      100 |      100 |      100 |      100 |                |
+  IStakingHelper.sol                                     |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\interfaces\oracles\              |      100 |      100 |      100 |      100 |                |
+  IOlympus.sol                                           |      100 |      100 |      100 |      100 |                |
+  IUniV2.sol                                             |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\interfaces\oracles\chainlink\    |      100 |      100 |      100 |      100 |                |
+  AggregatorV3Interface.sol                              |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\interfaces\wrappers\ERC20\       |      100 |      100 |      100 |      100 |                |
+  IERC20Wrapper.sol                                      |      100 |      100 |      100 |      100 |                |
+  IWrappedERC20Impl.sol                                  |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\interfaces\wrappers\ERC721\      |      100 |      100 |      100 |      100 |                |
+  IERC721Wrapper.sol                                     |      100 |      100 |      100 |      100 |                |
+  IWrappedERC721Impl.sol                                 |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\oracles\chainlink\               |      100 |    73.91 |      100 |    94.44 |                |
+  ChainlinkBasic.sol                                     |      100 |    61.54 |      100 |    93.75 |          43,97 |
+  ChainlinkBasicWithWbtc.sol                             |      100 |       75 |      100 |     87.5 |             43 |
+  OlympusOracle.sol                                      |      100 |      100 |      100 |      100 |                |
   UniV2Chainlink.sol                                     |      100 |    91.67 |      100 |    95.83 |             88 |
- contracts\peer-to-pool\                                 |    99.48 |    91.58 |    97.22 |    97.88 |                |
+ contracts\peer-to-peer\wrappers\ERC20\                  |      100 |    83.33 |      100 |    97.96 |                |
+  ERC20Wrapper.sol                                       |      100 |     87.5 |      100 |    96.43 |             50 |
+  WrappedERC20Impl.sol                                   |      100 |       75 |      100 |      100 |                |
+ contracts\peer-to-peer\wrappers\ERC721\                 |      100 |    90.91 |      100 |    98.28 |                |
+  ERC721Wrapper.sol                                      |      100 |    93.75 |      100 |      100 |                |
+  WrappedERC721Impl.sol                                  |      100 |    83.33 |      100 |    95.65 |             61 |
+ contracts\peer-to-pool\                                 |    97.66 |    88.46 |      100 |    96.61 |                |
   DataTypesPeerToPool.sol                                |      100 |      100 |      100 |      100 |                |
-  Factory.sol                                            |    96.55 |     62.5 |    88.89 |     91.3 |129,136,158,174 |
-  FundingPoolImpl.sol                                    |      100 |       95 |      100 |      100 |                |
-  LoanProposalImpl.sol                                   |      100 |    96.03 |      100 |     98.6 |     90,228,373 |
+  Factory.sol                                            |    94.74 |    71.88 |      100 |    91.23 |... 179,195,196 |
+  FundingPoolImpl.sol                                    |    95.74 |    89.13 |      100 |    97.37 |         53,124 |
+  LoanProposalImpl.sol                                   |    99.22 |    92.31 |      100 |    97.74 |... 224,254,402 |
  contracts\peer-to-pool\interfaces\                      |      100 |      100 |      100 |      100 |                |
   IFactory.sol                                           |      100 |      100 |      100 |      100 |                |
   IFundingPoolImpl.sol                                   |      100 |      100 |      100 |      100 |                |
   ILoanProposalImpl.sol                                  |      100 |      100 |      100 |      100 |                |
- contracts\test\                                         |    78.57 |       50 |    69.23 |    88.89 |                |
+ contracts\test\                                         |       80 |       50 |    73.33 |    89.29 |                |
   IPAXG.sol                                              |      100 |      100 |      100 |      100 |                |
   IUSDC.sol                                              |      100 |      100 |      100 |      100 |                |
   IWETH.sol                                              |      100 |      100 |      100 |      100 |                |
   MyERC20.sol                                            |      100 |      100 |      100 |      100 |                |
+  MyERC721.sol                                           |      100 |       50 |      100 |      100 |                |
   MyMaliciousCallback1.sol                               |      100 |       50 |    66.67 |      100 |                |
   MyMaliciousCallback2.sol                               |      100 |       50 |    66.67 |      100 |                |
   MyMaliciousERC20.sol                                   |     62.5 |       50 |       50 |       75 |       28,46,50 |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    99.35 |    92.55 |     96.5 |    98.19 |                |
+All files                                                |    98.65 |    89.97 |    97.63 |    96.98 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```

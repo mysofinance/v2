@@ -146,7 +146,7 @@ interface IAddressRegistry {
      * @param token Addresses of the given token to check
      * @return Boolean flag indicating whether the token is whitelisted
      */
-    function isWhitelistedToken(address token) external view returns (bool);
+    function isWhitelistedERC20(address token) external view returns (bool);
 
     /**
      * @notice Returns the address of the vault factory

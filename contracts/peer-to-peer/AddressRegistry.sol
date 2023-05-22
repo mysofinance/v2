@@ -67,52 +67,59 @@ contract AddressRegistry is Ownable, IAddressRegistry {
 
     function setWhitelistState(
         address[] calldata addrs,
-        DataTypesPeerToPeer.WhitelistState _whitelistState
+        DataTypesPeerToPeer.WhitelistState state
     ) external {
         _checkSenderAndIsInitialized();
+
         if (addrs.length < 1) {
             revert Errors.InvalidArrayLength();
         }
+
+        (
+            address _erc721Wrapper,
+            address _erc20Wrapper,
+            address _mysoTokenManager
+        ) = (erc721Wrapper, erc20Wrapper, mysoTokenManager);
+        // note (1/2): ERC721WRAPPER, ERC20WRAPPER and MYSO_TOKEN_MANAGER state can only be "occupied" by
+        // one addresses ("singleton state")
         if (
-            _whitelistState == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER
+            state == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER ||
+            state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER ||
+            state == DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
         ) {
-            _updateSingletonWhitelistState(
-                addrs,
-                erc721Wrapper,
-                DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER
+            if (addrs.length != 1) {
+                revert Errors.InvalidArrayLength();
+            }
+            if (addrs[0] == address(0)) {
+                revert Errors.InvalidAddress();
+            }
+            _updateSingletonState(
+                addrs[0],
+                state,
+                _erc721Wrapper,
+                _erc20Wrapper,
+                _mysoTokenManager
             );
-            erc721Wrapper = addrs[0];
-        } else if (
-            _whitelistState == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER
-        ) {
-            _updateSingletonWhitelistState(
-                addrs,
-                erc20Wrapper,
-                DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER
-            );
-            erc20Wrapper = addrs[0];
-        } else if (
-            _whitelistState ==
-            DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
-        ) {
-            _updateSingletonWhitelistState(
-                addrs,
-                mysoTokenManager,
-                DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
-            );
-            mysoTokenManager = addrs[0];
         } else {
-            for (uint i = 0; i < addrs.length; ) {
+            // note (2/2): all other states can be "occupied" by multiple addresses
+            for (uint i = 0; i < addrs.length; i++) {
                 if (addrs[i] == address(0)) {
                     revert Errors.InvalidAddress();
                 }
-                whitelistState[addrs[i]] = _whitelistState;
-                unchecked {
-                    i++;
+                if (whitelistState[addrs[i]] == state) {
+                    revert Errors.StateAlreadySet();
                 }
+                // reset previous state
+                _resetAddrState(
+                    addrs[i],
+                    _erc721Wrapper,
+                    _erc20Wrapper,
+                    _mysoTokenManager
+                );
+                whitelistState[addrs[i]] = state;
             }
         }
-        emit WhitelistStateUpdated(addrs, _whitelistState);
+        emit WhitelistStateUpdated(addrs, state);
     }
 
     function setAllowedTokensForCompartment(
@@ -133,7 +140,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             revert Errors.InvalidArrayLength();
         }
         for (uint i = 0; i < tokens.length; ) {
-            if (allowTokensForCompartment && !isWhitelistedToken(tokens[i])) {
+            if (allowTokensForCompartment && !isWhitelistedERC20(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
             _isTokenWhitelistedForCompartment[compartmentImpl][
@@ -299,7 +306,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         return _owner;
     }
 
-    function isWhitelistedToken(address token) public view returns (bool) {
+    function isWhitelistedERC20(address token) public view returns (bool) {
         DataTypesPeerToPeer.WhitelistState tokenWhitelistState = whitelistState[
             token
         ];
@@ -312,23 +319,48 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 .ERC20_TOKEN_REQUIRING_COMPARTMENT;
     }
 
-    function _updateSingletonWhitelistState(
-        address[] calldata newAddrToBeWhitelisted,
-        address oldAddrToBeDeWhitelisted,
-        DataTypesPeerToPeer.WhitelistState newWhitelistState
+    function _updateSingletonState(
+        address newAddr,
+        DataTypesPeerToPeer.WhitelistState state,
+        address _erc721Wrapper,
+        address _erc20Wrapper,
+        address _mysoTokenManager
     ) internal {
-        if (newAddrToBeWhitelisted.length != 1) {
-            revert Errors.InvalidArrayLength();
+        if (whitelistState[newAddr] == state) {
+            revert Errors.StateAlreadySet();
         }
-        if (oldAddrToBeDeWhitelisted == newAddrToBeWhitelisted[0]) {
-            revert Errors.InvalidAddress();
+        _resetAddrState(
+            newAddr,
+            _erc721Wrapper,
+            _erc20Wrapper,
+            _mysoTokenManager
+        );
+        if (state == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER) {
+            erc721Wrapper = newAddr;
+        } else if (state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER) {
+            erc20Wrapper = newAddr;
+        } else {
+            mysoTokenManager = newAddr;
         }
-        whitelistState[oldAddrToBeDeWhitelisted] = DataTypesPeerToPeer
+        whitelistState[newAddr] = state;
+    }
+
+    function _resetAddrState(
+        address addr,
+        address _erc721Wrapper,
+        address _erc20Wrapper,
+        address _mysoTokenManager
+    ) internal {
+        if (addr == _erc721Wrapper) {
+            delete erc721Wrapper;
+        } else if (addr == _erc20Wrapper) {
+            delete erc20Wrapper;
+        } else if (addr == _mysoTokenManager) {
+            delete mysoTokenManager;
+        }
+        whitelistState[addr] = DataTypesPeerToPeer
             .WhitelistState
             .NOT_WHITELISTED;
-        if (newAddrToBeWhitelisted[0] != address(0)) {
-            whitelistState[newAddrToBeWhitelisted[0]] = newWhitelistState;
-        }
     }
 
     function _checkSenderAndIsInitialized() internal view {

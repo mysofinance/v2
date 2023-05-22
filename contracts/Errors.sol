@@ -95,4 +95,5 @@ library Errors {
     error NonIncreasingNonFungibleTokenIds();
     error TransferToWrappedTokenFailed();
     error TransferFromWrappedTokenFailed();
+    error StateAlreadySet();
 }

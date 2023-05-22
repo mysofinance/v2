@@ -392,8 +392,8 @@ contract QuoteHandler is IQuoteHandler {
     ) internal view {
         IAddressRegistry registry = IAddressRegistry(_addressRegistry);
         if (
-            !registry.isWhitelistedToken(loanToken) ||
-            !registry.isWhitelistedToken(collToken)
+            !registry.isWhitelistedERC20(loanToken) ||
+            !registry.isWhitelistedERC20(collToken)
         ) {
             revert Errors.NonWhitelistedToken();
         }
