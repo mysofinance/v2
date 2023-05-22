@@ -352,10 +352,14 @@ contract QuoteHandler is IQuoteHandler {
             ) {
                 return false;
             }
+            // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
+            // when there is a specified whitelist authority address.
+            // Otherwise, the LTV must be set to a value <= 100% (overcollateralized).
             if (
                 onChainQuote.generalQuoteInfo.oracleAddr != address(0) &&
-                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >=
-                Constants.BASE
+                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >
+                Constants.BASE &&
+                onChainQuote.generalQuoteInfo.whitelistAuthority == address(0)
             ) {
                 return false;
             }
