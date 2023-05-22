@@ -94,7 +94,7 @@ interface IAddressRegistry {
     function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes memory signature,
+        bytes calldata signature,
         bytes32 salt
     ) external;
 
@@ -125,7 +125,7 @@ interface IAddressRegistry {
      * @param whitelistedUntil Timestamp until which borrowers shall be whitelisted under given whitelist authority
      */
     function updateBorrowerWhitelist(
-        address[] memory borrowers,
+        address[] calldata borrowers,
         uint256 whitelistedUntil
     ) external;
 

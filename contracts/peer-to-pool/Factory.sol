@@ -45,7 +45,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         uint256 _conversionGracePeriod,
         uint256 _repaymentGracePeriod
     ) external nonReentrant {
-        if (!isFundingPool[_fundingPool]) {
+        if (!isFundingPool[_fundingPool] || _collToken == address(0)) {
             revert Errors.InvalidAddress();
         }
         uint256 numLoanProposals = loanProposals.length;
@@ -129,7 +129,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     function claimLenderWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes memory signature,
+        bytes calldata signature,
         bytes32 salt
     ) external {
         bytes32 payloadHash = keccak256(
@@ -145,16 +145,17 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         ) {
             revert Errors.InvalidSignature();
         }
+        mapping(address => uint256)
+            storage whitelistedUntilPerLender = _lenderWhitelistedUntil[
+                whitelistAuthority
+            ];
         if (
             whitelistedUntil < block.timestamp ||
-            whitelistedUntil <=
-            _lenderWhitelistedUntil[whitelistAuthority][msg.sender]
+            whitelistedUntil <= whitelistedUntilPerLender[msg.sender]
         ) {
             revert Errors.CannotClaimOutdatedStatus();
         }
-        _lenderWhitelistedUntil[whitelistAuthority][
-            msg.sender
-        ] = whitelistedUntil;
+        whitelistedUntilPerLender[msg.sender] = whitelistedUntil;
         emit LenderWhitelistStatusClaimed(
             whitelistAuthority,
             msg.sender,
@@ -163,18 +164,21 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     }
 
     function updateLenderWhitelist(
-        address[] memory lenders,
+        address[] calldata lenders,
         uint256 whitelistedUntil
     ) external {
         for (uint i = 0; i < lenders.length; ) {
+            mapping(address => uint256)
+                storage whitelistedUntilPerLender = _lenderWhitelistedUntil[
+                    msg.sender
+                ];
             if (
                 lenders[i] == address(0) ||
-                whitelistedUntil ==
-                _lenderWhitelistedUntil[msg.sender][lenders[i]]
+                whitelistedUntil == whitelistedUntilPerLender[lenders[i]]
             ) {
                 revert Errors.InvalidUpdate();
             }
-            _lenderWhitelistedUntil[msg.sender][lenders[i]] = whitelistedUntil;
+            whitelistedUntilPerLender[lenders[i]] = whitelistedUntil;
             unchecked {
                 i++;
             }

@@ -150,21 +150,24 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         if (!ILoanProposalImpl(loanProposal).canUnsubscribe()) {
             revert Errors.NotInUnsubscriptionPhase();
         }
-        uint256 _subscriptionAmountOf = subscriptionAmountOf[loanProposal][
-            msg.sender
-        ];
-        if (amount > _subscriptionAmountOf) {
+        mapping(address => uint256)
+            storage subscriptionAmountPerLender = subscriptionAmountOf[
+                loanProposal
+            ];
+        if (amount > subscriptionAmountPerLender[msg.sender]) {
             revert Errors.UnsubscriptionAmountTooLarge();
         }
-        if (block.timestamp < _earliestUnsubscribe[loanProposal][msg.sender]) {
+        mapping(address => uint256)
+            storage earliestUnsubscribePerLender = _earliestUnsubscribe[
+                loanProposal
+            ];
+        if (block.timestamp < earliestUnsubscribePerLender[msg.sender]) {
             revert Errors.BeforeEarliestUnsubscribe();
         }
         balanceOf[msg.sender] += amount;
         totalSubscriptions[loanProposal] -= amount;
-        subscriptionAmountOf[loanProposal][msg.sender] =
-            _subscriptionAmountOf -
-            amount;
-        _earliestUnsubscribe[loanProposal][msg.sender] = 0;
+        subscriptionAmountPerLender[msg.sender] -= amount;
+        earliestUnsubscribePerLender[msg.sender] = 0;
 
         emit Unsubscribed(msg.sender, loanProposal, amount);
     }

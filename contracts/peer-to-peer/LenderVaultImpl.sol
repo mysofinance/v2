@@ -274,13 +274,14 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         if (!isSigner[signer] || signer != signers[signerIdx]) {
             revert Errors.InvalidSignerRemoveInfo();
         }
-        address signerMovedFromEnd = signers[signersLen - 1];
-        if (signerIdx < signersLen - 1) {
-            signers[signerIdx] = signerMovedFromEnd;
+        address signerWithSwappedPosition;
+        if (signerIdx != signersLen - 1) {
+            signerWithSwappedPosition = signers[signersLen - 1];
+            signers[signerIdx] = signerWithSwappedPosition;
         }
         signers.pop();
         isSigner[signer] = false;
-        emit RemovedSigner(signer, signerIdx, signerMovedFromEnd);
+        emit RemovedSigner(signer, signerIdx, signerWithSwappedPosition);
     }
 
     function loan(
@@ -299,8 +300,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
 
     function validateRepayInfo(
         address borrower,
-        DataTypesPeerToPeer.Loan memory _loan,
-        DataTypesPeerToPeer.LoanRepayInstructions memory loanRepayInstructions
+        DataTypesPeerToPeer.Loan calldata _loan,
+        DataTypesPeerToPeer.LoanRepayInstructions calldata loanRepayInstructions
     ) external view {
         if (borrower != _loan.borrower) {
             revert Errors.InvalidBorrower();
@@ -331,7 +332,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function getTokenBalancesAndLockedAmounts(
-        address[] memory tokens
+        address[] calldata tokens
     )
         external
         view

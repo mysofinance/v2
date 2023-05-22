@@ -53,9 +53,7 @@ abstract contract Ownable {
         address _newOwnerProposal
     ) internal view virtual {
         if (
-            _newOwnerProposal == address(0) ||
-            _newOwnerProposal == address(this) ||
-            _newOwnerProposal == _newOwner
+            _newOwnerProposal == address(this) || _newOwnerProposal == _newOwner
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
