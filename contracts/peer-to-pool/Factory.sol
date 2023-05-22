@@ -196,15 +196,6 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
-    function isWhitelistedBorrower(
-        address whitelistAuthority,
-        address borrower
-    ) external view returns (bool) {
-        return
-            _lenderWhitelistedUntil[whitelistAuthority][borrower] >
-            block.timestamp;
-    }
-
     function owner()
         external
         view
