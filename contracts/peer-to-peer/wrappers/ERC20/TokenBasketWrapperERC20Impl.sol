@@ -29,7 +29,7 @@ contract TokenBasketWrapperERC20Impl is
     }
 
     function initialize(
-        address tokenOwner,
+        address minter,
         address[] calldata _tokenAddrs,
         uint256 totalInitialSupply,
         string calldata _name,
@@ -39,7 +39,7 @@ contract TokenBasketWrapperERC20Impl is
         tokenName = _name;
         tokenSymbol = _symbol;
         _mint(
-            tokenOwner,
+            minter,
             totalInitialSupply < 10 ** 6 ? totalInitialSupply : 10 ** 6
         );
     }

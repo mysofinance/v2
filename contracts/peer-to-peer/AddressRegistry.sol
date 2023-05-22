@@ -252,41 +252,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         if (_erc721TokenWrapper == address(0)) {
             revert Errors.InvalidAddress();
         }
-        if (tokensToBeWrapped.length == 0) {
-            revert Errors.InvalidArrayLength();
-        }
-        uint160 prevNftAddressCastToUint160;
-        uint160 nftAddressCastToUint160;
-        uint256 prevId;
-        for (uint i = 0; i < tokensToBeWrapped.length; ) {
-            if (tokensToBeWrapped[i].tokenIds.length == 0) {
-                revert Errors.InvalidArrayLength();
-            }
-            if (
-                whitelistState[tokensToBeWrapped[i].tokenAddr] !=
-                DataTypesPeerToPeer.WhitelistState.NFT
-            ) {
-                revert Errors.NonWhitelistedToken();
-            }
-            nftAddressCastToUint160 = uint160(tokensToBeWrapped[i].tokenAddr);
-            if (nftAddressCastToUint160 <= prevNftAddressCastToUint160) {
-                revert Errors.NonIncreasingTokenAddrs();
-            }
-            prevId = 0;
-            for (uint j = 0; j < tokensToBeWrapped[i].tokenIds.length; ) {
-                if (tokensToBeWrapped[i].tokenIds[j] <= prevId && j != 0) {
-                    revert Errors.NonIncreasingNonFungibleTokenIds();
-                }
-                prevId = tokensToBeWrapped[i].tokenIds[j];
-                unchecked {
-                    j++;
-                }
-            }
-            prevNftAddressCastToUint160 = nftAddressCastToUint160;
-            unchecked {
-                i++;
-            }
-        }
         address newERC20Addr = IERC721Wrapper(_erc721TokenWrapper)
             .createWrappedToken(msg.sender, tokensToBeWrapped, name, symbol);
         whitelistState[newERC20Addr] = DataTypesPeerToPeer.WhitelistState.TOKEN;
@@ -305,48 +270,12 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         if (_tokenBasketWrapper == address(0)) {
             revert Errors.InvalidAddress();
         }
-        if (
-            tokenInfo.tokenAddrs.length == 0 ||
-            tokenInfo.tokenAddrs.length != tokenInfo.tokenAmounts.length
-        ) {
-            revert Errors.InvalidArrayLength();
-        }
-        uint160 prevTokenAddressCastToUint160;
-        uint160 currAddressCastToUint160;
-        uint256 minTokenAmount = type(uint256).max;
-        for (uint i = 0; i < tokenInfo.tokenAddrs.length; ) {
-            if (!isWhitelistedToken(tokenInfo.tokenAddrs[i])) {
-                revert Errors.NonWhitelistedToken();
-            }
-            currAddressCastToUint160 = uint160(tokenInfo.tokenAddrs[i]);
-            if (currAddressCastToUint160 <= prevTokenAddressCastToUint160) {
-                revert Errors.NonIncreasingTokenAddrs();
-            }
-            if (tokenInfo.tokenAmounts[i] == 0) {
-                revert Errors.InvalidSendAmount();
-            }
-            if (minTokenAmount > tokenInfo.tokenAmounts[i]) {
-                minTokenAmount = tokenInfo.tokenAmounts[i];
-            }
-            prevTokenAddressCastToUint160 = currAddressCastToUint160;
-            unchecked {
-                i++;
-            }
-        }
         address newERC20Addr = ITokenBasketWrapper(_tokenBasketWrapper)
-            .createWrappedTokenBasket(
-                msg.sender,
-                tokenInfo.tokenAddrs,
-                tokenInfo.tokenAmounts,
-                minTokenAmount,
-                tokenInfo.name,
-                tokenInfo.symbol
-            );
+            .createWrappedTokenBasket(msg.sender, tokenInfo);
         whitelistState[newERC20Addr] = DataTypesPeerToPeer.WhitelistState.TOKEN;
         emit TokenBasketWrapped(
             tokenInfo.tokenAddrs,
             tokenInfo.tokenAmounts,
-            minTokenAmount,
             tokenInfo.name,
             tokenInfo.symbol,
             newERC20Addr
@@ -415,6 +344,10 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             tokenWhitelistState == DataTypesPeerToPeer.WhitelistState.TOKEN ||
             tokenWhitelistState ==
             DataTypesPeerToPeer.WhitelistState.TOKEN_REQUIRING_COMPARTMENT;
+    }
+
+    function isWhitelistedNft(address token) public view returns (bool) {
+        return whitelistState[token] == DataTypesPeerToPeer.WhitelistState.NFT;
     }
 
     function _checkSenderAndIsInitialized() internal view {

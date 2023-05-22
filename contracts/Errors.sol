@@ -96,4 +96,5 @@ library Errors {
     error NonIncreasingTokenAddrs();
     error NonIncreasingNonFungibleTokenIds();
     error TransferToWrappedTokenFailed();
+    error TransferFromWrappedTokenFailed();
 }

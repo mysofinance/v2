@@ -58,7 +58,7 @@ contract WrappedERC721Impl is
                         j++;
                     }
                 } catch {
-                    revert Errors.TransferToWrappedTokenFailed();
+                    revert Errors.TransferFromWrappedTokenFailed();
                 }
             }
             unchecked {

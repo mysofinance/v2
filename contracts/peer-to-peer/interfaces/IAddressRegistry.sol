@@ -42,7 +42,6 @@ interface IAddressRegistry {
     event TokenBasketWrapped(
         address[] tokens,
         uint256[] amounts,
-        uint256 totalInitialSupply,
         string name,
         string symbol,
         address newErc20Addr
@@ -173,6 +172,13 @@ interface IAddressRegistry {
      * @return Boolean flag indicating whether the token is whitelisted
      */
     function isWhitelistedToken(address token) external view returns (bool);
+
+    /**
+     * @notice Returns boolean flag indicating whether token is whitelisted NFT
+     * @param token Addresses of the given token to check
+     * @return Boolean flag indicating whether the token is whitelisted NFT
+     */
+    function isWhitelistedNft(address token) external view returns (bool);
 
     /**
      * @notice Returns the address of the vault factory
