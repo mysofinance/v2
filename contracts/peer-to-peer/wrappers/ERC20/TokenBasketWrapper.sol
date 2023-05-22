@@ -60,7 +60,7 @@ contract TokenBasketWrapper is ReentrancyGuard, ITokenBasketWrapper {
         uint160 prevTokenAddressCastToUint160;
         uint160 currAddressCastToUint160;
         uint256 minTokenAmount = type(uint256).max;
-        for (uint256 i = 0; i < tokenInfo.tokenAddrs.length; i++) {
+        for (uint256 i = 0; i < tokenInfo.tokenAddrs.length; ) {
             if (
                 addressRegistry != address(0) &&
                 !IAddressRegistry(addressRegistry).isWhitelistedToken(

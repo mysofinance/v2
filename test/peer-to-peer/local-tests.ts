@@ -6,6 +6,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist } from './helpers/misc'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
+import BigNumber from 'bignumber.js'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -203,6 +204,26 @@ describe('Peer-to-Peer: Local Tests', function () {
     )
     await erc721WrapperWithoutRegistry.deployed()
 
+    // deploy token basket wrapper implementation
+    const TokenBasketWrapperERC20Implementaion = await ethers.getContractFactory('TokenBasketWrapperERC20Impl')
+    const tokenBasketWrapperERC20Implementation = await TokenBasketWrapperERC20Implementaion.connect(team).deploy()
+    await tokenBasketWrapperERC20Implementation.deployed()
+
+    // deploy token basket wrapper
+    const TokenBasketWrapper = await ethers.getContractFactory('TokenBasketWrapper')
+    const tokenBasketWrapper = await TokenBasketWrapper.connect(team).deploy(
+      addressRegistry.address,
+      tokenBasketWrapperERC20Implementation.address
+    )
+    await tokenBasketWrapper.deployed()
+
+    // deploy token basket wrapper without registry
+    const tokenBasketWrapperWithoutRegistry = await TokenBasketWrapper.connect(team).deploy(
+      ZERO_ADDRESS,
+      tokenBasketWrapperERC20Implementation.address
+    )
+    await tokenBasketWrapperWithoutRegistry.deployed()
+
     // reverts if user tries to create vault before initialized because address registry doesn't have lender vault factory set yet
     await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(
       addressRegistry,
@@ -384,6 +405,9 @@ describe('Peer-to-Peer: Local Tests', function () {
       wrappedERC721Implementation,
       erc721Wrapper,
       erc721WrapperWithoutRegistry,
+      tokenBasketWrapperERC20Implementation,
+      tokenBasketWrapper,
+      tokenBasketWrapperWithoutRegistry,
       myFirstNFT,
       mySecondNFT
     }
@@ -2473,7 +2497,7 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   describe('Wrapped ERC721 Testing', function () {
-    it('Should revert on invalid minter', async function () {
+    it('Should handle wrapping and redeeming of nfts correctly', async function () {
       const { addressRegistry, borrower, team, erc721Wrapper, erc721WrapperWithoutRegistry, myFirstNFT, mySecondNFT } =
         await setupTest()
 
@@ -2633,6 +2657,166 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check total supply is 0
       const totalSupplyPostRedeem = await wrappedToken.totalSupply()
       expect(totalSupplyPostRedeem).to.equal(0)
+    })
+  })
+
+  describe('Wrapped Token Basket Testing', function () {
+    it('Should handle wrapping and redeeming of token basket correctly', async function () {
+      const { addressRegistry, borrower, team, lender, usdc, weth, tokenBasketWrapper, tokenBasketWrapperWithoutRegistry } =
+        await setupTest()
+
+      // should revert if minter is zero address
+      await expect(
+        tokenBasketWrapper.connect(borrower).createWrappedTokenBasket(ZERO_ADDRESS, {
+          tokenAddrs: [weth.address, usdc.address],
+          tokenAmounts: [ONE_WETH, ONE_USDC],
+          name: '',
+          symbol: ''
+        })
+      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidAddress')
+
+      // should revert if tokenAddrs array has length 0 or unequal lengths
+      await expect(
+        tokenBasketWrapper.connect(team).createWrappedTokenBasket(team.address, {
+          tokenAddrs: [],
+          tokenAmounts: [ONE_WETH],
+          name: '',
+          symbol: ''
+        })
+      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidArrayLength')
+
+      await expect(
+        tokenBasketWrapper.connect(team).createWrappedTokenBasket(team.address, {
+          tokenAddrs: [weth.address, usdc.address],
+          tokenAmounts: [ONE_WETH],
+          name: '',
+          symbol: ''
+        })
+      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidArrayLength')
+
+      // should revert if address registry is non-zero and token is not whitelisted
+      await expect(
+        tokenBasketWrapper.connect(team).createWrappedTokenBasket(team.address, {
+          tokenAddrs: [team.address, usdc.address],
+          tokenAmounts: [ONE_WETH, ONE_USDC],
+          name: '',
+          symbol: ''
+        })
+      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'NonWhitelistedToken')
+
+      // should pass through all the way until transfer, where it will revert because of no approval
+      await expect(
+        tokenBasketWrapperWithoutRegistry.connect(team).createWrappedTokenBasket(team.address, {
+          tokenAddrs: [weth.address],
+          tokenAmounts: [ONE_WETH],
+          name: '',
+          symbol: ''
+        })
+      ).to.be.revertedWith('ERC20: insufficient allowance')
+
+      const sortedTokenAddrs = [weth.address, usdc.address].sort((a, b) => (ethers.BigNumber.from(a).lte(b) ? -1 : 1))
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setTokenWrapperContract(tokenBasketWrapper.address, false)
+
+      await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(100))
+
+      await usdc.connect(borrower).approve(tokenBasketWrapper.address, MAX_UINT256)
+      await weth.connect(borrower).approve(tokenBasketWrapper.address, MAX_UINT256)
+
+      //should revert if token addrs are out of order
+      await expect(
+        tokenBasketWrapper.connect(borrower).createWrappedTokenBasket(borrower.address, {
+          tokenAddrs: [sortedTokenAddrs[1], sortedTokenAddrs[0]],
+          tokenAmounts: [ONE_USDC, ONE_WETH],
+          name: '',
+          symbol: ''
+        })
+      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'NonIncreasingTokenAddrs')
+
+      //should revert if token amount is equal to 0
+      await expect(
+        tokenBasketWrapper.connect(borrower).createWrappedTokenBasket(borrower.address, {
+          tokenAddrs: [sortedTokenAddrs[0], sortedTokenAddrs[1]],
+          tokenAmounts: [0, ONE_WETH],
+          name: '',
+          symbol: ''
+        })
+      ).to.be.revertedWithCustomError(tokenBasketWrapper, 'InvalidSendAmount')
+
+      // create wrapped token basket
+      await addressRegistry.connect(borrower).createWrappedTokenBasket({
+        tokenAddrs: [sortedTokenAddrs[0], sortedTokenAddrs[1]],
+        tokenAmounts: [ONE_USDC.div(10), ONE_USDC.div(100)],
+        name: '',
+        symbol: ''
+      })
+
+      const newWrappedTokenAddr = await tokenBasketWrapper.wrappedERC20Instances(0)
+
+      const wrappedToken = await ethers.getContractAt('TokenBasketWrapperERC20Impl', newWrappedTokenAddr)
+
+      const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
+
+      // new token should be whitelisted as TOKEN
+      expect(whitelistTokenState).to.equal(1)
+
+      // check borrower has balance of ONE_USDC.div(100) (minimum of two amounts,and both less than 10 ** 6)
+      const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
+      expect(borrowerWrappedTokenBalance).to.equal(ONE_USDC.div(100))
+
+      // check total supply is ONE_USDC.div(100)
+      const totalSupply = await wrappedToken.totalSupply()
+      expect(totalSupply).to.equal(ONE_USDC.div(100))
+
+      // check ownership of all tokens has shifted to new wrapped token
+      const usdcBalanceOfWrappedToken = await usdc.balanceOf(wrappedToken.address)
+      const wethBalanceOfWrappedToken = await weth.balanceOf(wrappedToken.address)
+
+      expect(usdcBalanceOfWrappedToken).to.equal(ONE_USDC.div(10))
+      expect(wethBalanceOfWrappedToken).to.equal(ONE_USDC.div(100))
+
+      const preRedeemUsdcBalance = await usdc.balanceOf(borrower.address)
+      const preRedeemWethBalance = await weth.balanceOf(borrower.address)
+
+      // should revert if redeem more than balance
+      await expect(wrappedToken.connect(borrower).redeem(ONE_USDC)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'InvalidSendAmount'
+      )
+
+      await expect(wrappedToken.connect(team).redeem(ONE_USDC.div(100))).to.be.revertedWithCustomError(
+        wrappedToken,
+        'InvalidSendAmount'
+      )
+
+      // redeem half the balance
+      await wrappedToken.connect(borrower).redeem(totalSupply.div(2))
+
+      // check half of supply is burned
+      const postPartialRedeemTotalSupply = await wrappedToken.totalSupply()
+      expect(postPartialRedeemTotalSupply).to.equal(totalSupply.div(2))
+
+      // check balance of borrower is half of original
+      const postPartialRedeemBorrowerBalance = await wrappedToken.balanceOf(borrower.address)
+      expect(postPartialRedeemBorrowerBalance).to.equal(borrowerWrappedTokenBalance.div(2))
+
+      const postRedeemUsdcBalance = await usdc.balanceOf(borrower.address)
+      const postRedeemWethBalance = await weth.balanceOf(borrower.address)
+
+      expect(postRedeemUsdcBalance.sub(preRedeemUsdcBalance)).to.equal(usdcBalanceOfWrappedToken.div(2))
+      expect(postRedeemWethBalance.sub(preRedeemWethBalance)).to.equal(wethBalanceOfWrappedToken.div(2))
+
+      // redeem remaining balance
+      await wrappedToken.connect(borrower).redeem(totalSupply.div(2))
+
+      // check total supply is 0
+      const postFullRedeemTotalSupply = await wrappedToken.totalSupply()
+      expect(postFullRedeemTotalSupply).to.equal(0)
+
+      // check balance of borrower is 0
+      const postFullRedeemBorrowerBalance = await wrappedToken.balanceOf(borrower.address)
+      expect(postFullRedeemBorrowerBalance).to.equal(0)
     })
   })
 })

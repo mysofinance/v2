@@ -46,11 +46,11 @@ contract TokenBasketWrapperERC20Impl is
 
     function redeem(uint256 amount) external nonReentrant {
         // faster fail here than in burn
-        if (balanceOf(msg.sender) < 0) {
-            revert Errors.InvalidSender();
+        if (balanceOf(msg.sender) < amount) {
+            revert Errors.InvalidSendAmount();
         }
         uint256 currTotalSupply = totalSupply();
-        for (uint256 i = 0; i < tokenAddrs.length; i++) {
+        for (uint256 i = 0; i < tokenAddrs.length; ) {
             IERC20(tokenAddrs[i]).safeTransfer(
                 msg.sender,
                 (IERC20(tokenAddrs[i]).balanceOf(address(this)) * amount) /
