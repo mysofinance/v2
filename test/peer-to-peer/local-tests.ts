@@ -2191,7 +2191,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           callbackAddr,
           callbackData
         )
-      ).to.be.revertedWithCustomError(lenderVault, 'OutsideValidRepayWindow')
+      ).to.be.revertedWithCustomError(borrowerGateway, 'OutsideValidRepayWindow')
 
       // move forward past valid until timestamp
       await ethers.provider.send('evm_mine', [Number(onChainQuote.generalQuoteInfo.validUntil.toString()) + 1])
