@@ -43,50 +43,63 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         if (minter == address(0)) {
             revert Errors.InvalidAddress();
         }
-        if (tokensToBeWrapped.length == 0) {
-            revert Errors.InvalidArrayLength();
-        }
         bytes32 salt = keccak256(abi.encodePacked(tokensCreated.length));
         newErc20Addr = Clones.cloneDeterministic(wrappedErc20Impl, salt);
-        uint160 prevTokenAddressCastToUint160;
-        uint160 currAddressCastToUint160;
-        uint256 minTokenAmount = type(uint256).max;
-        for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
-            if (
-                addressRegistry != address(0) &&
-                !IAddressRegistry(addressRegistry).isWhitelistedERC20(
-                    tokensToBeWrapped[i].tokenAddr
-                )
-            ) {
-                revert Errors.NonWhitelistedToken();
-            }
-            currAddressCastToUint160 = uint160(tokensToBeWrapped[i].tokenAddr);
-            if (currAddressCastToUint160 <= prevTokenAddressCastToUint160) {
-                revert Errors.NonIncreasingTokenAddrs();
-            }
-            if (tokensToBeWrapped[i].tokenAmount == 0) {
-                revert Errors.InvalidSendAmount();
-            }
-            minTokenAmount = minTokenAmount > tokensToBeWrapped[i].tokenAmount
-                ? tokensToBeWrapped[i].tokenAmount
-                : minTokenAmount;
-            IERC20(tokensToBeWrapped[i].tokenAddr).safeTransferFrom(
+        if (tokensToBeWrapped.length == 0) {
+            // mint one placeholder token if no tokens passed in
+            IWrappedERC20Impl(newErc20Addr).initialize(
                 minter,
-                newErc20Addr,
-                tokensToBeWrapped[i].tokenAmount
+                tokensToBeWrapped,
+                10 ** 6,
+                name,
+                symbol,
+                true
             );
-            prevTokenAddressCastToUint160 = currAddressCastToUint160;
-            unchecked {
-                i++;
+        } else {
+            uint160 prevTokenAddressCastToUint160;
+            uint160 currAddressCastToUint160;
+            uint256 minTokenAmount = type(uint256).max;
+            for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
+                if (
+                    addressRegistry != address(0) &&
+                    !IAddressRegistry(addressRegistry).isWhitelistedERC20(
+                        tokensToBeWrapped[i].tokenAddr
+                    )
+                ) {
+                    revert Errors.NonWhitelistedToken();
+                }
+                currAddressCastToUint160 = uint160(
+                    tokensToBeWrapped[i].tokenAddr
+                );
+                if (currAddressCastToUint160 <= prevTokenAddressCastToUint160) {
+                    revert Errors.NonIncreasingTokenAddrs();
+                }
+                if (tokensToBeWrapped[i].tokenAmount == 0) {
+                    revert Errors.InvalidSendAmount();
+                }
+                minTokenAmount = minTokenAmount >
+                    tokensToBeWrapped[i].tokenAmount
+                    ? tokensToBeWrapped[i].tokenAmount
+                    : minTokenAmount;
+                IERC20(tokensToBeWrapped[i].tokenAddr).safeTransferFrom(
+                    minter,
+                    newErc20Addr,
+                    tokensToBeWrapped[i].tokenAmount
+                );
+                prevTokenAddressCastToUint160 = currAddressCastToUint160;
+                unchecked {
+                    i++;
+                }
             }
+            IWrappedERC20Impl(newErc20Addr).initialize(
+                minter,
+                tokensToBeWrapped,
+                minTokenAmount,
+                name,
+                symbol,
+                false
+            );
         }
-        IWrappedERC20Impl(newErc20Addr).initialize(
-            minter,
-            tokensToBeWrapped,
-            minTokenAmount,
-            name,
-            symbol
-        );
         tokensCreated.push(newErc20Addr);
     }
 }

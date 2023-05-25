@@ -20,6 +20,11 @@ interface IMysoTokenManager {
         address newLenderVaultAddr
     ) external;
 
+    function processP2PCreateWrappedTokenForERC721s(
+        address tokenCreator,
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped
+    ) external;
+
     function processP2PoolDeposit(
         address fundingPool,
         address depositor,

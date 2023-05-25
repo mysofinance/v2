@@ -96,4 +96,5 @@ library Errors {
     error TransferToWrappedTokenFailed();
     error TransferFromWrappedTokenFailed();
     error StateAlreadySet();
+    error PlaceholderTokenCannotBeRedeemed();
 }
