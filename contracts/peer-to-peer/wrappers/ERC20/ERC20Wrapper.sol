@@ -43,22 +43,16 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         if (minter == address(0)) {
             revert Errors.InvalidAddress();
         }
-        bytes32 salt = keccak256(abi.encodePacked(tokensCreated.length));
-        newErc20Addr = Clones.cloneDeterministic(wrappedErc20Impl, salt);
-        if (tokensToBeWrapped.length == 0) {
-            // mint one placeholder token if no tokens passed in
-            IWrappedERC20Impl(newErc20Addr).initialize(
-                minter,
-                tokensToBeWrapped,
-                10 ** 6,
-                name,
-                symbol,
-                true
-            );
-        } else {
+        newErc20Addr = Clones.cloneDeterministic(
+            wrappedErc20Impl,
+            keccak256(abi.encodePacked(tokensCreated.length))
+        );
+        uint256 minTokenAmount = type(uint256).max;
+        bool isIOU = tokensToBeWrapped.length == 0;
+
+        if (!isIOU) {
             uint160 prevTokenAddressCastToUint160;
             uint160 currAddressCastToUint160;
-            uint256 minTokenAmount = type(uint256).max;
             for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
                 if (
                     addressRegistry != address(0) &&
@@ -91,15 +85,15 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
                     i++;
                 }
             }
-            IWrappedERC20Impl(newErc20Addr).initialize(
-                minter,
-                tokensToBeWrapped,
-                minTokenAmount,
-                name,
-                symbol,
-                false
-            );
         }
+        IWrappedERC20Impl(newErc20Addr).initialize(
+            minter,
+            tokensToBeWrapped,
+            isIOU ? 10 ** 6 : minTokenAmount,
+            name,
+            symbol,
+            isIOU
+        );
         tokensCreated.push(newErc20Addr);
     }
 }

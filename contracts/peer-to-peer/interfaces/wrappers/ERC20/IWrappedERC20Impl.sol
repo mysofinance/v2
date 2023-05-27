@@ -12,7 +12,7 @@ interface IWrappedERC20Impl {
      * @param totalInitialSupply Total initial supply of the wrapped token basket
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
-     * @param isPlaceholderToken Whether the wrapped token is a placeholder token, i.e. it is not backed by any real ERC20 token
+     * @param isIOU Whether the wrapped token is an IOU token, i.e. it is not backed by any real ERC20 token
      */
     function initialize(
         address minter,
@@ -20,7 +20,7 @@ interface IWrappedERC20Impl {
         uint256 totalInitialSupply,
         string calldata name,
         string calldata symbol,
-        bool isPlaceholderToken
+        bool isIOU
     ) external;
 
     function redeem(uint256 amount) external;

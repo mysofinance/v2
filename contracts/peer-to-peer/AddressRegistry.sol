@@ -242,6 +242,13 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         if (_erc20Wrapper == address(0)) {
             revert Errors.InvalidAddress();
         }
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager)
+                .processP2PCreateWrappedTokenForERC20s(
+                    msg.sender,
+                    tokensToBeWrapped
+                );
+        }
         address newERC20Addr = IERC20Wrapper(_erc20Wrapper).createWrappedToken(
             msg.sender,
             tokensToBeWrapped,

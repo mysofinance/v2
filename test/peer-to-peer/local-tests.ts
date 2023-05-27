@@ -3079,7 +3079,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const newWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC20Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
-      const isPlaceholderToken = await wrappedToken.isPlaceholderToken()
+      const isIOU = await wrappedToken.isIOU()
 
       // check name, symbol, and decimal overrides
       const wrappedTokenName = await wrappedToken.name()
@@ -3089,7 +3089,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(wrappedTokenSymbol).to.equal('testSymbol')
       expect(wrappedTokenDecimals).to.equal(6)
       expect(whitelistTokenState).to.equal(1)
-      expect(isPlaceholderToken).to.equal(false)
+      expect(isIOU).to.equal(false)
 
       // check that tokens were stored in instance storage correctly
       const tokenAddrs = await wrappedToken.getWrappedTokensInfo()
@@ -3173,7 +3173,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(wrappedPlaceholderTokenSymbol).to.equal('testPlaceholderSymbol')
       expect(wrappedPlaceholderTokenDecimals).to.equal(6)
       expect(whitelistPlaceholderTokenState).to.equal(1)
-      expect(await wrappedPlaceholderToken.isPlaceholderToken()).to.equal(true)
+      expect(await wrappedPlaceholderToken.isIOU()).to.equal(true)
 
       const totalPlaceHolderSupply = await wrappedPlaceholderToken.totalSupply()
       expect(totalPlaceHolderSupply).to.equal(10 ** 6)

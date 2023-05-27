@@ -25,6 +25,11 @@ interface IMysoTokenManager {
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped
     ) external;
 
+    function processP2PCreateWrappedTokenForERC20s(
+        address tokenCreator,
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped
+    ) external;
+
     function processP2PoolDeposit(
         address fundingPool,
         address depositor,
