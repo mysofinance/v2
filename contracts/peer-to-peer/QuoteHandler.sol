@@ -371,6 +371,8 @@ contract QuoteHandler is IQuoteHandler {
                 return false;
             }
             if (
+                !(onChainQuote.quoteTuples[k].tenor == 0 &&
+                    onChainQuote.generalQuoteInfo.earliestRepayTenor == 0) &&
                 onChainQuote.quoteTuples[k].tenor <
                 onChainQuote.generalQuoteInfo.earliestRepayTenor +
                     Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
