@@ -348,34 +348,10 @@ contract QuoteHandler is IQuoteHandler {
         }
         for (uint256 k = 0; k < onChainQuote.quoteTuples.length; ) {
             if (
-                onChainQuote.quoteTuples[k].upfrontFeePctInBase > Constants.BASE
-            ) {
-                return false;
-            }
-            // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
-            // when there is a specified whitelist authority address.
-            // Otherwise, the LTV must be set to a value <= 100% (overcollateralized).
-            if (
-                onChainQuote.generalQuoteInfo.oracleAddr != address(0) &&
-                onChainQuote.quoteTuples[k].loanPerCollUnitOrLtv >
-                Constants.BASE &&
-                onChainQuote.generalQuoteInfo.whitelistAuthority == address(0)
-            ) {
-                return false;
-            }
-            if (
-                onChainQuote.quoteTuples[k].interestRatePctInBase +
-                    int(Constants.BASE) <=
-                0
-            ) {
-                return false;
-            }
-            if (
-                !(onChainQuote.quoteTuples[k].tenor == 0 &&
-                    onChainQuote.generalQuoteInfo.earliestRepayTenor == 0) &&
-                onChainQuote.quoteTuples[k].tenor <
-                onChainQuote.generalQuoteInfo.earliestRepayTenor +
-                    Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
+                !_isValidOnChainQuoteTuple(
+                    onChainQuote.generalQuoteInfo,
+                    onChainQuote.quoteTuples[k]
+                )
             ) {
                 return false;
             }
@@ -424,5 +400,46 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.OnChainQuote memory onChainQuote
     ) internal pure returns (bytes32 quoteHash) {
         quoteHash = keccak256(abi.encode(onChainQuote));
+    }
+
+    function _isValidOnChainQuoteTuple(
+        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
+    ) internal pure returns (bool) {
+        if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
+            // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent
+            if (
+                quoteTuple.tenor <
+                generalQuoteInfo.earliestRepayTenor +
+                    Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
+            ) {
+                return false;
+            }
+        } else if (quoteTuple.upfrontFeePctInBase == Constants.BASE) {
+            // note: if upfrontFee=100% this corresponds to an outright swap; check that tenor is zero
+            if (
+                quoteTuple.tenor + generalQuoteInfo.earliestRepayTenor != 0 ||
+                generalQuoteInfo.borrowerCompartmentImplementation != address(0)
+            ) {
+                return false;
+            }
+        } else {
+            // note: if upfrontFee>100% this is invalid
+            return false;
+        }
+        // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
+        // when there is a specified whitelist authority address.
+        // Otherwise, the LTV must be set to a value <= 100% (overcollateralized).
+        if (
+            generalQuoteInfo.oracleAddr != address(0) &&
+            quoteTuple.loanPerCollUnitOrLtv > Constants.BASE &&
+            generalQuoteInfo.whitelistAuthority == address(0)
+        ) {
+            return false;
+        }
+        if (quoteTuple.interestRatePctInBase + int(Constants.BASE) <= 0) {
+            return false;
+        }
+        return true;
     }
 }

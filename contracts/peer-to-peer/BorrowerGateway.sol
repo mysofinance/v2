@@ -230,9 +230,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.initLoanAmount
         );
         if (borrowInstructions.callbackAddr != address(0)) {
-            if (loan.initCollAmount == 0) {
-                revert Errors.CallbacksNotAllowedForZeroCollAmounts();
-            }
             IVaultCallback(borrowInstructions.callbackAddr).borrowCallback(
                 loan,
                 borrowInstructions.callbackData
