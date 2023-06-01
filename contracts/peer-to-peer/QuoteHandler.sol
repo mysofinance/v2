@@ -339,7 +339,7 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             return false;
         }
-        bool isSwapPrev;
+        bool isSwap;
         for (uint256 k = 0; k < onChainQuote.quoteTuples.length; ) {
             (bool isValid, bool isSwapCurr) = _isValidOnChainQuoteTuple(
                 onChainQuote.generalQuoteInfo,
@@ -351,10 +351,10 @@ contract QuoteHandler is IQuoteHandler {
             if (isSwapCurr && onChainQuote.quoteTuples.length > 1) {
                 return false;
             }
-            if (k > 0 && isSwapPrev != isSwapCurr) {
+            if (k > 0 && isSwap != isSwapCurr) {
                 return false;
             }
-            isSwapPrev = isSwapCurr;
+            isSwap = isSwapCurr;
             unchecked {
                 k++;
             }
@@ -364,7 +364,7 @@ contract QuoteHandler is IQuoteHandler {
             onChainQuote.generalQuoteInfo.loanToken,
             _addressRegistry,
             onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
-            isSwapCurr
+            isSwap
         );
         return true;
     }
@@ -384,31 +384,28 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.NonWhitelistedToken();
         }
 
-        DataTypesPeerToPeer.WhitelistState collTokenWhitelistState = registry
-            .whitelistState(collToken);
-        if (!isSwap) {
-            if (compartmentImpl == address(0)) {
-                if (
-                    collTokenWhitelistState ==
-                    DataTypesPeerToPeer
-                        .WhitelistState
-                        .ERC20_TOKEN_REQUIRING_COMPARTMENT
-                ) {
-                    revert Errors.CollateralMustBeCompartmentalized();
-                }
-            } else {
-                if (
-                    !registry.isWhitelistedCompartment(
-                        compartmentImpl,
-                        collToken
-                    )
-                ) {
-                    revert Errors.InvalidCompartmentForToken();
-                }
-            }
-        } else {
+        if (isSwap) {
             if (compartmentImpl != address(0)) {
                 revert Errors.InvalidSwap();
+            }
+            return;
+        }
+        if (compartmentImpl == address(0)) {
+            DataTypesPeerToPeer.WhitelistState collTokenWhitelistState = registry
+                    .whitelistState(collToken);
+            if (
+                collTokenWhitelistState ==
+                DataTypesPeerToPeer
+                    .WhitelistState
+                    .ERC20_TOKEN_REQUIRING_COMPARTMENT
+            ) {
+                revert Errors.CollateralMustBeCompartmentalized();
+            }
+        } else {
+            if (
+                !registry.isWhitelistedCompartment(compartmentImpl, collToken)
+            ) {
+                revert Errors.InvalidCompartmentForToken();
             }
         }
     }
