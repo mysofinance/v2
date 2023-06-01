@@ -3170,6 +3170,23 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
+      // should revert if trying to add multiple swap quotes (no need to have multiple
+      // swap quotes with different prices because takers would always take the cheaper one)
+      onChainQuote.quoteTuples.pop()
+      onChainQuote.quoteTuples[0].tenor = 0
+      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+      onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+      onChainQuote.quoteTuples.push({
+        loanPerCollUnitOrLtv: buyPricePerCollToken.sub(1),
+        interestRatePctInBase: 0,
+        upfrontFeePctInBase: BASE,
+        tenor: 0
+      })
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
       // should pass with valid swap on-chain quote
       onChainQuote.quoteTuples.pop()
       onChainQuote.quoteTuples[0].tenor = 0

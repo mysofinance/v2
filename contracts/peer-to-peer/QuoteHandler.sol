@@ -339,30 +339,22 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             return false;
         }
-        bool isSwap;
+        bool isSwapPrev;
         for (uint256 k = 0; k < onChainQuote.quoteTuples.length; ) {
-            if (
-                !_isValidOnChainQuoteTuple(
-                    onChainQuote.generalQuoteInfo,
-                    onChainQuote.quoteTuples[k]
-                )
-            ) {
+            (bool isValid, bool isSwapCurr) = _isValidOnChainQuoteTuple(
+                onChainQuote.generalQuoteInfo,
+                onChainQuote.quoteTuples[k]
+            );
+            if (!isValid) {
                 return false;
             }
-            if (k == 0) {
-                isSwap = _isSwap(
-                    onChainQuote.generalQuoteInfo,
-                    onChainQuote.quoteTuples[k]
-                );
-            } else if (
-                isSwap !=
-                _isSwap(
-                    onChainQuote.generalQuoteInfo,
-                    onChainQuote.quoteTuples[k]
-                )
-            ) {
+            if (isSwapCurr && onChainQuote.quoteTuples.length > 1) {
                 return false;
             }
+            if (k > 0 && isSwapPrev != isSwapCurr) {
+                return false;
+            }
+            isSwapPrev = isSwapCurr;
             unchecked {
                 k++;
             }
@@ -372,7 +364,7 @@ contract QuoteHandler is IQuoteHandler {
             onChainQuote.generalQuoteInfo.loanToken,
             _addressRegistry,
             onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
-            isSwap
+            isSwapCurr
         );
         return true;
     }
@@ -430,7 +422,8 @@ contract QuoteHandler is IQuoteHandler {
     function _isValidOnChainQuoteTuple(
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
-    ) internal pure returns (bool) {
+    ) internal pure returns (bool, bool) {
+        bool isSwap = _isSwap(generalQuoteInfo, quoteTuple);
         if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
             // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent
             if (
@@ -438,16 +431,16 @@ contract QuoteHandler is IQuoteHandler {
                 generalQuoteInfo.earliestRepayTenor +
                     Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
             ) {
-                return false;
+                return (false, isSwap);
             }
         } else if (quoteTuple.upfrontFeePctInBase == Constants.BASE) {
             // note: if upfrontFee=100% this corresponds to an outright swap; check other fields are consistent
-            if (!_isSwap(generalQuoteInfo, quoteTuple)) {
-                return false;
+            if (!isSwap) {
+                return (false, isSwap);
             }
         } else {
             // note: if upfrontFee>100% this is invalid
-            return false;
+            return (false, isSwap);
         }
         // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
         // when there is a specified whitelist authority address.
@@ -457,12 +450,12 @@ contract QuoteHandler is IQuoteHandler {
             quoteTuple.loanPerCollUnitOrLtv > Constants.BASE &&
             generalQuoteInfo.whitelistAuthority == address(0)
         ) {
-            return false;
+            return (false, isSwap);
         }
         if (quoteTuple.interestRatePctInBase + int(Constants.BASE) <= 0) {
-            return false;
+            return (false, isSwap);
         }
-        return true;
+        return (true, isSwap);
     }
 
     function _isSwap(
