@@ -51,8 +51,8 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         bool isIOU = tokensToBeWrapped.length == 0;
 
         if (!isIOU) {
-            uint160 prevTokenAddressCastToUint160;
-            uint160 currAddressCastToUint160;
+            address prevTokenAddress;
+            address currAddress;
             for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
                 if (
                     addressRegistry != address(0) &&
@@ -62,10 +62,8 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
                 ) {
                     revert Errors.NonWhitelistedToken();
                 }
-                currAddressCastToUint160 = uint160(
-                    tokensToBeWrapped[i].tokenAddr
-                );
-                if (currAddressCastToUint160 <= prevTokenAddressCastToUint160) {
+                currAddress = tokensToBeWrapped[i].tokenAddr;
+                if (currAddress <= prevTokenAddress) {
                     revert Errors.NonIncreasingTokenAddrs();
                 }
                 if (tokensToBeWrapped[i].tokenAmount == 0) {
@@ -80,7 +78,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
                     newErc20Addr,
                     tokensToBeWrapped[i].tokenAmount
                 );
-                prevTokenAddressCastToUint160 = currAddressCastToUint160;
+                prevTokenAddress = currAddress;
                 unchecked {
                     i++;
                 }

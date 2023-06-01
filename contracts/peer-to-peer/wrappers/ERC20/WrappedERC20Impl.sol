@@ -53,7 +53,7 @@ contract WrappedERC20Impl is
 
     function redeem(uint256 amount) external nonReentrant {
         if (isIOU) {
-            revert Errors.PlaceholderTokenCannotBeRedeemed();
+            revert Errors.IOUCannotBeRedeemedOnChain();
         }
         // faster fail here than in burn
         if (amount == 0 || balanceOf(msg.sender) < amount) {
