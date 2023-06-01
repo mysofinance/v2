@@ -1550,7 +1550,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackAddr,
           callbackData
         )
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidRepayAmount')
 
       // check revert if reclaim amount is zero (due to rounding)
       await expect(
@@ -2307,7 +2307,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             callbackAddr,
             callbackData
           )
-        ).to.be.revertedWithCustomError(lenderVault, 'InvalidRepayAmount')
+        ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidRepayAmount')
 
         await expect(
           lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount)
@@ -2358,7 +2358,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             callbackAddr,
             callbackData
           )
-        ).to.be.revertedWithCustomError(lenderVault, 'OutsideValidRepayWindow')
+        ).to.be.revertedWithCustomError(borrowerGateway, 'OutsideValidRepayWindow')
 
         // check crv reward for compartment address
         const totalGaugeRewardCRVPost = await crvGaugeInstance.claimable_tokens(collTokenCompartmentAddr)
@@ -3731,7 +3731,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await expect(
         borrowerGateway.connect(team).repay(repayBody, lenderVault.address, callbackAddr, callbackData)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidBorrower')
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidBorrower')
 
       await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
         .to.emit(borrowerGateway, 'Repaid')

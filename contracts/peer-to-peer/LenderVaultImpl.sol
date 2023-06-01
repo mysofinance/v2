@@ -298,30 +298,6 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         return _loans.length;
     }
 
-    function validateRepayInfo(
-        address borrower,
-        DataTypesPeerToPeer.Loan calldata _loan,
-        DataTypesPeerToPeer.LoanRepayInstructions calldata loanRepayInstructions
-    ) external view {
-        if (borrower != _loan.borrower) {
-            revert Errors.InvalidBorrower();
-        }
-        if (
-            block.timestamp < _loan.earliestRepay ||
-            block.timestamp >= _loan.expiry
-        ) {
-            revert Errors.OutsideValidRepayWindow();
-        }
-        // checks repayAmount <= remaining loan balance
-        if (
-            loanRepayInstructions.targetRepayAmount == 0 ||
-            loanRepayInstructions.targetRepayAmount + _loan.amountRepaidSoFar >
-            _loan.initRepayAmount
-        ) {
-            revert Errors.InvalidRepayAmount();
-        }
-    }
-
     function owner()
         external
         view
