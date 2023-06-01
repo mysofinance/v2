@@ -40,12 +40,6 @@ contract QuoteHandler is IQuoteHandler {
         if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
-        _checkTokensAndCompartmentWhitelist(
-            onChainQuote.generalQuoteInfo.collToken,
-            onChainQuote.generalQuoteInfo.loanToken,
-            _addressRegistry,
-            onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation
-        );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
@@ -73,12 +67,6 @@ contract QuoteHandler is IQuoteHandler {
         if (!_isValidOnChainQuote(newOnChainQuote)) {
             revert Errors.InvalidQuote();
         }
-        _checkTokensAndCompartmentWhitelist(
-            newOnChainQuote.generalQuoteInfo.collToken,
-            newOnChainQuote.generalQuoteInfo.loanToken,
-            _addressRegistry,
-            newOnChainQuote.generalQuoteInfo.borrowerCompartmentImplementation
-        );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
@@ -144,9 +132,10 @@ contract QuoteHandler is IQuoteHandler {
         uint256 quoteTupleIdx,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        _checkSenderAndGeneralQuoteInfo(
+        _checkSenderAndQuoteInfo(
             borrower,
-            onChainQuote.generalQuoteInfo
+            onChainQuote.generalQuoteInfo,
+            onChainQuote.quoteTuples[quoteTupleIdx]
         );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
@@ -174,9 +163,10 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof
     ) external {
-        _checkSenderAndGeneralQuoteInfo(
+        _checkSenderAndQuoteInfo(
             borrower,
-            offChainQuote.generalQuoteInfo
+            offChainQuote.generalQuoteInfo,
+            quoteTuple
         );
         if (offChainQuote.nonce < offChainQuoteNonce[lenderVault]) {
             revert Errors.InvalidQuote();
@@ -291,9 +281,10 @@ contract QuoteHandler is IQuoteHandler {
         );
     }
 
-    function _checkSenderAndGeneralQuoteInfo(
+    function _checkSenderAndQuoteInfo(
         address borrower,
-        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo
+        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal view {
         address _addressRegistry = addressRegistry;
         if (
@@ -305,7 +296,8 @@ contract QuoteHandler is IQuoteHandler {
             generalQuoteInfo.collToken,
             generalQuoteInfo.loanToken,
             _addressRegistry,
-            generalQuoteInfo.borrowerCompartmentImplementation
+            generalQuoteInfo.borrowerCompartmentImplementation,
+            _isSwap(generalQuoteInfo, quoteTuple)
         );
         if (generalQuoteInfo.validUntil < block.timestamp) {
             revert Errors.OutdatedQuote();
@@ -346,9 +338,24 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             return false;
         }
+        bool isSwap;
         for (uint256 k = 0; k < onChainQuote.quoteTuples.length; ) {
             if (
                 !_isValidOnChainQuoteTuple(
+                    onChainQuote.generalQuoteInfo,
+                    onChainQuote.quoteTuples[k]
+                )
+            ) {
+                return false;
+            }
+            if (k == 0) {
+                isSwap = _isSwap(
+                    onChainQuote.generalQuoteInfo,
+                    onChainQuote.quoteTuples[k]
+                );
+            } else if (
+                isSwap !=
+                _isSwap(
                     onChainQuote.generalQuoteInfo,
                     onChainQuote.quoteTuples[k]
                 )
@@ -359,6 +366,13 @@ contract QuoteHandler is IQuoteHandler {
                 k++;
             }
         }
+        _checkTokensAndCompartmentWhitelist(
+            onChainQuote.generalQuoteInfo.collToken,
+            onChainQuote.generalQuoteInfo.loanToken,
+            addressRegistry,
+            onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
+            isSwap
+        );
         return true;
     }
 
@@ -366,7 +380,8 @@ contract QuoteHandler is IQuoteHandler {
         address collToken,
         address loanToken,
         address _addressRegistry,
-        address compartmentImpl
+        address compartmentImpl,
+        bool isSwap
     ) internal view {
         IAddressRegistry registry = IAddressRegistry(_addressRegistry);
         if (
@@ -378,20 +393,29 @@ contract QuoteHandler is IQuoteHandler {
 
         DataTypesPeerToPeer.WhitelistState collTokenWhitelistState = registry
             .whitelistState(collToken);
-        if (compartmentImpl == address(0)) {
-            if (
-                collTokenWhitelistState ==
-                DataTypesPeerToPeer
-                    .WhitelistState
-                    .ERC20_TOKEN_REQUIRING_COMPARTMENT
-            ) {
-                revert Errors.CollateralMustBeCompartmentalized();
+        if (!isSwap) {
+            if (compartmentImpl == address(0)) {
+                if (
+                    collTokenWhitelistState ==
+                    DataTypesPeerToPeer
+                        .WhitelistState
+                        .ERC20_TOKEN_REQUIRING_COMPARTMENT
+                ) {
+                    revert Errors.CollateralMustBeCompartmentalized();
+                }
+            } else {
+                if (
+                    !registry.isWhitelistedCompartment(
+                        compartmentImpl,
+                        collToken
+                    )
+                ) {
+                    revert Errors.InvalidCompartmentForToken();
+                }
             }
         } else {
-            if (
-                !registry.isWhitelistedCompartment(compartmentImpl, collToken)
-            ) {
-                revert Errors.InvalidCompartmentForToken();
+            if (compartmentImpl != address(0)) {
+                revert Errors.InvalidSwap();
             }
         }
     }
@@ -416,11 +440,8 @@ contract QuoteHandler is IQuoteHandler {
                 return false;
             }
         } else if (quoteTuple.upfrontFeePctInBase == Constants.BASE) {
-            // note: if upfrontFee=100% this corresponds to an outright swap; check that tenor is zero
-            if (
-                quoteTuple.tenor + generalQuoteInfo.earliestRepayTenor != 0 ||
-                generalQuoteInfo.borrowerCompartmentImplementation != address(0)
-            ) {
+            // note: if upfrontFee=100% this corresponds to an outright swap; check other fields are consistent
+            if (!_isSwap(generalQuoteInfo, quoteTuple)) {
                 return false;
             }
         } else {
@@ -441,5 +462,16 @@ contract QuoteHandler is IQuoteHandler {
             return false;
         }
         return true;
+    }
+
+    function _isSwap(
+        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
+    ) internal pure returns (bool) {
+        return
+            quoteTuple.upfrontFeePctInBase == Constants.BASE &&
+            quoteTuple.tenor + generalQuoteInfo.earliestRepayTenor == 0 &&
+            quoteTuple.interestRatePctInBase == 0 &&
+            generalQuoteInfo.borrowerCompartmentImplementation == address(0);
     }
 }
