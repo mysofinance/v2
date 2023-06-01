@@ -37,7 +37,7 @@ contract QuoteHandler is IQuoteHandler {
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert Errors.InvalidSender();
         }
-        if (!_isValidOnChainQuote(onChainQuote)) {
+        if (!_isValidOnChainQuote(onChainQuote, _addressRegistry)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -64,7 +64,7 @@ contract QuoteHandler is IQuoteHandler {
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert Errors.InvalidSender();
         }
-        if (!_isValidOnChainQuote(newOnChainQuote)) {
+        if (!_isValidOnChainQuote(newOnChainQuote, _addressRegistry)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -317,7 +317,8 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function _isValidOnChainQuote(
-        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote,
+        address _addressRegistry
     ) internal view returns (bool) {
         if (
             onChainQuote.generalQuoteInfo.collToken ==
@@ -369,7 +370,7 @@ contract QuoteHandler is IQuoteHandler {
         _checkTokensAndCompartmentWhitelist(
             onChainQuote.generalQuoteInfo.collToken,
             onChainQuote.generalQuoteInfo.loanToken,
-            addressRegistry,
+            _addressRegistry,
             onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
             isSwap
         );
