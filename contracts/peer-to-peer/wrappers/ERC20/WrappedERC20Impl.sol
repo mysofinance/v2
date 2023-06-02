@@ -22,6 +22,7 @@ contract WrappedERC20Impl is
     string internal _tokenName;
     string internal _tokenSymbol;
     DataTypesPeerToPeer.WrappedERC20TokenInfo[] internal _wrappedTokens;
+    bool public isIOU;
 
     constructor() ERC20("Wrapped ERC20 Impl", "Wrapped ERC20 Impl") {
         _disableInitializers();
@@ -32,7 +33,8 @@ contract WrappedERC20Impl is
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata _name,
-        string calldata _symbol
+        string calldata _symbol,
+        bool _isIOU
     ) external initializer {
         for (uint256 i = 0; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
@@ -42,6 +44,7 @@ contract WrappedERC20Impl is
         }
         _tokenName = _name;
         _tokenSymbol = _symbol;
+        isIOU = _isIOU;
         _mint(
             minter,
             totalInitialSupply < 10 ** 6 ? totalInitialSupply : 10 ** 6
@@ -49,6 +52,9 @@ contract WrappedERC20Impl is
     }
 
     function redeem(uint256 amount) external nonReentrant {
+        if (isIOU) {
+            revert Errors.IOUCannotBeRedeemedOnChain();
+        }
         // faster fail here than in burn
         if (amount == 0 || balanceOf(msg.sender) < amount) {
             revert Errors.InvalidSendAmount();

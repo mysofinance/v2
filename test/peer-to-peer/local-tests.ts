@@ -2751,6 +2751,247 @@ describe('Peer-to-Peer: Local Tests', function () {
       const totalSupplyPostRedeem = await wrappedToken.totalSupply()
       expect(totalSupplyPostRedeem).to.equal(0)
     })
+
+    it('Should handle wrapping and borrowing of nfts correctly', async function () {
+      const {
+        addressRegistry,
+        borrower,
+        team,
+        usdc,
+        lender,
+        erc721Wrapper,
+        myFirstNFT,
+        mySecondNFT,
+        lenderVault,
+        quoteHandler,
+        borrowerGateway
+      } = await setupTest()
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([myFirstNFT.address, mySecondNFT.address], 6)
+      // mint tokens
+      await myFirstNFT.connect(team).safeMint(borrower.address, 1)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 2)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 1)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 2)
+      // check owner is borrower
+      const ownerOFMyFirstNFT = await myFirstNFT.ownerOf(1)
+      const ownerOFMySecondNFT = await mySecondNFT.ownerOf(1)
+      expect(ownerOFMyFirstNFT).to.equal(borrower.address)
+      expect(ownerOFMySecondNFT).to.equal(borrower.address)
+      const ownerSecondOfMyFirstNFT = await myFirstNFT.ownerOf(2)
+      const ownerSecondOfMySecondNFT = await mySecondNFT.ownerOf(2)
+      expect(ownerSecondOfMyFirstNFT).to.equal(borrower.address)
+      expect(ownerSecondOfMySecondNFT).to.equal(borrower.address)
+      // set approval for wrapper contract
+      await myFirstNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+      await mySecondNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+
+      // sort ERC721_TOKEN token addresses
+      const sortedNFTAddrs = [myFirstNFT.address, mySecondNFT.address].sort((a, b) =>
+        ethers.BigNumber.from(a).lte(b) ? -1 : 1
+      )
+
+      // check approvals
+      const isApprovedForAll = await myFirstNFT.isApprovedForAll(borrower.address, erc721Wrapper.address)
+      expect(isApprovedForAll).to.equal(true)
+      const isApprovedForAll2 = await mySecondNFT.isApprovedForAll(borrower.address, erc721Wrapper.address)
+      expect(isApprovedForAll2).to.equal(true)
+
+      // create wrapped token
+      await addressRegistry.connect(borrower).createWrappedTokenForERC721s(
+        [
+          { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+          { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+        ],
+        'testName',
+        'testSymbol'
+      )
+
+      const newWrappedTokenAddr = await erc721Wrapper.tokensCreated(0)
+
+      const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr)
+
+      const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
+
+      // new token should be whitelisted as ERC20_TOKEN
+      expect(whitelistTokenState).to.equal(1)
+
+      // check borrower has balance of 1
+      const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
+
+      expect(borrowerWrappedTokenBalance).to.equal(1)
+
+      // check total supply is 1
+      const totalSupply = await wrappedToken.totalSupply()
+
+      expect(totalSupply).to.equal(1)
+
+      // check wrapped token name, symbol and decimal overrides
+      const wrappedTokenName = await wrappedToken.name()
+      const wrappedTokenSymbol = await wrappedToken.symbol()
+      const wrappedTokenDecimals = await wrappedToken.decimals()
+      expect(wrappedTokenName).to.equal('testName')
+      expect(wrappedTokenSymbol).to.equal('testSymbol')
+      expect(wrappedTokenDecimals).to.equal(0)
+
+      const wrappedTokensInfo = await wrappedToken.getWrappedTokensInfo()
+      expect(wrappedTokensInfo.length).to.equal(2)
+
+      // check ownership of all NFTs has shifted to new wrapped token
+      const currOwnerFirstNFTIdx1 = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2 = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1 = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2 = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1).to.equal(wrappedToken.address)
+      expect(currOwnerFirstNFTIdx2).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2).to.equal(wrappedToken.address)
+
+      // prepare borrow, lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const depositAmount = ONE_USDC.mul(10000)
+      await usdc.connect(lender).transfer(lenderVault.address, depositAmount)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          whitelistAuthority: ZERO_ADDRESS,
+          collToken: wrappedToken.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves gateway and executes quote
+      await wrappedToken.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = 1
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+      const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv
+      const expectedReclaimableAmount = collSendAmount
+
+      // check pre/post amounts on borrow
+      let preLockedWrappedTokenAmounts = await lenderVault.lockedAmounts(wrappedToken.address)
+      let preLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
+      let preVaultWrappedTokenBal = await wrappedToken.balanceOf(lenderVault.address)
+      let preBorrowerWrappedTokenBal = await wrappedToken.balanceOf(borrower.address)
+      let preVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
+      let preBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      let postLockedWrappedTokenAmounts = await lenderVault.lockedAmounts(wrappedToken.address)
+      let postLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
+      let postVaultWrappedTokenBal = await wrappedToken.balanceOf(lenderVault.address)
+      let postBorrowerWrappedTokenBal = await wrappedToken.balanceOf(borrower.address)
+      let postVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
+      let postBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+
+      expect(postLockedWrappedTokenAmounts).to.equal(preLockedWrappedTokenAmounts.add(collSendAmount))
+      expect(postLockedUsdcAmounts).to.equal(preLockedUsdcAmounts)
+      expect(postVaultWrappedTokenBal).to.equal(preVaultWrappedTokenBal.add(collSendAmount))
+      expect(postBorrowerWrappedTokenBal).to.equal(preBorrowerWrappedTokenBal.sub(collSendAmount))
+      expect(postVaultUsdcBal).to.equal(preVaultUsdcBal.sub(expectedLoanAmount))
+      expect(postBorrowerUsdcBal).to.equal(preBorrowerUsdcBal.add(expectedLoanAmount))
+
+      // check ownership of all NFTs is still wrapped Token
+      const currOwnerFirstNFTIdx1PostBorrow = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostBorrow = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostBorrow = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostBorrow = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostBorrow).to.equal(wrappedToken.address)
+      expect(currOwnerFirstNFTIdx2PostBorrow).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1PostBorrow).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2PostBorrow).to.equal(wrappedToken.address)
+
+      await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(1000))
+
+      const loanId = 0
+      const loanInfo = await lenderVault.loan(loanId)
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: loanInfo.initRepayAmount.div(2),
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
+
+      await usdc.connect(borrower).approve(borrowerGateway.address, ONE_USDC.mul(10000))
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: loanInfo.initRepayAmount,
+            expectedTransferFee: 0
+          },
+          lenderVault.address,
+          callbackAddr,
+          callbackData
+        )
+      ).to.emit(borrowerGateway, 'Repaid')
+
+      await wrappedToken.connect(borrower).redeem()
+
+      // check ownership of all NFTs has shifted back to borrower
+      const currOwnerFirstNFTIdx1PostRedeem = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostRedeem = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostRedeem = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostRedeem = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerFirstNFTIdx2PostRedeem).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx2PostRedeem).to.equal(borrower.address)
+
+      // check borrower has balance of 0
+      const borrowerWrappedTokenBalancePostRedeem = await wrappedToken.balanceOf(borrower.address)
+      expect(borrowerWrappedTokenBalancePostRedeem).to.equal(0)
+
+      // check total supply is 0
+      const totalSupplyPostRedeem = await wrappedToken.totalSupply()
+      expect(totalSupplyPostRedeem).to.equal(0)
+    })
   })
 
   describe('Wrapped Token Basket Testing', function () {
@@ -2862,6 +3103,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const newWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC20Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
+      const isIOU = await wrappedToken.isIOU()
 
       // check name, symbol, and decimal overrides
       const wrappedTokenName = await wrappedToken.name()
@@ -2870,6 +3112,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(wrappedTokenName).to.equal('testName')
       expect(wrappedTokenSymbol).to.equal('testSymbol')
       expect(wrappedTokenDecimals).to.equal(6)
+      expect(whitelistTokenState).to.equal(1)
+      expect(isIOU).to.equal(false)
 
       // check that tokens were stored in instance storage correctly
       const tokenAddrs = await wrappedToken.getWrappedTokensInfo()
@@ -2937,6 +3181,26 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check balance of borrower is 0
       const postFullRedeemBorrowerBalance = await wrappedToken.balanceOf(borrower.address)
       expect(postFullRedeemBorrowerBalance).to.equal(0)
+
+      // create wrapped placeholder token basket
+      await addressRegistry.connect(borrower).createWrappedTokenForERC20s([], 'testPlaceholderName', 'testPlaceholderSymbol')
+
+      const newPlaceholderWrappedTokenAddr = await erc20Wrapper.tokensCreated(1)
+      const wrappedPlaceholderToken = await ethers.getContractAt('WrappedERC20Impl', newPlaceholderWrappedTokenAddr)
+      const whitelistPlaceholderTokenState = await addressRegistry.whitelistState(newPlaceholderWrappedTokenAddr)
+
+      // check name, symbol, and decimal overrides
+      const wrappedPlaceholderTokenName = await wrappedPlaceholderToken.name()
+      const wrappedPlaceholderTokenSymbol = await wrappedPlaceholderToken.symbol()
+      const wrappedPlaceholderTokenDecimals = await wrappedPlaceholderToken.decimals()
+      expect(wrappedPlaceholderTokenName).to.equal('testPlaceholderName')
+      expect(wrappedPlaceholderTokenSymbol).to.equal('testPlaceholderSymbol')
+      expect(wrappedPlaceholderTokenDecimals).to.equal(6)
+      expect(whitelistPlaceholderTokenState).to.equal(1)
+      expect(await wrappedPlaceholderToken.isIOU()).to.equal(true)
+
+      const totalPlaceHolderSupply = await wrappedPlaceholderToken.totalSupply()
+      expect(totalPlaceHolderSupply).to.equal(10 ** 6)
     })
   })
 

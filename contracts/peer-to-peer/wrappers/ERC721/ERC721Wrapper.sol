@@ -47,8 +47,8 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         }
         bytes32 salt = keccak256(abi.encodePacked(tokensCreated.length));
         newErc20Addr = Clones.cloneDeterministic(wrappedErc721Impl, salt);
-        uint160 prevNftAddressCastToUint160;
-        uint160 nftAddressCastToUint160;
+        address prevNftAddress;
+        address currNftAddress;
         uint256 checkedId;
         for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
             if (tokensToBeWrapped[i].tokenIds.length == 0) {
@@ -63,8 +63,8 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
             ) {
                 revert Errors.NonWhitelistedToken();
             }
-            nftAddressCastToUint160 = uint160(tokensToBeWrapped[i].tokenAddr);
-            if (nftAddressCastToUint160 <= prevNftAddressCastToUint160) {
+            currNftAddress = tokensToBeWrapped[i].tokenAddr;
+            if (currNftAddress <= prevNftAddress) {
                 revert Errors.NonIncreasingTokenAddrs();
             }
             checkedId = 0;
@@ -87,7 +87,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
                     revert Errors.TransferToWrappedTokenFailed();
                 }
             }
-            prevNftAddressCastToUint160 = nftAddressCastToUint160;
+            prevNftAddress = currNftAddress;
             unchecked {
                 i++;
             }

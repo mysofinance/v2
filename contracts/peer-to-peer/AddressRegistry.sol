@@ -8,6 +8,7 @@ import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IERC721Wrapper} from "./interfaces/wrappers/ERC721/IERC721Wrapper.sol";
 import {IERC20Wrapper} from "./interfaces/wrappers/ERC20/IERC20Wrapper.sol";
+import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 /**
  * @dev AddressRegistry is a contract that stores addresses of other contracts and controls whitelist state
@@ -212,6 +213,13 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         if (_erc721Wrapper == address(0)) {
             revert Errors.InvalidAddress();
         }
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager)
+                .processP2PCreateWrappedTokenForERC721s(
+                    msg.sender,
+                    tokensToBeWrapped
+                );
+        }
         address newERC20Addr = IERC721Wrapper(_erc721Wrapper)
             .createWrappedToken(msg.sender, tokensToBeWrapped, name, symbol);
         whitelistState[newERC20Addr] = DataTypesPeerToPeer
@@ -233,6 +241,13 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address _erc20Wrapper = erc20Wrapper;
         if (_erc20Wrapper == address(0)) {
             revert Errors.InvalidAddress();
+        }
+        if (mysoTokenManager != address(0)) {
+            IMysoTokenManager(mysoTokenManager)
+                .processP2PCreateWrappedTokenForERC20s(
+                    msg.sender,
+                    tokensToBeWrapped
+                );
         }
         address newERC20Addr = IERC20Wrapper(_erc20Wrapper).createWrappedToken(
             msg.sender,

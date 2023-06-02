@@ -43,49 +43,54 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         if (minter == address(0)) {
             revert Errors.InvalidAddress();
         }
-        if (tokensToBeWrapped.length == 0) {
-            revert Errors.InvalidArrayLength();
-        }
-        bytes32 salt = keccak256(abi.encodePacked(tokensCreated.length));
-        newErc20Addr = Clones.cloneDeterministic(wrappedErc20Impl, salt);
-        uint160 prevTokenAddressCastToUint160;
-        uint160 currAddressCastToUint160;
+        newErc20Addr = Clones.cloneDeterministic(
+            wrappedErc20Impl,
+            keccak256(abi.encodePacked(tokensCreated.length))
+        );
         uint256 minTokenAmount = type(uint256).max;
-        for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
-            if (
-                addressRegistry != address(0) &&
-                !IAddressRegistry(addressRegistry).isWhitelistedERC20(
-                    tokensToBeWrapped[i].tokenAddr
-                )
-            ) {
-                revert Errors.NonWhitelistedToken();
-            }
-            currAddressCastToUint160 = uint160(tokensToBeWrapped[i].tokenAddr);
-            if (currAddressCastToUint160 <= prevTokenAddressCastToUint160) {
-                revert Errors.NonIncreasingTokenAddrs();
-            }
-            if (tokensToBeWrapped[i].tokenAmount == 0) {
-                revert Errors.InvalidSendAmount();
-            }
-            minTokenAmount = minTokenAmount > tokensToBeWrapped[i].tokenAmount
-                ? tokensToBeWrapped[i].tokenAmount
-                : minTokenAmount;
-            IERC20(tokensToBeWrapped[i].tokenAddr).safeTransferFrom(
-                minter,
-                newErc20Addr,
-                tokensToBeWrapped[i].tokenAmount
-            );
-            prevTokenAddressCastToUint160 = currAddressCastToUint160;
-            unchecked {
-                i++;
+        bool isIOU = tokensToBeWrapped.length == 0;
+
+        if (!isIOU) {
+            address prevTokenAddress;
+            address currAddress;
+            for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
+                if (
+                    addressRegistry != address(0) &&
+                    !IAddressRegistry(addressRegistry).isWhitelistedERC20(
+                        tokensToBeWrapped[i].tokenAddr
+                    )
+                ) {
+                    revert Errors.NonWhitelistedToken();
+                }
+                currAddress = tokensToBeWrapped[i].tokenAddr;
+                if (currAddress <= prevTokenAddress) {
+                    revert Errors.NonIncreasingTokenAddrs();
+                }
+                if (tokensToBeWrapped[i].tokenAmount == 0) {
+                    revert Errors.InvalidSendAmount();
+                }
+                minTokenAmount = minTokenAmount >
+                    tokensToBeWrapped[i].tokenAmount
+                    ? tokensToBeWrapped[i].tokenAmount
+                    : minTokenAmount;
+                IERC20(tokensToBeWrapped[i].tokenAddr).safeTransferFrom(
+                    minter,
+                    newErc20Addr,
+                    tokensToBeWrapped[i].tokenAmount
+                );
+                prevTokenAddress = currAddress;
+                unchecked {
+                    i++;
+                }
             }
         }
         IWrappedERC20Impl(newErc20Addr).initialize(
             minter,
             tokensToBeWrapped,
-            minTokenAmount,
+            isIOU ? 10 ** 6 : minTokenAmount,
             name,
-            symbol
+            symbol,
+            isIOU
         );
         tokensCreated.push(newErc20Addr);
     }
