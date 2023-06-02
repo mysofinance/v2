@@ -96,4 +96,8 @@ library Errors {
     error TransferToWrappedTokenFailed();
     error TransferFromWrappedTokenFailed();
     error StateAlreadySet();
+    error ReclaimableCollateralAmountZero();
+    error CallbacksNotAllowedForSwaps();
+    error InvalidSwap();
+    error InvalidUpfrontFee();
 }
