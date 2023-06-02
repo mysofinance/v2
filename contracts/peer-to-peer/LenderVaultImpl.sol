@@ -155,44 +155,64 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         if (loanAmount < borrowInstructions.minLoanAmount) {
             revert Errors.TooSmallLoanAmount();
         }
-
+        collReceiver = address(this);
         _loan.borrower = borrower;
         _loan.loanToken = generalQuoteInfo.loanToken;
         _loan.collToken = generalQuoteInfo.collToken;
+        _loan.initLoanAmount = SafeCast.toUint128(loanAmount);
         _loan.initCollAmount = SafeCast.toUint128(
             borrowInstructions.collSendAmount -
                 upfrontFee -
                 borrowInstructions.expectedTransferFee
         );
-        _loan.initLoanAmount = SafeCast.toUint128(loanAmount);
-        _loan.initRepayAmount = SafeCast.toUint128(repayAmount);
-        _loan.expiry = SafeCast.toUint40(block.timestamp + quoteTuple.tenor);
-        _loan.earliestRepay = SafeCast.toUint40(
-            block.timestamp + generalQuoteInfo.earliestRepayTenor
-        );
-        if (
-            _loan.expiry <
-            SafeCast.toUint40(
-                _loan.earliestRepay +
-                    Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
-            )
-        ) {
-            revert Errors.InvalidEarliestRepay();
-        }
-
-        if (generalQuoteInfo.borrowerCompartmentImplementation == address(0)) {
-            collReceiver = address(this);
-            lockedAmounts[_loan.collToken] += _loan.initCollAmount;
-        } else {
-            collReceiver = _createCollCompartment(
-                generalQuoteInfo.borrowerCompartmentImplementation,
-                _loans.length
+        if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
+            // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent
+            _loan.expiry = SafeCast.toUint40(
+                block.timestamp + quoteTuple.tenor
             );
-            _loan.collTokenCompartmentAddr = collReceiver;
+            _loan.earliestRepay = SafeCast.toUint40(
+                block.timestamp + generalQuoteInfo.earliestRepayTenor
+            );
+            if (
+                _loan.expiry <
+                SafeCast.toUint40(
+                    _loan.earliestRepay +
+                        Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
+                )
+            ) {
+                revert Errors.InvalidEarliestRepay();
+            }
+            if (_loan.initCollAmount == 0) {
+                revert Errors.ReclaimableCollateralAmountZero();
+            }
+            if (
+                generalQuoteInfo.borrowerCompartmentImplementation == address(0)
+            ) {
+                lockedAmounts[_loan.collToken] += _loan.initCollAmount;
+            } else {
+                collReceiver = _createCollCompartment(
+                    generalQuoteInfo.borrowerCompartmentImplementation,
+                    _loans.length
+                );
+                _loan.collTokenCompartmentAddr = collReceiver;
+            }
+            _loan.initRepayAmount = SafeCast.toUint128(repayAmount);
+            loanId = _loans.length;
+            _loans.push(_loan);
+            emit QuoteProcessed(borrower, _loan, loanId, collReceiver, true);
+        } else if (quoteTuple.upfrontFeePctInBase == Constants.BASE) {
+            // note: if upfrontFee=100% this corresponds to an outright swap; check that tenor is zero
+            if (
+                _loan.initCollAmount != 0 ||
+                quoteTuple.tenor + generalQuoteInfo.earliestRepayTenor != 0 ||
+                generalQuoteInfo.borrowerCompartmentImplementation != address(0)
+            ) {
+                revert Errors.InvalidSwap();
+            }
+            emit QuoteProcessed(borrower, _loan, loanId, collReceiver, false);
+        } else {
+            revert Errors.InvalidUpfrontFee();
         }
-        loanId = _loans.length;
-        _loans.push(_loan);
-        emit QuoteProcessed(borrower, _loan, loanId, collReceiver);
     }
 
     function withdraw(address token, uint256 amount) external {

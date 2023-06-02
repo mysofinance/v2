@@ -26,7 +26,8 @@ interface ILenderVaultImpl {
         address borrower,
         DataTypesPeerToPeer.Loan loan,
         uint256 loanId,
-        address collReceiver
+        address collReceiver,
+        bool isLoan
     );
 
     event Withdrew(address indexed tokenAddr, uint256 withdrawAmount);

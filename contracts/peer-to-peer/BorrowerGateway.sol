@@ -265,10 +265,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         // protocol fees on whole sendAmount
         // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
-        uint256 protocolFeeAmount = (borrowInstructions.collSendAmount *
+        uint256 protocolFeeAmount = ((borrowInstructions.collSendAmount *
             applicableProtocolFee *
-            (loan.expiry - block.timestamp)) /
-            (Constants.BASE * Constants.YEAR_IN_SECONDS);
+            (loan.initCollAmount == 0 ? 1 : (loan.expiry - block.timestamp))) /
+            (Constants.BASE * Constants.YEAR_IN_SECONDS));
 
         // should only happen when tenor >> 1 year or very large upfront fees with more reasonable protocol fees
         // e.g. at 5% MAX_FEE_PER_ANNUM, tenor still needs to be 20 years with no upfront fee
