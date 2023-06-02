@@ -28,10 +28,8 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        address _addressRegistry = addressRegistry;
-        if (
-            !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
-        ) {
+        IAddressRegistry registry = IAddressRegistry(addressRegistry);
+        if (!registry.isRegisteredVault(lenderVault)) {
             revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
@@ -55,10 +53,8 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.OnChainQuote calldata oldOnChainQuote,
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external {
-        address _addressRegistry = addressRegistry;
-        if (
-            !IAddressRegistry(_addressRegistry).isRegisteredVault(lenderVault)
-        ) {
+        IAddressRegistry registry = IAddressRegistry(addressRegistry);
+        if (!registry.isRegisteredVault(lenderVault)) {
             revert Errors.UnregisteredVault();
         }
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
@@ -161,7 +157,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
-        bytes32[] memory proof
+        bytes32[] calldata proof
     ) external {
         _checkSenderAndQuoteInfo(
             borrower,
@@ -286,17 +282,15 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal view {
-        address _addressRegistry = addressRegistry;
-        if (
-            msg.sender != IAddressRegistry(_addressRegistry).borrowerGateway()
-        ) {
+        IAddressRegistry registry = IAddressRegistry(addressRegistry);
+        if (msg.sender != registry.borrowerGateway()) {
             revert Errors.InvalidSender();
         }
         _checkTokensAndCompartmentWhitelist(
             generalQuoteInfo.collToken,
             generalQuoteInfo.loanToken,
-            _addressRegistry,
-            generalQuoteInfo.borrowerCompartmentImplementation,
+            registry,
+            generalQuoteInfo.borrowerCompartmentImplementation
             _isSwap(generalQuoteInfo, quoteTuple)
         );
         if (generalQuoteInfo.validUntil < block.timestamp) {
@@ -307,7 +301,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         if (
             generalQuoteInfo.whitelistAuthority != address(0) &&
-            !IAddressRegistry(_addressRegistry).isWhitelistedBorrower(
+            !registry.isWhitelistedBorrower(
                 generalQuoteInfo.whitelistAuthority,
                 borrower
             )
@@ -372,11 +366,10 @@ contract QuoteHandler is IQuoteHandler {
     function _checkTokensAndCompartmentWhitelist(
         address collToken,
         address loanToken,
-        address _addressRegistry,
-        address compartmentImpl,
+        IAddressRegistry registry,
+        address compartmentImpl
         bool isSwap
     ) internal view {
-        IAddressRegistry registry = IAddressRegistry(_addressRegistry);
         if (
             !registry.isWhitelistedERC20(loanToken) ||
             !registry.isWhitelistedERC20(collToken)

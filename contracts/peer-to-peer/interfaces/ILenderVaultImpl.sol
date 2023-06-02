@@ -171,18 +171,6 @@ interface ILenderVaultImpl {
     ) external view returns (DataTypesPeerToPeer.Loan memory loan);
 
     /**
-     * @notice function validates repay info
-     * @param borrower address of the borrower
-     * @param loan loan that is being repaid
-     * @param loanRepayInstructions struct containing repayment info (see DataTypesPeerToPeer.sol notes)
-     */
-    function validateRepayInfo(
-        address borrower,
-        DataTypesPeerToPeer.Loan calldata loan,
-        DataTypesPeerToPeer.LoanRepayInstructions calldata loanRepayInstructions
-    ) external view;
-
-    /**
      * @notice function to return owner address
      * @return owner address
      */

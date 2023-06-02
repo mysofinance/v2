@@ -157,16 +157,27 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
             revert Errors.UnregisteredVault();
         }
-
-        DataTypesPeerToPeer.Loan memory loan = ILenderVaultImpl(vaultAddr).loan(
+        ILenderVaultImpl lenderVault = ILenderVaultImpl(vaultAddr);
+        DataTypesPeerToPeer.Loan memory loan = lenderVault.loan(
             loanRepayInstructions.targetLoanId
         );
-
-        ILenderVaultImpl(vaultAddr).validateRepayInfo(
-            msg.sender,
-            loan,
-            loanRepayInstructions
-        );
+        if (msg.sender != loan.borrower) {
+            revert Errors.InvalidBorrower();
+        }
+        if (
+            block.timestamp < loan.earliestRepay ||
+            block.timestamp >= loan.expiry
+        ) {
+            revert Errors.OutsideValidRepayWindow();
+        }
+        // checks repayAmount <= remaining loan balance
+        if (
+            loanRepayInstructions.targetRepayAmount == 0 ||
+            loanRepayInstructions.targetRepayAmount + loan.amountRepaidSoFar >
+            loan.initRepayAmount
+        ) {
+            revert Errors.InvalidRepayAmount();
+        }
 
         uint256 reclaimCollAmount = _processRepayTransfers(
             vaultAddr,
@@ -176,7 +187,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             callbackData
         );
 
-        ILenderVaultImpl(vaultAddr).updateLoanInfo(
+        lenderVault.updateLoanInfo(
             loanRepayInstructions.targetRepayAmount,
             loanRepayInstructions.targetLoanId,
             reclaimCollAmount,
@@ -213,11 +224,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.Loan memory loan,
         uint256 upfrontFee
     ) internal {
+        IAddressRegistry registry = IAddressRegistry(addressRegistry);
         if (
             borrowInstructions.callbackAddr != address(0) &&
-            IAddressRegistry(addressRegistry).whitelistState(
-                borrowInstructions.callbackAddr
-            ) !=
+            registry.whitelistState(borrowInstructions.callbackAddr) !=
             DataTypesPeerToPeer.WhitelistState.CALLBACK
         ) {
             revert Errors.NonWhitelistedCallback();
@@ -239,8 +249,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         uint256 currProtocolFee = protocolFee;
         uint256 applicableProtocolFee = currProtocolFee;
 
-        address mysoTokenManager = IAddressRegistry(addressRegistry)
-            .mysoTokenManager();
+        address mysoTokenManager = registry.mysoTokenManager();
         if (mysoTokenManager != address(0)) {
             applicableProtocolFee = IMysoTokenManager(mysoTokenManager)
                 .processP2PBorrow(
@@ -273,7 +282,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (protocolFeeAmount != 0) {
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
-                IAddressRegistry(addressRegistry).owner(),
+                registry.owner(),
                 protocolFeeAmount
             );
         }
