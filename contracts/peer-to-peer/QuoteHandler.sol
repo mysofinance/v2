@@ -35,7 +35,7 @@ contract QuoteHandler is IQuoteHandler {
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert Errors.InvalidSender();
         }
-        if (!_isValidOnChainQuote(onChainQuote, _addressRegistry)) {
+        if (!_isValidOnChainQuote(onChainQuote, registry)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -60,7 +60,7 @@ contract QuoteHandler is IQuoteHandler {
         if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
             revert Errors.InvalidSender();
         }
-        if (!_isValidOnChainQuote(newOnChainQuote, _addressRegistry)) {
+        if (!_isValidOnChainQuote(newOnChainQuote, registry)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -290,7 +290,7 @@ contract QuoteHandler is IQuoteHandler {
             generalQuoteInfo.collToken,
             generalQuoteInfo.loanToken,
             registry,
-            generalQuoteInfo.borrowerCompartmentImplementation
+            generalQuoteInfo.borrowerCompartmentImplementation,
             _isSwap(generalQuoteInfo, quoteTuple)
         );
         if (generalQuoteInfo.validUntil < block.timestamp) {
@@ -312,7 +312,7 @@ contract QuoteHandler is IQuoteHandler {
 
     function _isValidOnChainQuote(
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote,
-        address _addressRegistry
+        IAddressRegistry registry
     ) internal view returns (bool) {
         if (
             onChainQuote.generalQuoteInfo.collToken ==
@@ -356,7 +356,7 @@ contract QuoteHandler is IQuoteHandler {
         _checkTokensAndCompartmentWhitelist(
             onChainQuote.generalQuoteInfo.collToken,
             onChainQuote.generalQuoteInfo.loanToken,
-            _addressRegistry,
+            registry,
             onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
             isSwap
         );
@@ -367,7 +367,7 @@ contract QuoteHandler is IQuoteHandler {
         address collToken,
         address loanToken,
         IAddressRegistry registry,
-        address compartmentImpl
+        address compartmentImpl,
         bool isSwap
     ) internal view {
         if (
