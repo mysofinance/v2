@@ -6,7 +6,6 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist } from './helpers/misc'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
-import { ADDRESS_ZERO } from '@uniswap/v3-sdk'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -91,7 +90,7 @@ async function generateOffChainQuote({
   const quoteTuplesRoot = quoteTuplesTree.root
   let offChainQuote = {
     generalQuoteInfo: {
-      whitelistAuthority: whitelistAuthority == ADDRESS_ZERO ? ADDRESS_ZERO : whitelistAuthority.address,
+      whitelistAuthority: whitelistAuthority == ZERO_ADDRESS ? ZERO_ADDRESS : whitelistAuthority.address,
       collToken: weth.address,
       loanToken: usdc.address,
       oracleAddr: ZERO_ADDRESS,
@@ -3155,7 +3154,41 @@ describe('Peer-to-Peer: Local Tests', function () {
       await addressRegistry.connect(team).setWhitelistState([team.address], 0)
       await addressRegistry.connect(team).setAllowedTokensForCompartment(team.address, [weth.address], false)
 
+      // should revert if trying to add "mixed" quote tuples, where some correspond to loans and some to swaps
+      // with potentially incompatible compartment requirements
+      onChainQuote.quoteTuples[0].tenor = 0
+      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+      onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+      onChainQuote.quoteTuples.push({
+        loanPerCollUnitOrLtv: buyPricePerCollToken,
+        interestRatePctInBase: 0,
+        upfrontFeePctInBase: BASE.sub(1),
+        tenor: Number(ONE_DAY.toString())
+      })
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+      // should revert if trying to add multiple swap quotes (no need to have multiple
+      // swap quotes with different prices because takers would always take the cheaper one)
+      onChainQuote.quoteTuples.pop()
+      onChainQuote.quoteTuples[0].tenor = 0
+      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+      onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+      onChainQuote.quoteTuples.push({
+        loanPerCollUnitOrLtv: buyPricePerCollToken.sub(1),
+        interestRatePctInBase: 0,
+        upfrontFeePctInBase: BASE,
+        tenor: 0
+      })
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
       // should pass with valid swap on-chain quote
+      onChainQuote.quoteTuples.pop()
       onChainQuote.quoteTuples[0].tenor = 0
       onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
       onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
