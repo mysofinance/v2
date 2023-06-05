@@ -86,10 +86,8 @@ library DataTypesPeerToPeer {
         bytes32 salt;
         // for invalidating multiple parallel quotes in one click
         uint256 nonce;
-        // arrays of necessary parameters for recovering signatures
-        uint8[] v;
-        bytes32[] r;
-        bytes32[] s;
+        // array of compact signatures from vault signers
+        bytes[] compactSigs;
     }
 
     struct LoanRepayInstructions {

@@ -139,26 +139,45 @@ export const whitelistLender = async (
 
   // construct payload and sign
   const payload = ethers.utils.defaultAbiCoder.encode(
-    ['address', 'uint256', 'uint256', 'bytes32'],
-    [lender.address, whitelistedUntil, chainId, salt]
+    ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+    [factory.address, lender.address, whitelistedUntil, chainId, salt]
   )
   const payloadHash = ethers.utils.keccak256(payload)
   const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
   const sig = ethers.utils.splitSignature(signature)
+  const compactSig = sig.compact
   const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
   expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
   // expects to revert on invalid whitelist authority
   await expect(
-    factory.connect(lender).claimLenderWhitelistStatus(ZERO_ADDR, whitelistedUntil, signature, salt)
+    factory.connect(lender).claimLenderWhitelistStatus(ZERO_ADDR, whitelistedUntil, compactSig, salt)
   ).to.be.revertedWithCustomError(factory, 'InvalidSignature')
 
   // expects to revert on invalid signature
   const invalidSignature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+  const invalidSig = ethers.utils.splitSignature(invalidSignature)
+  const invalidCompactSig = invalidSig.compact
   await expect(
-    factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, invalidSignature, salt)
+    factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, invalidCompactSig, salt)
   ).to.be.revertedWithCustomError(factory, 'InvalidSignature')
 
   // have lender claim whitelist status
-  await factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
+  await factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, salt)
+
+  // should revert when trying to reclaim whitelist status again
+  await expect(
+    factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, salt)
+  ).to.be.revertedWithCustomError(factory, 'InvalidSignature')
+
+  // check dewhitelisting lender
+  await factory.connect(whitelistAuthority).updateLenderWhitelist([lender.address], 0)
+
+  // should revert when trying to backrun dewhitelisting
+  await expect(
+    factory.connect(lender).claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, salt)
+  ).to.be.revertedWithCustomError(factory, 'InvalidSignature')
+
+  // whitelist again
+  await factory.connect(whitelistAuthority).updateLenderWhitelist([lender.address], MAX_UINT256)
 }

@@ -7,6 +7,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
+import {Helpers} from "../Helpers.sol";
 import {Ownable} from "../Ownable.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
@@ -24,6 +25,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     address[] public fundingPools;
     mapping(address => bool) public isLoanProposal;
     mapping(address => bool) public isFundingPool;
+    mapping(bytes => bool) internal _signatureIsInvalidated;
     mapping(address => bool) internal _depositTokenHasFundingPool;
     mapping(address => mapping(address => uint256))
         internal _lenderWhitelistedUntil;
@@ -129,16 +131,26 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     function claimLenderWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes calldata signature,
+        bytes calldata compactSig,
         bytes32 salt
     ) external {
+        if (_signatureIsInvalidated[compactSig]) {
+            revert Errors.InvalidSignature();
+        }
         bytes32 payloadHash = keccak256(
-            abi.encode(msg.sender, whitelistedUntil, block.chainid, salt)
+            abi.encode(
+                address(this),
+                msg.sender,
+                whitelistedUntil,
+                block.chainid,
+                salt
+            )
         );
         bytes32 messageHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
         );
-        address recoveredSigner = messageHash.recover(signature);
+        (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSig);
+        address recoveredSigner = messageHash.recover(r, vs);
         if (
             whitelistAuthority == address(0) ||
             recoveredSigner != whitelistAuthority
@@ -156,6 +168,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             revert Errors.CannotClaimOutdatedStatus();
         }
         whitelistedUntilPerLender[msg.sender] = whitelistedUntil;
+        _signatureIsInvalidated[compactSig] = true;
         emit LenderWhitelistStatusClaimed(
             whitelistAuthority,
             msg.sender,
@@ -210,7 +223,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         address lender
     ) external view returns (bool) {
         return
-            _lenderWhitelistedUntil[whitelistAuthority][lender] >
+            _lenderWhitelistedUntil[whitelistAuthority][lender] >=
             block.timestamp;
     }
 }

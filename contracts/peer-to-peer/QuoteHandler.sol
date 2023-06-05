@@ -6,11 +6,14 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
+import {Helpers} from "../Helpers.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 
 contract QuoteHandler is IQuoteHandler {
+    using ECDSA for bytes32;
+
     address public immutable addressRegistry;
     mapping(address => uint256) public offChainQuoteNonce;
     mapping(address => mapping(bytes32 => bool))
@@ -182,9 +185,7 @@ contract QuoteHandler is IQuoteHandler {
             !_areValidSignatures(
                 lenderVault,
                 offChainQuoteHash,
-                offChainQuote.v,
-                offChainQuote.r,
-                offChainQuote.s
+                offChainQuote.compactSigs
             )
         ) {
             revert Errors.InvalidOffChainSignature();
@@ -225,14 +226,10 @@ contract QuoteHandler is IQuoteHandler {
     function _areValidSignatures(
         address lenderVault,
         bytes32 offChainQuoteHash,
-        uint8[] calldata v,
-        bytes32[] calldata r,
-        bytes32[] calldata s
+        bytes[] calldata compactSigs
     ) internal view returns (bool) {
         if (
-            v.length != r.length ||
-            v.length != s.length ||
-            v.length != ILenderVaultImpl(lenderVault).minNumOfSigners()
+            compactSigs.length < ILenderVaultImpl(lenderVault).minNumOfSigners()
         ) {
             return false;
         }
@@ -243,17 +240,17 @@ contract QuoteHandler is IQuoteHandler {
             )
         );
         address recoveredSigner;
-        uint160 prevSignerCastToUint160;
-        for (uint256 i = 0; i < v.length; ) {
-            recoveredSigner = ECDSA.recover(messageHash, v[i], r[i], s[i]);
+        address prevSigner;
+        for (uint256 i = 0; i < compactSigs.length; ) {
+            (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSigs[i]);
+            recoveredSigner = messageHash.recover(r, vs);
             if (!ILenderVaultImpl(lenderVault).isSigner(recoveredSigner)) {
                 return false;
             }
-            uint160 recoveredSignerCastToUint160 = uint160(recoveredSigner);
-            if (recoveredSignerCastToUint160 <= prevSignerCastToUint160) {
+            if (recoveredSigner <= prevSigner) {
                 return false;
             }
-            prevSignerCastToUint160 = recoveredSignerCastToUint160;
+            prevSigner = recoveredSigner;
             unchecked {
                 i++;
             }
@@ -301,6 +298,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         if (
             generalQuoteInfo.whitelistAuthority != address(0) &&
+            generalQuoteInfo.whitelistAuthority != borrower &&
             !registry.isWhitelistedBorrower(
                 generalQuoteInfo.whitelistAuthority,
                 borrower

@@ -71,13 +71,13 @@ interface IFactory {
      * @notice Allows user to claim whitelisted status
      * @param whitelistAuthority Address of whitelist authorithy
      * @param whitelistedUntil Timestamp until when user is whitelisted
-     * @param signature Signature from whitelist authority
+     * @param compactSig Compact signature from whitelist authority
      * @param salt Salt to make signature unique
      */
     function claimLenderWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes calldata signature,
+        bytes calldata compactSig,
         bytes32 salt
     ) external;
 

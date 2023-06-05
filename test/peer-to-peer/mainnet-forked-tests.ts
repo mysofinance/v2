@@ -4283,6 +4283,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
+      const compactSig = sig.compact
       const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
       expect(recoveredAddr).to.equal(lender.address)
 
@@ -4290,9 +4291,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await lenderVault.connect(lender).addSigners([lender.address])
 
       // lender add sig to quote and pass to borrower
-      offChainQuoteWithBadTuples.v = [sig.v]
-      offChainQuoteWithBadTuples.r = [sig.r]
-      offChainQuoteWithBadTuples.s = [sig.s]
+      offChainQuoteWithBadTuples.compactSigs = [compactSig]
 
       // borrower obtains proof for quote tuple idx 0
       let quoteTupleIdx = 0
