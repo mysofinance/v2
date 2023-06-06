@@ -29,7 +29,8 @@ async function generateOffChainQuote({
   offChainQuoteBodyInfo = {},
   generalQuoteInfo = {},
   customSignature = {},
-  earliestRepayTenor = 0
+  earliestRepayTenor = 0,
+  minLoan = ONE_USDC.mul(1000)
 }: {
   lenderVault: LenderVaultImpl
   lender: SignerWithAddress
@@ -40,6 +41,7 @@ async function generateOffChainQuote({
   generalQuoteInfo?: any
   customSignature?: any
   earliestRepayTenor?: any
+  minLoan?: any
 }) {
   // lenderVault owner gives quote
   const blocknum = await ethers.provider.getBlockNumber()
@@ -81,6 +83,12 @@ async function generateOffChainQuote({
       interestRatePctInBase: 0,
       upfrontFeePctInBase: BASE.add(1), // invalid swap quote
       tenor: 0
+    },
+    {
+      loanPerCollUnitOrLtv: 0, // invalid quote with zero loan amount
+      interestRatePctInBase: 0,
+      upfrontFeePctInBase: 0,
+      tenor: ONE_DAY.mul(90)
     }
   ]
   const quoteTuplesTree = StandardMerkleTree.of(
@@ -94,7 +102,7 @@ async function generateOffChainQuote({
       collToken: weth.address,
       loanToken: usdc.address,
       oracleAddr: ZERO_ADDRESS,
-      minLoan: ONE_USDC.mul(1000),
+      minLoan: minLoan,
       maxLoan: MAX_UINT256,
       validUntil: timestamp + 60,
       earliestRepayTenor: earliestRepayTenor,
@@ -1081,6 +1089,80 @@ describe('Peer-to-Peer: Local Tests', function () {
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+    })
+
+    it('Should not proccess zero loan amounts', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote that results in zero loan amount
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let onChainQuote = {
+        generalQuoteInfo: {
+          whitelistAuthority: ZERO_ADDRESS,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 0,
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false
+        },
+        quoteTuples: [
+          {
+            loanPerCollUnitOrLtv: 0, // invalid value
+            interestRatePctInBase: BASE.mul(20).div(100),
+            upfrontFeePctInBase: 0,
+            tenor: ONE_DAY.mul(365).mul(20)
+          }
+        ],
+        salt: ZERO_BYTES32
+      }
+      // check invalid on-chain quote cannot bet added
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // lender produces invalid quote off-chain
+      const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        weth,
+        usdc,
+        minLoan: 0
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 6
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // reverts if trying to borrow with quote that would result in zero loan amount
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(lenderVault, 'TooSmallLoanAmount')
     })
   })
 

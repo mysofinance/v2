@@ -432,6 +432,10 @@ contract QuoteHandler is IQuoteHandler {
             // note: if upfrontFee>100% this is invalid
             return (false, isSwap);
         }
+
+        if (quoteTuple.loanPerCollUnitOrLtv == 0) {
+            return (false, isSwap);
+        }
         // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
         // when there is a specified whitelist authority address.
         // Otherwise, the LTV must be set to a value <= 100% (overcollateralized).
