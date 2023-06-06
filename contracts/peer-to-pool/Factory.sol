@@ -180,6 +180,9 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         address[] calldata lenders,
         uint256 whitelistedUntil
     ) external {
+        if (lenders.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
         for (uint i = 0; i < lenders.length; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerLender = _lenderWhitelistedUntil[

@@ -867,6 +867,12 @@ describe('Peer-to-Pool: Local Tests', function () {
       'InvalidLender'
     )
 
+    // should revert when trying to update lender whitelist with empty array
+    await expect(factory.connect(whitelistAuthority).updateLenderWhitelist([], 1)).to.be.revertedWithCustomError(
+      factory,
+      'InvalidArrayLength'
+    )
+
     // whitelist lender 1
     await whitelistLender(factory, whitelistAuthority, lender1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, MAX_UINT256)
     // check subscription now works
