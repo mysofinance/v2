@@ -46,7 +46,6 @@ export const createOnChainRequest = async ({
   ]
   let onChainQuote = {
     generalQuoteInfo: {
-      whitelistAuthority: ZERO_ADDR,
       collToken: collToken,
       loanToken: loanToken,
       oracleAddr: ZERO_ADDR,
@@ -55,7 +54,9 @@ export const createOnChainRequest = async ({
       validUntil: _validUntil,
       earliestRepayTenor: 0,
       borrowerCompartmentImplementation: borrowerCompartmentImplementation,
-      isSingleUse: false
+      isSingleUse: false,
+      whitelistAddr: ZERO_ADDR,
+      isWhitelistAddrSingleBorrower: false
     },
     quoteTuples: quoteTuples,
     salt: ZERO_BYTES32

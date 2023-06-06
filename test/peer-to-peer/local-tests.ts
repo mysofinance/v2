@@ -90,7 +90,6 @@ async function generateOffChainQuote({
   const quoteTuplesRoot = quoteTuplesTree.root
   let offChainQuote = {
     generalQuoteInfo: {
-      whitelistAuthority: whitelistAuthority == ZERO_ADDRESS ? ZERO_ADDRESS : whitelistAuthority.address,
       collToken: weth.address,
       loanToken: usdc.address,
       oracleAddr: ZERO_ADDRESS,
@@ -100,6 +99,8 @@ async function generateOffChainQuote({
       earliestRepayTenor: earliestRepayTenor,
       borrowerCompartmentImplementation: ZERO_ADDRESS,
       isSingleUse: false,
+      whitelistAddr: whitelistAuthority == ZERO_ADDRESS ? ZERO_ADDRESS : whitelistAuthority.address,
+      isWhitelistAddrSingleBorrower: false,
       ...generalQuoteInfo
     },
     quoteTuplesRoot: quoteTuplesRoot,
@@ -827,7 +828,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -836,7 +836,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -966,7 +968,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -975,7 +976,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1040,7 +1043,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -1049,7 +1051,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: [
           {
@@ -1976,7 +1980,6 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       let offChainQuoteWithBadTuples = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -1985,7 +1988,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuplesRoot: badQuoteTuplesRoot,
         salt: ZERO_BYTES32,
@@ -2115,7 +2120,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2124,7 +2128,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2240,7 +2246,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2249,7 +2254,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY.mul(360),
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: true
+          isSingleUse: true,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2396,7 +2403,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2405,7 +2411,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY.mul(360),
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: true
+          isSingleUse: true,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2521,7 +2529,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2530,7 +2537,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2842,7 +2851,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: wrappedToken.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2851,7 +2859,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3201,7 +3211,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -3210,7 +3219,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3321,7 +3332,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -3330,7 +3340,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32

@@ -297,12 +297,14 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.InvalidQuote();
         }
         if (
-            generalQuoteInfo.whitelistAuthority != address(0) &&
-            generalQuoteInfo.whitelistAuthority != borrower &&
-            !registry.isWhitelistedBorrower(
-                generalQuoteInfo.whitelistAuthority,
-                borrower
-            )
+            generalQuoteInfo.whitelistAddr != address(0) &&
+            ((generalQuoteInfo.isWhitelistAddrSingleBorrower &&
+                generalQuoteInfo.whitelistAddr != borrower) ||
+                (!generalQuoteInfo.isWhitelistAddrSingleBorrower &&
+                    !registry.isWhitelistedBorrower(
+                        generalQuoteInfo.whitelistAddr,
+                        borrower
+                    )))
         ) {
             revert Errors.InvalidBorrower();
         }
@@ -431,12 +433,12 @@ contract QuoteHandler is IQuoteHandler {
             return (false, isSwap);
         }
         // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
-        // when there is a specified whitelist authority address.
+        // when there is a specified whitelist address.
         // Otherwise, the LTV must be set to a value <= 100% (overcollateralized).
         if (
             generalQuoteInfo.oracleAddr != address(0) &&
             quoteTuple.loanPerCollUnitOrLtv > Constants.BASE &&
-            generalQuoteInfo.whitelistAuthority == address(0)
+            generalQuoteInfo.whitelistAddr == address(0)
         ) {
             return (false, isSwap);
         }

@@ -374,7 +374,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -383,7 +382,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -395,7 +396,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
-      onChainQuote.generalQuoteInfo.whitelistAuthority = team.address
+      onChainQuote.generalQuoteInfo.whitelistAddr = team.address
 
       // now non-overcollateralized loan should work since whitelist authority is non-zero
       await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
@@ -426,7 +427,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -435,7 +435,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -473,7 +475,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -482,7 +483,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY.mul(366),
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -520,7 +523,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -529,7 +531,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp - 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -566,7 +570,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -575,7 +578,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -618,7 +623,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -627,7 +631,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -651,7 +657,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -660,7 +665,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: [],
         salt: ZERO_BYTES32
@@ -697,7 +704,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: weth.address,
           oracleAddr: ZERO_ADDR,
@@ -706,7 +712,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -743,7 +751,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -752,7 +759,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -831,7 +840,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -840,7 +848,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -994,7 +1004,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1003,7 +1012,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1177,7 +1188,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1186,7 +1196,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1327,7 +1339,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1336,7 +1347,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1470,7 +1483,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1479,7 +1491,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1592,7 +1606,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1601,7 +1614,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1655,7 +1670,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1664,7 +1678,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1721,7 +1737,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1730,7 +1745,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1873,7 +1890,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -1882,7 +1898,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3368,7 +3386,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -3377,7 +3394,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: aaveStakingCompartmentImplementation.address,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3455,7 +3474,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: paxg.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -3464,7 +3482,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3548,7 +3568,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: paxg.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
@@ -3557,7 +3576,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3641,7 +3662,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: usdc.address,
           loanToken: paxg.address,
           oracleAddr: ZERO_ADDR,
@@ -3650,7 +3670,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3842,7 +3864,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: paxg.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -3851,14 +3872,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
       }
       let badOnChainQuoteAddrNotInOracle = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: ldo.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -3867,7 +3889,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4010,7 +4034,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -4019,7 +4042,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4132,7 +4157,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: usdc.address,
           loanToken: weth.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -4141,7 +4165,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4252,7 +4278,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let offChainQuoteWithBadTuples = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: chainlinkBasicImplementation.address,
@@ -4261,7 +4286,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuplesRoot: badQuoteTuplesRoot,
         salt: ZERO_BYTES32,
@@ -4382,7 +4409,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: gohm.address,
           loanToken: usdc.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -4391,7 +4417,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4399,7 +4427,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithNeitherAddressGohm = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -4408,7 +4435,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4416,7 +4445,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithNoOracle = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: gohm.address,
           loanToken: ldo.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -4425,7 +4453,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4540,7 +4570,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: usdc.address,
           loanToken: gohm.address,
           oracleAddr: olympusOracleImplementation.address,
@@ -4549,7 +4578,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4677,7 +4708,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: uniV2WethUsdc.address,
           loanToken: usdc.address,
           oracleAddr: uniV2OracleImplementation.address,
@@ -4686,7 +4716,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4694,7 +4726,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithNoLpTokens = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: uniV2OracleImplementation.address,
@@ -4703,7 +4734,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4711,7 +4744,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       let onChainQuoteWithLoanTokenNoOracle = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: uniV2WethUsdc.address,
           loanToken: gohm.address,
           oracleAddr: uniV2OracleImplementation.address,
@@ -4720,7 +4752,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -4860,7 +4894,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDR,
           collToken: usdc.address,
           loanToken: uniV2WethUsdc.address,
           oracleAddr: uniV2OracleImplementation.address,
@@ -4869,7 +4902,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
