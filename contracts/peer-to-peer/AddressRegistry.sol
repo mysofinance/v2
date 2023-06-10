@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
+import {Helpers} from "../Helpers.sol";
 import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IERC721Wrapper} from "./interfaces/wrappers/ERC721/IERC721Wrapper.sol";
@@ -28,6 +29,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public erc721Wrapper;
     address public erc20Wrapper;
     mapping(address => bool) public isRegisteredVault;
+    mapping(bytes => bool) internal _signatureIsInvalidated;
     mapping(address => mapping(address => uint256))
         internal _borrowerWhitelistedUntil;
     mapping(address => DataTypesPeerToPeer.WhitelistState)
@@ -170,16 +172,26 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes calldata signature,
+        bytes calldata compactSig,
         bytes32 salt
     ) external {
+        if (_signatureIsInvalidated[compactSig]) {
+            revert Errors.InvalidSignature();
+        }
         bytes32 payloadHash = keccak256(
-            abi.encode(msg.sender, whitelistedUntil, block.chainid, salt)
+            abi.encode(
+                address(this),
+                msg.sender,
+                whitelistedUntil,
+                block.chainid,
+                salt
+            )
         );
         bytes32 messageHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
         );
-        address recoveredSigner = messageHash.recover(signature);
+        (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSig);
+        address recoveredSigner = messageHash.recover(r, vs);
         if (
             whitelistAuthority == address(0) ||
             recoveredSigner != whitelistAuthority
@@ -197,6 +209,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             revert Errors.CannotClaimOutdatedStatus();
         }
         whitelistedUntilPerBorrower[msg.sender] = whitelistedUntil;
+        _signatureIsInvalidated[compactSig] = true;
         emit BorrowerWhitelistStatusClaimed(
             whitelistAuthority,
             msg.sender,
@@ -294,7 +307,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address borrower
     ) external view returns (bool) {
         return
-            _borrowerWhitelistedUntil[whitelistAuthority][borrower] >
+            _borrowerWhitelistedUntil[whitelistAuthority][borrower] >=
             block.timestamp;
     }
 

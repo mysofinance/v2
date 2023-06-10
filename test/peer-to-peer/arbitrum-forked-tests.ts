@@ -365,7 +365,6 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     ]
     let onChainQuote = {
       generalQuoteInfo: {
-        whitelistAuthority: whitelistAuthority.address,
         collToken: weth.address,
         loanToken: usdc.address,
         oracleAddr: ZERO_ADDR,
@@ -374,7 +373,9 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
         validUntil: timestamp + 60,
         earliestRepayTenor: 0,
         borrowerCompartmentImplementation: ZERO_ADDR,
-        isSingleUse: false
+        isSingleUse: false,
+        whitelistAddr: whitelistAuthority.address,
+        isWhitelistAddrSingleBorrower: false
       },
       quoteTuples: quoteTuples,
       salt: ZERO_BYTES32
