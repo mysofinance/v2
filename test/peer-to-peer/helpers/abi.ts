@@ -372,11 +372,6 @@ const payloadScheme = [
     components: [
       {
         internalType: 'address',
-        name: 'whitelistAuthority',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
         name: 'collToken',
         type: 'address'
       },
@@ -418,6 +413,16 @@ const payloadScheme = [
       {
         internalType: 'bool',
         name: 'isSingleUse',
+        type: 'bool'
+      },
+      {
+        internalType: 'address',
+        name: 'whitelistAddr',
+        type: 'address'
+      },
+      {
+        internalType: 'bool',
+        name: 'isWhitelistAddrSingleBorrower',
         type: 'bool'
       }
     ],

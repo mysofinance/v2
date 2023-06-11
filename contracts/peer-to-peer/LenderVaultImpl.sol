@@ -396,10 +396,10 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             ) {
                 revert Errors.NonWhitelistedOracle();
             }
-            // arbitrage protection if LTV > 100% and no whitelist authority
+            // arbitrage protection if LTV > 100% and no whitelist restriction
             if (
                 quoteTuple.loanPerCollUnitOrLtv > Constants.BASE &&
-                generalQuoteInfo.whitelistAuthority == address(0)
+                generalQuoteInfo.whitelistAddr == address(0)
             ) {
                 revert Errors.LtvHigherThanMax();
             }

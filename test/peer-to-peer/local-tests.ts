@@ -28,7 +28,7 @@ async function generateOffChainQuote({
   usdc,
   offChainQuoteBodyInfo = {},
   generalQuoteInfo = {},
-  customSignature = {},
+  customSignatures = [],
   earliestRepayTenor = 0,
   minLoan = ONE_USDC.mul(1000),
   maxLoan = MAX_UINT256
@@ -40,7 +40,7 @@ async function generateOffChainQuote({
   usdc: MyERC20
   offChainQuoteBodyInfo?: any
   generalQuoteInfo?: any
-  customSignature?: any
+  customSignatures?: any[]
   earliestRepayTenor?: any
   minLoan?: any
   maxLoan?: any
@@ -100,7 +100,6 @@ async function generateOffChainQuote({
   const quoteTuplesRoot = quoteTuplesTree.root
   let offChainQuote = {
     generalQuoteInfo: {
-      whitelistAuthority: whitelistAuthority == ZERO_ADDRESS ? ZERO_ADDRESS : whitelistAuthority.address,
       collToken: weth.address,
       loanToken: usdc.address,
       oracleAddr: ZERO_ADDRESS,
@@ -110,14 +109,14 @@ async function generateOffChainQuote({
       earliestRepayTenor: earliestRepayTenor,
       borrowerCompartmentImplementation: ZERO_ADDRESS,
       isSingleUse: false,
+      whitelistAddr: whitelistAuthority == ZERO_ADDRESS ? ZERO_ADDRESS : whitelistAuthority.address,
+      isWhitelistAddrSingleBorrower: false,
       ...generalQuoteInfo
     },
     quoteTuplesRoot: quoteTuplesRoot,
     salt: ZERO_BYTES32,
     nonce: 0,
-    v: [0],
-    r: [ZERO_BYTES32],
-    s: [ZERO_BYTES32],
+    compactSigs: [],
     ...offChainQuoteBodyInfo
   }
 
@@ -133,6 +132,8 @@ async function generateOffChainQuote({
   const payloadHash = ethers.utils.keccak256(payload)
   const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
   const sig = ethers.utils.splitSignature(signature)
+  const compactSig = sig.compact
+
   const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
   expect(recoveredAddr).to.equal(lender.address)
 
@@ -140,10 +141,7 @@ async function generateOffChainQuote({
   await lenderVault.connect(lender).addSigners([lender.address])
 
   // lender add sig to quote and pass to borrower
-  offChainQuote.v = customSignature.v || [sig.v]
-  offChainQuote.r = customSignature.r || [sig.r]
-  offChainQuote.s = customSignature.s || [sig.s]
-
+  offChainQuote.compactSigs = customSignatures.length != 0 ? customSignatures : [compactSig]
   return { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash }
 }
 
@@ -526,12 +524,13 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // construct payload and sign
       let payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256', 'uint256', 'bytes32'],
-        [borrower.address, whitelistedUntil1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [addressRegistry.address, borrower.address, whitelistedUntil1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
       )
       let payloadHash = ethers.utils.keccak256(payload)
       const signature1 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
       const sig1 = ethers.utils.splitSignature(signature1)
+      const compactSig1 = sig1.compact
       let recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig1)
       expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
@@ -540,13 +539,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         addressRegistry
           .connect(team)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
 
       // revert if trying to claim whitelist with whitelist authority being zero address
       await expect(
-        addressRegistry.connect(team).claimBorrowerWhitelistStatus(ZERO_ADDRESS, whitelistedUntil1, signature1, salt)
+        addressRegistry.connect(team).claimBorrowerWhitelistStatus(ZERO_ADDRESS, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
 
       // move forward past valid until timestamp
@@ -557,7 +556,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         addressRegistry
           .connect(borrower)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
 
@@ -566,33 +565,34 @@ describe('Peer-to-Peer: Local Tests', function () {
       timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil2 = Number(timestamp.toString()) + 60 * 60 * 365
       payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256', 'uint256', 'bytes32'],
-        [borrower.address, whitelistedUntil2, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [addressRegistry.address, borrower.address, whitelistedUntil2, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
       )
       payloadHash = ethers.utils.keccak256(payload)
       const signature2 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
       const sig2 = ethers.utils.splitSignature(signature2)
+      const compactSig2 = sig2.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig2)
 
       // have borrower claim whitelist status
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
       await addressRegistry
         .connect(borrower)
-        .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)
+        .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, compactSig2, salt)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
 
       // revert if trying to claim again
       await expect(
         addressRegistry
           .connect(borrower)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)
-      ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, compactSig2, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
 
       // revert if trying to claim previous sig with outdated whitelistedUntil timestamp
       await expect(
         addressRegistry
           .connect(borrower)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
 
       // revert if whitelist authority tries to set same whitelistedUntil on borrower
@@ -608,6 +608,15 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check that whitelist authority can overwrite whitelistedUntil
       await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], 0)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
+
+      // check that user can't backrun dewhitelisting
+      await expect(
+        addressRegistry
+          .connect(borrower)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig2, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
+
+      // whitelist user again
       await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], MAX_UINT256)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
     })
@@ -829,7 +838,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -838,7 +846,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -968,7 +978,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -977,7 +986,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -1042,7 +1053,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -1051,7 +1061,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: [
           {
@@ -1848,6 +1860,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler,
         lender,
         borrower,
+        team,
         whitelistAuthority,
         usdc,
         weth,
@@ -1868,15 +1881,18 @@ describe('Peer-to-Peer: Local Tests', function () {
         whitelistedUntil: whitelistedUntil
       })
 
+      // generate off chain quote with bad signature
+      const payloadHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('some payload'))
+      const someSignature = await team.signMessage(ethers.utils.arrayify(payloadHash))
+      const someSig = ethers.utils.splitSignature(someSignature)
+      const someCompactSig = someSig.compact
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
         whitelistAuthority,
         weth,
         usdc,
-        customSignature: {
-          v: [0, 1, 2, 3]
-        }
+        customSignatures: [someCompactSig]
       })
 
       // borrower obtains proof for chosen quote tuple
@@ -1963,14 +1979,17 @@ describe('Peer-to-Peer: Local Tests', function () {
       // signer1, signer2, signer3
       const signature1 = await signer1.signMessage(ethers.utils.arrayify(payloadHash))
       const sig1 = ethers.utils.splitSignature(signature1)
+      const compactSig1 = sig1.compact
       let recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig1)
       expect(recoveredAddr).to.equal(signer1.address)
       const signature2 = await signer2.signMessage(ethers.utils.arrayify(payloadHash))
       const sig2 = ethers.utils.splitSignature(signature2)
+      const compactSig2 = sig2.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig2)
       expect(recoveredAddr).to.equal(signer2.address)
       const signature3 = await signer3.signMessage(ethers.utils.arrayify(payloadHash))
       const sig3 = ethers.utils.splitSignature(signature3)
+      const compactSig3 = sig3.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig3)
       expect(recoveredAddr).to.equal(signer3.address)
 
@@ -1995,9 +2014,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       }
 
       // check revert on redundant sigs
-      offChainQuote.v = [sig1.v, sig2.v, sig1.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig1.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig1.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig1]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2005,9 +2022,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on redundant sigs
-      offChainQuote.v = [sig1.v, sig2.v, sig2.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig2.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig2.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig2]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2015,9 +2030,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on redundant sigs
-      offChainQuote.v = [sig1.v, sig1.v, sig2.v]
-      offChainQuote.r = [sig1.r, sig1.r, sig2.r]
-      offChainQuote.s = [sig1.s, sig1.s, sig2.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig1, compactSig2]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2027,11 +2040,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check revert on unauthorized sigs
       const signature4 = await lender.signMessage(ethers.utils.arrayify(payloadHash))
       const sig4 = ethers.utils.splitSignature(signature4)
+      const compactSig4 = sig4.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig4)
       expect(recoveredAddr).to.equal(lender.address)
-      offChainQuote.v = [sig1.v, sig2.v, sig4.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig4.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig4.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig4]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2039,10 +2051,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on too few sigs
-      offChainQuote.v = [sig1.v, sig2.v]
-      offChainQuote.r = [sig1.r, sig2.r]
-      offChainQuote.s = [sig1.s, sig2.s]
-
+      offChainQuote.compactSigs = [compactSig1, compactSig2]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2050,9 +2059,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on too few sigs
-      offChainQuote.v = [sig1.v, sig3.v]
-      offChainQuote.r = [sig1.r, sig3.r]
-      offChainQuote.s = [sig1.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig3]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2060,29 +2067,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on too few sigs
-      offChainQuote.v = [sig2.v, sig3.v]
-      offChainQuote.r = [sig2.r, sig3.r]
-      offChainQuote.s = [sig2.s, sig3.s]
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
-
-      // check revert if signature arrays unequal length
-      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
-      offChainQuote.r = [sig2.r, sig3.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig3.s]
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
-
-      // check revert if signature arrays unequal length
-      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig3.r]
-      offChainQuote.s = [sig2.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig2, compactSig3]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2090,9 +2075,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert if correct number of valid sigs but wrong order
-      offChainQuote.v = [sig2.v, sig1.v, sig3.v]
-      offChainQuote.r = [sig2.r, sig1.r, sig3.r]
-      offChainQuote.s = [sig2.s, sig1.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig2, compactSig1, compactSig3]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -2100,9 +2083,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check borrow tx successful if correct number of valid sigs
-      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig3.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig3]
       const borrowWithOffChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
@@ -2171,7 +2152,6 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       let offChainQuoteWithBadTuples = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2180,7 +2160,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuplesRoot: badQuoteTuplesRoot,
         salt: ZERO_BYTES32,
@@ -2202,6 +2184,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const payloadHash = ethers.utils.keccak256(payload)
       const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
+      const compactSig = sig.compact
       const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
       expect(recoveredAddr).to.equal(lender.address)
 
@@ -2209,9 +2192,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await lenderVault.connect(lender).addSigners([lender.address])
 
       // lender add sig to quote and pass to borrower
-      offChainQuoteWithBadTuples.v = [sig.v]
-      offChainQuoteWithBadTuples.r = [sig.r]
-      offChainQuoteWithBadTuples.s = [sig.s]
+      offChainQuoteWithBadTuples.compactSigs = [compactSig]
 
       // borrower obtains proof for quote tuple idx 0
       let quoteTupleIdx = 0
@@ -2311,7 +2292,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2320,7 +2300,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2436,7 +2418,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2445,7 +2426,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY.mul(360),
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: true
+          isSingleUse: true,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2592,7 +2575,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2601,7 +2583,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY.mul(360),
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: true
+          isSingleUse: true,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2717,7 +2701,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2726,7 +2709,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3038,7 +3023,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: wrappedToken.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -3047,7 +3031,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3397,7 +3383,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -3406,7 +3391,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -3517,7 +3504,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -3526,7 +3512,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32

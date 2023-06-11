@@ -42,8 +42,6 @@ library DataTypesPeerToPeer {
     }
 
     struct GeneralQuoteInfo {
-        // address of a borrower whitelist authority (optional)
-        address whitelistAuthority;
         // address of collateral token
         address collToken;
         // address of loan token
@@ -64,6 +62,11 @@ library DataTypesPeerToPeer {
         // will invalidate quote after one use
         // if false, will be a standing quote
         bool isSingleUse;
+        // whitelist address (optional)
+        address whitelistAddr;
+        // flag indicating whether whitelistAddr refers to a single whitelisted
+        // borrower or to a whitelist authority that can whitelist multiple addresses
+        bool isWhitelistAddrSingleBorrower;
     }
 
     struct OnChainQuote {
@@ -86,10 +89,8 @@ library DataTypesPeerToPeer {
         bytes32 salt;
         // for invalidating multiple parallel quotes in one click
         uint256 nonce;
-        // arrays of necessary parameters for recovering signatures
-        uint8[] v;
-        bytes32[] r;
-        bytes32[] s;
+        // array of compact signatures from vault signers
+        bytes[] compactSigs;
     }
 
     struct LoanRepayInstructions {
