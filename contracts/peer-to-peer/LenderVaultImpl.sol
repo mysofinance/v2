@@ -152,7 +152,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         ) {
             revert Errors.InvalidSendAmount();
         }
-        if (loanAmount < borrowInstructions.minLoanAmount) {
+        if (loanAmount < borrowInstructions.minLoanAmount || loanAmount == 0) {
             revert Errors.TooSmallLoanAmount();
         }
         collReceiver = address(this);

@@ -293,7 +293,11 @@ contract QuoteHandler is IQuoteHandler {
         if (generalQuoteInfo.validUntil < block.timestamp) {
             revert Errors.OutdatedQuote();
         }
-        if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
+        if (
+            generalQuoteInfo.collToken == generalQuoteInfo.loanToken ||
+            generalQuoteInfo.maxLoan == 0 ||
+            generalQuoteInfo.minLoan > generalQuoteInfo.maxLoan
+        ) {
             revert Errors.InvalidQuote();
         }
         if (
@@ -430,6 +434,10 @@ contract QuoteHandler is IQuoteHandler {
             }
         } else {
             // note: if upfrontFee>100% this is invalid
+            return (false, isSwap);
+        }
+
+        if (quoteTuple.loanPerCollUnitOrLtv == 0) {
             return (false, isSwap);
         }
         // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
