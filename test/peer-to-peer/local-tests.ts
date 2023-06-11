@@ -30,7 +30,8 @@ async function generateOffChainQuote({
   generalQuoteInfo = {},
   customSignature = {},
   earliestRepayTenor = 0,
-  minLoan = ONE_USDC.mul(1000)
+  minLoan = ONE_USDC.mul(1000),
+  maxLoan = MAX_UINT256
 }: {
   lenderVault: LenderVaultImpl
   lender: SignerWithAddress
@@ -42,6 +43,7 @@ async function generateOffChainQuote({
   customSignature?: any
   earliestRepayTenor?: any
   minLoan?: any
+  maxLoan?: any
 }) {
   // lenderVault owner gives quote
   const blocknum = await ethers.provider.getBlockNumber()
@@ -103,7 +105,7 @@ async function generateOffChainQuote({
       loanToken: usdc.address,
       oracleAddr: ZERO_ADDRESS,
       minLoan: minLoan,
-      maxLoan: MAX_UINT256,
+      maxLoan: maxLoan,
       validUntil: timestamp + 60,
       earliestRepayTenor: earliestRepayTenor,
       borrowerCompartmentImplementation: ZERO_ADDRESS,
@@ -938,7 +940,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(postLenderBal.sub(preLenderBal)).to.be.equal(preVaultBal.sub(postVaultBal))
     })
 
-    it('Should not proccess with insufficient vault funds', async function () {
+    it('Should not process with insufficient vault funds', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // check that only owner can propose new owner
@@ -1017,7 +1019,7 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   describe('Borrow Gateway', function () {
-    it('Should not proccess with bigger fee than max fee', async function () {
+    it('Should not process with bigger fee than max fee', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       await expect(borrowerGateway.connect(lender).setProtocolFee(0)).to.be.revertedWithCustomError(
@@ -1091,7 +1093,95 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
     })
 
-    it('Should not proccess zero loan amounts', async function () {
+    it('Should not process off-chain quote with invalid min/max loan amount (1/2)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender produces invalid quote off-chain
+      const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        weth,
+        usdc,
+        minLoan: 2,
+        maxLoan: 1
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 0
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // reverts if trying to borrow with quote that would result in zero loan amount
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+    })
+
+    it('Should not process off-chain quote with invalid min/max loan amount (2/2)', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender produces invalid quote off-chain
+      const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        weth,
+        usdc,
+        minLoan: 0,
+        maxLoan: 0
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 0
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // reverts if trying to borrow with quote that would result in zero loan amount
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+    })
+
+    it('Should not process zero loan amounts', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc

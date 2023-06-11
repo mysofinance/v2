@@ -296,7 +296,11 @@ contract QuoteHandler is IQuoteHandler {
         if (generalQuoteInfo.validUntil < block.timestamp) {
             revert Errors.OutdatedQuote();
         }
-        if (generalQuoteInfo.collToken == generalQuoteInfo.loanToken) {
+        if (
+            generalQuoteInfo.collToken == generalQuoteInfo.loanToken ||
+            generalQuoteInfo.maxLoan == 0 ||
+            generalQuoteInfo.minLoan > generalQuoteInfo.maxLoan
+        ) {
             revert Errors.InvalidQuote();
         }
         if (
