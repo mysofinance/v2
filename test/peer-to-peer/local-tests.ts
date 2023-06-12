@@ -411,6 +411,15 @@ describe('Peer-to-Peer: Local Tests', function () {
     // reset address whitelist state
     await addressRegistry.connect(team).setWhitelistState([team.address], 0)
 
+    // check that 2 addresses cannot have the same singleton state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 9)
+    await expect(addressRegistry.connect(team).setWhitelistState([lender.address], 9)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'StateAlreadySet'
+    )
+    // reset address whitelist state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+
     // reverts if nft wrapper contract address is zero
     await expect(
       addressRegistry.connect(team).createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '')

@@ -96,13 +96,14 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             if (addrs[0] == address(0)) {
                 revert Errors.InvalidAddress();
             }
-            _updateSingletonState(
+            _updateSingletonAddr(
                 addrs[0],
                 state,
                 _erc721Wrapper,
                 _erc20Wrapper,
                 _mysoTokenManager
             );
+            whitelistState[addrs[0]] = state;
         } else {
             // note (2/2): all other states can be "occupied" by multiple addresses
             for (uint i = 0; i < addrs.length; i++) {
@@ -112,8 +113,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 if (whitelistState[addrs[i]] == state) {
                     revert Errors.StateAlreadySet();
                 }
-                // reset previous state
-                _resetAddrState(
+                // check if addr was singleton before and delete, if needed
+                _checkAddrAndDeleteIfSingleton(
                     addrs[i],
                     _erc721Wrapper,
                     _erc20Wrapper,
@@ -347,17 +348,25 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 .ERC20_TOKEN_REQUIRING_COMPARTMENT;
     }
 
-    function _updateSingletonState(
+    function _updateSingletonAddr(
         address newAddr,
         DataTypesPeerToPeer.WhitelistState state,
         address _erc721Wrapper,
         address _erc20Wrapper,
         address _mysoTokenManager
     ) internal {
-        if (whitelistState[newAddr] == state) {
+        // check if address already has given state set or
+        // other singleton addresses occupy target state
+        if (
+            whitelistState[newAddr] == state ||
+            whitelistState[_erc721Wrapper] == state ||
+            whitelistState[_erc20Wrapper] == state ||
+            whitelistState[_mysoTokenManager] == state
+        ) {
             revert Errors.StateAlreadySet();
         }
-        _resetAddrState(
+        // check if addr was singleton before and delete, if needed
+        _checkAddrAndDeleteIfSingleton(
             newAddr,
             _erc721Wrapper,
             _erc20Wrapper,
@@ -370,10 +379,9 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         } else {
             mysoTokenManager = newAddr;
         }
-        whitelistState[newAddr] = state;
     }
 
-    function _resetAddrState(
+    function _checkAddrAndDeleteIfSingleton(
         address addr,
         address _erc721Wrapper,
         address _erc20Wrapper,
@@ -386,9 +394,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         } else if (addr == _mysoTokenManager) {
             delete mysoTokenManager;
         }
-        whitelistState[addr] = DataTypesPeerToPeer
-            .WhitelistState
-            .NOT_WHITELISTED;
     }
 
     function _checkSenderAndIsInitialized() internal view {
