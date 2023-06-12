@@ -1194,7 +1194,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should not process zero loan amounts', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1202,6 +1202,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       // lenderVault owner gives quote that results in zero loan amount
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+
       let onChainQuote = {
         generalQuoteInfo: {
           whitelistAuthority: ZERO_ADDRESS,
@@ -1213,7 +1214,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: [
           {
@@ -1225,11 +1228,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         ],
         salt: ZERO_BYTES32
       }
+
       // check invalid on-chain quote cannot bet added
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
