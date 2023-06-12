@@ -60,6 +60,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         if (
             _unsubscribeGracePeriod < Constants.MIN_UNSUBSCRIBE_GRACE_PERIOD ||
+            _unsubscribeGracePeriod > Constants.MAX_UNSUBSCRIBE_GRACE_PERIOD ||
             _conversionGracePeriod < Constants.MIN_CONVERSION_GRACE_PERIOD ||
             _repaymentGracePeriod < Constants.MIN_REPAYMENT_GRACE_PERIOD ||
             _conversionGracePeriod + _repaymentGracePeriod >

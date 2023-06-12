@@ -26,6 +26,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const MIN_ARRANGER_FEE = BASE.mul(5).div(10000) // 5bps
 const MAX_ARRANGER_FEE = BASE.mul(5).div(10) // 50%
 const MIN_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY
+const MAX_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY.mul(14)
 const LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 60 * 60 // 1h
 const MIN_TIME_BETWEEN_DUE_DATES = ONE_DAY.mul(7)
 const MIN_CONVERSION_GRACE_PERIOD = ONE_DAY
@@ -329,6 +330,20 @@ describe('Peer-to-Pool: Local Tests', function () {
           MIN_ARRANGER_FEE,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_REPAYMENT_GRACE_PERIOD).add(1),
+          MIN_REPAYMENT_GRACE_PERIOD
+        )
+    ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
+    // revert on too long unsubscribe grace period
+    await expect(
+      factory
+        .connect(arranger)
+        .createLoanProposal(
+          fundingPool.address,
+          daoToken.address,
+          ADDRESS_ZERO,
+          MIN_ARRANGER_FEE,
+          MAX_UNSUBSCRIBE_GRACE_PERIOD.add(1),
+          MIN_CONVERSION_GRACE_PERIOD,
           MIN_REPAYMENT_GRACE_PERIOD
         )
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
