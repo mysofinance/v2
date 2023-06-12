@@ -437,6 +437,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     let firstDueDate = ethers.BigNumber.from(timestamp)
       .add(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD)
+      .add(UNSUBSCRIBE_GRACE_PERIOD)
       .add(LOAN_EXECUTION_GRACE_PERIOD)
       .add(MIN_TIME_UNTIL_FIRST_DUE_DATE)
       .add(60) // +60s
@@ -798,6 +799,61 @@ describe('Peer-to-Pool: Local Tests', function () {
     // check updated loan proposal status
     dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(3)
+  })
+
+  it('Should handle accept loan terms edge case correctly', async function () {
+    const { fundingPool, factory, daoToken, arranger, daoTreasury, usdc, lender1, lender2, lender3 } = await setupTest()
+    // arranger creates loan proposal
+    const loanProposal = await createLoanProposal(
+      factory,
+      arranger,
+      fundingPool.address,
+      daoToken.address,
+      ADDRESS_ZERO,
+      REL_ARRANGER_FEE,
+      UNSUBSCRIBE_GRACE_PERIOD,
+      CONVERSION_GRACE_PERIOD,
+      REPAYMENT_GRACE_PERIOD
+    )
+
+    // add some loan terms
+    const loanTerms = await getDummyLoanTerms(daoTreasury.address)
+
+    // get current time
+    let blocknum = await ethers.provider.getBlockNumber()
+    let timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+
+    // make first due date as close as possible (add 15s buffer)
+    loanTerms.repaymentSchedule[0].dueTimestamp = ethers.BigNumber.from(timestamp)
+      .add(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD)
+      .add(UNSUBSCRIBE_GRACE_PERIOD)
+      .add(LOAN_EXECUTION_GRACE_PERIOD)
+      .add(MIN_TIME_UNTIL_FIRST_DUE_DATE)
+      .add(15)
+    loanTerms.repaymentSchedule[1].dueTimestamp = loanTerms.repaymentSchedule[0].dueTimestamp.add(MIN_TIME_BETWEEN_DUE_DATES)
+    loanTerms.repaymentSchedule[2].dueTimestamp = loanTerms.repaymentSchedule[1].dueTimestamp.add(MIN_TIME_BETWEEN_DUE_DATES)
+    loanTerms.repaymentSchedule[3].dueTimestamp = loanTerms.repaymentSchedule[2].dueTimestamp.add(MIN_TIME_BETWEEN_DUE_DATES)
+
+    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
+
+    // check status updated correctly
+    let dynamicData = await loanProposal.dynamicData()
+    expect(dynamicData.status).to.be.equal(1)
+
+    // add lender subscriptions
+    await addSubscriptionsToLoanProposal(lender1, lender2, lender3, usdc, fundingPool, loanProposal)
+
+    // move forward past loan terms update cool off period
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
+    // dao accepts
+    await loanProposal.connect(daoTreasury).acceptLoanTerms(lastLoanTermsUpdateTime)
+    // check status updated correctly
+    dynamicData = await loanProposal.dynamicData()
+    expect(dynamicData.status).to.be.equal(2)
   })
 
   it('Should handle lender whitelist correctly', async function () {

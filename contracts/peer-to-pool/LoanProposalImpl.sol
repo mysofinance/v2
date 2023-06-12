@@ -134,10 +134,20 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.WaitForLoanTermsCoolOffPeriod();
         }
+        // once cool off period has passed, check if "remaining" time until
+        // first due date is "sufficiently" far enough in the future
+        if (
+            _loanTerms.repaymentSchedule[0].dueTimestamp <
+            block.timestamp +
+                staticData.unsubscribeGracePeriod +
+                Constants.LOAN_EXECUTION_GRACE_PERIOD +
+                Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
+        ) {
+            revert Errors.FirstDueDateTooCloseOrPassed();
+        }
         if (_loanTermsUpdateTime != lastLoanTermsUpdateTime) {
             revert Errors.InconsistentLastLoanTermsUpdateTime();
         }
-        _repaymentScheduleCheck(_loanTerms.repaymentSchedule);
         uint256 totalSubscriptions = IFundingPoolImpl(staticData.fundingPool)
             .totalSubscriptions(address(this));
         // check if resulting final loan amount
@@ -625,6 +635,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             repaymentSchedule[0].dueTimestamp <
             block.timestamp +
                 Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD +
+                staticData.unsubscribeGracePeriod +
                 Constants.LOAN_EXECUTION_GRACE_PERIOD +
                 Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
         ) {
