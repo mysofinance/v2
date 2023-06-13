@@ -42,6 +42,8 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const YEAR_IN_SECONDS = 31_536_000
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
+const UNI_V3_SWAP_ROUTER = '0xE592427A0AEce92De3Edee1F18E0157C05861564'
+const BALANCER_V2_VAULT = '0xBA12222222228d8Ba445958a75a0704d566BF2C8'
 
 function getLoopingSendAmount(
   collTokenFromBorrower: number,
@@ -1802,9 +1804,24 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackAddr,
         callbackData
       }
+
+      // pre callback allowances
+      let preWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+      let preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // post callback allowances
+      let postWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+      let postUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+
+      // check callback allowances are zero
+      expect(preWethAllowance).to.be.equal(0)
+      expect(preUsdcAllowance).to.be.equal(0)
+      expect(postWethAllowance).to.be.equal(0)
+      expect(postUsdcAllowance).to.be.equal(0)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -1832,6 +1849,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmountBn).div(ONE_WETH)
       )
 
+      // pre callback allowances
+      preWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+      preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+
       // check repay
       const loan = await lenderVault.loan(0)
       const minSwapReceiveLoanToken = 0
@@ -1851,6 +1872,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           callbackDataRepay
         )
       )
+
+      // post callback allowances
+      postWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+      postUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
+
+      // check callback allowances are zero
+      expect(preWethAllowance).to.be.equal(0)
+      expect(preUsdcAllowance).to.be.equal(0)
+      expect(postWethAllowance).to.be.equal(0)
+      expect(postUsdcAllowance).to.be.equal(0)
     })
 
     it('Should handle looping via Balancer correctly', async function () {
@@ -1923,11 +1954,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const loanPerColl =
         Number(onChainQuote.quoteTuples[0].loanPerCollUnitOrLtv.mul(PRECISION).div(ONE_USDC).toString()) / PRECISION
       const swapFee = Number((await balancerV2Pool.getSwapFeePercentage()).mul(PRECISION).div(BASE).toString()) / PRECISION
-      const balancerV2Vault = await new ethers.Contract(
-        '0xBA12222222228d8Ba445958a75a0704d566BF2C8',
-        balancerV2VaultAbi,
-        team
-      ) // could be any signer, here used team
+      const balancerV2Vault = await new ethers.Contract(BALANCER_V2_VAULT, balancerV2VaultAbi, team) // could be any signer, here used team
       const balancerV2PoolTokens = await balancerV2Vault.getPoolTokens(poolId)
       const collTokenInDexPool =
         Number(
@@ -2019,9 +2046,23 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           )
       ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
+      // pre callback allowances
+      let preWethAllowance = await weth.allowance(callbackAddr, BALANCER_V2_VAULT)
+      let preUsdcAllowance = await usdc.allowance(callbackAddr, BALANCER_V2_VAULT)
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // post callback allowances
+      let postWethAllowance = await weth.allowance(callbackAddr, BALANCER_V2_VAULT)
+      let postUsdcAllowance = await usdc.allowance(callbackAddr, BALANCER_V2_VAULT)
+
+      // check callback allowances are zero
+      expect(preWethAllowance).to.be.equal(0)
+      expect(preUsdcAllowance).to.be.equal(0)
+      expect(postWethAllowance).to.be.equal(0)
+      expect(postUsdcAllowance).to.be.equal(0)
 
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
@@ -3098,6 +3139,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         )
       ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
+      // pre callback allowances
+      let preCollAllowance = await collInstance.allowance(callbackAddr, BALANCER_V2_VAULT)
+      let preLoanAllowance = await weth.allowance(callbackAddr, BALANCER_V2_VAULT)
+
       // partial repay
       await expect(
         borrowerGateway.connect(borrower).repay(
@@ -3113,6 +3158,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
         .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, partialRepayAmount)
+
+      // post callback allowances
+      let postCollAllowance = await collInstance.allowance(callbackAddr, BALANCER_V2_VAULT)
+      let postLoanAllowance = await weth.allowance(callbackAddr, BALANCER_V2_VAULT)
+
+      // check allowances are zero
+      expect(preCollAllowance).to.be.equal(0)
+      expect(preLoanAllowance).to.be.equal(0)
+      expect(postCollAllowance).to.be.equal(0)
+      expect(postLoanAllowance).to.be.equal(0)
 
       // check balance post repay
       const borrowerCollBalPostRepay = await collInstance.balanceOf(borrower.address)

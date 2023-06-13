@@ -55,7 +55,10 @@ contract BalancerV2Looping is VaultCallback {
         );
         IERC20Metadata(loan.loanToken).safeDecreaseAllowance(
             BALANCER_V2_VAULT,
-            0
+            IERC20Metadata(loan.loanToken).allowance(
+                address(this),
+                BALANCER_V2_VAULT
+            )
         );
     }
 
@@ -97,7 +100,10 @@ contract BalancerV2Looping is VaultCallback {
         );
         IERC20Metadata(loan.collToken).safeDecreaseAllowance(
             BALANCER_V2_VAULT,
-            0
+            IERC20Metadata(loan.collToken).allowance(
+                address(this),
+                BALANCER_V2_VAULT
+            )
         );
     }
 }

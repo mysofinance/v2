@@ -43,7 +43,10 @@ contract UniV3Looping is VaultCallback {
         ISwapRouter(UNI_V3_SWAP_ROUTER).exactInputSingle(params);
         IERC20Metadata(loan.loanToken).safeDecreaseAllowance(
             UNI_V3_SWAP_ROUTER,
-            0
+            IERC20Metadata(loan.loanToken).allowance(
+                address(this),
+                UNI_V3_SWAP_ROUTER
+            )
         );
     }
 
@@ -76,7 +79,10 @@ contract UniV3Looping is VaultCallback {
         ISwapRouter(UNI_V3_SWAP_ROUTER).exactInputSingle(params);
         IERC20Metadata(loan.collToken).safeDecreaseAllowance(
             UNI_V3_SWAP_ROUTER,
-            0
+            IERC20Metadata(loan.collToken).allowance(
+                address(this),
+                UNI_V3_SWAP_ROUTER
+            )
         );
     }
 }
