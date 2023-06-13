@@ -22,6 +22,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
     address public immutable addressRegistry;
     address public immutable wrappedErc20Impl;
     address[] public tokensCreated;
+    uint256 public numTokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc20Impl) {
         if (_wrappedErc20Impl == address(0)) {
@@ -45,7 +46,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         }
         newErc20Addr = Clones.cloneDeterministic(
             wrappedErc20Impl,
-            keccak256(abi.encodePacked(tokensCreated.length))
+            keccak256(abi.encodePacked(numTokensCreated++))
         );
         uint256 minTokenAmount = type(uint256).max;
         bool isIOU = tokensToBeWrapped.length == 0;

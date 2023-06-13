@@ -18,4 +18,10 @@ interface IERC721Wrapper {
         string calldata name,
         string calldata symbol
     ) external returns (address);
+
+    /**
+     * @notice Returns the number of tokens created
+     * @return numTokens Number of tokens created
+     */
+    function numTokensCreated() external view returns (uint256 numTokens);
 }
