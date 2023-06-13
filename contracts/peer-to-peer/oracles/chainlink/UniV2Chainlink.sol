@@ -16,14 +16,14 @@ import {Errors} from "../../../Errors.sol";
  * should only be utilized with eth based oracles, not usd-based oracles
  */
 contract UniV2Chainlink is IOracle, ChainlinkBasic {
-    uint256 public immutable tolerance; // 5% tolerance must be an integer less than 100 and greater than 0
+    uint256 internal immutable _tolerance; // tolerance must be an integer less than 100 and greater than 0
     mapping(address => bool) public isLpToken;
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _lpAddrs,
-        uint256 _tolerance
+        uint256 _toleranceAmount
     )
         ChainlinkBasic(
             _tokenAddrs,
@@ -35,10 +35,10 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         if (_lpAddrs.length == 0) {
             revert Errors.InvalidArrayLength();
         }
-        if (_tolerance >= 100 || _tolerance == 0) {
+        if (_toleranceAmount >= 100 || _toleranceAmount == 0) {
             revert Errors.InvalidOracleTolerance();
         }
-        tolerance = _tolerance;
+        _tolerance = _toleranceAmount;
         for (uint i = 0; i < _lpAddrs.length; ) {
             if (_lpAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
@@ -143,8 +143,8 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             priceToken0;
 
         if (
-            priceFromReserves > ((100 + tolerance) * priceFromOracle) / 100 ||
-            priceFromReserves < ((100 - tolerance) * priceFromOracle) / 100
+            priceFromReserves > ((100 + _tolerance) * priceFromOracle) / 100 ||
+            priceFromReserves < ((100 - _tolerance) * priceFromOracle) / 100
         ) {
             revert Errors.ReserveRatiosSkewedFromOraclePrice();
         }
