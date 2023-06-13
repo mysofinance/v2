@@ -208,7 +208,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     // deploy balancer v2 callbacks
     const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
     await BalancerV2Looping.connect(lender)
-    const balancerV2Looping = await BalancerV2Looping.deploy()
+    const balancerV2Looping = await BalancerV2Looping.deploy(borrowerGateway.address)
     await balancerV2Looping.deployed()
 
     // whitelist addrs
@@ -308,7 +308,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     // deploy uni v3 callback
     const UniV3Looping = await ethers.getContractFactory('UniV3Looping')
     await UniV3Looping.connect(lender)
-    const uniV3Looping = await UniV3Looping.deploy()
+    const uniV3Looping = await UniV3Looping.deploy(borrowerGateway.address)
     await uniV3Looping.deployed()
 
     // whitelist addrs

@@ -51,7 +51,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
             revert Errors.IncorrectGaugeForLpToken();
         }
         liqGaugeAddr = _liqGaugeAddr;
-        IERC20(loan.collToken).approve(_liqGaugeAddr, amount);
+        IERC20(loan.collToken).safeIncreaseAllowance(_liqGaugeAddr, amount);
         IStakingHelper(_liqGaugeAddr).deposit(amount);
         emit Staked(gaugeIndex, liqGaugeAddr, amount);
     }

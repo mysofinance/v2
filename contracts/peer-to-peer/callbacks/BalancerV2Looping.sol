@@ -4,17 +4,20 @@ pragma solidity ^0.8.19;
 
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
-import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
-import {IBalancerAsset} from "../interfaces/callbacks/IBalancerAsset.sol";
 import {BalancerDataTypes} from "../interfaces/callbacks/BalancerDataTypes.sol";
+import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
+import {VaultCallback} from "./VaultCallback.sol";
+import {IBalancerAsset} from "../interfaces/callbacks/IBalancerAsset.sol";
 import {IBalancerVault} from "../interfaces/callbacks/IBalancerVault.sol";
+import {IVaultCallback} from "../interfaces/IVaultCallback.sol";
 
-contract BalancerV2Looping is IVaultCallback {
+contract BalancerV2Looping is VaultCallback {
     using SafeERC20 for IERC20Metadata;
 
     address private constant BALANCER_V2_VAULT =
         0xBA12222222228d8Ba445958a75a0704d566BF2C8;
+
+    constructor(address _borrowerGateway) VaultCallback(_borrowerGateway) {}
 
     function borrowCallback(
         DataTypesPeerToPeer.Loan calldata loan,
@@ -31,8 +34,6 @@ contract BalancerV2Looping is IVaultCallback {
             data,
             (bytes32, uint256, uint256)
         );
-        // underflow if loan token transfer fees from vault to callbackAddr...?
-        // maybe need a loanTokenBalBefore var passed in?
         BalancerDataTypes.SingleSwap memory singleSwap = BalancerDataTypes
             .SingleSwap({
                 poolId: poolId,
@@ -42,8 +43,7 @@ contract BalancerV2Looping is IVaultCallback {
                 amount: loan.initLoanAmount,
                 userData: "0x"
             });
-        IERC20Metadata(loan.loanToken).approve(BALANCER_V2_VAULT, 0);
-        IERC20Metadata(loan.loanToken).approve(
+        IERC20Metadata(loan.loanToken).safeIncreaseAllowance(
             BALANCER_V2_VAULT,
             loan.initLoanAmount
         );
@@ -53,13 +53,16 @@ contract BalancerV2Looping is IVaultCallback {
             minSwapReceive,
             deadline
         );
-        IERC20Metadata(loan.loanToken).approve(BALANCER_V2_VAULT, 0);
+        IERC20Metadata(loan.loanToken).safeDecreaseAllowance(
+            BALANCER_V2_VAULT,
+            0
+        );
     }
 
-    function repayCallback(
+    function _repayCallback(
         DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
-    ) external {
+    ) internal override {
         BalancerDataTypes.FundManagement
             memory fundManagement = BalancerDataTypes.FundManagement({
                 sender: address(this), // swap payer
@@ -82,14 +85,19 @@ contract BalancerV2Looping is IVaultCallback {
                 amount: collBalance,
                 userData: "0x"
             });
-        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, 0);
-        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, collBalance);
+        IERC20Metadata(loan.collToken).safeIncreaseAllowance(
+            BALANCER_V2_VAULT,
+            collBalance
+        );
         IBalancerVault(BALANCER_V2_VAULT).swap(
             singleSwap,
             fundManagement,
             minSwapReceive,
             deadline
         );
-        IERC20Metadata(loan.collToken).approve(BALANCER_V2_VAULT, 0);
+        IERC20Metadata(loan.collToken).safeDecreaseAllowance(
+            BALANCER_V2_VAULT,
+            0
+        );
     }
 }
