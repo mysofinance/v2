@@ -169,7 +169,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         }
         isRegisteredVault[addr] = true;
         _registeredVaults.push(addr);
-        numRegisteredVaults++;
+        ++numRegisteredVaults;
     }
 
     function claimBorrowerWhitelistStatus(
