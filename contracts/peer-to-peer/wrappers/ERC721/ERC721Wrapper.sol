@@ -21,7 +21,6 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
     address public immutable addressRegistry;
     address public immutable wrappedErc721Impl;
     address[] public tokensCreated;
-    uint256 public numTokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc721Impl) {
         if (_wrappedErc721Impl == address(0)) {
@@ -46,7 +45,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         if (tokensToBeWrapped.length == 0) {
             revert Errors.InvalidArrayLength();
         }
-        bytes32 salt = keccak256(abi.encodePacked(numTokensCreated++));
+        bytes32 salt = keccak256(abi.encodePacked(tokensCreated.length));
         newErc20Addr = Clones.cloneDeterministic(wrappedErc721Impl, salt);
         address prevNftAddress;
         address currNftAddress;
