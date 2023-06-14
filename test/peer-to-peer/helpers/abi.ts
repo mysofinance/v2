@@ -69,6 +69,16 @@ const collTokenAbi = [
     type: 'function'
   },
   {
+    name: 'allowance',
+    outputs: [{ type: 'uint256', name: '' }],
+    inputs: [
+      { type: 'address', name: 'owner' },
+      { type: 'address', name: 'spender' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     name: 'approve',
     outputs: [{ type: 'bool', name: '' }],
     inputs: [
