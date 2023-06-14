@@ -99,13 +99,14 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function updateLoanInfo(
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount,
+        uint128 collAmount,
         address collTokenCompartmentAddr,
         address collToken
     ) external {
         _senderCheckGateway();
 
         _loans[loanId].amountRepaidSoFar += repayAmount;
+        _loans[loanId].amountReclaimedSoFar += collAmount;
 
         // only update lockedAmounts when no compartment
         if (collTokenCompartmentAddr == address(0)) {

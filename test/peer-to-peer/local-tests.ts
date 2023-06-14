@@ -456,6 +456,9 @@ describe('Peer-to-Peer: Local Tests', function () {
     const usdc = await USDC.deploy('USDC', 'USDC', 6)
     await usdc.deployed()
 
+    const usdc2 = await USDC.deploy('USDC', 'USDC', 6)
+    await usdc2.deployed()
+
     const WETH = await MyERC20.connect(team)
     const weth = await WETH.deploy('WETH', 'WETH', 18)
     await weth.deployed()
@@ -477,7 +480,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       addressRegistry,
       'InvalidSender'
     )
-    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address, usdc2.address], 1)
     await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 1)).to.be.revertedWithCustomError(
       addressRegistry,
       'InvalidAddress'
@@ -506,6 +509,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       signer2: sortedAddrs[1],
       signer3: sortedAddrs[2],
       usdc,
+      usdc2,
       weth,
       lenderVault,
       wrappedERC721Implementation,
@@ -3374,31 +3378,30 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
   })
 
-  describe('Swap Testing (Edge Case for Loans with upfrontfee=100% and tenor=0)', function () {
-    it('Should handle on-chain swap quotes correctly (1/2)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+  describe('Edge Case Testing', function () {
+    it('Should handle case correctly where borrower partially repays "almost" full loan amount', async function () {
+      const { borrowerGateway, quoteHandler, lender, borrower, usdc, usdc2, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
-      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+      await usdc.mint(lenderVault.address, ONE_USDC.mul(1000000000))
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const buyPricePerCollToken = ONE_USDC.mul(1869)
       let quoteTuples = [
         {
-          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000000),
           interestRatePctInBase: 0,
-          upfrontFeePctInBase: BASE,
-          tenor: 0
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
         }
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          collToken: weth.address,
+          collToken: usdc2.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
-          minLoan: ONE_USDC.mul(1000),
+          minLoan: 0,
           maxLoan: MAX_UINT256,
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
@@ -3416,366 +3419,472 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      // check balance pre borrow
-      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
-      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
-      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
-      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
-      const numLoansPre = await lenderVault.totalNumLoans()
-      const lockedAmountsWethPre = await lenderVault.lockedAmounts(weth.address)
-      const lockedAmountsUsdcPre = await lenderVault.lockedAmounts(usdc.address)
-
-      // borrower approves gateway and executes quote
-      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const sellAmountOfCollToken = ONE_WETH
+      // prepare borrow params
+      const collTokenSendAmount = ONE_USDC.mul(1000)
       const expectedTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
-        collSendAmount: sellAmountOfCollToken,
+        collSendAmount: collTokenSendAmount,
         expectedTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
+      // mint coll tokens, approve gateway and execute quote
+      await usdc2.mint(borrower.address, collTokenSendAmount)
+      await usdc2.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
-      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
-      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
-      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
-      const numLoansPost = await lenderVault.totalNumLoans()
-      const lockedAmountsWethPost = await lenderVault.lockedAmounts(weth.address)
-      const lockedAmountsUsdcPost = await lenderVault.lockedAmounts(usdc.address)
 
-      // check balance post borrow
-      expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
-      expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(sellAmountOfCollToken)
-      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
-      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(
-        buyPricePerCollToken.mul(sellAmountOfCollToken).div(ONE_WETH)
+      // approve loan token
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // check amountReclaimedSoFar on loan pre repay
+      let loan = await lenderVault.loan(0)
+      expect(loan.amountReclaimedSoFar).to.be.equal(0)
+
+      // do partial repay of close to full loan amount
+      const repayAmount1 = ONE_USDC.mul(1000000000).sub(999999)
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: 0,
+          targetRepayAmount: repayAmount1,
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
       )
 
-      // check no change in locked amounts
-      expect(lockedAmountsWethPost).to.equal(lockedAmountsWethPre)
-      expect(lockedAmountsWethPost).to.equal(0)
-      expect(lockedAmountsUsdcPost).to.equal(lockedAmountsUsdcPre)
-      expect(lockedAmountsUsdcPost).to.equal(0)
+      // check amountReclaimedSoFar on loan after 1st repay
+      loan = await lenderVault.loan(0)
+      expect(loan.amountReclaimedSoFar).to.be.equal(999999999)
 
-      // check no loan was pushed
-      expect(numLoansPost).to.equal(numLoansPre)
-      expect(numLoansPost).to.equal(0)
-
-      // check no repay possible
-      await expect(
-        borrowerGateway.connect(borrower).repay(
-          {
-            targetLoanId: 0,
-            targetRepayAmount: buyPricePerCollToken,
-            expectedTransferFee: 0
-          },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
-        )
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
-
-      // check lender can unlock swapped amount (=upfront fee) immediately
-      const userWethBalPreWithdraw = await weth.balanceOf(lender.address)
-      const vaultWethBalPreWithdraw = await weth.balanceOf(lenderVault.address)
-      await lenderVault.connect(lender).withdraw(weth.address, sellAmountOfCollToken)
-      const userWethBalPostWithdraw = await weth.balanceOf(lender.address)
-      const vaultWethBalPostWithdraw = await weth.balanceOf(lenderVault.address)
-      expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(
-        vaultWethBalPreWithdraw.sub(vaultWethBalPostWithdraw)
+      // do partial repay of close to full loan amount
+      const repayAmount2 = 999999
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: 0,
+          targetRepayAmount: repayAmount2,
+          expectedTransferFee: 0
+        },
+        lenderVault.address,
+        callbackAddr,
+        callbackData
       )
-      expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(sellAmountOfCollToken)
+
+      // check amountReclaimedSoFar on loan after final repay
+      loan = await lenderVault.loan(0)
+      expect(loan.amountReclaimedSoFar).to.be.equal(1000000000)
     })
 
-    it('Should handle on-chain swap quotes correctly (2/2)', async function () {
-      const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
-        await setupTest()
+    describe('Swap Testing (Edge Case for Loans with upfrontfee=100% and tenor=0)', function () {
+      it('Should handle on-chain swap quotes correctly (1/2)', async function () {
+        const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
-      // lenderVault owner deposits usdc
-      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
-      // lenderVault owner gives quote
-      const blocknum = await ethers.provider.getBlockNumber()
-      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      const buyPricePerCollToken = ONE_USDC.mul(1869)
-      let quoteTuples = [
-        {
+        // lenderVault owner gives quote
+        const blocknum = await ethers.provider.getBlockNumber()
+        const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+        const buyPricePerCollToken = ONE_USDC.mul(1869)
+        let quoteTuples = [
+          {
+            loanPerCollUnitOrLtv: buyPricePerCollToken,
+            interestRatePctInBase: 0,
+            upfrontFeePctInBase: BASE,
+            tenor: 0
+          }
+        ]
+        let onChainQuote = {
+          generalQuoteInfo: {
+            collToken: weth.address,
+            loanToken: usdc.address,
+            oracleAddr: ZERO_ADDRESS,
+            minLoan: ONE_USDC.mul(1000),
+            maxLoan: MAX_UINT256,
+            validUntil: timestamp + 60,
+            earliestRepayTenor: 0,
+            borrowerCompartmentImplementation: ZERO_ADDRESS,
+            isSingleUse: false,
+            whitelistAddr: ZERO_ADDRESS,
+            isWhitelistAddrSingleBorrower: false
+          },
+          quoteTuples: quoteTuples,
+          salt: ZERO_BYTES32
+        }
+
+        await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+          quoteHandler,
+          'OnChainQuoteAdded'
+        )
+
+        // check balance pre borrow
+        const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+        const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+        const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+        const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+        const numLoansPre = await lenderVault.totalNumLoans()
+        const lockedAmountsWethPre = await lenderVault.lockedAmounts(weth.address)
+        const lockedAmountsUsdcPre = await lenderVault.lockedAmounts(usdc.address)
+
+        // borrower approves gateway and executes quote
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const sellAmountOfCollToken = ONE_WETH
+        const expectedTransferFee = 0
+        const quoteTupleIdx = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount: sellAmountOfCollToken,
+          expectedTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData
+        }
+        await borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+        const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+        const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+        const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+        const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+        const numLoansPost = await lenderVault.totalNumLoans()
+        const lockedAmountsWethPost = await lenderVault.lockedAmounts(weth.address)
+        const lockedAmountsUsdcPost = await lenderVault.lockedAmounts(usdc.address)
+
+        // check balance post borrow
+        expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
+        expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(sellAmountOfCollToken)
+        expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+        expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(
+          buyPricePerCollToken.mul(sellAmountOfCollToken).div(ONE_WETH)
+        )
+
+        // check no change in locked amounts
+        expect(lockedAmountsWethPost).to.equal(lockedAmountsWethPre)
+        expect(lockedAmountsWethPost).to.equal(0)
+        expect(lockedAmountsUsdcPost).to.equal(lockedAmountsUsdcPre)
+        expect(lockedAmountsUsdcPost).to.equal(0)
+
+        // check no loan was pushed
+        expect(numLoansPost).to.equal(numLoansPre)
+        expect(numLoansPost).to.equal(0)
+
+        // check no repay possible
+        await expect(
+          borrowerGateway.connect(borrower).repay(
+            {
+              targetLoanId: 0,
+              targetRepayAmount: buyPricePerCollToken,
+              expectedTransferFee: 0
+            },
+            lenderVault.address,
+            callbackAddr,
+            callbackData
+          )
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
+
+        // check lender can unlock swapped amount (=upfront fee) immediately
+        const userWethBalPreWithdraw = await weth.balanceOf(lender.address)
+        const vaultWethBalPreWithdraw = await weth.balanceOf(lenderVault.address)
+        await lenderVault.connect(lender).withdraw(weth.address, sellAmountOfCollToken)
+        const userWethBalPostWithdraw = await weth.balanceOf(lender.address)
+        const vaultWethBalPostWithdraw = await weth.balanceOf(lenderVault.address)
+        expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(
+          vaultWethBalPreWithdraw.sub(vaultWethBalPostWithdraw)
+        )
+        expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(sellAmountOfCollToken)
+      })
+
+      it('Should handle on-chain swap quotes correctly (2/2)', async function () {
+        const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+          await setupTest()
+
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+        // lenderVault owner gives quote
+        const blocknum = await ethers.provider.getBlockNumber()
+        const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+        const buyPricePerCollToken = ONE_USDC.mul(1869)
+        let quoteTuples = [
+          {
+            loanPerCollUnitOrLtv: buyPricePerCollToken,
+            interestRatePctInBase: 0,
+            upfrontFeePctInBase: BASE,
+            tenor: 0
+          }
+        ]
+        let onChainQuote = {
+          generalQuoteInfo: {
+            collToken: weth.address,
+            loanToken: usdc.address,
+            oracleAddr: ZERO_ADDRESS,
+            minLoan: ONE_USDC.mul(1000),
+            maxLoan: MAX_UINT256,
+            validUntil: timestamp + 60,
+            earliestRepayTenor: 0,
+            borrowerCompartmentImplementation: ZERO_ADDRESS,
+            isSingleUse: false,
+            whitelistAddr: ZERO_ADDRESS,
+            isWhitelistAddrSingleBorrower: false
+          },
+          quoteTuples: quoteTuples,
+          salt: ZERO_BYTES32
+        }
+
+        // should revert with bad swap on-chain quote (tenor != 0)
+        onChainQuote.quoteTuples[0].tenor = 1
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (earliest repay != 0)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 1
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (tenor and earliest repay != 0)
+        onChainQuote.quoteTuples[0].tenor = 1
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 1
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (upfrontfee < 100%)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.mul(0)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (upfrontfee < 100%)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.div(10)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (upfrontfee > 100%)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.add(1)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (compartment address != 0x)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = team.address
+        // set dummy compartment to test revert when trying to add swap-quote with compartment
+        await addressRegistry.connect(team).setWhitelistState([team.address], 3)
+        await addressRegistry.connect(team).setAllowedTokensForCompartment(team.address, [weth.address], true)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+        await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+        await addressRegistry.connect(team).setAllowedTokensForCompartment(team.address, [weth.address], false)
+
+        // should revert if trying to add "mixed" quote tuples, where some correspond to loans and some to swaps
+        // with potentially incompatible compartment requirements
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+        onChainQuote.quoteTuples.push({
           loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE.sub(1),
+          tenor: Number(ONE_DAY.toString())
+        })
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert if trying to add multiple swap quotes (no need to have multiple
+        // swap quotes with different prices because takers would always take the cheaper one)
+        onChainQuote.quoteTuples.pop()
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+        onChainQuote.quoteTuples.push({
+          loanPerCollUnitOrLtv: buyPricePerCollToken.sub(1),
           interestRatePctInBase: 0,
           upfrontFeePctInBase: BASE,
           tenor: 0
+        })
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should pass with valid swap on-chain quote
+        onChainQuote.quoteTuples.pop()
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+        await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const sellAmountOfCollToken = ONE_WETH
+        const expectedTransferFee = 0
+        const quoteTupleIdx = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount: sellAmountOfCollToken,
+          expectedTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData
         }
-      ]
-      let onChainQuote = {
-        generalQuoteInfo: {
-          collToken: weth.address,
-          loanToken: usdc.address,
-          oracleAddr: ZERO_ADDRESS,
-          minLoan: ONE_USDC.mul(1000),
-          maxLoan: MAX_UINT256,
-          validUntil: timestamp + 60,
-          earliestRepayTenor: 0,
-          borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false,
-          whitelistAddr: ZERO_ADDRESS,
-          isWhitelistAddrSingleBorrower: false
-        },
-        quoteTuples: quoteTuples,
-        salt: ZERO_BYTES32
-      }
-
-      // should revert with bad swap on-chain quote (tenor != 0)
-      onChainQuote.quoteTuples[0].tenor = 1
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should revert with bad swap on-chain quote (earliest repay != 0)
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 1
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should revert with bad swap on-chain quote (tenor and earliest repay != 0)
-      onChainQuote.quoteTuples[0].tenor = 1
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 1
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should revert with bad swap on-chain quote (upfrontfee < 100%)
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
-      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.mul(0)
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should revert with bad swap on-chain quote (upfrontfee < 100%)
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
-      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.div(10)
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should revert with bad swap on-chain quote (upfrontfee > 100%)
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
-      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.add(1)
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should revert with bad swap on-chain quote (compartment address != 0x)
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
-      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
-      onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = team.address
-      // set dummy compartment to test revert when trying to add swap-quote with compartment
-      await addressRegistry.connect(team).setWhitelistState([team.address], 3)
-      await addressRegistry.connect(team).setAllowedTokensForCompartment(team.address, [weth.address], true)
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-      await addressRegistry.connect(team).setWhitelistState([team.address], 0)
-      await addressRegistry.connect(team).setAllowedTokensForCompartment(team.address, [weth.address], false)
-
-      // should revert if trying to add "mixed" quote tuples, where some correspond to loans and some to swaps
-      // with potentially incompatible compartment requirements
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
-      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
-      onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
-      onChainQuote.quoteTuples.push({
-        loanPerCollUnitOrLtv: buyPricePerCollToken,
-        interestRatePctInBase: 0,
-        upfrontFeePctInBase: BASE.sub(1),
-        tenor: Number(ONE_DAY.toString())
-      })
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should revert if trying to add multiple swap quotes (no need to have multiple
-      // swap quotes with different prices because takers would always take the cheaper one)
-      onChainQuote.quoteTuples.pop()
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
-      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
-      onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
-      onChainQuote.quoteTuples.push({
-        loanPerCollUnitOrLtv: buyPricePerCollToken.sub(1),
-        interestRatePctInBase: 0,
-        upfrontFeePctInBase: BASE,
-        tenor: 0
-      })
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // should pass with valid swap on-chain quote
-      onChainQuote.quoteTuples.pop()
-      onChainQuote.quoteTuples[0].tenor = 0
-      onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
-      onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
-      onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
-      await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
-      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const sellAmountOfCollToken = ONE_WETH
-      const expectedTransferFee = 0
-      const quoteTupleIdx = 0
-      const callbackAddr = ZERO_ADDRESS
-      const callbackData = ZERO_BYTES32
-      const borrowInstructions = {
-        collSendAmount: sellAmountOfCollToken,
-        expectedTransferFee,
-        deadline: MAX_UINT256,
-        minLoanAmount: 0,
-        callbackAddr,
-        callbackData
-      }
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.emit(lenderVault, 'QuoteProcessed')
-    })
-
-    it('Should handle off-chain swap quotes correctly (1/2)', async function () {
-      const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
-
-      // lenderVault owner deposits usdc
-      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
-      // lender produces template off-chain quote (incl swap quote tuples)
-      const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
-        lenderVault,
-        lender,
-        whitelistAuthority: ZERO_ADDRESS,
-        weth,
-        usdc
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+        ).to.emit(lenderVault, 'QuoteProcessed')
       })
 
-      // borrower approves gateway and executes quote
-      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
-      const callbackAddr = ZERO_ADDRESS
-      const callbackData = ZERO_BYTES32
-      const borrowInstructions = {
-        collSendAmount,
-        expectedTransferFee,
-        deadline: MAX_UINT256,
-        minLoanAmount: 0,
-        callbackAddr,
-        callbackData
-      }
+      it('Should handle off-chain swap quotes correctly (1/2)', async function () {
+        const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
-      // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0)
-      let quoteTupleIdx = 2
-      let selectedQuoteTuple = quoteTuples[quoteTupleIdx]
-      let proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      // should revert with invalid quote
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
-      // borrower obtains proof for another invalid quote tuple (tuple idx 3 has upfrontfee < 100% but tenor = 0)
-      quoteTupleIdx = 3
-      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
-      proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      // should revert with invalid quote
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
+        // lender produces template off-chain quote (incl swap quote tuples)
+        const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+          lenderVault,
+          lender,
+          whitelistAuthority: ZERO_ADDRESS,
+          weth,
+          usdc
+        })
 
-      // borrower obtains proof for valid quote tuple (upfront fee = 100% and tenor = 0 and earliest repay = 0)
-      quoteTupleIdx = 4
-      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
-      proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.emit(lenderVault, 'QuoteProcessed')
+        // borrower approves gateway and executes quote
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const collSendAmount = ONE_WETH
+        const expectedTransferFee = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount,
+          expectedTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData
+        }
 
-      // borrower obtains proof for invalid quote tuple (tuple idx 5 has upfrontfee > 100%)
-      quoteTupleIdx = 5
-      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
-      proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      // should revert with invalid quote
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'InsufficientSendAmount')
-    })
+        // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0)
+        let quoteTupleIdx = 2
+        let selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        let proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
 
-    it('Should handle off-chain swap quotes correctly (2/2)', async function () {
-      const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+        // borrower obtains proof for another invalid quote tuple (tuple idx 3 has upfrontfee < 100% but tenor = 0)
+        quoteTupleIdx = 3
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
 
-      // lenderVault owner deposits usdc
-      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+        // borrower obtains proof for valid quote tuple (upfront fee = 100% and tenor = 0 and earliest repay = 0)
+        quoteTupleIdx = 4
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.emit(lenderVault, 'QuoteProcessed')
 
-      // lender produces quote with earliest repay != 0
-      const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
-        lenderVault,
-        lender,
-        whitelistAuthority: ZERO_ADDRESS,
-        weth,
-        usdc,
-        earliestRepayTenor: 1
+        // borrower obtains proof for invalid quote tuple (tuple idx 5 has upfrontfee > 100%)
+        quoteTupleIdx = 5
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InsufficientSendAmount')
       })
 
-      // borrower approves gateway and executes quote
-      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
-      const callbackAddr = ZERO_ADDRESS
-      const callbackData = ZERO_BYTES32
-      const borrowInstructions = {
-        collSendAmount,
-        expectedTransferFee,
-        deadline: MAX_UINT256,
-        minLoanAmount: 0,
-        callbackAddr,
-        callbackData
-      }
-      // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0 and earliestRepayTenor != 0)
-      let quoteTupleIdx = 2
-      let selectedQuoteTuple = quoteTuples[quoteTupleIdx]
-      let proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      // should revert with invalid quote
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
+      it('Should handle off-chain swap quotes correctly (2/2)', async function () {
+        const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
-      // borrower obtains proof for another invalid quote tuple (tuple idx 3 has upfrontfee < 100% but tenor = 0 and earliestRepayTenor != 0)
-      quoteTupleIdx = 3
-      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
-      proof = quoteTuplesTree.getProof(quoteTupleIdx)
-      // should revert with invalid quote
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+        // lender produces quote with earliest repay != 0
+        const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+          lenderVault,
+          lender,
+          whitelistAuthority: ZERO_ADDRESS,
+          weth,
+          usdc,
+          earliestRepayTenor: 1
+        })
+
+        // borrower approves gateway and executes quote
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const collSendAmount = ONE_WETH
+        const expectedTransferFee = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount,
+          expectedTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData
+        }
+        // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0 and earliestRepayTenor != 0)
+        let quoteTupleIdx = 2
+        let selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        let proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
+
+        // borrower obtains proof for another invalid quote tuple (tuple idx 3 has upfrontfee < 100% but tenor = 0 and earliestRepayTenor != 0)
+        quoteTupleIdx = 3
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
+      })
     })
   })
 })

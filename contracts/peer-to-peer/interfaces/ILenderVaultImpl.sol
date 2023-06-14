@@ -65,7 +65,7 @@ interface ILenderVaultImpl {
     function updateLoanInfo(
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount,
+        uint128 collAmount,
         address collTokenCompartmentAddr,
         address collToken
     ) external;
