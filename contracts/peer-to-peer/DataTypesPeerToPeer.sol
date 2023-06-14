@@ -19,9 +19,12 @@ library DataTypesPeerToPeer {
         uint128 initLoanAmount;
         // full repay amount at start of loan
         uint128 initRepayAmount;
-        // amount repaid up until current time
+        // amount repaid (loan token) up until current time
         // note: partial repayments are allowed
         uint128 amountRepaidSoFar;
+        // amount reclaimed (coll token) up until current time
+        // note: partial repayments are allowed
+        uint128 amountReclaimedSoFar;
         // flag tracking if collateral has been unlocked by vault
         bool collUnlocked;
         // address of the compartment housing the collateral

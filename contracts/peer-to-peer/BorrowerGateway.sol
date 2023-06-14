@@ -179,7 +179,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             revert Errors.InvalidRepayAmount();
         }
 
-        uint256 reclaimCollAmount = _processRepayTransfers(
+        uint128 reclaimCollAmount = _processRepayTransfers(
             vaultAddr,
             loanRepayInstructions,
             loan,
@@ -326,12 +326,19 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.Loan memory loan,
         address callbackAddr,
         bytes calldata callbackData
-    ) internal returns (uint256 reclaimCollAmount) {
-        reclaimCollAmount =
-            (loan.initCollAmount * loanRepayInstructions.targetRepayAmount) /
-            loan.initRepayAmount;
-        if (reclaimCollAmount == 0) {
-            revert Errors.ReclaimAmountIsZero();
+    ) internal returns (uint128 reclaimCollAmount) {
+        uint128 leftRepaymentAmount = loan.initRepayAmount -
+            loan.amountRepaidSoFar;
+        if (leftRepaymentAmount == loanRepayInstructions.targetRepayAmount) {
+            reclaimCollAmount = loan.initCollAmount - loan.amountReclaimedSoFar;
+        } else {
+            reclaimCollAmount =
+                (loan.initCollAmount *
+                    loanRepayInstructions.targetRepayAmount) /
+                loan.initRepayAmount;
+            if (reclaimCollAmount == 0) {
+                revert Errors.ReclaimAmountIsZero();
+            }
         }
         if (
             callbackAddr != address(0) &&
@@ -364,7 +371,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         IERC20Metadata(loan.loanToken).safeTransferFrom(
             loan.borrower,
             lenderVault,
-            uint256(loanRepayInstructions.targetRepayAmount) +
+            loanRepayInstructions.targetRepayAmount +
                 loanRepayInstructions.expectedTransferFee
         );
 
