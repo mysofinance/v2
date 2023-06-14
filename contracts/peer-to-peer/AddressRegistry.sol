@@ -28,6 +28,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     address public mysoTokenManager;
     address public erc721Wrapper;
     address public erc20Wrapper;
+    uint256 public numRegisteredVaults;
     mapping(address => bool) public isRegisteredVault;
     mapping(bytes => bool) internal _signatureIsInvalidated;
     mapping(address => mapping(address => uint256))
@@ -168,6 +169,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         }
         isRegisteredVault[addr] = true;
         _registeredVaults.push(addr);
+        ++numRegisteredVaults;
     }
 
     function claimBorrowerWhitelistStatus(

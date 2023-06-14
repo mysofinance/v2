@@ -213,4 +213,10 @@ interface IAddressRegistry {
         address compartmentImpl,
         address token
     ) external view returns (bool isWhitelisted);
+
+    /**
+     * @notice Returns current number of vaults registered
+     * @return numVaults Current number of vaults registered
+     */
+    function numRegisteredVaults() external view returns (uint256 numVaults);
 }
