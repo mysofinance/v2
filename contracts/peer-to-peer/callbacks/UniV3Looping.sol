@@ -25,9 +25,13 @@ contract UniV3Looping is VaultCallback {
             data,
             (uint256, uint256, uint24)
         );
+        // swap whole loan token balance received from borrower gateway
+        uint256 loanTokenBalance = IERC20(loan.loanToken).balanceOf(
+            address(this)
+        );
         IERC20Metadata(loan.loanToken).safeIncreaseAllowance(
             UNI_V3_SWAP_ROUTER,
-            loan.initLoanAmount
+            loanTokenBalance
         );
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
@@ -36,7 +40,7 @@ contract UniV3Looping is VaultCallback {
                 fee: poolFee,
                 recipient: loan.borrower,
                 deadline: deadline,
-                amountIn: loan.initLoanAmount,
+                amountIn: loanTokenBalance,
                 amountOutMinimum: minSwapReceive,
                 sqrtPriceLimitX96: 0
             });
@@ -59,10 +63,12 @@ contract UniV3Looping is VaultCallback {
             (uint256, uint256, uint24)
         );
         // swap whole coll token balance received from borrower gateway
-        uint256 collBalance = IERC20(loan.collToken).balanceOf(address(this));
+        uint256 collTokenBalance = IERC20(loan.collToken).balanceOf(
+            address(this)
+        );
         IERC20Metadata(loan.collToken).safeIncreaseAllowance(
             UNI_V3_SWAP_ROUTER,
-            collBalance
+            collTokenBalance
         );
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
             .ExactInputSingleParams({
@@ -71,7 +77,7 @@ contract UniV3Looping is VaultCallback {
                 fee: poolFee,
                 recipient: loan.borrower,
                 deadline: deadline,
-                amountIn: collBalance,
+                amountIn: collTokenBalance,
                 amountOutMinimum: minSwapReceive,
                 sqrtPriceLimitX96: 0
             });

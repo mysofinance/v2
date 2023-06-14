@@ -34,19 +34,23 @@ contract BalancerV2Looping is VaultCallback {
             data,
             (bytes32, uint256, uint256)
         );
+        // swap whole loan token balance received from borrower gateway
+        uint256 loanTokenBalance = IERC20(loan.loanToken).balanceOf(
+            address(this)
+        );
+        IERC20Metadata(loan.loanToken).safeIncreaseAllowance(
+            BALANCER_V2_VAULT,
+            loanTokenBalance
+        );
         BalancerDataTypes.SingleSwap memory singleSwap = BalancerDataTypes
             .SingleSwap({
                 poolId: poolId,
                 kind: BalancerDataTypes.SwapKind.GIVEN_IN,
                 assetIn: IBalancerAsset(loan.loanToken),
                 assetOut: IBalancerAsset(loan.collToken),
-                amount: loan.initLoanAmount,
+                amount: loanTokenBalance,
                 userData: "0x"
             });
-        IERC20Metadata(loan.loanToken).safeIncreaseAllowance(
-            BALANCER_V2_VAULT,
-            loan.initLoanAmount
-        );
         IBalancerVault(BALANCER_V2_VAULT).swap(
             singleSwap,
             fundManagement,
