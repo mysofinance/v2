@@ -16,7 +16,7 @@ import {Errors} from "../../../Errors.sol";
  * should only be utilized with eth based oracles, not usd-based oracles
  */
 contract UniV2Chainlink is IOracle, ChainlinkBasic {
-    uint256 internal immutable _tolerance; // tolerance must be an integer less than 100 and greater than 0
+    uint256 internal immutable _tolerance; // tolerance must be an integer less than 10000 and greater than 0
     mapping(address => bool) public isLpToken;
 
     constructor(
@@ -35,7 +35,7 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         if (_lpAddrs.length == 0) {
             revert Errors.InvalidArrayLength();
         }
-        if (_toleranceAmount >= 100 || _toleranceAmount == 0) {
+        if (_toleranceAmount >= 10000 || _toleranceAmount == 0) {
             revert Errors.InvalidOracleTolerance();
         }
         _tolerance = _toleranceAmount;
@@ -129,6 +129,17 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             Math.sqrt(10 ** token0Decimals * 10 ** token1Decimals);
     }
 
+    /**
+     * @notice function checks that price from reserves is within tolerance of price from oracle
+     * @dev This function is needed because a one-sided donation and sync can skew the fair reserve
+     * calculation above. This function checks that the price from reserves is within a tolerance
+     * @param reserve0 Reserve of token0
+     * @param reserve1 Reserve of token1
+     * @param priceToken0 Price of token0 from oracle
+     * @param priceToken1 Price of token1 from oracle
+     * @param token0Decimals Decimals of token0
+     * @param token1Decimals Decimals of token1
+     */
     function _reserveAndPriceCheck(
         uint256 reserve0,
         uint256 reserve1,
@@ -143,8 +154,9 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
             priceToken0;
 
         if (
-            priceFromReserves > ((100 + _tolerance) * priceFromOracle) / 100 ||
-            priceFromReserves < ((100 - _tolerance) * priceFromOracle) / 100
+            priceFromReserves >
+            ((10000 + _tolerance) * priceFromOracle) / 10000 ||
+            priceFromReserves < ((10000 - _tolerance) * priceFromOracle) / 10000
         ) {
             revert Errors.ReserveRatiosSkewedFromOraclePrice();
         }

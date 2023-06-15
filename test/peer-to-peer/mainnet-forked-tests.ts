@@ -4670,7 +4670,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcEthChainlinkAddr],
           [ZERO_ADDR],
-          5
+          500
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidAddress')
       await expect(
@@ -4678,7 +4678,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
           [usdcEthChainlinkAddr],
           [],
-          5
+          500
         )
       ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidArrayLength')
       // deploy correctly
@@ -4686,7 +4686,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         [uniV2WethUsdc.address],
-        5
+        500
       )
       await uniV2OracleImplementation.deployed()
 
@@ -4873,7 +4873,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
         [usdcEthChainlinkAddr],
         [uniV2WethUsdc.address],
-        5
+        500
       )
       await uniV2OracleImplementation.deployed()
 
@@ -5299,7 +5299,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             [usdc.address, paxg.address, usdtAddr],
             [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
             [uniV2WethUsdcAddr, uniV2WethWiseAddr, uniV2WethUsdtAddr, uniV2PaxgUsdcAddr],
-            100
+            10000
           )
         ).to.be.revertedWithCustomError(UniV2OracleImplementation, 'InvalidOracleTolerance')
 
@@ -5307,7 +5307,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address, usdtAddr],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr, usdtEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2WethWiseAddr, uniV2WethUsdtAddr, uniV2PaxgUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5745,7 +5745,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5794,7 +5794,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5840,7 +5840,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5890,7 +5890,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5938,7 +5938,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -5988,7 +5988,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -6038,7 +6038,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address, paxg.address],
           [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
           [uniV2WethUsdcAddr, uniV2PaxgUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -6111,7 +6111,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -6172,7 +6172,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
@@ -6216,7 +6216,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           [usdc.address],
           [usdcEthChainlinkAddr],
           [uniV2WethUsdcAddr],
-          5
+          500
         )
         await uniV2OracleImplementation.deployed()
 
