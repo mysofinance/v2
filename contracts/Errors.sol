@@ -101,4 +101,6 @@ library Errors {
     error CallbacksNotAllowedForSwaps();
     error InvalidSwap();
     error InvalidUpfrontFee();
+    error InvalidOracleTolerance();
+    error ReserveRatiosSkewedFromOraclePrice();
 }

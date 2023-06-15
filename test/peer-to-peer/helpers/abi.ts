@@ -293,6 +293,15 @@ const gohmAbi = [
 
 const uniV2Abi = [
   {
+    constant: false,
+    inputs: [],
+    name: 'sync',
+    outputs: [],
+    payable: false,
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
     constant: true,
     inputs: [],
     name: 'getReserves',

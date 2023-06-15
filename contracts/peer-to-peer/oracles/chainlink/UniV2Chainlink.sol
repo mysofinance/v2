@@ -16,12 +16,14 @@ import {Errors} from "../../../Errors.sol";
  * should only be utilized with eth based oracles, not usd-based oracles
  */
 contract UniV2Chainlink is IOracle, ChainlinkBasic {
+    uint256 internal immutable _tolerance; // tolerance must be an integer less than 10000 and greater than 0
     mapping(address => bool) public isLpToken;
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        address[] memory _lpAddrs
+        address[] memory _lpAddrs,
+        uint256 _toleranceAmount
     )
         ChainlinkBasic(
             _tokenAddrs,
@@ -33,6 +35,10 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         if (_lpAddrs.length == 0) {
             revert Errors.InvalidArrayLength();
         }
+        if (_toleranceAmount >= 10000 || _toleranceAmount == 0) {
+            revert Errors.InvalidOracleTolerance();
+        }
+        _tolerance = _toleranceAmount;
         for (uint i = 0; i < _lpAddrs.length; ) {
             if (_lpAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
@@ -87,6 +93,7 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         if (reserve0 * reserve1 == 0) {
             revert Errors.ZeroReserve();
         }
+
         (address token0, address token1) = (
             IUniV2(lpToken).token0(),
             IUniV2(lpToken).token1()
@@ -94,13 +101,24 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         uint256 totalLpSupply = IUniV2(lpToken).totalSupply();
         uint256 priceToken0 = _getPriceOfToken(token0);
         uint256 priceToken1 = _getPriceOfToken(token1);
+        uint256 token0Decimals = IERC20Metadata(token0).decimals();
+        uint256 token1Decimals = IERC20Metadata(token1).decimals();
+
+        _reserveAndPriceCheck(
+            reserve0,
+            reserve1,
+            priceToken0,
+            priceToken1,
+            token0Decimals,
+            token1Decimals
+        );
 
         // calculate fair LP token price based on "fair reserves" as described in
         // https://blog.alphaventuredao.io/fair-lp-token-pricing/
         // formula: p = 2 * sqrt(r0 * r1) * sqrt(p0) * sqrt(p1) / s
         // note: price is for 1 "whole" LP token unit, hence need to scale up by LP token decimals;
         // need to divide by sqrt reserve decimals to cancel out units of invariant k
-        // IMPORTANT: while formula is robust against typical flashloan skews, lenders should us this
+        // IMPORTANT: while formula is robust against typical flashloan skews, lenders should use this
         // oracle with caution and take into account skew scenarios when setting their LTVs
         lpTokenPriceInEth =
             (2 *
@@ -108,9 +126,39 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
                 Math.sqrt(priceToken0 * priceToken1) *
                 10 ** IERC20Metadata(lpToken).decimals()) /
             totalLpSupply /
-            Math.sqrt(
-                10 ** IERC20Metadata(token0).decimals() *
-                    10 ** IERC20Metadata(token1).decimals()
-            );
+            Math.sqrt(10 ** token0Decimals * 10 ** token1Decimals);
+    }
+
+    /**
+     * @notice function checks that price from reserves is within tolerance of price from oracle
+     * @dev This function is needed because a one-sided donation and sync can skew the fair reserve
+     * calculation above. This function checks that the price from reserves is within a tolerance
+     * @param reserve0 Reserve of token0
+     * @param reserve1 Reserve of token1
+     * @param priceToken0 Price of token0 from oracle
+     * @param priceToken1 Price of token1 from oracle
+     * @param token0Decimals Decimals of token0
+     * @param token1Decimals Decimals of token1
+     */
+    function _reserveAndPriceCheck(
+        uint256 reserve0,
+        uint256 reserve1,
+        uint256 priceToken0,
+        uint256 priceToken1,
+        uint256 token0Decimals,
+        uint256 token1Decimals
+    ) internal view {
+        uint256 priceFromReserves = (reserve0 * 10 ** token1Decimals) /
+            reserve1;
+        uint256 priceFromOracle = (priceToken1 * 10 ** token0Decimals) /
+            priceToken0;
+
+        if (
+            priceFromReserves >
+            ((10000 + _tolerance) * priceFromOracle) / 10000 ||
+            priceFromReserves < ((10000 - _tolerance) * priceFromOracle) / 10000
+        ) {
+            revert Errors.ReserveRatiosSkewedFromOraclePrice();
+        }
     }
 }
