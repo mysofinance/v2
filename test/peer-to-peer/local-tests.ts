@@ -433,6 +433,12 @@ describe('Peer-to-Peer: Local Tests', function () {
     await addressRegistry.connect(team).setWhitelistState([borrower.address], 4)
     await addressRegistry.connect(team).setWhitelistState([borrower.address], 0)
 
+    // add testnet token manager
+    const TestnetTokenManager = await ethers.getContractFactory('TestnetTokenManager')
+    const testnetTokenManager = await TestnetTokenManager.deploy()
+    await testnetTokenManager.deployed()
+    await addressRegistry.connect(team).setWhitelistState([testnetTokenManager.address], 9)
+
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
     /* ********************************** */
@@ -519,7 +525,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       erc20Wrapper,
       tokenBasketWrapperWithoutRegistry,
       myFirstNFT,
-      mySecondNFT
+      mySecondNFT,
+      testnetTokenManager
     }
   }
 
@@ -2283,7 +2290,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         whitelistAuthority,
         usdc,
         weth,
-        lenderVault
+        lenderVault,
+        testnetTokenManager
       } = await setupTest()
 
       // lenderVault owner deposits usdc
@@ -2341,8 +2349,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const borrowerMysoTokenBalPre = await testnetTokenManager.balanceOf(borrower.address)
       const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+      const vaultMysoTokenBalPre = await testnetTokenManager.balanceOf(lenderVault.address)
+      expect(borrowerMysoTokenBalPre).to.be.equal(0)
+      expect(vaultMysoTokenBalPre).to.be.equal(ONE_WETH) // from initial vault creation
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -2365,9 +2377,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const borrowerMysoTokenBalPost = await testnetTokenManager.balanceOf(borrower.address)
       const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const vaultMysoTokenBalPost = await testnetTokenManager.balanceOf(lenderVault.address)
 
+      expect(borrowerMysoTokenBalPost).to.be.equal(ONE_WETH)
+      expect(vaultMysoTokenBalPost).to.be.equal(ONE_WETH.add(ONE_WETH))
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
