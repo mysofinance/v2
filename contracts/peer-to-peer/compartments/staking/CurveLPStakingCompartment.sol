@@ -32,6 +32,9 @@ contract CurveLPStakingCompartment is BaseCompartment {
         if (msg.sender != loan.borrower && !approvedStaker[msg.sender]) {
             revert Errors.InvalidSender();
         }
+        if (block.timestamp >= loan.expiry) {
+            revert Errors.LoanExpired();
+        }
         if (liqGaugeAddr != address(0)) {
             revert Errors.AlreadyStaked();
         }

@@ -2407,6 +2407,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
+        // check borrower cannot access collateral anymore after default
+        await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.revertedWithCustomError(
+          crvCompInstance,
+          'LoanExpired'
+        )
+
         await expect(
           borrowerGateway.connect(borrower).repay(
             {
@@ -2915,6 +2921,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(borrowerCollRepayBalPost).to.be.equal(borrowerUNIBalPre.sub(upfrontFee).div(coeffRepay))
 
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // check borrower cannot access collateral anymore after default
+      await expect(uniCompInstance.connect(borrower).delegate(borrower.address)).to.be.revertedWithCustomError(
+        uniCompInstance,
+        'LoanExpired'
+      )
 
       // unlock collateral
       const lenderCollBalPre = await collInstance.balanceOf(lender.address)

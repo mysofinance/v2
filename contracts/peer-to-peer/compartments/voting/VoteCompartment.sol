@@ -23,6 +23,9 @@ contract VoteCompartment is BaseCompartment {
         if (msg.sender != loan.borrower && !approvedDelegator[msg.sender]) {
             revert Errors.InvalidSender();
         }
+        if (block.timestamp >= loan.expiry) {
+            revert Errors.LoanExpired();
+        }
         if (_delegatee == address(0)) {
             revert Errors.InvalidDelegatee();
         }
