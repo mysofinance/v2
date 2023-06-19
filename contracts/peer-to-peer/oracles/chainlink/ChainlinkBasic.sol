@@ -5,6 +5,7 @@ pragma solidity 0.8.19;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
+import {Constants} from "../../../Constants.sol";
 import {Errors} from "../../../Errors.sol";
 
 /**
@@ -79,7 +80,7 @@ contract ChainlinkBasic is IOracle {
 
     function _checkAndReturnLatestRoundData(
         address oracleAddr
-    ) internal view returns (uint256 tokenPriceRaw) {
+    ) internal view virtual returns (uint256 tokenPriceRaw) {
         (
             uint80 roundId,
             int256 answer,
@@ -91,8 +92,9 @@ contract ChainlinkBasic is IOracle {
             roundId == 0 ||
             answeredInRound < roundId ||
             answer < 1 ||
-            updatedAt == 0 ||
-            updatedAt > block.timestamp
+            updatedAt > block.timestamp ||
+            updatedAt <
+            block.timestamp - Constants.MAX_PRICE_UPDATE_TIMESTAMP_DIVERGENCE
         ) {
             revert Errors.InvalidOracleAnswer();
         }
