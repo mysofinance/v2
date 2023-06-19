@@ -4,34 +4,27 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {MaliciousOwnerContract} from "./MaliciousOwnerContract.sol";
+import {Ownable} from "../Ownable.sol";
 import {ILenderVaultImpl} from "../peer-to-peer/interfaces/ILenderVaultImpl.sol";
 
 contract MaliciousCompartment {
     address internal immutable _tokenToBeWithdrawn;
+    address internal immutable _maliciousOwnerContract;
 
-    constructor(address tokenToBeWithdrawn) {
+    constructor(address tokenToBeWithdrawn, address maliciousOwnerContract) {
         _tokenToBeWithdrawn = tokenToBeWithdrawn;
+        _maliciousOwnerContract = maliciousOwnerContract;
     }
 
-    function initialize(address /*_vaultAddr*/, uint256 /*_loanIdx*/) external {
-        uint256 withdrawAmount = IERC20(_tokenToBeWithdrawn).balanceOf(
-            msg.sender
-        ) / 2;
-        ILenderVaultImpl(msg.sender).withdraw(
-            _tokenToBeWithdrawn,
-            withdrawAmount
+    function initialize(address _vaultAddr, uint256 /*_loanIdx*/) external {
+        MaliciousOwnerContract(_maliciousOwnerContract).callback(
+            _vaultAddr,
+            _tokenToBeWithdrawn
         );
     }
 
-    // transfer coll on repays
-    function transferCollFromCompartment(
-        uint256 repayAmount,
-        uint256 repayAmountLeft,
-        address borrowerAddr,
-        address collTokenAddr,
-        address callbackAddr
-    ) external {}
-
-    // unlockColl this would be called on defaults
-    function unlockCollToVault(address collTokenAddr) external {}
+    function claimVaultOwnership(address lenderVault) external {
+        Ownable(lenderVault).claimOwnership();
+    }
 }

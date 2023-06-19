@@ -56,8 +56,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         (
             DataTypesPeerToPeer.Loan memory loan,
             uint256 loanId,
-            uint256 upfrontFee,
-            address collReceiver
+            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
         ) = ILenderVaultImpl(lenderVault).processQuote(
                 msg.sender,
                 borrowInstructions,
@@ -67,17 +66,16 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         _processTransfers(
             lenderVault,
-            collReceiver,
             borrowInstructions,
             loan,
-            upfrontFee
+            transferInstructions
         );
 
         emit Borrowed(
             lenderVault,
             loan.borrower,
             loan,
-            upfrontFee,
+            transferInstructions.upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData
@@ -119,8 +117,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         (
             DataTypesPeerToPeer.Loan memory loan,
             uint256 loanId,
-            uint256 upfrontFee,
-            address collReceiver
+            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
         ) = ILenderVaultImpl(lenderVault).processQuote(
                 msg.sender,
                 borrowInstructions,
@@ -130,17 +127,16 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         _processTransfers(
             lenderVault,
-            collReceiver,
             borrowInstructions,
             loan,
-            upfrontFee
+            transferInstructions
         );
 
         emit Borrowed(
             lenderVault,
             loan.borrower,
             loan,
-            upfrontFee,
+            transferInstructions.upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData
@@ -218,11 +214,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     function _processTransfers(
         address lenderVault,
-        address collReceiver,
         DataTypesPeerToPeer.BorrowTransferInstructions
             calldata borrowInstructions,
         DataTypesPeerToPeer.Loan memory loan,
-        uint256 upfrontFee
+        DataTypesPeerToPeer.TransferInstructions memory transferInstructions
     ) internal {
         IAddressRegistry registry = IAddressRegistry(addressRegistry);
         if (
@@ -237,7 +232,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             borrowInstructions.callbackAddr == address(0)
                 ? loan.borrower
                 : borrowInstructions.callbackAddr,
-            loan.initLoanAmount
+            loan.initLoanAmount,
+            transferInstructions.isLoan
         );
         if (borrowInstructions.callbackAddr != address(0)) {
             IVaultCallback(borrowInstructions.callbackAddr).borrowCallback(
@@ -274,7 +270,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // e.g. at 5% MAX_FEE_PER_ANNUM, tenor still needs to be 20 years with no upfront fee
         // but a high upfrontFee could also make this fail for smaller protocolFee amounts
         if (
-            borrowInstructions.collSendAmount < protocolFeeAmount + upfrontFee
+            borrowInstructions.collSendAmount <
+            protocolFeeAmount + transferInstructions.upfrontFee
         ) {
             revert Errors.InsufficientSendAmount();
         }
@@ -288,15 +285,19 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         }
 
         uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
-            collReceiver
+            transferInstructions.collReceiver
         );
 
         uint256 collReceiverTransferAmount = borrowInstructions.collSendAmount -
             protocolFeeAmount;
-        uint256 collReceiverExpBalDiff = loan.initCollAmount + upfrontFee;
-        if (collReceiver != lenderVault && upfrontFee != 0) {
-            collReceiverTransferAmount -= upfrontFee;
-            collReceiverExpBalDiff -= upfrontFee;
+        uint256 collReceiverExpBalDiff = loan.initCollAmount +
+            transferInstructions.upfrontFee;
+        if (
+            transferInstructions.collReceiver != lenderVault &&
+            transferInstructions.upfrontFee != 0
+        ) {
+            collReceiverTransferAmount -= transferInstructions.upfrontFee;
+            collReceiverExpBalDiff -= transferInstructions.upfrontFee;
             // Note: if a compartment is used then we need to transfer the upfront fee to the vault separately;
             // in the special case where the coll also has a token transfer fee then the vault will receive slightly
             // less collToken than upfrontFee due to coll token transferFee, which, however can be counteracted with
@@ -304,17 +305,18 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
                 lenderVault,
-                upfrontFee
+                transferInstructions.upfrontFee
             );
         }
         IERC20Metadata(loan.collToken).safeTransferFrom(
             loan.borrower,
-            collReceiver,
+            transferInstructions.collReceiver,
             collReceiverTransferAmount
         );
         if (
-            IERC20Metadata(loan.collToken).balanceOf(collReceiver) !=
-            collReceiverExpBalDiff + collReceiverPreBal
+            IERC20Metadata(loan.collToken).balanceOf(
+                transferInstructions.collReceiver
+            ) != collReceiverExpBalDiff + collReceiverPreBal
         ) {
             revert Errors.InvalidSendAmount();
         }
@@ -351,7 +353,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             ? ILenderVaultImpl(lenderVault).transferTo(
                 loan.collToken,
                 callbackAddr == address(0) ? loan.borrower : callbackAddr,
-                reclaimCollAmount
+                reclaimCollAmount,
+                false
             )
             : ILenderVaultImpl(lenderVault).transferCollFromCompartment(
                 loanRepayInstructions.targetRepayAmount,

@@ -79,8 +79,7 @@ interface ILenderVaultImpl {
      * @param quoteTuple struct containing specific quote tuple info (see DataTypesPeerToPeer.sol notes)
      * @return loan loan information after processing the quote
      * @return loanId index of loans in the loans array
-     * @return upfrontFee upfront fee in coll token
-     * @return collReceiver receiver of the collateral (e.g., vault or compartment)
+     * @return transferInstructions struct containing transfer instruction info (see DataTypesPeerToPeer.sol notes)
      */
     function processQuote(
         address borrower,
@@ -93,8 +92,7 @@ interface ILenderVaultImpl {
         returns (
             DataTypesPeerToPeer.Loan calldata loan,
             uint256 loanId,
-            uint256 upfrontFee,
-            address collReceiver
+            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
         );
 
     /**
@@ -111,11 +109,13 @@ interface ILenderVaultImpl {
      * @param token address of the token to transfer
      * @param recipient address which receives the tokens
      * @param amount amount of token to transfer
+     * @param checkLockedAmounts boolean flag indicating whether locked amounts need to be checked
      */
     function transferTo(
         address token,
         address recipient,
-        uint256 amount
+        uint256 amount,
+        bool checkLockedAmounts
     ) external;
 
     /**

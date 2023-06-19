@@ -121,6 +121,15 @@ library DataTypesPeerToPeer {
         bytes callbackData;
     }
 
+    struct TransferInstructions {
+        // ...
+        address collReceiver;
+        // ...
+        uint256 upfrontFee;
+        // ...
+        bool isLoan;
+    }
+
     struct WrappedERC721TokenInfo {
         // address of the ERC721_TOKEN
         address tokenAddr;

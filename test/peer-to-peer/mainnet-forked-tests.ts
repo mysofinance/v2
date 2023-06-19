@@ -2370,7 +2370,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidRepayAmount')
 
         await expect(
-          lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount)
+          lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount, false)
+        ).to.be.revertedWithCustomError(lenderVault, 'UnregisteredGateway')
+        await expect(
+          lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount, true)
         ).to.be.revertedWithCustomError(lenderVault, 'UnregisteredGateway')
 
         // partial repay
