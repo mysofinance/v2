@@ -247,15 +247,16 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         address collTokenAddr,
         address callbackAddr,
         address collTokenCompartmentAddr
-    ) external {
+    ) external returns (uint128 reclaimCollAmount) {
         _senderCheckGateway();
-        IBaseCompartment(collTokenCompartmentAddr).transferCollFromCompartment(
-            repayAmount,
-            repayAmountLeft,
-            borrowerAddr,
-            collTokenAddr,
-            callbackAddr
-        );
+        reclaimCollAmount = IBaseCompartment(collTokenCompartmentAddr)
+            .transferCollFromCompartment(
+                repayAmount,
+                repayAmountLeft,
+                borrowerAddr,
+                collTokenAddr,
+                callbackAddr
+            );
     }
 
     function setMinNumOfSigners(uint256 _minNumOfSigners) external {
@@ -412,8 +413,21 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                     )) /
                 Constants.BASE;
         }
+        int256 _interestRateFactor = int256(Constants.BASE) +
+            quoteTuple.interestRatePctInBase;
+        if (_interestRateFactor <= 0) {
+            revert Errors.InvalidInterestRateFactor();
+        }
+        uint256 interestRateFactor = uint256(_interestRateFactor);
+        uint256 unscaledLoanAmount = loanPerCollUnit *
+            (collSendAmount - expectedTransferFee);
+
         loanAmount =
-            (loanPerCollUnit * (collSendAmount - expectedTransferFee)) /
+            unscaledLoanAmount /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        repayAmount =
+            (unscaledLoanAmount * interestRateFactor) /
+            Constants.BASE /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
         uint256 vaultLoanTokenBal = IERC20(generalQuoteInfo.loanToken)
             .balanceOf(address(this));
@@ -424,13 +438,6 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         ) {
             revert Errors.InsufficientVaultFunds();
         }
-        int256 _interestRateFactor = int256(Constants.BASE) +
-            quoteTuple.interestRatePctInBase;
-        if (_interestRateFactor <= 0) {
-            revert Errors.InvalidInterestRateFactor();
-        }
-        uint256 interestRateFactor = uint256(_interestRateFactor);
-        repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;
     }
 
     function _newOwnerProposalCheck(

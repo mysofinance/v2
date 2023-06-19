@@ -29,6 +29,7 @@ interface IBaseCompartment {
      * @param borrowerAddr address of borrower receiving transfer
      * @param collTokenAddr address of collateral token being transferred
      * @param callbackAddr address to send collateral to instead of borrower if using callback
+     * @return reclaimCollAmount amount of transferred collateral
      */
     function transferCollFromCompartment(
         uint256 repayAmount,
@@ -36,7 +37,7 @@ interface IBaseCompartment {
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
-    ) external;
+    ) external returns (uint128 reclaimCollAmount);
 
     /**
      * @notice function to unlock all collateral left in compartment
