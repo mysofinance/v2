@@ -17,8 +17,8 @@ contract AaveStakingCompartment is BaseCompartment {
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
-    ) external {
-        _transferCollFromCompartment(
+    ) external returns (uint128 reclaimCollAmount) {
+        reclaimCollAmount = _transferCollFromCompartment(
             repayAmount,
             repayAmountLeft,
             borrowerAddr,

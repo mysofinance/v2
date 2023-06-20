@@ -329,19 +329,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         address callbackAddr,
         bytes calldata callbackData
     ) internal returns (uint128 reclaimCollAmount) {
-        uint128 leftRepaymentAmount = loan.initRepayAmount -
-            loan.amountRepaidSoFar;
-        if (leftRepaymentAmount == loanRepayInstructions.targetRepayAmount) {
-            reclaimCollAmount = loan.initCollAmount - loan.amountReclaimedSoFar;
-        } else {
-            reclaimCollAmount =
-                (loan.initCollAmount *
-                    loanRepayInstructions.targetRepayAmount) /
-                loan.initRepayAmount;
-            if (reclaimCollAmount == 0) {
-                revert Errors.ReclaimAmountIsZero();
-            }
-        }
         if (
             callbackAddr != address(0) &&
             IAddressRegistry(addressRegistry).whitelistState(callbackAddr) !=
@@ -349,21 +336,42 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         ) {
             revert Errors.NonWhitelistedCallback();
         }
-        loan.collTokenCompartmentAddr == address(0)
-            ? ILenderVaultImpl(lenderVault).transferTo(
+
+        if (loan.collTokenCompartmentAddr == address(0)) {
+            uint128 leftRepaymentAmount = loan.initRepayAmount -
+                loan.amountRepaidSoFar;
+            if (
+                leftRepaymentAmount == loanRepayInstructions.targetRepayAmount
+            ) {
+                reclaimCollAmount =
+                    loan.initCollAmount -
+                    loan.amountReclaimedSoFar;
+            } else {
+                reclaimCollAmount =
+                    (loan.initCollAmount *
+                        loanRepayInstructions.targetRepayAmount) /
+                    loan.initRepayAmount;
+                if (reclaimCollAmount == 0) {
+                    revert Errors.ReclaimAmountIsZero();
+                }
+            }
+            ILenderVaultImpl(lenderVault).transferTo(
                 loan.collToken,
                 callbackAddr == address(0) ? loan.borrower : callbackAddr,
-                reclaimCollAmount,
-                false
-            )
-            : ILenderVaultImpl(lenderVault).transferCollFromCompartment(
-                loanRepayInstructions.targetRepayAmount,
-                loan.initRepayAmount - loan.amountRepaidSoFar,
-                loan.borrower,
-                loan.collToken,
-                callbackAddr,
-                loan.collTokenCompartmentAddr
+                reclaimCollAmount
             );
+        } else {
+            reclaimCollAmount = ILenderVaultImpl(lenderVault)
+                .transferCollFromCompartment(
+                    loanRepayInstructions.targetRepayAmount,
+                    loan.initRepayAmount - loan.amountRepaidSoFar,
+                    loan.borrower,
+                    loan.collToken,
+                    callbackAddr,
+                    loan.collTokenCompartmentAddr
+                );
+        }
+
         if (callbackAddr != address(0)) {
             IVaultCallback(callbackAddr).repayCallback(loan, callbackData);
         }

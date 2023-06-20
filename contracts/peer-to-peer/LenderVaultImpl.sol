@@ -265,15 +265,16 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         address collTokenAddr,
         address callbackAddr,
         address collTokenCompartmentAddr
-    ) external {
+    ) external returns (uint128 reclaimCollAmount) {
         _senderCheckGateway();
-        IBaseCompartment(collTokenCompartmentAddr).transferCollFromCompartment(
-            repayAmount,
-            repayAmountLeft,
-            borrowerAddr,
-            collTokenAddr,
-            callbackAddr
-        );
+        reclaimCollAmount = IBaseCompartment(collTokenCompartmentAddr)
+            .transferCollFromCompartment(
+                repayAmount,
+                repayAmountLeft,
+                borrowerAddr,
+                collTokenAddr,
+                callbackAddr
+            );
     }
 
     function setMinNumOfSigners(uint256 _minNumOfSigners) external {
@@ -430,16 +431,22 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                     )) /
                 Constants.BASE;
         }
-        loanAmount =
-            (loanPerCollUnit * (collSendAmount - expectedTransferFee)) /
-            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
         int256 _interestRateFactor = int256(Constants.BASE) +
             quoteTuple.interestRatePctInBase;
         if (_interestRateFactor <= 0) {
             revert Errors.InvalidInterestRateFactor();
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
-        repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;
+        uint256 unscaledLoanAmount = loanPerCollUnit *
+            (collSendAmount - expectedTransferFee);
+
+        loanAmount =
+            unscaledLoanAmount /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        repayAmount =
+            (unscaledLoanAmount * interestRateFactor) /
+            Constants.BASE /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());        
     }
 
     function _newOwnerProposalCheck(
