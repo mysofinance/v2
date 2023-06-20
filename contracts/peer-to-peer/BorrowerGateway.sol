@@ -233,7 +233,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 ? loan.borrower
                 : borrowInstructions.callbackAddr,
             loan.initLoanAmount,
-            transferInstructions.isLoan
+            true
         );
         if (borrowInstructions.callbackAddr != address(0)) {
             IVaultCallback(borrowInstructions.callbackAddr).borrowCallback(
@@ -358,7 +358,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             ILenderVaultImpl(lenderVault).transferTo(
                 loan.collToken,
                 callbackAddr == address(0) ? loan.borrower : callbackAddr,
-                reclaimCollAmount
+                reclaimCollAmount,
+                false
             );
         } else {
             reclaimCollAmount = ILenderVaultImpl(lenderVault)

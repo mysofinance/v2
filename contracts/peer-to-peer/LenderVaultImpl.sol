@@ -246,7 +246,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     ) external {
         _senderCheckGateway();
         // note: check balance changes don't violate locked amounts
-        // @dev: check not needed for swaps as they don't update locked amounts
+        // @dev: check not needed for repays as unlock occurs after transfer (for now...)
         if (
             checkLockedAmounts &&
             amount >
@@ -446,7 +446,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         repayAmount =
             (unscaledLoanAmount * interestRateFactor) /
             Constants.BASE /
-            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());        
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
     }
 
     function _newOwnerProposalCheck(
