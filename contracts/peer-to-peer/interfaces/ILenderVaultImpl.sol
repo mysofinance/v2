@@ -109,13 +109,11 @@ interface ILenderVaultImpl {
      * @param token address of the token to transfer
      * @param recipient address which receives the tokens
      * @param amount amount of token to transfer
-     * @param checkLockedAmounts boolean flag indicating whether locked amounts need to be checked
      */
     function transferTo(
         address token,
         address recipient,
-        uint256 amount,
-        bool checkLockedAmounts
+        uint256 amount
     ) external;
 
     /**

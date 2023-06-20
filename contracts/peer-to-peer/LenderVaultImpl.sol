@@ -99,18 +99,18 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function updateLoanInfo(
         uint128 repayAmount,
         uint256 loanId,
-        uint128 collAmount,
+        uint128 reclaimCollAmount,
         address collTokenCompartmentAddr,
         address collToken
     ) external {
         _senderCheckGateway();
 
         _loans[loanId].amountRepaidSoFar += repayAmount;
-        _loans[loanId].amountReclaimedSoFar += collAmount;
+        _loans[loanId].amountReclaimedSoFar += reclaimCollAmount;
 
         // only update lockedAmounts when no compartment
         if (collTokenCompartmentAddr == address(0)) {
-            lockedAmounts[collToken] -= collAmount;
+            lockedAmounts[collToken] -= reclaimCollAmount;
         }
     }
 
@@ -241,14 +241,10 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function transferTo(
         address token,
         address recipient,
-        uint256 amount,
-        bool checkLockedAmounts
+        uint256 amount
     ) external {
         _senderCheckGateway();
-        // note: check balance changes don't violate locked amounts
-        // @dev: check not needed for swaps as they don't update locked amounts
         if (
-            checkLockedAmounts &&
             amount >
             IERC20Metadata(token).balanceOf(address(this)) -
                 lockedAmounts[token]

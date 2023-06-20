@@ -1093,11 +1093,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         {
           targetLoanId: loanId,
           targetRepayAmount: repayAmount.div(2),
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
+        lenderVault.address
       )
 
       const collBalPostRepayVault = await weth.balanceOf(lenderVault.address)
@@ -1561,11 +1561,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: 0,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidRepayAmount')
 
@@ -1575,11 +1575,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: 1,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
     })
@@ -1866,11 +1866,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: 0,
             targetRepayAmount: loan.initRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       )
 
@@ -2322,10 +2322,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           borrowerGateway
             .connect(borrower)
             .repay(
-              { targetLoanId: loanId, targetRepayAmount: repayAmount, expectedTransferFee: 0 },
-              lenderVault.address,
-              callbackAddr,
-              callbackData
+              {
+                targetLoanId: loanId,
+                targetRepayAmount: repayAmount,
+                expectedTransferFee: 0,
+                callbackAddr: callbackAddr,
+                callbackData: callbackData
+              },
+              lenderVault.address
             )
         )
           .to.emit(borrowerGateway, 'Repaid')
@@ -2361,19 +2365,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             {
               targetLoanId: loanId,
               targetRepayAmount: MAX_UINT128,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidRepayAmount')
 
         await expect(
-          lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount, false)
-        ).to.be.revertedWithCustomError(lenderVault, 'UnregisteredGateway')
-        await expect(
-          lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount, true)
+          lenderVault.connect(lender).transferTo(collTokenAddress, lender.address, repayAmount)
         ).to.be.revertedWithCustomError(lenderVault, 'UnregisteredGateway')
 
         // partial repay
@@ -2382,11 +2383,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             {
               targetLoanId: loanId,
               targetRepayAmount: partialRepayAmount,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         )
           .to.emit(borrowerGateway, 'Repaid')
@@ -2421,11 +2422,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             {
               targetLoanId: loanId,
               targetRepayAmount: partialRepayAmount,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         ).to.be.revertedWithCustomError(borrowerGateway, 'OutsideValidRepayWindow')
 
@@ -2715,11 +2716,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       )
         .to.emit(borrowerGateway, 'Repaid')
@@ -2909,11 +2910,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       )
         .to.emit(borrowerGateway, 'Repaid')
@@ -3132,11 +3133,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackDataRepay
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
 
@@ -3147,11 +3148,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: BigNumber.from(0).add(1)
+            expectedTransferFee: BigNumber.from(0).add(1),
+            callbackAddr: callbackAddr,
+            callbackData: callbackDataRepay
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
@@ -3165,11 +3166,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackDataRepay
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       )
         .to.emit(borrowerGateway, 'Repaid')
@@ -3810,23 +3811,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const repayBody = {
         targetLoanId: loanId,
         targetRepayAmount: ONE_PAXG.mul(10).mul(110).div(100),
-        expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100), 2)
+        expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100), 2),
+        callbackAddr: callbackAddr,
+        callbackData: callbackData
       }
 
-      await expect(borrowerGateway.connect(borrower).repay(repayBody, team.address, callbackAddr, callbackData)).to.be
-        .reverted
+      await expect(borrowerGateway.connect(borrower).repay(repayBody, team.address)).to.be.reverted
 
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .repay({ ...repayBody, expectedTransferFee: BASE }, lenderVault.address, callbackAddr, callbackData)
-      ).to.be.reverted
+      await expect(borrowerGateway.connect(borrower).repay({ ...repayBody, expectedTransferFee: BASE }, lenderVault.address))
+        .to.be.reverted
 
-      await expect(
-        borrowerGateway.connect(team).repay(repayBody, lenderVault.address, callbackAddr, callbackData)
-      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidBorrower')
+      await expect(borrowerGateway.connect(team).repay(repayBody, lenderVault.address)).to.be.revertedWithCustomError(
+        borrowerGateway,
+        'InvalidBorrower'
+      )
 
-      await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
+      await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address))
         .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
       const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)

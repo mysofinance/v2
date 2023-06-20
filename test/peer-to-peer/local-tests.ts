@@ -2395,11 +2395,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'OutsideValidRepayWindow')
 
@@ -3138,11 +3138,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount.div(2),
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
 
@@ -3153,11 +3153,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.emit(borrowerGateway, 'Repaid')
 
@@ -3469,11 +3469,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         {
           targetLoanId: 0,
           targetRepayAmount: repayAmount1,
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
+        lenderVault.address
       )
 
       // check amountReclaimedSoFar on loan after 1st repay
@@ -3486,11 +3486,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         {
           targetLoanId: 0,
           targetRepayAmount: repayAmount2,
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
+        lenderVault.address
       )
 
       // check amountReclaimedSoFar on loan after final repay
@@ -3599,11 +3599,11 @@ describe('Peer-to-Peer: Local Tests', function () {
             {
               targetLoanId: 0,
               targetRepayAmount: buyPricePerCollToken,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
 
