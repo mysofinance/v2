@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBaseCompartment} from "../interfaces/compartments/IBaseCompartment.sol";
 import {ILenderVaultImpl} from "../interfaces/ILenderVaultImpl.sol";
@@ -37,18 +38,19 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
-    ) internal {
+    ) internal returns (uint128 reclaimCollAmount) {
         _withdrawCheck();
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
-        uint256 amount = (repayAmount * currentCompartmentBal) /
-            repayAmountLeft;
+        reclaimCollAmount = SafeCast.toUint128(
+            (repayAmount * currentCompartmentBal) / repayAmountLeft
+        );
         address collReceiver = callbackAddr == address(0)
             ? borrowerAddr
             : callbackAddr;
-        IERC20(collTokenAddr).safeTransfer(collReceiver, amount);
+        IERC20(collTokenAddr).safeTransfer(collReceiver, reclaimCollAmount);
     }
 
     function _unlockCollToVault(address collTokenAddr) internal {
