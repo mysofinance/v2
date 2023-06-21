@@ -246,7 +246,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     ) external {
         _senderCheckGateway();
         // note: check balance changes don't violate locked amounts
-        // @dev: check not needed for repays as unlock occurs after transfer (for now...)
+        // @dev: skip check for repays as unlock occurs after transfer (for now...)
         if (
             checkLockedAmounts &&
             amount >
