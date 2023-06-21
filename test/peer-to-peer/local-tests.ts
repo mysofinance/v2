@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
-import { LenderVaultImpl, MyERC20 } from '../typechain-types'
+import { LenderVaultImpl, MyERC20 } from '../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist } from './helpers/misc'
@@ -462,9 +462,6 @@ describe('Peer-to-Peer: Local Tests', function () {
     const usdc = await USDC.deploy('USDC', 'USDC', 6)
     await usdc.deployed()
 
-    const usdc2 = await USDC.deploy('USDC', 'USDC', 6)
-    await usdc2.deployed()
-
     const WETH = await MyERC20.connect(team)
     const weth = await WETH.deploy('WETH', 'WETH', 18)
     await weth.deployed()
@@ -486,7 +483,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       addressRegistry,
       'InvalidSender'
     )
-    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address, usdc2.address], 1)
+    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
     await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 1)).to.be.revertedWithCustomError(
       addressRegistry,
       'InvalidAddress'
@@ -515,7 +512,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       signer2: sortedAddrs[1],
       signer3: sortedAddrs[2],
       usdc,
-      usdc2,
       weth,
       lenderVault,
       wrappedERC721Implementation,
@@ -3396,7 +3392,13 @@ describe('Peer-to-Peer: Local Tests', function () {
 
   describe('Edge Case Testing', function () {
     it('Should handle case correctly where borrower partially repays "almost" full loan amount', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, usdc2, lenderVault } = await setupTest()
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, lenderVault } = await setupTest()
+
+      // deploy & whitelist test token
+      const MyERC20 = await ethers.getContractFactory('MyERC20')
+      const collToken = await MyERC20.deploy('COLL', 'COLL', 6)
+      await collToken.deployed()
+      await addressRegistry.connect(team).setWhitelistState([collToken.address], 1)
 
       // lenderVault owner deposits usdc
       await usdc.mint(lenderVault.address, ONE_USDC.mul(1000000000))
@@ -3414,7 +3416,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          collToken: usdc2.address,
+          collToken: collToken.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
           minLoan: 0,
@@ -3450,8 +3452,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         callbackData
       }
       // mint coll tokens, approve gateway and execute quote
-      await usdc2.mint(borrower.address, collTokenSendAmount)
-      await usdc2.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      await collToken.mint(borrower.address, collTokenSendAmount)
+      await collToken.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -3496,6 +3498,78 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check amountReclaimedSoFar on loan after final repay
       loan = await lenderVault.loan(0)
       expect(loan.amountReclaimedSoFar).to.be.equal(1000000000)
+    })
+
+    it('Should handle repayment amount calculation with potential rounding error correctly', async function () {
+      const { addressRegistry, borrowerGateway, quoteHandler, team, lender, borrower, lenderVault } = await setupTest()
+
+      // test tokens
+      const MyERC20 = await ethers.getContractFactory('MyERC20')
+      const collToken = await MyERC20.deploy('COLL', 'COLL', 6)
+      await collToken.deployed()
+      const loanToken = await MyERC20.deploy('LOAN', 'LOAN', 0)
+      await loanToken.deployed()
+      await addressRegistry.connect(team).setWhitelistState([collToken.address, loanToken.address], 1)
+
+      // lenderVault owner deposits usdc
+      await loanToken.mint(lenderVault.address, MAX_UINT256)
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: 10,
+          interestRatePctInBase: BASE.mul(30).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: collToken.address,
+          loanToken: loanToken.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 0,
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // prepare borrow params
+      const collTokenSendAmount = 692308
+      const quoteTupleIdx = 0
+      const borrowInstructions = {
+        collSendAmount: collTokenSendAmount,
+        expectedTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32
+      }
+      // mint coll tokens, approve gateway and execute quote
+      await collToken.mint(borrower.address, collTokenSendAmount)
+      await collToken.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // get loan info
+      const loan = await lenderVault.loan(0)
+      expect(loan.initLoanAmount).to.be.equal(6)
+      expect(loan.initRepayAmount).to.be.equal(9)
     })
 
     describe('Swap Testing (Edge Case for Loans with upfrontfee=100% and tenor=0)', function () {

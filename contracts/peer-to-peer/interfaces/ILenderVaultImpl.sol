@@ -126,6 +126,7 @@ interface ILenderVaultImpl {
      * @param collTokenAddr address of the coll token to transfer to compartment
      * @param callbackAddr address of callback
      * @param collTokenCompartmentAddr address of the coll token compartment
+     * @return reclaimCollAmount amount of transferred collateral
      */
     function transferCollFromCompartment(
         uint256 repayAmount,
@@ -134,7 +135,7 @@ interface ILenderVaultImpl {
         address collTokenAddr,
         address callbackAddr,
         address collTokenCompartmentAddr
-    ) external;
+    ) external returns (uint128 reclaimCollAmount);
 
     /**
      * @notice function to set minimum number of signers required for an offchain quote
