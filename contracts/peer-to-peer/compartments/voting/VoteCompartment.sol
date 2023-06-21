@@ -56,15 +56,15 @@ contract VoteCompartment is BaseCompartment {
 
     // transfer coll on repays
     function transferCollFromCompartment(
-        uint256 repayAmount,
-        uint256 repayAmountLeft,
+        uint256 /*repayAmount*/,
+        uint256 /*repayAmountLeft*/,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
-    ) external returns (uint128 reclaimCollAmount) {
-        reclaimCollAmount = _transferCollFromCompartment(
-            repayAmount,
-            repayAmountLeft,
+    ) external {
+        _transferCollFromCompartment(
+            reclaimCollAmount,
             borrowerAddr,
             collTokenAddr,
             callbackAddr
@@ -74,5 +74,11 @@ contract VoteCompartment is BaseCompartment {
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
         _unlockCollToVault(collTokenAddr);
+    }
+
+    function getReclaimableBalance(
+        address collToken
+    ) external view override returns (uint256) {
+        return IERC20(collToken).balanceOf(address(this));
     }
 }

@@ -4,11 +4,13 @@ pragma solidity 0.8.19;
 
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
+import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
 import {IBorrowerGateway} from "./interfaces/IBorrowerGateway.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
@@ -181,17 +183,25 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         ) {
             revert Errors.InvalidRepayAmount();
         }
+        bool noCompartment = loan.collTokenCompartmentAddr == address(0);
+        // @dev: amountReclaimedSoFar cannot exceed initCollAmount for non-compartmentalized assets
+        uint256 maxReclaimableCollAmount = noCompartment
+            ? loan.initCollAmount - loan.amountReclaimedSoFar
+            : IBaseCompartment(loan.collTokenCompartmentAddr)
+                .getReclaimableBalance(loan.collToken);
+        // @dev: amountRepaidSoFar cannot exceed initRepayAmount
         uint128 leftRepaymentAmount = loan.initRepayAmount -
             loan.amountRepaidSoFar;
         uint128 reclaimCollAmount;
         if (leftRepaymentAmount == loanRepayInstructions.targetRepayAmount) {
-            reclaimCollAmount = loan.initCollAmount - loan.amountReclaimedSoFar;
+            reclaimCollAmount = SafeCast.toUint128(maxReclaimableCollAmount);
         } else {
-            reclaimCollAmount =
-                (loan.initCollAmount *
-                    loanRepayInstructions.targetRepayAmount) /
-                loan.initRepayAmount;
-            if (reclaimCollAmount == 0) {
+            reclaimCollAmount = SafeCast.toUint128(
+                (maxReclaimableCollAmount *
+                    uint256(loanRepayInstructions.targetRepayAmount)) /
+                    uint256(loan.initRepayAmount)
+            );
+            if (noCompartment && reclaimCollAmount == 0) {
                 revert Errors.ReclaimAmountIsZero();
             }
         }
@@ -200,7 +210,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loanRepayInstructions.targetRepayAmount,
             loanRepayInstructions.targetLoanId,
             reclaimCollAmount,
-            loan.collTokenCompartmentAddr,
+            noCompartment,
             loan.collToken
         );
 
@@ -209,7 +219,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loanRepayInstructions,
             loan,
             leftRepaymentAmount,
-            reclaimCollAmount
+            reclaimCollAmount,
+            noCompartment
         );
 
         emit Repaid(
@@ -347,9 +358,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.LoanRepayInstructions memory loanRepayInstructions,
         DataTypesPeerToPeer.Loan memory loan,
         uint128 leftRepaymentAmount,
-        uint128 reclaimCollAmount
+        uint128 reclaimCollAmount,
+        bool noCompartment
     ) internal {
-        loan.collTokenCompartmentAddr == address(0)
+        noCompartment
             ? ILenderVaultImpl(lenderVault).transferTo(
                 loan.collToken,
                 loanRepayInstructions.callbackAddr == address(0)
@@ -360,6 +372,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             : ILenderVaultImpl(lenderVault).transferCollFromCompartment(
                 loanRepayInstructions.targetRepayAmount,
                 leftRepaymentAmount,
+                reclaimCollAmount,
                 loan.borrower,
                 loan.collToken,
                 loanRepayInstructions.callbackAddr,

@@ -126,11 +126,11 @@ library DataTypesPeerToPeer {
     }
 
     struct TransferInstructions {
-        // ...
+        // collateral token receiver
         address collReceiver;
-        // ...
+        // effective upfront fee in collateral tokens (vault or compartment)
         uint256 upfrontFee;
-        // ...
+        // boolean flag indicating whether transfers relate to loan (or swap)
         bool isLoan;
     }
 

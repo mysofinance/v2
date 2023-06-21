@@ -33,20 +33,13 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
 
     // transfer coll on repays
     function _transferCollFromCompartment(
-        uint256 repayAmount,
-        uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
-    ) internal returns (uint128 reclaimCollAmount) {
+    ) internal {
         _withdrawCheck();
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
-        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
-            address(this)
-        );
-        reclaimCollAmount = SafeCast.toUint128(
-            (repayAmount * currentCompartmentBal) / repayAmountLeft
-        );
         address collReceiver = callbackAddr == address(0)
             ? borrowerAddr
             : callbackAddr;

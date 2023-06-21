@@ -100,7 +100,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         uint128 repayAmount,
         uint256 loanId,
         uint128 reclaimCollAmount,
-        address collTokenCompartmentAddr,
+        bool noCompartment,
         address collToken
     ) external {
         _senderCheckGateway();
@@ -109,7 +109,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loans[loanId].amountReclaimedSoFar += reclaimCollAmount;
 
         // only update lockedAmounts when no compartment
-        if (collTokenCompartmentAddr == address(0)) {
+        if (noCompartment) {
             lockedAmounts[collToken] -= reclaimCollAmount;
         }
     }
@@ -257,20 +257,21 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr,
         address collTokenCompartmentAddr
-    ) external returns (uint128 reclaimCollAmount) {
+    ) external {
         _senderCheckGateway();
-        reclaimCollAmount = IBaseCompartment(collTokenCompartmentAddr)
-            .transferCollFromCompartment(
-                repayAmount,
-                repayAmountLeft,
-                borrowerAddr,
-                collTokenAddr,
-                callbackAddr
-            );
+        IBaseCompartment(collTokenCompartmentAddr).transferCollFromCompartment(
+            repayAmount,
+            repayAmountLeft,
+            reclaimCollAmount,
+            borrowerAddr,
+            collTokenAddr,
+            callbackAddr
+        );
     }
 
     function setMinNumOfSigners(uint256 _minNumOfSigners) external {
@@ -427,29 +428,28 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                     )) /
                 Constants.BASE;
         }
+        uint256 unscaledLoanAmount = loanPerCollUnit *
+            (collSendAmount - expectedTransferFee);
+
+        // calculate loan amount
+        loanAmount =
+            unscaledLoanAmount /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+
+        // calculate interest rate factor
+        // @dev: custom typecasting rather than safecasting to catch when interest rate factor = 0
         int256 _interestRateFactor = int256(Constants.BASE) +
             quoteTuple.interestRatePctInBase;
         if (_interestRateFactor <= 0) {
             revert Errors.InvalidInterestRateFactor();
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
-        uint256 unscaledLoanAmount = loanPerCollUnit *
-            (collSendAmount - expectedTransferFee);
 
-        loanAmount =
-            unscaledLoanAmount /
-            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        // calculate repay amount
         repayAmount =
             (unscaledLoanAmount * interestRateFactor) /
             Constants.BASE /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
-        int256 _interestRateFactor = int256(Constants.BASE) +
-            quoteTuple.interestRatePctInBase;
-        if (_interestRateFactor <= 0) {
-            revert Errors.InvalidInterestRateFactor();
-        }
-        uint256 interestRateFactor = uint256(_interestRateFactor);
-        repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;
     }
 
     function _newOwnerProposalCheck(

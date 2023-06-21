@@ -2256,7 +2256,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'AlreadyStaked'
       )
       await expect(
-        crvCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
+        crvCompInstance.connect(team).transferCollFromCompartment(1, 1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
       ).to.be.revertedWithCustomError(crvCompInstance, 'InvalidSender')
 
       const lenderStakeStatus = await crvCompInstance.approvedStaker(lender.address)
@@ -2319,18 +2319,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           : BigNumber.from(0)
         // repay
         await expect(
-          borrowerGateway
-            .connect(borrower)
-            .repay(
-              {
-                targetLoanId: loanId,
-                targetRepayAmount: repayAmount,
-                expectedTransferFee: 0,
-                callbackAddr: callbackAddr,
-                callbackData: callbackData
-              },
-              lenderVault.address
-            )
+          borrowerGateway.connect(borrower).repay(
+            {
+              targetLoanId: loanId,
+              targetRepayAmount: repayAmount,
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
+            },
+            lenderVault.address
+          )
         )
           .to.emit(borrowerGateway, 'Repaid')
           .withArgs(lenderVault.address, loanId, repayAmount)
@@ -3088,7 +3086,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await expect(uniCompInstance.connect(team).initialize(borrower.address, 1)).to.be.reverted
 
       await expect(
-        uniCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
+        uniCompInstance.connect(team).transferCollFromCompartment(1, 1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
       ).to.be.revertedWithCustomError(uniCompInstance, 'InvalidSender')
 
       await expect(uniCompInstance.connect(team).unlockCollToVault(collTokenAddress)).to.be.revertedWithCustomError(
