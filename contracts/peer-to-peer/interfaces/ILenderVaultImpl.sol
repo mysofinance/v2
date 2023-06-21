@@ -59,14 +59,14 @@ interface ILenderVaultImpl {
      * @param repayAmount amount of loan repaid
      * @param loanId index of loan in loans array
      * @param collAmount amount of collateral to unlock
-     * @param collTokenCompartmentAddr address of the compartment to unlock collateral
+     * @param noCompartment boolean flag indicating whether loan has no compartment
      * @param collToken address of the collateral token
      */
     function updateLoanInfo(
         uint128 repayAmount,
         uint256 loanId,
         uint128 collAmount,
-        address collTokenCompartmentAddr,
+        bool noCompartment,
         address collToken
     ) external;
 
@@ -120,22 +120,23 @@ interface ILenderVaultImpl {
      * @notice function to transfer token from a compartment
      * @dev only borrow gateway can call this function, if callbackAddr, then
      * the collateral will be transferred to the callback address
-     * @param repayAmount amount of loan token that was repaid
-     * @param repayAmountLeft amount of loan still outstanding
+     * @param repayAmount amount of loan token to be repaid
+     * @param repayAmountLeft amount of loan token still outstanding
+     * @param reclaimCollAmount amount of collateral to be reclaimed
      * @param borrowerAddr address of the borrower
      * @param collTokenAddr address of the coll token to transfer to compartment
      * @param callbackAddr address of callback
      * @param collTokenCompartmentAddr address of the coll token compartment
-     * @return reclaimCollAmount amount of transferred collateral
      */
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr,
         address collTokenCompartmentAddr
-    ) external returns (uint128 reclaimCollAmount);
+    ) external;
 
     /**
      * @notice function to set minimum number of signers required for an offchain quote

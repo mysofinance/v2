@@ -13,6 +13,8 @@ import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
 
 contract CurveLPStakingCompartment is BaseCompartment {
+    // solhint-disable no-empty-blocks
+
     using SafeERC20 for IERC20;
 
     address public liqGaugeAddr;
@@ -80,13 +82,15 @@ contract CurveLPStakingCompartment is BaseCompartment {
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 /*reclaimCollAmount*/,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
-    ) external returns (uint128 reclaimCollAmount) {
-        reclaimCollAmount = _collAccountingHelper(
+    ) external {
+        _collAccountingHelper(
             repayAmount,
             repayAmountLeft,
+            0,
             borrowerAddr,
             collTokenAddr,
             callbackAddr,
@@ -99,6 +103,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         _collAccountingHelper(
             1,
             1,
+            0,
             address(0),
             collTokenAddr,
             address(0),
@@ -106,24 +111,31 @@ contract CurveLPStakingCompartment is BaseCompartment {
         );
     }
 
+    function getReclaimableBalance(
+        address collToken
+    ) external view override returns (uint256 reclaimableCollBalance) {
+        reclaimableCollBalance = IERC20(collToken).balanceOf(address(this));
+        address _liqGaugeAddr = liqGaugeAddr;
+        if (_liqGaugeAddr != address(0)) {
+            reclaimableCollBalance += IERC20(_liqGaugeAddr).balanceOf(
+                address(this)
+            );
+        }
+    }
+
     function _withdrawCollFromGauge(
+        address _liqGaugeAddr,
         uint256 repayAmount,
         uint256 repayAmountLeft
     ) internal returns (address[8] memory _rewardTokenAddr) {
-        address _liqGaugeAddr = liqGaugeAddr;
-
         uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
             address(this)
         );
-
         // withdraw proportion of gauge amount
         uint256 withdrawAmount = (repayAmount * currentStakedBal) /
             repayAmountLeft;
-
         IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
-
         uint256 index;
-
         try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
             address rewardTokenAddrZeroIndex
         ) {
@@ -164,6 +176,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
     function _collAccountingHelper(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 /*reclaimableCollBalance*/,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr,
@@ -178,6 +191,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         address[8] memory _rewardTokenAddr;
         if (_liqGaugeAddr != address(0)) {
             _rewardTokenAddr = _withdrawCollFromGauge(
+                _liqGaugeAddr,
                 repayAmount,
                 repayAmountLeft
             );
