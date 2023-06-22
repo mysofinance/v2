@@ -199,7 +199,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             reclaimCollAmount = SafeCast.toUint128(
                 (maxReclaimableCollAmount *
                     uint256(loanRepayInstructions.targetRepayAmount)) /
-                    uint256(loan.initRepayAmount)
+                    uint256(leftRepaymentAmount)
             );
             if (noCompartment && reclaimCollAmount == 0) {
                 revert Errors.ReclaimAmountIsZero();
