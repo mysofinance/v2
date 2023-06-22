@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
-import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
+import {ICurveStakingHelper} from "../../interfaces/compartments/staking/ICurveStakingHelper.sol";
 import {ILenderVaultImpl} from "../../interfaces/ILenderVaultImpl.sol";
 import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
@@ -44,7 +44,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
 
         uint256 amount = IERC20(loan.collToken).balanceOf(address(this));
 
-        address _liqGaugeAddr = IStakingHelper(GAUGE_CONTROLLER).gauges(
+        address _liqGaugeAddr = ICurveStakingHelper(GAUGE_CONTROLLER).gauges(
             gaugeIndex
         );
 
@@ -52,13 +52,14 @@ contract CurveLPStakingCompartment is BaseCompartment {
             revert Errors.InvalidGaugeIndex();
         }
 
-        address lpTokenAddrForGauge = IStakingHelper(_liqGaugeAddr).lp_token();
+        address lpTokenAddrForGauge = ICurveStakingHelper(_liqGaugeAddr)
+            .lp_token();
         if (lpTokenAddrForGauge != loan.collToken) {
             revert Errors.IncorrectGaugeForLpToken();
         }
         liqGaugeAddr = _liqGaugeAddr;
         IERC20(loan.collToken).safeIncreaseAllowance(_liqGaugeAddr, amount);
-        IStakingHelper(_liqGaugeAddr).deposit(amount);
+        ICurveStakingHelper(_liqGaugeAddr).deposit(amount);
         IERC20(loan.collToken).safeDecreaseAllowance(
             _liqGaugeAddr,
             IERC20(loan.collToken).allowance(address(this), _liqGaugeAddr)
@@ -134,9 +135,9 @@ contract CurveLPStakingCompartment is BaseCompartment {
         // withdraw proportion of gauge amount
         uint256 withdrawAmount = (repayAmount * currentStakedBal) /
             repayAmountLeft;
-        IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
+        ICurveStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
         uint256 index;
-        try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
+        try ICurveStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
             address rewardTokenAddrZeroIndex
         ) {
             // versions 2, 3, 4, or 5
@@ -144,9 +145,8 @@ contract CurveLPStakingCompartment is BaseCompartment {
             index = 1;
             address rewardTokenAddr;
             while (index < 8) {
-                rewardTokenAddr = IStakingHelper(_liqGaugeAddr).reward_tokens(
-                    index
-                );
+                rewardTokenAddr = ICurveStakingHelper(_liqGaugeAddr)
+                    .reward_tokens(index);
                 if (rewardTokenAddr != address(0)) {
                     _rewardTokenAddr[index] = rewardTokenAddr;
                 } else {
@@ -158,17 +158,22 @@ contract CurveLPStakingCompartment is BaseCompartment {
             }
         } catch {
             // version 1 gauge
-            IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+            ICurveStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
         }
         if (index > 0) {
-            try IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount, true) {
+            try
+                ICurveStakingHelper(_liqGaugeAddr).withdraw(
+                    withdrawAmount,
+                    true
+                )
+            {
                 // version 3, 4, or 5 gauge
             } catch {
                 // version 2 gauge
                 if (_rewardTokenAddr[0] != address(0)) {
-                    IStakingHelper(_liqGaugeAddr).claim_rewards();
+                    ICurveStakingHelper(_liqGaugeAddr).claim_rewards();
                 }
-                IStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
+                ICurveStakingHelper(_liqGaugeAddr).withdraw(withdrawAmount);
             }
         }
     }

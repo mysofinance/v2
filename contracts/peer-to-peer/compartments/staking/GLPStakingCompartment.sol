@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
+import {IGLPStakingHelper} from "../../interfaces/compartments/staking/IGLPStakingHelper.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
 
@@ -35,7 +35,7 @@ contract GLPStakingCompartment is BaseCompartment {
         );
 
         //solhint-ignore-empty-blocks
-        try IStakingHelper(FEE_GLP).claim(address(this)) {
+        try IGLPStakingHelper(FEE_GLP).claim(address(this)) {
             // do nothing
         } catch {
             // do nothing
@@ -55,7 +55,7 @@ contract GLPStakingCompartment is BaseCompartment {
         _unlockCollToVault(collTokenAddr);
 
         //solhint-ignore-empty-blocks
-        try IStakingHelper(FEE_GLP).claim(address(this)) {
+        try IGLPStakingHelper(FEE_GLP).claim(address(this)) {
             // do nothing
         } catch {
             // do nothing
