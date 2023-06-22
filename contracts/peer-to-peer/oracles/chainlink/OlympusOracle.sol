@@ -7,6 +7,7 @@ import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/Aggregat
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
+import {ChainlinkBase} from "./ChainlinkBase.sol";
 import {Errors} from "../../../Errors.sol";
 
 /**
@@ -40,7 +41,7 @@ contract OlympusOracle is IOracle, ChainlinkBasic {
     )
         external
         view
-        override(ChainlinkBasic, IOracle)
+        override(ChainlinkBase, IOracle)
         returns (uint256 collTokenPriceInLoanToken)
     {
         if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {

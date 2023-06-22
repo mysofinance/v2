@@ -7,6 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {IUniV2} from "../../interfaces/oracles/IUniV2.sol";
+import {ChainlinkBase} from "./ChainlinkBase.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
 
@@ -56,7 +57,7 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
     )
         external
         view
-        override(ChainlinkBasic, IOracle)
+        override(ChainlinkBase, IOracle)
         returns (uint256 collTokenPriceInLoanToken)
     {
         bool isCollTokenLpToken = isLpToken[collToken];

@@ -603,7 +603,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault } =
         await setupTest()
 
-      const ChainlinkBasicWithSequencerImplementation = await ethers.getContractFactory('ChainlinkBasicWithSequencer')
+      const ChainlinkBasicWithSequencerImplementation = await ethers.getContractFactory('ChainlinkArbitrumSequencerUSD')
 
       const chainlinkBasicWithSequencerImplementation = await ChainlinkBasicWithSequencerImplementation.connect(team).deploy(
         [usdc.address, weth.address],
@@ -698,8 +698,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
-      expect(Math.abs(Number(vaultWethBalPost.sub(vaultWethBalPre).sub(collSendAmount.toString())))).to.lessThanOrEqual(1)
-      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
+      expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(collSendAmount)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(maxLoanPerColl)
     })
   })
 })

@@ -38,11 +38,7 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
             uint256 answer2 = _checkAndReturnLatestRoundData(BTC_USD_ORACLE);
             tokenPriceRaw = (answer1 * answer2) / BASE_CURRENCY_UNIT;
         } else {
-            address oracleAddr = oracleAddrs[token];
-            if (oracleAddr == address(0)) {
-                revert Errors.NoOracle();
-            }
-            tokenPriceRaw = _checkAndReturnLatestRoundData(oracleAddr);
+            tokenPriceRaw = super._getPriceOfToken(token);
         }
     }
 }

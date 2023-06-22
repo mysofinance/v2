@@ -3,14 +3,14 @@
 pragma solidity 0.8.19;
 
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
-import {ChainlinkBasic} from "./ChainlinkBasic.sol";
+import {ChainlinkBase} from "./ChainlinkBase.sol";
 import {Constants} from "../../../Constants.sol";
 import {Errors} from "../../../Errors.sol";
 
 /**
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
-contract ChainlinkBasicWithSequencer is ChainlinkBasic {
+contract ChainlinkArbitrumSequencerUSD is ChainlinkBase {
     // solhint-disable no-empty-blocks
     address internal constant SEQUENCER_FEED =
         0xFdB631F5EE196F0ed6FAa767959853A9F217697D; // arbitrum sequencer feed
@@ -19,14 +19,7 @@ contract ChainlinkBasicWithSequencer is ChainlinkBasic {
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         uint256 baseCurrencyUnit
-    )
-        ChainlinkBasic(
-            _tokenAddrs,
-            _oracleAddrs,
-            0x000000000000000000000000000000000000dEaD, // no base currency needed for USD on arbitrum
-            baseCurrencyUnit
-        )
-    {}
+    ) ChainlinkBase(_tokenAddrs, _oracleAddrs, baseCurrencyUnit) {}
 
     function _checkAndReturnLatestRoundData(
         address oracleAddr
