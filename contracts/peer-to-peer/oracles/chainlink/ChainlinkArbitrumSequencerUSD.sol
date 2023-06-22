@@ -17,9 +17,8 @@ contract ChainlinkArbitrumSequencerUSD is ChainlinkBase {
 
     constructor(
         address[] memory _tokenAddrs,
-        address[] memory _oracleAddrs,
-        uint256 baseCurrencyUnit
-    ) ChainlinkBase(_tokenAddrs, _oracleAddrs, baseCurrencyUnit) {}
+        address[] memory _oracleAddrs
+    ) ChainlinkBase(_tokenAddrs, _oracleAddrs, 1e8) {}
 
     function _checkAndReturnLatestRoundData(
         address oracleAddr

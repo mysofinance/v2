@@ -607,8 +607,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
       const chainlinkBasicWithSequencerImplementation = await ChainlinkBasicWithSequencerImplementation.connect(team).deploy(
         [usdc.address, weth.address],
-        [usdcUsdChainlinkAddr, ethUsdChainlinkAddr],
-        10 ** 8
+        [usdcUsdChainlinkAddr, ethUsdChainlinkAddr]
       )
 
       await chainlinkBasicWithSequencerImplementation.deployed()
