@@ -23,7 +23,7 @@ contract ChainlinkBasicWithSequencer is ChainlinkBasic {
         ChainlinkBasic(
             _tokenAddrs,
             _oracleAddrs,
-            0x000000000000000000000000000000000000dEaD, // no base currency needed on L2
+            0x000000000000000000000000000000000000dEaD, // no base currency needed for USD on arbitrum
             baseCurrencyUnit
         )
     {}

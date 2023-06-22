@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { BigNumber } from 'ethers'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG, getArbitrumForkingConfig } from '../../hardhat.config'
-import { collTokenAbi, gmxRewardRouterAbi } from './helpers/abi'
+import { collTokenAbi, gmxRewardRouterAbi, chainlinkAggregatorAbi } from './helpers/abi'
 import { createOnChainRequest, setupBorrowerWhitelist } from './helpers/misc'
 import { fromReadableAmount, getOptimCollSendAndFlashBorrowAmount, toReadableAmount } from './helpers/uniV3'
 import { SupportedChainId, Token } from '@uniswap/sdk-core'
@@ -594,5 +594,112 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
     ).to.be.reverted
+  })
+  describe('Testing chainlink arbitrum oracles', function () {
+    const usdcUsdChainlinkAddr = '0x50834f3163758fcc1df9973b6e91f0f0f0434ad3'
+    const ethUsdChainlinkAddr = '0x639fe6ab55c921f74e7fac1ee960c0b6293ba612'
+
+    it('Should process usd based oracles correctly', async function () {
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, usdc, weth, team, lenderVault } =
+        await setupTest()
+
+      const ChainlinkBasicWithSequencerImplementation = await ethers.getContractFactory('ChainlinkBasicWithSequencer')
+
+      const chainlinkBasicWithSequencerImplementation = await ChainlinkBasicWithSequencerImplementation.connect(team).deploy(
+        [usdc.address, weth.address],
+        [usdcUsdChainlinkAddr, ethUsdChainlinkAddr],
+        10 ** 8
+      )
+
+      await chainlinkBasicWithSequencerImplementation.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([chainlinkBasicWithSequencerImplementation.address], 2)
+
+      const usdcOracleInstance = new ethers.Contract(usdcUsdChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+      const wethOracleInstance = new ethers.Contract(ethUsdChainlinkAddr, chainlinkAggregatorAbi, borrower.provider)
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: BASE.mul(75).div(100),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: chainlinkBasicWithSequencerImplementation.address,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      // borrower approves and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const collSendAmount = ONE_WETH
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // check balance post borrow
+      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+
+      const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
+      const collTokenRoundData = await wethOracleInstance.latestRoundData()
+      const loanTokenPriceRaw = loanTokenRoundData.answer
+      const collTokenPriceRaw = collTokenRoundData.answer
+
+      const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_USDC).div(loanTokenPriceRaw)
+      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+
+      expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(collSendAmount)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
+      expect(Math.abs(Number(vaultWethBalPost.sub(vaultWethBalPre).sub(collSendAmount.toString())))).to.lessThanOrEqual(1)
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost).sub(maxLoanPerColl)).to.equal(0)
+    })
   })
 })
