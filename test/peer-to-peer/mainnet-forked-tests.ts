@@ -1585,6 +1585,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         lenderVault.address
       )
 
+      // after first repay, half the init collateral should be unlocked and sent from vault
       const collBalPostFirstRepayVault = await weth.balanceOf(lenderVault.address)
       const lockedVaultCollPostRepay = await lenderVault.lockedAmounts(weth.address)
 
@@ -1604,6 +1605,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         lenderVault.address
       )
 
+      // second repay should unlock another quarter of the init collateral, so only 1/4 should be locked
       const collBalPostSecondRepayVault = await weth.balanceOf(lenderVault.address)
       const lockedVaultCollPostSecondRepay = await lenderVault.lockedAmounts(weth.address)
 
@@ -1612,6 +1614,27 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         collBalPostFirstRepayVault.sub(collBalPostSecondRepayVault)
       )
       expect(lockedVaultCollPostSecondRepay).to.equal(initCollAmount.div(4))
+
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.div(16),
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+
+      // third repay should unlock 1/16 of the init collateral, so only 3/16 should be locked
+      const collBalPostThirdRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostThirdRepay = await lenderVault.lockedAmounts(weth.address)
+
+      expect(collBalPostSecondRepayVault.sub(collBalPostThirdRepayVault)).to.equal(initCollAmount.div(16))
+      expect(lockedVaultCollPostSecondRepay.sub(lockedVaultCollPostThirdRepay)).to.equal(
+        collBalPostSecondRepayVault.sub(collBalPostThirdRepayVault)
+      )
+      expect(lockedVaultCollPostThirdRepay).to.equal(initCollAmount.mul(3).div(16))
     })
 
     it('Should revert on invalid repays', async function () {
