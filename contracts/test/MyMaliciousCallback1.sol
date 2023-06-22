@@ -3,6 +3,8 @@
 pragma solidity 0.8.19;
 
 contract MyMaliciousCallback1 {
+    // solhint-disable avoid-low-level-calls no-inline-assembly no-empty-blocks
+
     uint256 internal _vaultVictim;
     address internal _collToken;
     address internal _compartmentVictim;
@@ -28,7 +30,8 @@ contract MyMaliciousCallback1 {
          */
         (bool success, bytes memory result) = _compartmentVictim.delegatecall(
             abi.encodeWithSignature(
-                "transferCollFromCompartment(uint256,uint256,address,address,address)",
+                "transferCollFromCompartment(uint256,uint256,uint128,address,address,address)",
+                1,
                 1,
                 1,
                 address(this),
@@ -46,6 +49,7 @@ contract MyMaliciousCallback1 {
                 revert(add(result, 32), mload(result))
             }
         }
+        return 0;
     }
 
     function transfer(address, uint256) external returns (bool) {}

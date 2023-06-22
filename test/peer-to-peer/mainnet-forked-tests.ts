@@ -1093,11 +1093,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         {
           targetLoanId: loanId,
           targetRepayAmount: repayAmount.div(2),
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
+        lenderVault.address
       )
 
       const collBalPostRepayVault = await weth.balanceOf(lenderVault.address)
@@ -1155,7 +1155,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([weth.address])
       expect(tokenBalanceAndLockedAmountsPostRepay._lockedAmounts[0]).to.equal(0)
 
-      // since did not autowithdraw, no change in collateral balance
+      // no change in collateral balance
       expect(collBalPostUnlock).to.equal(collBalPostRepayVault)
       // all coll has been unlocked
       expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostUnlock)).to.equal(initCollAmount)
@@ -1456,6 +1456,200 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(postVaultBal2).to.be.equal(0)
     })
 
+    it('Should handle multiple repays correctly', async function () {
+      const {
+        borrowerGateway,
+        addressRegistry,
+        quoteHandler,
+        lender,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const upfrontFeePctInBase = BASE.mul(1).div(100)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: upfrontFeePctInBase,
+          tenor: ONE_DAY.mul(365)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // borrow with on chain quote
+      const collSendAmount = ONE_WETH
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      // get borrower whitelisted
+      const whitelistedUntil = Number(timestamp.toString()) + 60 * 60 * 365
+      await setupBorrowerWhitelist({
+        addressRegistry: addressRegistry,
+        borrower: borrower,
+        whitelistAuthority: whitelistAuthority,
+        chainId: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+        whitelistedUntil: whitelistedUntil
+      })
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
+      })
+
+      expect(borrowEvent).to.not.be.undefined
+
+      // test partial repays with no compartment
+      const loanId = borrowEvent?.args?.['loanId']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+
+      // lender transfers usdc so borrower can repay (lender is like a faucet)
+      await usdc.connect(lender).transfer(borrower.address, 10000000000)
+
+      const collBalPreRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPreRepay = await lenderVault.lockedAmounts(weth.address)
+      const tokenBalanceAndLockedAmountsPreRepay = await lenderVault
+        .connect(lender)
+        .getTokenBalancesAndLockedAmounts([weth.address])
+      expect(tokenBalanceAndLockedAmountsPreRepay._lockedAmounts[0]).to.equal(lockedVaultCollPreRepay)
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.div(2),
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+
+      // after first repay, half the init collateral should be unlocked and sent from vault
+      const collBalPostFirstRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostRepay = await lenderVault.lockedAmounts(weth.address)
+
+      expect(collBalPreRepayVault.sub(collBalPostFirstRepayVault)).to.equal(initCollAmount.div(2))
+      expect(lockedVaultCollPreRepay.sub(lockedVaultCollPostRepay)).to.equal(
+        collBalPreRepayVault.sub(collBalPostFirstRepayVault)
+      )
+
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.div(4),
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+
+      // second repay should unlock another quarter of the init collateral, so only 1/4 should be locked
+      const collBalPostSecondRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostSecondRepay = await lenderVault.lockedAmounts(weth.address)
+
+      expect(collBalPostFirstRepayVault.sub(collBalPostSecondRepayVault)).to.equal(initCollAmount.div(4))
+      expect(lockedVaultCollPostRepay.sub(lockedVaultCollPostSecondRepay)).to.equal(
+        collBalPostFirstRepayVault.sub(collBalPostSecondRepayVault)
+      )
+      expect(lockedVaultCollPostSecondRepay).to.equal(initCollAmount.div(4))
+
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.div(16),
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+
+      // third repay should unlock 1/16 of the init collateral, so only 3/16 should be locked
+      const collBalPostThirdRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostThirdRepay = await lenderVault.lockedAmounts(weth.address)
+
+      expect(collBalPostSecondRepayVault.sub(collBalPostThirdRepayVault)).to.equal(initCollAmount.div(16))
+      expect(lockedVaultCollPostSecondRepay.sub(lockedVaultCollPostThirdRepay)).to.equal(
+        collBalPostSecondRepayVault.sub(collBalPostThirdRepayVault)
+      )
+      expect(lockedVaultCollPostThirdRepay).to.equal(initCollAmount.mul(3).div(16))
+
+      // final repay should unlock remaining 3/16 of collateral
+      const loan = await lenderVault.loan(loanId)
+      expect(loan.initRepayAmount.sub(loan.amountRepaidSoFar)).to.be.equal(repayAmount.mul(3).div(16))
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.mul(3).div(16),
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+      const collBalPostFourthRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostFourthRepay = await lenderVault.lockedAmounts(weth.address)
+      expect(collBalPostFourthRepayVault).to.equal(collSendAmount.mul(upfrontFeePctInBase).div(BASE))
+      expect(lockedVaultCollPostFourthRepay).to.equal(0)
+    })
+
     it('Should revert on invalid repays', async function () {
       const {
         borrowerGateway,
@@ -1561,11 +1755,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: 0,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidRepayAmount')
 
@@ -1575,11 +1769,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: 1,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
     })
@@ -1866,11 +2060,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: 0,
             targetRepayAmount: loan.initRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       )
 
@@ -2256,7 +2450,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'AlreadyStaked'
       )
       await expect(
-        crvCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
+        crvCompInstance.connect(team).transferCollFromCompartment(1, 1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
       ).to.be.revertedWithCustomError(crvCompInstance, 'InvalidSender')
 
       const lenderStakeStatus = await crvCompInstance.approvedStaker(lender.address)
@@ -2319,14 +2513,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           : BigNumber.from(0)
         // repay
         await expect(
-          borrowerGateway
-            .connect(borrower)
-            .repay(
-              { targetLoanId: loanId, targetRepayAmount: repayAmount, expectedTransferFee: 0 },
-              lenderVault.address,
-              callbackAddr,
-              callbackData
-            )
+          borrowerGateway.connect(borrower).repay(
+            {
+              targetLoanId: loanId,
+              targetRepayAmount: repayAmount,
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
+            },
+            lenderVault.address
+          )
         )
           .to.emit(borrowerGateway, 'Repaid')
           .withArgs(lenderVault.address, loanId, repayAmount)
@@ -2361,11 +2557,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             {
               targetLoanId: loanId,
               targetRepayAmount: MAX_UINT128,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidRepayAmount')
 
@@ -2379,11 +2575,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             {
               targetLoanId: loanId,
               targetRepayAmount: partialRepayAmount,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         )
           .to.emit(borrowerGateway, 'Repaid')
@@ -2407,16 +2603,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
         await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
+        // check borrower cannot access collateral anymore after default
+        await expect(crvCompInstance.connect(lender).stake(compartmentData)).to.be.revertedWithCustomError(
+          crvCompInstance,
+          'LoanExpired'
+        )
+
         await expect(
           borrowerGateway.connect(borrower).repay(
             {
               targetLoanId: loanId,
               targetRepayAmount: partialRepayAmount,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         ).to.be.revertedWithCustomError(borrowerGateway, 'OutsideValidRepayWindow')
 
@@ -2706,11 +2908,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       )
         .to.emit(borrowerGateway, 'Repaid')
@@ -2900,11 +3102,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       )
         .to.emit(borrowerGateway, 'Repaid')
@@ -2915,6 +3117,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(borrowerCollRepayBalPost).to.be.equal(borrowerUNIBalPre.sub(upfrontFee).div(coeffRepay))
 
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // check borrower cannot access collateral anymore after default
+      await expect(uniCompInstance.connect(borrower).delegate(borrower.address)).to.be.revertedWithCustomError(
+        uniCompInstance,
+        'LoanExpired'
+      )
 
       // unlock collateral
       const lenderCollBalPre = await collInstance.balanceOf(lender.address)
@@ -3072,7 +3280,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await expect(uniCompInstance.connect(team).initialize(borrower.address, 1)).to.be.reverted
 
       await expect(
-        uniCompInstance.connect(team).transferCollFromCompartment(1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
+        uniCompInstance.connect(team).transferCollFromCompartment(1, 1, 1, borrower.address, collTokenAddress, ZERO_ADDR)
       ).to.be.revertedWithCustomError(uniCompInstance, 'InvalidSender')
 
       await expect(uniCompInstance.connect(team).unlockCollToVault(collTokenAddress)).to.be.revertedWithCustomError(
@@ -3117,11 +3325,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackDataRepay
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       ).to.revertedWithCustomError(borrowerGateway, 'NonWhitelistedCallback')
 
@@ -3132,11 +3340,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: BigNumber.from(0).add(1)
+            expectedTransferFee: BigNumber.from(0).add(1),
+            callbackAddr: callbackAddr,
+            callbackData: callbackDataRepay
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       ).to.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
@@ -3150,11 +3358,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackDataRepay
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackDataRepay
+          lenderVault.address
         )
       )
         .to.emit(borrowerGateway, 'Repaid')
@@ -3795,23 +4003,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const repayBody = {
         targetLoanId: loanId,
         targetRepayAmount: ONE_PAXG.mul(10).mul(110).div(100),
-        expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100), 2)
+        expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100), 2),
+        callbackAddr: callbackAddr,
+        callbackData: callbackData
       }
 
-      await expect(borrowerGateway.connect(borrower).repay(repayBody, team.address, callbackAddr, callbackData)).to.be
-        .reverted
+      await expect(borrowerGateway.connect(borrower).repay(repayBody, team.address)).to.be.reverted
 
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .repay({ ...repayBody, expectedTransferFee: BASE }, lenderVault.address, callbackAddr, callbackData)
-      ).to.be.reverted
+      await expect(borrowerGateway.connect(borrower).repay({ ...repayBody, expectedTransferFee: BASE }, lenderVault.address))
+        .to.be.reverted
 
-      await expect(
-        borrowerGateway.connect(team).repay(repayBody, lenderVault.address, callbackAddr, callbackData)
-      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidBorrower')
+      await expect(borrowerGateway.connect(team).repay(repayBody, lenderVault.address)).to.be.revertedWithCustomError(
+        borrowerGateway,
+        'InvalidBorrower'
+      )
 
-      await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address, callbackAddr, callbackData))
+      await expect(borrowerGateway.connect(borrower).repay(repayBody, lenderVault.address))
         .to.emit(borrowerGateway, 'Repaid')
         .withArgs(lenderVault.address, loanId, ONE_PAXG.mul(10).mul(110).div(100))
       const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
