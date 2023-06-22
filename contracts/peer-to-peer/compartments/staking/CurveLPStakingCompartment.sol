@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IStakingHelper} from "../../interfaces/compartments/staking/IStakingHelper.sol";
@@ -12,6 +13,8 @@ import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
 
 contract CurveLPStakingCompartment is BaseCompartment {
+    // solhint-disable no-empty-blocks
+
     using SafeERC20 for IERC20;
 
     address public liqGaugeAddr;
@@ -31,6 +34,9 @@ contract CurveLPStakingCompartment is BaseCompartment {
         );
         if (msg.sender != loan.borrower && !approvedStaker[msg.sender]) {
             revert Errors.InvalidSender();
+        }
+        if (block.timestamp >= loan.expiry) {
+            revert Errors.LoanExpired();
         }
         if (liqGaugeAddr != address(0)) {
             revert Errors.AlreadyStaked();
@@ -76,6 +82,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 /*reclaimCollAmount*/,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
@@ -83,6 +90,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         _collAccountingHelper(
             repayAmount,
             repayAmountLeft,
+            0,
             borrowerAddr,
             collTokenAddr,
             callbackAddr,
@@ -95,6 +103,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         _collAccountingHelper(
             1,
             1,
+            0,
             address(0),
             collTokenAddr,
             address(0),
@@ -102,24 +111,31 @@ contract CurveLPStakingCompartment is BaseCompartment {
         );
     }
 
+    function getReclaimableBalance(
+        address collToken
+    ) external view override returns (uint256 reclaimableCollBalance) {
+        reclaimableCollBalance = IERC20(collToken).balanceOf(address(this));
+        address _liqGaugeAddr = liqGaugeAddr;
+        if (_liqGaugeAddr != address(0)) {
+            reclaimableCollBalance += IERC20(_liqGaugeAddr).balanceOf(
+                address(this)
+            );
+        }
+    }
+
     function _withdrawCollFromGauge(
+        address _liqGaugeAddr,
         uint256 repayAmount,
         uint256 repayAmountLeft
     ) internal returns (address[8] memory _rewardTokenAddr) {
-        address _liqGaugeAddr = liqGaugeAddr;
-
         uint256 currentStakedBal = IERC20(_liqGaugeAddr).balanceOf(
             address(this)
         );
-
         // withdraw proportion of gauge amount
         uint256 withdrawAmount = (repayAmount * currentStakedBal) /
             repayAmountLeft;
-
         IStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
-
         uint256 index;
-
         try IStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
             address rewardTokenAddrZeroIndex
         ) {
@@ -160,28 +176,26 @@ contract CurveLPStakingCompartment is BaseCompartment {
     function _collAccountingHelper(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 /*reclaimableCollBalance*/,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr,
         bool isUnlock
-    ) internal {
+    ) internal returns (uint128 lpTokenAmount) {
         _withdrawCheck();
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
+
         address _liqGaugeAddr = liqGaugeAddr;
-        // check staked balance in gauge if gaugeAddr has been set
-        // if not staked, then liqGaugeAddr = 0 and will not withdraw or have a reward address
-        address[8] memory _rewardTokenAddr = _liqGaugeAddr != address(0)
-            ? _withdrawCollFromGauge(repayAmount, repayAmountLeft)
-            : [
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(0),
-                address(0)
-            ];
+
+        // if gaugeAddr has been set, withdraw from gauge and get reward token addresses
+        address[8] memory _rewardTokenAddr;
+        if (_liqGaugeAddr != address(0)) {
+            _rewardTokenAddr = _withdrawCollFromGauge(
+                _liqGaugeAddr,
+                repayAmount,
+                repayAmountLeft
+            );
+        }
 
         // now check lp token balance of compartment which will be portion unstaked (could have never been staked)
         uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
@@ -189,19 +203,39 @@ contract CurveLPStakingCompartment is BaseCompartment {
         );
 
         // transfer proportion of compartment lp token balance if never staked or an unlock, else all balance if staked
-        {
-            uint256 lpTokenAmount = isUnlock || _liqGaugeAddr != address(0)
+        lpTokenAmount = SafeCast.toUint128(
+            isUnlock || _liqGaugeAddr != address(0)
                 ? currentCompartmentBal
-                : (repayAmount * currentCompartmentBal) / repayAmountLeft;
+                : (repayAmount * currentCompartmentBal) / repayAmountLeft
+        );
 
-            // if unlock, send to vault, else if callback send directly there, else to borrower
-            address lpTokenReceiver = isUnlock
-                ? vaultAddr
-                : (callbackAddr == address(0) ? borrowerAddr : callbackAddr);
+        // if unlock, send to vault, else if callback send directly there, else to borrower
+        address lpTokenReceiver = isUnlock
+            ? vaultAddr
+            : (callbackAddr == address(0) ? borrowerAddr : callbackAddr);
 
-            IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
+        IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
+
+        if (_liqGaugeAddr != address(0)) {
+            _payoutRewards(
+                isUnlock,
+                borrowerAddr,
+                repayAmount,
+                repayAmountLeft,
+                collTokenAddr,
+                _rewardTokenAddr
+            );
         }
+    }
 
+    function _payoutRewards(
+        bool isUnlock,
+        address borrowerAddr,
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
+        address collTokenAddr,
+        address[8] memory _rewardTokenAddr
+    ) internal {
         // rest of rewards are always sent to borrower, not for callback
         // if unlock then sent to vaultAddr
         address rewardReceiver = isUnlock ? vaultAddr : borrowerAddr;

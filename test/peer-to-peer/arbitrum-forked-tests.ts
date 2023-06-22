@@ -283,11 +283,11 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
         {
           targetLoanId: loanId,
           targetRepayAmount: partialRepayAmount,
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
+        lenderVault.address
       )
     )
       .to.emit(borrowerGateway, 'Repaid')
@@ -483,11 +483,11 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
         {
           targetLoanId: 0,
           targetRepayAmount: loan.initRepayAmount,
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackDataRepay
+        lenderVault.address
       )
     )
   })

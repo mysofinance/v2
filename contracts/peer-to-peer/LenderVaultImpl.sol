@@ -99,18 +99,18 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function updateLoanInfo(
         uint128 repayAmount,
         uint256 loanId,
-        uint128 collAmount,
-        address collTokenCompartmentAddr,
+        uint128 reclaimCollAmount,
+        bool noCompartment,
         address collToken
     ) external {
         _senderCheckGateway();
 
         _loans[loanId].amountRepaidSoFar += repayAmount;
-        _loans[loanId].amountReclaimedSoFar += collAmount;
+        _loans[loanId].amountReclaimedSoFar += reclaimCollAmount;
 
         // only update lockedAmounts when no compartment
-        if (collTokenCompartmentAddr == address(0)) {
-            lockedAmounts[collToken] -= collAmount;
+        if (noCompartment) {
+            lockedAmounts[collToken] -= reclaimCollAmount;
         }
     }
 
@@ -125,18 +125,18 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         returns (
             DataTypesPeerToPeer.Loan memory _loan,
             uint256 loanId,
-            uint256 upfrontFee,
-            address collReceiver
+            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
         )
     {
         _senderCheckGateway();
-        upfrontFee =
+        transferInstructions.upfrontFee =
             (borrowInstructions.collSendAmount *
                 quoteTuple.upfrontFeePctInBase) /
             Constants.BASE;
         if (
             borrowInstructions.collSendAmount <
-            upfrontFee + borrowInstructions.expectedTransferFee
+            transferInstructions.upfrontFee +
+                borrowInstructions.expectedTransferFee
         ) {
             revert Errors.InsufficientSendAmount();
         }
@@ -156,14 +156,14 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         if (loanAmount < borrowInstructions.minLoanAmount || loanAmount == 0) {
             revert Errors.TooSmallLoanAmount();
         }
-        collReceiver = address(this);
+        transferInstructions.collReceiver = address(this);
         _loan.borrower = borrower;
         _loan.loanToken = generalQuoteInfo.loanToken;
         _loan.collToken = generalQuoteInfo.collToken;
         _loan.initLoanAmount = SafeCast.toUint128(loanAmount);
         _loan.initCollAmount = SafeCast.toUint128(
             borrowInstructions.collSendAmount -
-                upfrontFee -
+                transferInstructions.upfrontFee -
                 borrowInstructions.expectedTransferFee
         );
         if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
@@ -191,16 +191,17 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             ) {
                 lockedAmounts[_loan.collToken] += _loan.initCollAmount;
             } else {
-                collReceiver = _createCollCompartment(
+                transferInstructions.collReceiver = _createCollCompartment(
                     generalQuoteInfo.borrowerCompartmentImplementation,
                     _loans.length
                 );
-                _loan.collTokenCompartmentAddr = collReceiver;
+                _loan.collTokenCompartmentAddr = transferInstructions
+                    .collReceiver;
             }
             _loan.initRepayAmount = SafeCast.toUint128(repayAmount);
             loanId = _loans.length;
             _loans.push(_loan);
-            emit QuoteProcessed(borrower, _loan, loanId, collReceiver, true);
+            transferInstructions.isLoan = true;
         } else if (quoteTuple.upfrontFeePctInBase == Constants.BASE) {
             // note: if upfrontFee=100% this corresponds to an outright swap; check that tenor is zero
             if (
@@ -210,10 +211,16 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             ) {
                 revert Errors.InvalidSwap();
             }
-            emit QuoteProcessed(borrower, _loan, loanId, collReceiver, false);
         } else {
             revert Errors.InvalidUpfrontFee();
         }
+        emit QuoteProcessed(
+            borrower,
+            _loan,
+            loanId,
+            transferInstructions.collReceiver,
+            transferInstructions.isLoan
+        );
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -237,12 +244,20 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         uint256 amount
     ) external {
         _senderCheckGateway();
+        if (
+            amount >
+            IERC20Metadata(token).balanceOf(address(this)) -
+                lockedAmounts[token]
+        ) {
+            revert Errors.InsufficientVaultFunds();
+        }
         IERC20Metadata(token).safeTransfer(recipient, amount);
     }
 
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr,
@@ -252,6 +267,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         IBaseCompartment(collTokenCompartmentAddr).transferCollFromCompartment(
             repayAmount,
             repayAmountLeft,
+            reclaimCollAmount,
             borrowerAddr,
             collTokenAddr,
             callbackAddr
@@ -412,25 +428,28 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                     )) /
                 Constants.BASE;
         }
+        uint256 unscaledLoanAmount = loanPerCollUnit *
+            (collSendAmount - expectedTransferFee);
+
+        // calculate loan amount
         loanAmount =
-            (loanPerCollUnit * (collSendAmount - expectedTransferFee)) /
+            unscaledLoanAmount /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
-        uint256 vaultLoanTokenBal = IERC20(generalQuoteInfo.loanToken)
-            .balanceOf(address(this));
-        // check if loan is too big for vault excluding locked funds
-        if (
-            loanAmount >
-            vaultLoanTokenBal - lockedAmounts[generalQuoteInfo.loanToken]
-        ) {
-            revert Errors.InsufficientVaultFunds();
-        }
+
+        // calculate interest rate factor
+        // @dev: custom typecasting rather than safecasting to catch when interest rate factor = 0
         int256 _interestRateFactor = int256(Constants.BASE) +
             quoteTuple.interestRatePctInBase;
         if (_interestRateFactor <= 0) {
             revert Errors.InvalidInterestRateFactor();
         }
         uint256 interestRateFactor = uint256(_interestRateFactor);
-        repayAmount = (loanAmount * interestRateFactor) / Constants.BASE;
+
+        // calculate repay amount
+        repayAmount =
+            (unscaledLoanAmount * interestRateFactor) /
+            Constants.BASE /
+            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
     }
 
     function _newOwnerProposalCheck(

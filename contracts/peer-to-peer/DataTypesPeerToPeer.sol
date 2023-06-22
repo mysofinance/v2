@@ -104,6 +104,10 @@ library DataTypesPeerToPeer {
         // expected transfer fees in loan token (=0 for tokens without transfer fee)
         // note: amount that borrower sends is targetRepayAmount + expectedTransferFee
         uint128 expectedTransferFee;
+        // e.g., for using collateral to payoff debt via DEX
+        address callbackAddr;
+        // any data needed by callback
+        bytes callbackData;
     }
 
     struct BorrowTransferInstructions {
@@ -119,6 +123,15 @@ library DataTypesPeerToPeer {
         address callbackAddr;
         // any data needed by callback
         bytes callbackData;
+    }
+
+    struct TransferInstructions {
+        // collateral token receiver
+        address collReceiver;
+        // effective upfront fee in collateral tokens (vault or compartment)
+        uint256 upfrontFee;
+        // boolean flag indicating whether transfers relate to loan (or swap)
+        bool isLoan;
     }
 
     struct WrappedERC721TokenInfo {

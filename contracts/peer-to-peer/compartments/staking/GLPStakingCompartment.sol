@@ -9,6 +9,8 @@ import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
 
 contract GLPStakingCompartment is BaseCompartment {
+    // solhint-disable no-empty-blocks
+
     using SafeERC20 for IERC20;
 
     // arbitrum WETH address
@@ -20,13 +22,13 @@ contract GLPStakingCompartment is BaseCompartment {
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
     ) external {
         _transferCollFromCompartment(
-            repayAmount,
-            repayAmountLeft,
+            reclaimCollAmount,
             borrowerAddr,
             collTokenAddr,
             callbackAddr
@@ -63,5 +65,11 @@ contract GLPStakingCompartment is BaseCompartment {
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
         // transfer all weth to vault
         IERC20(WETH).safeTransfer(vaultAddr, currentWethBal);
+    }
+
+    function getReclaimableBalance(
+        address collToken
+    ) external view override returns (uint256) {
+        return IERC20(collToken).balanceOf(address(this));
     }
 }

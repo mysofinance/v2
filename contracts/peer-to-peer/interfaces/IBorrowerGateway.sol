@@ -59,15 +59,11 @@ interface IBorrowerGateway {
      * @notice function which allows a borrower to repay a loan
      * @param loanRepayInstructions data needed for loan repay (see DataTypesPeerToPeer comments)
      * @param vaultAddr address of the vault in which loan was taken out
-     * @param callbackAddr address for callback (if any, e.g. 1-click repay)
-     * @param callbackData data needed by the callback address
      */
     function repay(
         DataTypesPeerToPeer.LoanRepayInstructions
             calldata loanRepayInstructions,
-        address vaultAddr,
-        address callbackAddr,
-        bytes calldata callbackData
+        address vaultAddr
     ) external;
 
     /**

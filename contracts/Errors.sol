@@ -105,4 +105,5 @@ library Errors {
     error ReserveRatiosSkewedFromOraclePrice();
     error SequencerDown();
     error GracePeriodNotOver();
+    error LoanExpired();
 }
