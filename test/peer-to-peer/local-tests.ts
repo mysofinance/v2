@@ -2391,11 +2391,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'OutsideValidRepayWindow')
 
@@ -3134,11 +3134,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount.div(2),
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
 
@@ -3149,11 +3149,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
       ).to.emit(borrowerGateway, 'Repaid')
 
@@ -3471,11 +3471,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         {
           targetLoanId: 0,
           targetRepayAmount: repayAmount1,
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
+        lenderVault.address
       )
 
       // check amountReclaimedSoFar on loan after 1st repay
@@ -3488,11 +3488,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         {
           targetLoanId: 0,
           targetRepayAmount: repayAmount2,
-          expectedTransferFee: 0
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
         },
-        lenderVault.address,
-        callbackAddr,
-        callbackData
+        lenderVault.address
       )
 
       // check amountReclaimedSoFar on loan after final repay
@@ -3673,11 +3673,11 @@ describe('Peer-to-Peer: Local Tests', function () {
             {
               targetLoanId: 0,
               targetRepayAmount: buyPricePerCollToken,
-              expectedTransferFee: 0
+              expectedTransferFee: 0,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
             },
-            lenderVault.address,
-            callbackAddr,
-            callbackData
+            lenderVault.address
           )
         ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
 
@@ -3975,6 +3975,142 @@ describe('Peer-to-Peer: Local Tests', function () {
             .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
         ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
       })
+    })
+
+    it('It should handle potential compartment callback reentrancy on withdraw correctly', async function () {
+      const { quoteHandler, addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } =
+        await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // step 1: lender owner gives regular quote
+      const loanPerCollUnit = ONE_USDC.mul(1000)
+      let quoteTuples1 = [
+        {
+          loanPerCollUnitOrLtv: loanPerCollUnit,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(30)
+        }
+      ]
+      let onChainQuote1 = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 0,
+          maxLoan: MAX_UINT256,
+          validUntil: MAX_UINT256,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples1,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // step 2: borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const collSendAmount1 = ONE_WETH
+      const quoteTupleIdx1 = 0
+      const borrowInstructions1 = {
+        collSendAmount: collSendAmount1,
+        expectedTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32
+      }
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+
+      // step 3: deploy malicious owner callback contract
+      const MaliciousOwnerContract = await ethers.getContractFactory('MaliciousOwnerContract')
+      MaliciousOwnerContract.connect(lender)
+      const maliciousOwnerContract = await MaliciousOwnerContract.deploy()
+      await maliciousOwnerContract.deployed()
+      await weth.connect(lender).mint(lenderVault.address, ONE_WETH) // mint some coll token to vault to process quote
+
+      // step 4: malicious compartment is added to the system
+      const MaliciousCompartment = await ethers.getContractFactory('MaliciousCompartment')
+      MaliciousCompartment.connect(lender)
+      const maliciousCompartment = await MaliciousCompartment.deploy(weth.address, maliciousOwnerContract.address)
+      await maliciousCompartment.deployed()
+      await addressRegistry.connect(team).setWhitelistState([maliciousCompartment.address], 3)
+      await addressRegistry.connect(team).setAllowedTokensForCompartment(maliciousCompartment.address, [usdc.address], true)
+
+      // step 4: lender quotes with malicious compartment
+      const loanPerCollUnit2 = ONE_WETH
+      let quoteTuples2 = [
+        {
+          loanPerCollUnitOrLtv: loanPerCollUnit2,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(30)
+        }
+      ]
+      let onChainQuote2 = {
+        generalQuoteInfo: {
+          collToken: usdc.address,
+          loanToken: weth.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 0,
+          maxLoan: MAX_UINT256,
+          validUntil: MAX_UINT256,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: maliciousCompartment.address,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples2,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote2)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // step 5: lender transfers vault ownership to malicious callback contract that gets called on
+      // compartment initialize
+      await lenderVault.connect(lender).proposeNewOwner(maliciousOwnerContract.address)
+      await maliciousOwnerContract.connect(lender).claimVaultOwnership(lenderVault.address)
+      expect(await lenderVault.owner()).to.be.equal(maliciousOwnerContract.address)
+
+      // step 6: lender consumes own quote with malicious compartment
+      await usdc.connect(lender).mint(lender.address, ONE_USDC)
+      await usdc.connect(lender).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount2 = ONE_USDC
+      const quoteTupleIdx2 = 0
+      const borrowInstructions2 = {
+        collSendAmount: collSendAmount2,
+        expectedTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32
+      }
+      await expect(
+        borrowerGateway
+          .connect(lender)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions2, onChainQuote2, quoteTupleIdx2)
+      ).to.be.revertedWithCustomError(lenderVault, 'InsufficientVaultFunds')
+
+      // check locked amounts and balances
+      const vaultLockedWeth = await lenderVault.lockedAmounts(weth.address)
+      const vaultBalWeth = await weth.balanceOf(lenderVault.address)
+      expect(vaultLockedWeth).to.be.lte(vaultBalWeth)
     })
   })
 })
