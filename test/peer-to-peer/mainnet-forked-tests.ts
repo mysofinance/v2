@@ -2746,6 +2746,160 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       })
     })
 
+    it('Should process borrow/repay correctly when collateral crv was mistakenly whitelisted for crv compartment', async function () {
+      const { borrowerGateway, lender, borrower, quoteHandler, team, usdc, lenderVault, addressRegistry } = await setupTest()
+
+      const CRV_ADDR = '0xD533a949740bb3306d119CC777fa900bA034cd52'
+      const collInstance = new ethers.Contract(CRV_ADDR, collTokenAbi, borrower.provider)
+
+      // drop crv borrower balance to ONE_CRV
+      const crvSlotIndex = 3
+      const crvIndex = ethers.utils.solidityKeccak256(['uint256', 'uint256'], [crvSlotIndex, borrower.address])
+      await ethers.provider.send('hardhat_setStorageAt', [
+        CRV_ADDR,
+        crvIndex.toString(),
+        ethers.utils.hexZeroPad(BigNumber.from(10).pow(18).toHexString(), 32)
+      ])
+
+      // create crv staking implementation
+      const CrvStakingCompartmentImplementation = await ethers.getContractFactory('CurveLPStakingCompartment')
+      await CrvStakingCompartmentImplementation.connect(team)
+      const crvStakingCompartmentImplementation = await CrvStakingCompartmentImplementation.deploy()
+      await crvStakingCompartmentImplementation.deployed()
+
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([CRV_ADDR, usdc.address], 1)
+      // whitelist compartment
+      await addressRegistry.connect(team).setWhitelistState([crvStakingCompartmentImplementation.address], 3)
+      // whitelist tokens for compartment
+      await addressRegistry
+        .connect(team)
+        .setAllowedTokensForCompartment(crvStakingCompartmentImplementation.address, [CRV_ADDR], true)
+
+      // lender deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(10000000))
+
+      // get pre balances
+      const borrowerWethBalPre = await collInstance.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+      const vaultWethBalPre = await collInstance.balanceOf(lenderVault.address)
+
+      expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
+
+      // borrower approves borrower gateway
+      await collInstance.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const onChainQuote = await createOnChainRequest({
+        lender,
+        collToken: collInstance.address,
+        loanToken: usdc.address,
+        borrowerCompartmentImplementation: crvStakingCompartmentImplementation.address,
+        lenderVault,
+        quoteHandler,
+        loanPerCollUnit: ONE_USDC.mul(1000),
+        validUntil: MAX_UINT256
+      })
+
+      // borrow with on chain quote
+      const collSendAmount = BigNumber.from(10).pow(18)
+      const expectedTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const borrowWithOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+      const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
+      })
+
+      const loanId = borrowEvent?.args?.['loanId']
+      const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
+      const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+      const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+
+      const coeffRepay = 2
+      const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
+
+      // check balance post borrow
+      const borrowerCollBalPost = await collInstance.balanceOf(borrower.address)
+      expect(borrowerWethBalPre.sub(borrowerCollBalPost)).to.be.equal(collSendAmount)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+      const expUpfrontFee = collSendAmount.mul(onChainQuote.quoteTuples[0].upfrontFeePctInBase).div(BASE)
+      const vaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
+      expect(vaultCollBalPost.sub(vaultWethBalPre)).to.equal(expUpfrontFee)
+
+      // borrower approves borrower gateway
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // mine 50000 blocks with an interval of 60 seconds, ~1 month
+      await hre.network.provider.send('hardhat_mine', [
+        BigNumber.from(50000).toHexString(),
+        BigNumber.from(60).toHexString()
+      ])
+
+      // increase borrower usdc balance to repay
+      await usdc.connect(lender).transfer(borrower.address, partialRepayAmount)
+
+      // partial repay
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: partialRepayAmount,
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      )
+        .to.emit(borrowerGateway, 'Repaid')
+        .withArgs(lenderVault.address, loanId, partialRepayAmount)
+
+      // check balance post repay
+      const vaultUsdcBalPostRepay = await usdc.balanceOf(lenderVault.address)
+      const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
+      const borrowerCollRepayBalPost = await collInstance.balanceOf(borrower.address)
+      const expReclaimedColl = initCollAmount.mul(partialRepayAmount).div(repayAmount)
+      expect(borrowerUsdcBalPost).to.be.equal(borrowerUsdcBalPostRepay)
+      expect(vaultUsdcBalPostRepay.sub(vaultUsdcBalPost)).to.be.equal(partialRepayAmount)
+      expect(borrowerCollRepayBalPost.sub(borrowerCollBalPost)).to.be.equal(expReclaimedColl)
+
+      // move forward past loan expiry
+      await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+      // unlock unclaimed collateral
+      const lenderVaultWethBalPre = await collInstance.balanceOf(lenderVault.address)
+      const lenderCollBalPre = await collInstance.balanceOf(lender.address)
+
+      expect(lenderCollBalPre).to.equal(BigNumber.from(0))
+
+      await lenderVault.connect(lender).unlockCollateral(CRV_ADDR, [loanId])
+
+      const lenderCollBalPost = await collInstance.balanceOf(lender.address)
+      const lenderVaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
+
+      // unlock collateral
+      expect(lenderCollBalPost).to.equal(lenderCollBalPre)
+      expect(lenderVaultCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
+    })
+
     it('Should process aToken borrow and partial repayment correctly with rewards', async () => {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } =
         await setupTest()
