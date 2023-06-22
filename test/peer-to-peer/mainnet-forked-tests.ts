@@ -1634,8 +1634,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // final repay should unlock remaining 3/16 of collateral
       const loan = await lenderVault.loan(loanId)
       expect(loan.initRepayAmount.sub(loan.amountRepaidSoFar)).to.be.equal(repayAmount.mul(3).div(16))
-      console.log('pre1', await weth.balanceOf(lenderVault.address))
-      console.log('pre2', await lenderVault.lockedAmounts(weth.address))
       await borrowerGateway.connect(borrower).repay(
         {
           targetLoanId: loanId,
