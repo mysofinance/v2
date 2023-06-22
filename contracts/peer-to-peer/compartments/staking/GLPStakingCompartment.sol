@@ -34,6 +34,43 @@ contract GLPStakingCompartment is BaseCompartment {
             callbackAddr
         );
 
+        _handleRewards(
+            collTokenAddr,
+            borrowerAddr,
+            repayAmount,
+            repayAmountLeft,
+            false
+        );
+    }
+
+    // unlockColl this would be called on defaults
+    function unlockCollToVault(address collTokenAddr) external {
+        _unlockCollToVault(collTokenAddr);
+
+        _handleRewards(collTokenAddr, vaultAddr, 0, 0, true);
+    }
+
+    function getReclaimableBalance(
+        address collToken
+    ) external view override returns (uint256) {
+        return IERC20(collToken).balanceOf(address(this));
+    }
+
+    function _handleRewards(
+        address collTokenAddr,
+        address recipient,
+        uint256 repayAmount,
+        uint256 repayAmountLeft,
+        bool isUnlock
+    ) internal {
+        // if collTokenAddr is weth, then return so don't double transfer on partial repay
+        // or waste gas on unlock when no rewards will be paid out
+        // note: this should never actually happen since weth
+        // and this compartment should not be whitelisted, but just in case
+        if (collTokenAddr == WETH) {
+            return;
+        }
+
         //solhint-ignore-empty-blocks
         try IGLPStakingHelper(FEE_GLP).claim(address(this)) {
             // do nothing
@@ -45,31 +82,9 @@ contract GLPStakingCompartment is BaseCompartment {
         uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
 
         // transfer proportion of weth token balance
-        uint256 wethTokenAmount = (repayAmount * currentWethBal) /
-            repayAmountLeft;
-        IERC20(WETH).safeTransfer(borrowerAddr, wethTokenAmount);
-    }
-
-    // unlockColl this would be called on defaults
-    function unlockCollToVault(address collTokenAddr) external {
-        _unlockCollToVault(collTokenAddr);
-
-        //solhint-ignore-empty-blocks
-        try IGLPStakingHelper(FEE_GLP).claim(address(this)) {
-            // do nothing
-        } catch {
-            // do nothing
-        }
-
-        // get weth token balance
-        uint256 currentWethBal = IERC20(WETH).balanceOf(address(this));
-        // transfer all weth to vault
-        IERC20(WETH).safeTransfer(vaultAddr, currentWethBal);
-    }
-
-    function getReclaimableBalance(
-        address collToken
-    ) external view override returns (uint256) {
-        return IERC20(collToken).balanceOf(address(this));
+        uint256 wethTokenAmount = isUnlock
+            ? currentWethBal
+            : (repayAmount * currentWethBal) / repayAmountLeft;
+        IERC20(WETH).safeTransfer(recipient, wethTokenAmount);
     }
 }

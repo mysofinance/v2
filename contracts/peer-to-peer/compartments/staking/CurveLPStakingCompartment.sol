@@ -250,13 +250,27 @@ contract CurveLPStakingCompartment is BaseCompartment {
         uint256 tokenAmount = isUnlock
             ? currentCrvBal
             : (repayAmount * currentCrvBal) / repayAmountLeft;
-        IERC20(CRV_ADDR).safeTransfer(rewardReceiver, tokenAmount);
+
+        // only perform crv transfer if
+        // 1) crv token amount > 0 and coll token is not CRV else skip
+        // if unlock, still ok to skip since then all balance would have been
+        // transferred to vault earlier in this _withdrawCollFromGauge function
+        // note: this should never actually happen since crv
+        // and this compartment should not be whitelisted, but just in case
+        if (tokenAmount > 0 && CRV_ADDR != collTokenAddr) {
+            IERC20(CRV_ADDR).safeTransfer(rewardReceiver, tokenAmount);
+        }
 
         uint256 index = 0;
         uint256 currentRewardTokenBal;
         while (index < 8 && _rewardTokenAddr[index] != address(0)) {
-            // skip reward if it is also be the coll token (a curve lp token...should be very unlikely)
-            if (_rewardTokenAddr[index] != collTokenAddr) {
+            if (
+                !_checkIfRewardShouldBeSkipped(
+                    collTokenAddr,
+                    index,
+                    _rewardTokenAddr
+                )
+            ) {
                 currentRewardTokenBal = IERC20(_rewardTokenAddr[index])
                     .balanceOf(address(this));
 
@@ -276,5 +290,32 @@ contract CurveLPStakingCompartment is BaseCompartment {
                 index++;
             }
         }
+    }
+
+    function _checkIfRewardShouldBeSkipped(
+        address collTokenAddr,
+        uint256 index,
+        address[8] memory rewardTokens
+    ) internal pure returns (bool) {
+        // skip reward if it is also be the coll token or crv token (a curve lp token in practice...should be very unlikely)
+        if (
+            rewardTokens[index] == collTokenAddr ||
+            rewardTokens[index] == CRV_ADDR
+        ) {
+            return true;
+        }
+        // only check when not first reward token
+        if (index > 0) {
+            // check if reward token is a duplicate in previous entries, if so then skip
+            for (uint256 i = 0; i < index; ) {
+                if (rewardTokens[i] == rewardTokens[index]) {
+                    return true;
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+        return false;
     }
 }
