@@ -1476,18 +1476,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const upfrontFeePctInBase = BASE.mul(1).div(100)
       let quoteTuples = [
         {
           loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
           interestRatePctInBase: BASE.mul(10).div(100),
-          upfrontFeePctInBase: BASE.mul(1).div(100),
+          upfrontFeePctInBase: upfrontFeePctInBase,
           tenor: ONE_DAY.mul(365)
-        },
-        {
-          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
-          interestRatePctInBase: BASE.mul(20).div(100),
-          upfrontFeePctInBase: 0,
-          tenor: ONE_DAY.mul(180)
         }
       ]
       let onChainQuote = {
@@ -1635,6 +1630,26 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         collBalPostSecondRepayVault.sub(collBalPostThirdRepayVault)
       )
       expect(lockedVaultCollPostThirdRepay).to.equal(initCollAmount.mul(3).div(16))
+
+      // final repay should unlock remaining 3/16 of collateral
+      const loan = await lenderVault.loan(loanId)
+      expect(loan.initRepayAmount.sub(loan.amountRepaidSoFar)).to.be.equal(repayAmount.mul(3).div(16))
+      console.log('pre1', await weth.balanceOf(lenderVault.address))
+      console.log('pre2', await lenderVault.lockedAmounts(weth.address))
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: repayAmount.mul(3).div(16),
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+      const collBalPostFourthRepayVault = await weth.balanceOf(lenderVault.address)
+      const lockedVaultCollPostFourthRepay = await lenderVault.lockedAmounts(weth.address)
+      expect(collBalPostFourthRepayVault).to.equal(collSendAmount.mul(upfrontFeePctInBase).div(BASE))
+      expect(lockedVaultCollPostFourthRepay).to.equal(0)
     })
 
     it('Should revert on invalid repays', async function () {

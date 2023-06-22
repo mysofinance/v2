@@ -49,6 +49,7 @@ contract MyMaliciousCallback1 {
                 revert(add(result, 32), mload(result))
             }
         }
+        return 0;
     }
 
     function transfer(address, uint256) external returns (bool) {}
