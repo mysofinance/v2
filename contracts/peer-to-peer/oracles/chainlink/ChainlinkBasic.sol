@@ -93,8 +93,8 @@ contract ChainlinkBasic is IOracle {
             answeredInRound < roundId ||
             answer < 1 ||
             updatedAt > block.timestamp ||
-            updatedAt <
-            block.timestamp - Constants.MAX_PRICE_UPDATE_TIMESTAMP_DIVERGENCE
+            updatedAt + Constants.MAX_PRICE_UPDATE_TIMESTAMP_DIVERGENCE <
+            block.timestamp
         ) {
             revert Errors.InvalidOracleAnswer();
         }

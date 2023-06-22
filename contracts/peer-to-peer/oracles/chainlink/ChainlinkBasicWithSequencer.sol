@@ -40,7 +40,7 @@ contract ChainlinkBasicWithSequencer is ChainlinkBasic {
         }
         // check if last restart was less than or equal grace period length
         if (startedAt + Constants.SEQUENCER_GRACE_PERIOD > block.timestamp) {
-            revert Errors.SequencerDown();
+            revert Errors.GracePeriodNotOver();
         }
         tokenPriceRaw = super._checkAndReturnLatestRoundData(oracleAddr);
     }
