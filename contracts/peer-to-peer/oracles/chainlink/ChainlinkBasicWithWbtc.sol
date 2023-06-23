@@ -2,9 +2,6 @@
 
 pragma solidity 0.8.19;
 
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
 
@@ -32,7 +29,7 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
 
     function _getPriceOfToken(
         address token
-    ) internal view override(ChainlinkBasic) returns (uint256 tokenPriceRaw) {
+    ) internal view override returns (uint256 tokenPriceRaw) {
         if (token == BASE_CURRENCY) {
             uint256 answer1 = _checkAndReturnLatestRoundData(WBTC_BTC_ORACLE);
             uint256 answer2 = _checkAndReturnLatestRoundData(BTC_USD_ORACLE);

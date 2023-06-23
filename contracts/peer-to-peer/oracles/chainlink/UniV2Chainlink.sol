@@ -4,10 +4,7 @@ pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {IUniV2} from "../../interfaces/oracles/IUniV2.sol";
-import {ChainlinkBase} from "./ChainlinkBase.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
 
@@ -16,7 +13,7 @@ import {Errors} from "../../../Errors.sol";
  * compatible with v2v3 or v3 interfaces
  * should only be utilized with eth based oracles, not usd-based oracles
  */
-contract UniV2Chainlink is IOracle, ChainlinkBasic {
+contract UniV2Chainlink is ChainlinkBasic {
     uint256 internal immutable _tolerance; // tolerance must be an integer less than 10000 and greater than 0
     mapping(address => bool) public isLpToken;
 
@@ -54,12 +51,7 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
     function getPrice(
         address collToken,
         address loanToken
-    )
-        external
-        view
-        override(ChainlinkBase, IOracle)
-        returns (uint256 collTokenPriceInLoanToken)
-    {
+    ) external view override returns (uint256 collTokenPriceInLoanToken) {
         bool isCollTokenLpToken = isLpToken[collToken];
         bool isLoanTokenLpToken = isLpToken[loanToken];
         if (!isCollTokenLpToken && !isLoanTokenLpToken) {

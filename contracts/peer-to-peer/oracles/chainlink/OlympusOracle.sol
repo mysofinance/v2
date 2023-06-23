@@ -3,18 +3,15 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
-import {ChainlinkBase} from "./ChainlinkBase.sol";
 import {Errors} from "../../../Errors.sol";
 
 /**
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
  * should only be utilized with eth based oracles, not usd-based oracles
  */
-contract OlympusOracle is IOracle, ChainlinkBasic {
+contract OlympusOracle is ChainlinkBasic {
     address internal constant GOHM_ADDR =
         0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
     uint256 internal constant SOHM_DECIMALS = 9;
@@ -38,12 +35,7 @@ contract OlympusOracle is IOracle, ChainlinkBasic {
     function getPrice(
         address collToken,
         address loanToken
-    )
-        external
-        view
-        override(ChainlinkBase, IOracle)
-        returns (uint256 collTokenPriceInLoanToken)
-    {
+    ) external view override returns (uint256 collTokenPriceInLoanToken) {
         if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {
             revert Errors.NeitherTokenIsGOHM();
         }

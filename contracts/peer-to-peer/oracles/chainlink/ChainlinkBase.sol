@@ -6,11 +6,12 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
 import {Constants} from "../../../Constants.sol";
 import {Errors} from "../../../Errors.sol";
+import {IOracle} from "../../interfaces/IOracle.sol";
 
 /**
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
-abstract contract ChainlinkBase {
+abstract contract ChainlinkBase is IOracle {
     // solhint-disable no-empty-blocks
 
     uint256 public immutable BASE_CURRENCY_UNIT;
