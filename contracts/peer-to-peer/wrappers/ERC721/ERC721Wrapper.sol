@@ -56,17 +56,18 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         _tokensCreated.push(newErc20Addr);
         ++numTokensCreated;
 
-        _transferTokens(
-            minter,
-            numTokensToBeWrapped,
-            tokensToBeWrapped,
-            newErc20Addr
-        );
         IWrappedERC721Impl(newErc20Addr).initialize(
             minter,
             tokensToBeWrapped,
             name,
             symbol
+        );
+
+        _transferTokens(
+            minter,
+            numTokensToBeWrapped,
+            tokensToBeWrapped,
+            newErc20Addr
         );
     }
 

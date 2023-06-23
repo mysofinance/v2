@@ -57,6 +57,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             tokensToBeWrapped,
             newErc20Addr
         );
+        // @dev: state update happens after external call due to minTokenAmount determination
         IWrappedERC20Impl(newErc20Addr).initialize(
             minter,
             tokensToBeWrapped,
