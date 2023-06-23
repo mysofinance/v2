@@ -16,6 +16,7 @@ import {Errors} from "../../../Errors.sol";
 contract UniV2Chainlink is ChainlinkBasic {
     uint256 internal immutable _tolerance; // tolerance must be an integer less than 10000 and greater than 0
     mapping(address => bool) public isLpToken;
+    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     constructor(
         address[] memory _tokenAddrs,
@@ -26,7 +27,7 @@ contract UniV2Chainlink is ChainlinkBasic {
         ChainlinkBasic(
             _tokenAddrs,
             _oracleAddrs,
-            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weth address
+            WETH,
             1e18 // 18 decimals for ETH based oracles
         )
     {
