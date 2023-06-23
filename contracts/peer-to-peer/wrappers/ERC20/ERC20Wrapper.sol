@@ -13,18 +13,17 @@ import {IWrappedERC20Impl} from "../../interfaces/wrappers/ERC20/IWrappedERC20Im
 
 /**
  * @dev ERC20Wrapper is a contract that wraps tokens from possibly multiple ERC20 contracts
- * IMPORTANT: This contract allows for whitelisting registered token addresses IF an address registry is provided.
- * This is to prevent the creation of wrapped tokens for non-registered tokens if that is a functionality that
- * is desired. If not, then the address registry can be set to the zero address.
+ * IMPORTANT: This contract allows for wrapping tokens that are whitelisted with the address registry.
  */
 contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
     using SafeERC20 for IERC20;
     address public immutable addressRegistry;
     address public immutable wrappedErc20Impl;
-    address[] public tokensCreated;
+    address[] internal _tokensCreated;
+    uint256 public numTokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc20Impl) {
-        if (_wrappedErc20Impl == address(0)) {
+        if (_addressRegistry == address(0) || _wrappedErc20Impl == address(0)) {
             revert Errors.InvalidAddress();
         }
         addressRegistry = _addressRegistry;
@@ -32,7 +31,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
     }
 
     // token addresses must be unique and passed in increasing order.
-    // token amounts must be non-zero
+    // token amounts must be non-zero.
     // minter must approve this contract to transfer all tokens to be wrapped.
     function createWrappedToken(
         address minter,
@@ -40,20 +39,50 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         string calldata name,
         string calldata symbol
     ) external nonReentrant returns (address newErc20Addr) {
-        if (minter == address(0)) {
+        if (msg.sender != addressRegistry) {
+            revert Errors.InvalidSender();
+        }
+        if (minter == address(0) || minter == address(this)) {
             revert Errors.InvalidAddress();
         }
         newErc20Addr = Clones.cloneDeterministic(
             wrappedErc20Impl,
-            keccak256(abi.encodePacked(tokensCreated.length))
+            keccak256(abi.encodePacked(_tokensCreated.length))
         );
-        uint256 minTokenAmount = type(uint256).max;
-        bool isIOU = tokensToBeWrapped.length == 0;
+        _tokensCreated.push(newErc20Addr);
+        ++numTokensCreated;
 
+        (bool isIOU, uint256 minTokenAmount) = _transferTokens(
+            minter,
+            tokensToBeWrapped,
+            newErc20Addr
+        );
+        IWrappedERC20Impl(newErc20Addr).initialize(
+            minter,
+            tokensToBeWrapped,
+            isIOU ? 10 ** 6 : minTokenAmount,
+            name,
+            symbol,
+            isIOU
+        );
+    }
+
+    function tokensCreated() external view returns (address[] memory) {
+        return _tokensCreated;
+    }
+
+    function _transferTokens(
+        address minter,
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
+        address newErc20Addr
+    ) internal returns (bool isIOU, uint256 minTokenAmount) {
+        minTokenAmount = type(uint256).max;
+        address prevTokenAddress;
+        address currAddress;
+        uint256 numTokensToBeWrapped = tokensToBeWrapped.length;
+        isIOU = numTokensToBeWrapped == 0;
         if (!isIOU) {
-            address prevTokenAddress;
-            address currAddress;
-            for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
+            for (uint256 i = 0; i < numTokensToBeWrapped; ) {
                 if (
                     addressRegistry != address(0) &&
                     !IAddressRegistry(addressRegistry).isWhitelistedERC20(
@@ -80,18 +109,9 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
                 );
                 prevTokenAddress = currAddress;
                 unchecked {
-                    i++;
+                    ++i;
                 }
             }
         }
-        IWrappedERC20Impl(newErc20Addr).initialize(
-            minter,
-            tokensToBeWrapped,
-            isIOU ? 10 ** 6 : minTokenAmount,
-            name,
-            symbol,
-            isIOU
-        );
-        tokensCreated.push(newErc20Addr);
     }
 }

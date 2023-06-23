@@ -41,16 +41,17 @@ contract WrappedERC721Impl is
         _mint(minter, 1);
     }
 
-    function redeem() external nonReentrant {
-        if (balanceOf(msg.sender) != 1) {
-            revert Errors.InvalidSender();
+    function redeem(address account, address recipient) external nonReentrant {
+        if (msg.sender != account) {
+            _spendAllowance(account, msg.sender, 1);
         }
+        _burn(account, 1);
         for (uint256 i = 0; i < _wrappedTokens.length; ) {
             for (uint256 j = 0; j < _wrappedTokens[i].tokenIds.length; ) {
                 try
                     IERC721(_wrappedTokens[i].tokenAddr).transferFrom(
                         address(this),
-                        msg.sender,
+                        recipient,
                         _wrappedTokens[i].tokenIds[j]
                     )
                 {
@@ -65,7 +66,6 @@ contract WrappedERC721Impl is
                 i++;
             }
         }
-        _burn(msg.sender, 1);
     }
 
     function getWrappedTokensInfo()
