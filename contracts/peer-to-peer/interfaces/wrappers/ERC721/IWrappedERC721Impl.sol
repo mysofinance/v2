@@ -19,8 +19,17 @@ interface IWrappedERC721Impl {
         string calldata symbol
     ) external;
 
-    function redeem() external;
+    /**
+     * @notice Function to redeem wrapped token for underlying tokens
+     * @param account Account that is redeeming wrapped tokens
+     * @param recipient Account that is receiving underlying tokens
+     */
+    function redeem(address account, address recipient) external;
 
+    /**
+     * @notice Returns wrapped token info
+     * @return wrappedTokens array of struct containing information about wrapped tokens
+     */
     function getWrappedTokensInfo()
         external
         view

@@ -107,7 +107,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             whitelistState[addrs[0]] = state;
         } else {
             // note (2/2): all other states can be "occupied" by multiple addresses
-            for (uint i = 0; i < addrs.length; i++) {
+            for (uint i = 0; i < addrs.length; ) {
                 if (addrs[i] == address(0)) {
                     revert Errors.InvalidAddress();
                 }
@@ -122,6 +122,9 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                     _mysoTokenManager
                 );
                 whitelistState[addrs[i]] = state;
+                unchecked {
+                    ++i;
+                }
             }
         }
         emit WhitelistStateUpdated(addrs, state);
@@ -152,7 +155,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 tokens[i]
             ] = allowTokensForCompartment;
             unchecked {
-                i++;
+                ++i;
             }
         }
         emit AllowedTokensForCompartmentUpdated(
@@ -299,7 +302,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             }
             whitelistedUntilPerBorrower[borrowers[i]] = whitelistedUntil;
             unchecked {
-                i++;
+                ++i;
             }
         }
         emit BorrowerWhitelistUpdated(msg.sender, borrowers, whitelistedUntil);

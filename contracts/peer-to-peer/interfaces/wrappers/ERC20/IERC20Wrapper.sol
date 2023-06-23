@@ -18,4 +18,28 @@ interface IERC20Wrapper {
         string calldata name,
         string calldata symbol
     ) external returns (address);
+
+    /**
+     * @notice Returns address registry
+     * @return address registry
+     */
+    function addressRegistry() external view returns (address);
+
+    /**
+     * @notice Returns implementation contract address
+     * @return implementation contract address
+     */
+    function wrappedErc20Impl() external view returns (address);
+
+    /**
+     * @notice Returns array of tokens created
+     * @return array of tokens created
+     */
+    function tokensCreated() external view returns (address[] memory);
+
+    /**
+     * @notice Returns number of tokens created
+     * @return number of tokens created
+     */
+    function numTokensCreated() external view returns (uint256);
 }

@@ -39,7 +39,7 @@ contract WrappedERC20Impl is
         for (uint256 i = 0; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
-                i++;
+                ++i;
             }
         }
         _tokenName = _name;
@@ -51,27 +51,33 @@ contract WrappedERC20Impl is
         );
     }
 
-    function redeem(uint256 amount) external nonReentrant {
+    function redeem(
+        address account,
+        address recipient,
+        uint256 amount
+    ) external nonReentrant {
         if (isIOU) {
             revert Errors.IOUCannotBeRedeemedOnChain();
         }
-        // faster fail here than in burn
-        if (amount == 0 || balanceOf(msg.sender) < amount) {
-            revert Errors.InvalidSendAmount();
+        if (amount == 0) {
+            revert Errors.InvalidAmount();
         }
         uint256 currTotalSupply = totalSupply();
+        if (msg.sender != account) {
+            _spendAllowance(account, msg.sender, amount);
+        }
+        _burn(account, amount);
         for (uint256 i = 0; i < _wrappedTokens.length; ) {
             address tokenAddr = _wrappedTokens[i].tokenAddr;
             IERC20(tokenAddr).safeTransfer(
-                msg.sender,
+                recipient,
                 (IERC20(tokenAddr).balanceOf(address(this)) * amount) /
                     currTotalSupply
             );
             unchecked {
-                i++;
+                ++i;
             }
         }
-        _burn(msg.sender, amount);
     }
 
     function getWrappedTokensInfo()

@@ -252,7 +252,7 @@ contract QuoteHandler is IQuoteHandler {
             }
             prevSigner = recoveredSigner;
             unchecked {
-                i++;
+                ++i;
             }
         }
         return true;
@@ -354,7 +354,7 @@ contract QuoteHandler is IQuoteHandler {
             }
             isSwap = isSwapCurr;
             unchecked {
-                k++;
+                ++k;
             }
         }
         _checkTokensAndCompartmentWhitelist(
