@@ -49,10 +49,14 @@ interface IBaseCompartment {
 
     /**
      * @notice function returns the potentially reclaimable collateral token balance
+     * @param initCollAmount initially reclaimable collateral amount
+     * @param amountReclaimedSoFar amount of collateral reclaimed so far
      * @param collTokenAddr address of collateral token for which reclaimable balance is being retrieved
      * @dev depending on compartment implementation this could be simple balanceOf or eg staked balance call
      */
     function getReclaimableBalance(
+        uint256 initCollAmount,
+        uint256 amountReclaimedSoFar,
         address collTokenAddr
     ) external view returns (uint256 reclaimableBalance);
 }

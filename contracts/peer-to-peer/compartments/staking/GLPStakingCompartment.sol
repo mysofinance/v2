@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IGLPStakingHelper} from "../../interfaces/compartments/staking/IGLPStakingHelper.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
-import {Errors} from "../../../Errors.sol";
 
 contract GLPStakingCompartment is BaseCompartment {
     // solhint-disable no-empty-blocks
@@ -34,7 +33,7 @@ contract GLPStakingCompartment is BaseCompartment {
             callbackAddr
         );
 
-        _handleRewards(
+        _transferRewards(
             collTokenAddr,
             borrowerAddr,
             repayAmount,
@@ -46,17 +45,18 @@ contract GLPStakingCompartment is BaseCompartment {
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
         _unlockCollToVault(collTokenAddr);
-
-        _handleRewards(collTokenAddr, vaultAddr, 0, 0, true);
+        _transferRewards(collTokenAddr, vaultAddr, 0, 0, true);
     }
 
     function getReclaimableBalance(
+        uint256 /*initCollAmount*/,
+        uint256 /*amountReclaimedSoFar*/,
         address collToken
     ) external view override returns (uint256) {
         return IERC20(collToken).balanceOf(address(this));
     }
 
-    function _handleRewards(
+    function _transferRewards(
         address collTokenAddr,
         address recipient,
         uint256 repayAmount,
