@@ -38,6 +38,7 @@ interface IWrappedERC721Impl {
         uint256[] calldata tokenIds
     ) external;
 
+    /**
      * @notice Function to redeem wrapped token for underlying tokens
      * @param account Account that is redeeming wrapped tokens
      * @param recipient Account that is receiving underlying tokens

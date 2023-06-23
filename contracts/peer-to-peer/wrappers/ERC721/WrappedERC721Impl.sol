@@ -21,7 +21,7 @@ contract WrappedERC721Impl is
     DataTypesPeerToPeer.WrappedERC721TokenInfo[] internal _wrappedTokens;
     address public redeemer;
     mapping(address => mapping(uint256 => bool)) public stuckTokens;
-    bool internal mutex;
+    bool internal _mutex;
 
     constructor() ERC20("Wrapped ERC721 Impl", "Wrapped ERC721 Impl") {
         _disableInitializers();
@@ -45,9 +45,9 @@ contract WrappedERC721Impl is
     }
 
     function redeem(address account, address recipient) external nonReentrant {
-        if (mutex) {
-            revert Errors.Reentrancy();
-        }
+        // mutex is used to prevent entrancy into the sweepTokensLeftAfterRedeem function
+        // in case the redeemer/recipient is one of the NFTs being transferred
+        _mutex = true;
         if (msg.sender != account) {
             _spendAllowance(account, msg.sender, 1);
         }
@@ -69,7 +69,9 @@ contract WrappedERC721Impl is
                         tokenId
                     )
                 // solhint-disable-next-line no-empty-blocks
-                {} catch {
+                {
+
+                } catch {
                     stuckTokens[tokenAddr][tokenId] = true;
                     emit TransferFromWrappedTokenFailed(tokenAddr, tokenId);
                 }
@@ -81,18 +83,17 @@ contract WrappedERC721Impl is
                 ++i;
             }
         }
-        mutex = false;
+        _mutex = false;
         emit Redeemed(msg.sender);
     }
 
     function sweepTokensLeftAfterRedeem(
         address tokenAddr,
         uint256[] calldata tokenIds
-    ) external {
-        if (mutex) {
+    ) external nonReentrant {
+        if (_mutex) {
             revert Errors.Reentrancy();
         }
-        mutex = true;
         if (msg.sender != redeemer) {
             revert Errors.InvalidSender();
         }
@@ -121,7 +122,6 @@ contract WrappedERC721Impl is
                 ++i;
             }
         }
-        mutex = false;
         emit TokenSweepAttempted(tokenAddr, tokenIds);
     }
 
