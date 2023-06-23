@@ -69,13 +69,15 @@ contract WrappedERC721Impl is
                         msg.sender,
                         tokenId
                     )
+                // solhint-disable-next-line no-empty-blocks
                 {
-                    unchecked {
-                        ++j;
-                    }
+
                 } catch {
                     stuckTokens[tokenAddr][tokenId] = true;
                     emit TransferFromWrappedTokenFailed(tokenAddr, tokenId);
+                }
+                unchecked {
+                    ++j;
                 }
             }
             unchecked {
@@ -117,9 +119,9 @@ contract WrappedERC721Impl is
                 } catch {
                     emit TransferFromWrappedTokenFailed(tokenAddr, tokenIds[i]);
                 }
-                unchecked {
-                    ++i;
-                }
+            }
+            unchecked {
+                ++i;
             }
         }
         mutex = false;
