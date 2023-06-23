@@ -376,17 +376,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         address borrowerCompartmentImplementation,
         uint256 loanId
     ) internal returns (address collCompartment) {
-        bytes32 salt = keccak256(
-            abi.encodePacked(
-                borrowerCompartmentImplementation,
-                address(this),
-                loanId
-            )
-        );
-        collCompartment = Clones.cloneDeterministic(
-            borrowerCompartmentImplementation,
-            salt
-        );
+        collCompartment = Clones.clone(borrowerCompartmentImplementation);
         IBaseCompartment(collCompartment).initialize(address(this), loanId);
     }
 

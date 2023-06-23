@@ -29,10 +29,7 @@ contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
     {
         uint256 numRegisteredVaults = IAddressRegistry(addressRegistry)
             .numRegisteredVaults();
-        bytes32 salt = keccak256(
-            abi.encodePacked(lenderVaultImpl, msg.sender, numRegisteredVaults)
-        );
-        newLenderVaultAddr = Clones.cloneDeterministic(lenderVaultImpl, salt);
+        newLenderVaultAddr = Clones.clone(lenderVaultImpl);
         ILenderVaultImpl(newLenderVaultAddr).initialize(
             msg.sender,
             addressRegistry
