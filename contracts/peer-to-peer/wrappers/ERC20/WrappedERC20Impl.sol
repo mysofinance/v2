@@ -39,7 +39,7 @@ contract WrappedERC20Impl is
         for (uint256 i = 0; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
-                i++;
+                ++i;
             }
         }
         _tokenName = _name;
@@ -75,7 +75,7 @@ contract WrappedERC20Impl is
                     currTotalSupply
             );
             unchecked {
-                i++;
+                ++i;
             }
         }
     }

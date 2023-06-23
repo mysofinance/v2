@@ -220,7 +220,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 .repaymentSchedule[i]
                 .collTokenDueIfConverted;
             unchecked {
-                i++;
+                ++i;
             }
         }
         dynamicData.arrangerFee = _arrangerFee;
@@ -598,7 +598,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 .repaymentSchedule[i]
                 .collTokenDueIfConverted;
             unchecked {
-                i++;
+                ++i;
             }
         }
         return (
@@ -656,7 +656,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             }
             prevDueDate = currDueDate;
             unchecked {
-                i++;
+                ++i;
             }
         }
     }

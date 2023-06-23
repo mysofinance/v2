@@ -33,7 +33,7 @@ contract WrappedERC721Impl is
         for (uint256 i = 0; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
-                i++;
+                ++i;
             }
         }
         _tokenName = _name;
@@ -56,14 +56,14 @@ contract WrappedERC721Impl is
                     )
                 {
                     unchecked {
-                        j++;
+                        ++j;
                     }
                 } catch {
                     revert Errors.TransferFromWrappedTokenFailed();
                 }
             }
             unchecked {
-                i++;
+                ++i;
             }
         }
     }
