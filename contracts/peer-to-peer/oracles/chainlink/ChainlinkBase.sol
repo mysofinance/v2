@@ -22,14 +22,13 @@ abstract contract ChainlinkBase is IOracle {
         address[] memory _oracleAddrs,
         uint256 baseCurrencyUnit
     ) {
-        if (
-            _tokenAddrs.length == 0 || _tokenAddrs.length != _oracleAddrs.length
-        ) {
+        uint256 tokenAddrsLength = _tokenAddrs.length;
+        if (tokenAddrsLength == 0 || tokenAddrsLength != _oracleAddrs.length) {
             revert Errors.InvalidArrayLength();
         }
         uint8 oracleDecimals;
         uint256 version;
-        for (uint i = 0; i < _oracleAddrs.length; ) {
+        for (uint i = 0; i < tokenAddrsLength; ) {
             if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }
