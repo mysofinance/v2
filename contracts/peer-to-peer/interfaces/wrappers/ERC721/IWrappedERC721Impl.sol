@@ -29,14 +29,6 @@ interface IWrappedERC721Impl {
     ) external;
 
     /**
-     * @notice Redeems the wrapped tokens
-     * @dev This function can only be called by the owner of the erc20 wrapper
-     * @dev This function can only be called once then token is burnt
-     * @dev Any stuck tokens can be swept by the redeemer later
-     */
-    function redeem() external;
-
-    /**
      * @notice Transfers any stuck wrapped tokens to the redeemer
      * @param tokenAddr Address of the token to be swept
      * @param tokenIds Array of token ids to be swept
@@ -46,6 +38,16 @@ interface IWrappedERC721Impl {
         uint256[] calldata tokenIds
     ) external;
 
+     * @notice Function to redeem wrapped token for underlying tokens
+     * @param account Account that is redeeming wrapped tokens
+     * @param recipient Account that is receiving underlying tokens
+     */
+    function redeem(address account, address recipient) external;
+
+    /**
+     * @notice Returns wrapped token info
+     * @return wrappedTokens array of struct containing information about wrapped tokens
+     */
     function getWrappedTokensInfo()
         external
         view

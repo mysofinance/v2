@@ -4,8 +4,6 @@ pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {IUniV2} from "../../interfaces/oracles/IUniV2.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
@@ -15,9 +13,11 @@ import {Errors} from "../../../Errors.sol";
  * compatible with v2v3 or v3 interfaces
  * should only be utilized with eth based oracles, not usd-based oracles
  */
-contract UniV2Chainlink is IOracle, ChainlinkBasic {
+contract UniV2Chainlink is ChainlinkBasic {
     uint256 internal immutable _tolerance; // tolerance must be an integer less than 10000 and greater than 0
     mapping(address => bool) public isLpToken;
+    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    uint256 internal constant UNI_V2_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
 
     constructor(
         address[] memory _tokenAddrs,
@@ -28,8 +28,8 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
         ChainlinkBasic(
             _tokenAddrs,
             _oracleAddrs,
-            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weth address
-            1e18 // 18 decimals for ETH based oracles
+            WETH,
+            UNI_V2_BASE_CURRENCY_UNIT
         )
     {
         if (_lpAddrs.length == 0) {
@@ -53,12 +53,7 @@ contract UniV2Chainlink is IOracle, ChainlinkBasic {
     function getPrice(
         address collToken,
         address loanToken
-    )
-        external
-        view
-        override(ChainlinkBasic, IOracle)
-        returns (uint256 collTokenPriceInLoanToken)
-    {
+    ) external view override returns (uint256 collTokenPriceInLoanToken) {
         bool isCollTokenLpToken = isLpToken[collToken];
         bool isLoanTokenLpToken = isLpToken[loanToken];
         if (!isCollTokenLpToken && !isLoanTokenLpToken) {

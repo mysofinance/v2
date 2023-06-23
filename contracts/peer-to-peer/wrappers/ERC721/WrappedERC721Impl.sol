@@ -44,16 +44,15 @@ contract WrappedERC721Impl is
         _mint(minter, 1);
     }
 
-    function redeem() external {
+    function redeem(address account, address recipient) external nonReentrant {
         if (mutex) {
             revert Errors.Reentrancy();
         }
-        mutex = true;
-        if (balanceOf(msg.sender) != 1) {
-            revert Errors.InvalidSender();
+        if (msg.sender != account) {
+            _spendAllowance(account, msg.sender, 1);
         }
-        redeemer = msg.sender;
-        _burn(msg.sender, 1);
+        _burn(account, 1);
+        redeemer = account;
         uint256 tokensLength = _wrappedTokens.length;
         address tokenAddr;
         uint256 tokenId;
@@ -66,13 +65,11 @@ contract WrappedERC721Impl is
                 try
                     IERC721(tokenAddr).transferFrom(
                         address(this),
-                        msg.sender,
+                        recipient,
                         tokenId
                     )
                 // solhint-disable-next-line no-empty-blocks
-                {
-
-                } catch {
+                {} catch {
                     stuckTokens[tokenAddr][tokenId] = true;
                     emit TransferFromWrappedTokenFailed(tokenAddr, tokenId);
                 }

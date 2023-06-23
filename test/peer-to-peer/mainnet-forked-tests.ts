@@ -4062,6 +4062,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidArrayLength')
       await expect(
         ChainlinkBasicImplementation.connect(team).deploy(
+          ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'],
+          [usdcEthChainlinkAddr],
+          ZERO_ADDR,
+          BASE
+        )
+      ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidAddress')
+      await expect(
+        ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [ZERO_ADDR, paxgEthChainlinkAddr],
           weth.address,
@@ -4088,7 +4096,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ChainlinkBasicImplementation.connect(team).deploy(
           ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
           [usdcUsdChainlinkAddr, paxgEthChainlinkAddr],
-          ZERO_ADDR,
+          lenderVault.address,
           BASE
         )
       ).to.be.revertedWithCustomError(ChainlinkBasicImplementation, 'InvalidOracleDecimals')

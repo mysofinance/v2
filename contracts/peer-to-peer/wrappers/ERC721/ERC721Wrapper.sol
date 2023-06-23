@@ -20,17 +20,19 @@ import {IWrappedERC721Impl} from "../../interfaces/wrappers/ERC721/IWrappedERC72
 contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
     address public immutable addressRegistry;
     address public immutable wrappedErc721Impl;
-    address[] public tokensCreated;
+    address[] public _tokensCreated;
+    uint256 public numTokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc721Impl) {
-        if (_wrappedErc721Impl == address(0)) {
+        if (
+            _addressRegistry == address(0) || _wrappedErc721Impl == address(0)
+        ) {
             revert Errors.InvalidAddress();
         }
         addressRegistry = _addressRegistry;
         wrappedErc721Impl = _wrappedErc721Impl;
     }
 
-    // token addresses must be unique and passed in increasing order.
     // token ids must be unique and passed in increasing order for each token address.
     // minter must approve this contract to transfer all tokens to be wrapped.
     function createWrappedToken(
@@ -39,18 +41,50 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         string calldata name,
         string calldata symbol
     ) external nonReentrant returns (address newErc20Addr) {
+        if (msg.sender != addressRegistry) {
+            revert Errors.InvalidSender();
+        }
         if (minter == address(0) || minter == address(this)) {
             revert Errors.InvalidAddress();
         }
-        if (tokensToBeWrapped.length == 0) {
+        uint256 numTokensToBeWrapped = tokensToBeWrapped.length;
+        if (numTokensToBeWrapped == 0) {
             revert Errors.InvalidArrayLength();
         }
-        bytes32 salt = keccak256(abi.encodePacked(tokensCreated.length));
+        bytes32 salt = keccak256(abi.encodePacked(_tokensCreated.length));
         newErc20Addr = Clones.cloneDeterministic(wrappedErc721Impl, salt);
+        _tokensCreated.push(newErc20Addr);
+        ++numTokensCreated;
+
+        IWrappedERC721Impl(newErc20Addr).initialize(
+            minter,
+            tokensToBeWrapped,
+            name,
+            symbol
+        );
+
+        _transferTokens(
+            minter,
+            numTokensToBeWrapped,
+            tokensToBeWrapped,
+            newErc20Addr
+        );
+    }
+
+    function tokensCreated() external view returns (address[] memory) {
+        return _tokensCreated;
+    }
+
+    function _transferTokens(
+        address minter,
+        uint256 numTokensToBeWrapped,
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
+        address newErc20Addr
+    ) internal {
         address prevNftAddress;
         address currNftAddress;
         uint256 checkedId;
-        for (uint256 i = 0; i < tokensToBeWrapped.length; ) {
+        for (uint256 i = 0; i < numTokensToBeWrapped; ) {
             if (tokensToBeWrapped[i].tokenIds.length == 0) {
                 revert Errors.InvalidArrayLength();
             }
@@ -67,7 +101,6 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
             if (currNftAddress <= prevNftAddress) {
                 revert Errors.NonIncreasingTokenAddrs();
             }
-            checkedId = 0;
             for (uint256 j = 0; j < tokensToBeWrapped[i].tokenIds.length; ) {
                 if (tokensToBeWrapped[i].tokenIds[j] <= checkedId && j != 0) {
                     revert Errors.NonIncreasingNonFungibleTokenIds();
@@ -92,12 +125,5 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
                 ++i;
             }
         }
-        IWrappedERC721Impl(newErc20Addr).initialize(
-            minter,
-            tokensToBeWrapped,
-            name,
-            symbol
-        );
-        tokensCreated.push(newErc20Addr);
     }
 }

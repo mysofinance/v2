@@ -196,7 +196,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             }
             whitelistedUntilPerLender[lenders[i]] = whitelistedUntil;
             unchecked {
-                i++;
+                ++i;
             }
         }
         emit LenderWhitelistUpdated(msg.sender, lenders, whitelistedUntil);

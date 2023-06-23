@@ -23,12 +23,32 @@ interface IWrappedERC20Impl {
         bool isIOU
     ) external;
 
-    function redeem(uint256 amount) external;
+    /**
+     * @notice Function to redeem wrapped token for underlying tokens
+     * @param account Account that is redeeming wrapped tokens
+     * @param recipient Account that is receiving underlying tokens
+     * @param amount Amount of wrapped tokens to be redeemed
+     */
+    function redeem(
+        address account,
+        address recipient,
+        uint256 amount
+    ) external;
 
+    /**
+     * @notice Returns wrapped token info
+     * @return wrappedTokens array of struct containing information about wrapped tokens
+     */
     function getWrappedTokensInfo()
         external
         view
         returns (
             DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens
         );
+
+    /**
+     * @notice Returns whether wrapped token is IOU
+     * @return boolean flag indicating whether wrapped token is IOU
+     */
+    function isIOU() external view returns (bool);
 }

@@ -82,7 +82,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             }
             _loan.collUnlocked = true;
             unchecked {
-                i++;
+                ++i;
             }
         }
 
@@ -295,7 +295,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             isSigner[_signers[i]] = true;
             signers.push(_signers[i]);
             unchecked {
-                i++;
+                ++i;
             }
         }
         emit AddedSigners(_signers);
