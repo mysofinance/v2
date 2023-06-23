@@ -5,7 +5,6 @@ pragma solidity ^0.8.19;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
-import {Errors} from "../../../Errors.sol";
 
 contract AaveStakingCompartment is BaseCompartment {
     using SafeERC20 for IERC20;
@@ -33,6 +32,8 @@ contract AaveStakingCompartment is BaseCompartment {
     }
 
     function getReclaimableBalance(
+        uint256 /*initCollAmount*/,
+        uint256 /*amountReclaimedSoFar*/,
         address collToken
     ) external view override returns (uint256) {
         return IERC20(collToken).balanceOf(address(this));
