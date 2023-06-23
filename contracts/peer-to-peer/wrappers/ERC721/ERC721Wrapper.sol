@@ -39,7 +39,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         string calldata name,
         string calldata symbol
     ) external nonReentrant returns (address newErc20Addr) {
-        if (minter == address(0)) {
+        if (minter == address(0) || minter == address(this)) {
             revert Errors.InvalidAddress();
         }
         if (tokensToBeWrapped.length == 0) {
@@ -81,7 +81,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
                     )
                 {
                     unchecked {
-                        j++;
+                        ++j;
                     }
                 } catch {
                     revert Errors.TransferToWrappedTokenFailed();
@@ -89,7 +89,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
             }
             prevNftAddress = currNftAddress;
             unchecked {
-                i++;
+                ++i;
             }
         }
         IWrappedERC721Impl(newErc20Addr).initialize(

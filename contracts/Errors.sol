@@ -104,4 +104,5 @@ library Errors {
     error InvalidOracleTolerance();
     error ReserveRatiosSkewedFromOraclePrice();
     error LoanExpired();
+    error Reentrancy();
 }

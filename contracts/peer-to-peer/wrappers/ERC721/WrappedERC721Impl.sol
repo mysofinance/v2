@@ -19,6 +19,9 @@ contract WrappedERC721Impl is
     string internal _tokenName;
     string internal _tokenSymbol;
     DataTypesPeerToPeer.WrappedERC721TokenInfo[] internal _wrappedTokens;
+    address public redeemer;
+    mapping(address => mapping(uint256 => bool)) public stuckTokens;
+    bool internal mutex;
 
     constructor() ERC20("Wrapped ERC721 Impl", "Wrapped ERC721 Impl") {
         _disableInitializers();
@@ -33,7 +36,7 @@ contract WrappedERC721Impl is
         for (uint256 i = 0; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
-                i++;
+                ++i;
             }
         }
         _tokenName = _name;
@@ -41,31 +44,86 @@ contract WrappedERC721Impl is
         _mint(minter, 1);
     }
 
-    function redeem() external nonReentrant {
+    function redeem() external {
+        if (mutex) {
+            revert Errors.Reentrancy();
+        }
+        mutex = true;
         if (balanceOf(msg.sender) != 1) {
             revert Errors.InvalidSender();
         }
-        for (uint256 i = 0; i < _wrappedTokens.length; ) {
-            for (uint256 j = 0; j < _wrappedTokens[i].tokenIds.length; ) {
+        redeemer = msg.sender;
+        _burn(msg.sender, 1);
+        uint256 tokensLength = _wrappedTokens.length;
+        address tokenAddr;
+        uint256 tokenId;
+        uint256 idsLength;
+        for (uint256 i = 0; i < tokensLength; ) {
+            idsLength = _wrappedTokens[i].tokenIds.length;
+            tokenAddr = _wrappedTokens[i].tokenAddr;
+            for (uint256 j = 0; j < idsLength; ) {
+                tokenId = _wrappedTokens[i].tokenIds[j];
                 try
-                    IERC721(_wrappedTokens[i].tokenAddr).transferFrom(
+                    IERC721(tokenAddr).transferFrom(
                         address(this),
                         msg.sender,
-                        _wrappedTokens[i].tokenIds[j]
+                        tokenId
                     )
                 {
                     unchecked {
-                        j++;
+                        ++j;
                     }
                 } catch {
-                    revert Errors.TransferFromWrappedTokenFailed();
+                    stuckTokens[tokenAddr][tokenId] = true;
+                    emit TransferFromWrappedTokenFailed(tokenAddr, tokenId);
                 }
             }
             unchecked {
-                i++;
+                ++i;
             }
         }
-        _burn(msg.sender, 1);
+        mutex = false;
+        emit Redeemed(msg.sender);
+    }
+
+    function sweepTokensLeftAfterRedeem(
+        address tokenAddr,
+        uint256[] calldata tokenIds
+    ) external {
+        if (mutex) {
+            revert Errors.Reentrancy();
+        }
+        mutex = true;
+        if (msg.sender != redeemer) {
+            revert Errors.InvalidSender();
+        }
+        if (tokenIds.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        mapping(uint256 => bool) storage stuckTokenAddr = stuckTokens[
+            tokenAddr
+        ];
+        for (uint256 i = 0; i < tokenIds.length; ) {
+            // if not stuck, skip, else try to transfer
+            if (stuckTokenAddr[tokenIds[i]]) {
+                try
+                    IERC721(tokenAddr).transferFrom(
+                        address(this),
+                        msg.sender,
+                        tokenIds[i]
+                    )
+                {
+                    delete stuckTokenAddr[tokenIds[i]];
+                } catch {
+                    emit TransferFromWrappedTokenFailed(tokenAddr, tokenIds[i]);
+                }
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+        mutex = false;
+        emit TokenSweepAttempted(tokenAddr, tokenIds);
     }
 
     function getWrappedTokensInfo()
