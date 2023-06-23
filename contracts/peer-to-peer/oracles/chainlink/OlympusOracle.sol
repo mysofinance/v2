@@ -3,8 +3,6 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
@@ -13,36 +11,26 @@ import {Errors} from "../../../Errors.sol";
  * @dev supports olympus gOhm oracles which are compatible with v2v3 or v3 interfaces
  * should only be utilized with eth based oracles, not usd-based oracles
  */
-contract OlympusOracle is IOracle, ChainlinkBasic {
+contract OlympusOracle is ChainlinkBasic {
     address internal constant GOHM_ADDR =
         0x0ab87046fBb341D058F17CBC4c1133F25a20a52f;
     uint256 internal constant SOHM_DECIMALS = 9;
     address internal constant ETH_OHM_ORACLE_ADDR =
         0x9a72298ae3886221820B1c878d12D872087D3a23;
+    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    uint256 internal constant GOHM_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
-    )
-        ChainlinkBasic(
-            _tokenAddrs,
-            _oracleAddrs,
-            0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2, // weth address
-            1e18 // 18 decimals for ETH based oracles
-        )
-    {
+    ) ChainlinkBasic(_tokenAddrs, _oracleAddrs, WETH, GOHM_BASE_CURRENCY_UNIT) {
         oracleAddrs[GOHM_ADDR] = ETH_OHM_ORACLE_ADDR;
     }
 
     function getPrice(
         address collToken,
         address loanToken
-    )
-        external
-        view
-        override(ChainlinkBasic, IOracle)
-        returns (uint256 collTokenPriceInLoanToken)
-    {
+    ) external view override returns (uint256 collTokenPriceInLoanToken) {
         if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {
             revert Errors.NeitherTokenIsGOHM();
         }

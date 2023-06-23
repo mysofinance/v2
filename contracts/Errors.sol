@@ -102,5 +102,7 @@ library Errors {
     error InvalidUpfrontFee();
     error InvalidOracleTolerance();
     error ReserveRatiosSkewedFromOraclePrice();
+    error SequencerDown();
+    error GracePeriodNotOver();
     error LoanExpired();
 }

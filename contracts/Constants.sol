@@ -8,6 +8,8 @@ library Constants {
     uint256 internal constant MAX_ARRANGER_SPLIT = 0.5e18; // 50% max in base
     uint256 internal constant MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY =
         1 days;
+    uint256 internal constant MAX_PRICE_UPDATE_TIMESTAMP_DIVERGENCE = 1 days;
+    uint256 internal constant SEQUENCER_GRACE_PERIOD = 1 hours;
     uint256 internal constant MIN_UNSUBSCRIBE_GRACE_PERIOD = 1 days;
     uint256 internal constant MAX_UNSUBSCRIBE_GRACE_PERIOD = 14 days;
     uint256 internal constant MIN_CONVERSION_GRACE_PERIOD = 1 days;
