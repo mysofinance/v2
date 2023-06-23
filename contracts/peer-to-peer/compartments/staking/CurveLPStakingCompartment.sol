@@ -5,7 +5,6 @@ pragma solidity ^0.8.19;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {ICurveStakingHelper} from "../../interfaces/compartments/staking/ICurveStakingHelper.sol";
 import {ILenderVaultImpl} from "../../interfaces/ILenderVaultImpl.sol";
 import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
@@ -262,6 +261,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         uint256 i;
         uint256 currentRewardTokenBal;
         while (i < 8 && _rewardTokenAddr[i] != address(0)) {
+            // skip invalid reward tokens
             if (_checkIfValidRewardToken(collTokenAddr, i, _rewardTokenAddr)) {
                 currentRewardTokenBal = IERC20(_rewardTokenAddr[i]).balanceOf(
                     address(this)
@@ -290,16 +290,15 @@ contract CurveLPStakingCompartment is BaseCompartment {
         uint256 index,
         address[8] memory rewardTokens
     ) internal pure returns (bool) {
-        // skip reward if it is also be the coll token or crv token (a curve lp token in practice...should be very unlikely)
+        // invalid reward if it is equal to collateral or crv token
         if (
             rewardTokens[index] == collTokenAddr ||
             rewardTokens[index] == CRV_ADDR
         ) {
             return false;
         }
-        // only check when not first reward token
+        // check if reward token is a duplicate in previous entries
         if (index > 0) {
-            // check if reward token is a duplicate in previous entries, if so then skip
             for (uint256 i = 0; i < index; ) {
                 if (rewardTokens[i] == rewardTokens[index]) {
                     return false;
