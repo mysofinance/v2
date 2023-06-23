@@ -18,18 +18,12 @@ contract OlympusOracle is ChainlinkBasic {
     address internal constant ETH_OHM_ORACLE_ADDR =
         0x9a72298ae3886221820B1c878d12D872087D3a23;
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    uint256 internal constant GOHM_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
-    )
-        ChainlinkBasic(
-            _tokenAddrs,
-            _oracleAddrs,
-            WETH,
-            1e18 // 18 decimals for ETH based oracles
-        )
-    {
+    ) ChainlinkBasic(_tokenAddrs, _oracleAddrs, WETH, GOHM_BASE_CURRENCY_UNIT) {
         oracleAddrs[GOHM_ADDR] = ETH_OHM_ORACLE_ADDR;
     }
 

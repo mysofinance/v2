@@ -15,17 +15,13 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
     address internal constant BTC_USD_ORACLE =
         0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c;
     address internal constant WBTC = 0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599;
+    uint256 internal constant WBTC_BASE_CURRENCY_UNIT = 1e8; // 8 decimals for USD based oracles
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
     )
-        ChainlinkBasic(
-            _tokenAddrs,
-            _oracleAddrs,
-            WBTC,
-            1e8 // 8 decimals for USD based oracles
-        )
+        ChainlinkBasic(_tokenAddrs, _oracleAddrs, WBTC, WBTC_BASE_CURRENCY_UNIT)
     {}
 
     function _getPriceOfToken(
