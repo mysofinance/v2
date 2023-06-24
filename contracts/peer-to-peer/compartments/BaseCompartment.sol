@@ -52,7 +52,7 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
         uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
-        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
+        IERC20(collTokenAddr).safeTransfer(msg.sender, currentCollBalance);
     }
 
     function _withdrawCheck() internal view {
