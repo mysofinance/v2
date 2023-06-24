@@ -119,7 +119,7 @@ contract UniV2Chainlink is ChainlinkBasic {
             (2 *
                 Math.sqrt(reserve0 * reserve1) *
                 Math.sqrt(priceToken0 * priceToken1) *
-                10 ** IERC20Metadata(lpToken).decimals()) /
+                UNI_V2_BASE_CURRENCY_UNIT) /
             totalLpSupply /
             Math.sqrt(10 ** token0Decimals * 10 ** token1Decimals);
     }
