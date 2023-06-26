@@ -17,7 +17,7 @@ import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 contract Factory is Ownable, ReentrancyGuard, IFactory {
     using ECDSA for bytes32;
 
-    uint256 public arrangerFeeSplit;
+    uint256 public protocolFee;
     address public immutable loanProposalImpl;
     address public immutable fundingPoolImpl;
     address public mysoTokenManager;
@@ -30,7 +30,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     mapping(address => mapping(address => uint256))
         internal _lenderWhitelistedUntil;
 
-    constructor(address _loanProposalImpl, address _fundingPoolImpl) Ownable() {
+    constructor(address _loanProposalImpl, address _fundingPoolImpl) {
         if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
             revert Errors.InvalidAddress();
         }
@@ -115,17 +115,17 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         emit FundingPoolCreated(newFundingPool, _depositToken);
     }
 
-    function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external {
+    function setProtocolFee(uint256 _newprotocolFee) external {
         _senderCheckOwner();
-        uint256 oldArrangerFeeSplit = arrangerFeeSplit;
+        uint256 oldprotocolFee = protocolFee;
         if (
-            _newArrangerFeeSplit > Constants.MAX_ARRANGER_SPLIT ||
-            _newArrangerFeeSplit == oldArrangerFeeSplit
+            _newprotocolFee > Constants.MAX_P2POOL_PROTOCOL_FEE ||
+            _newprotocolFee == oldprotocolFee
         ) {
             revert Errors.InvalidFee();
         }
-        arrangerFeeSplit = _newArrangerFeeSplit;
-        emit ArrangerFeeSplitUpdated(oldArrangerFeeSplit, _newArrangerFeeSplit);
+        protocolFee = _newprotocolFee;
+        emit ProtocolFeeUpdated(oldprotocolFee, _newprotocolFee);
     }
 
     function claimLenderWhitelistStatus(
@@ -183,7 +183,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         if (lenders.length == 0) {
             revert Errors.InvalidArrayLength();
         }
-        for (uint i = 0; i < lenders.length; ) {
+        for (uint256 i; i < lenders.length; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerLender = _lenderWhitelistedUntil[
                     msg.sender

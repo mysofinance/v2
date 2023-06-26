@@ -17,7 +17,7 @@ interface IFundingPoolImpl {
     event LoanProposalExecuted(
         address indexed loanProposal,
         address indexed borrower,
-        uint256 finalLoanAmount,
+        uint256 grossLoanAmount,
         uint256 arrangerFee,
         uint256 protocolFee
     );

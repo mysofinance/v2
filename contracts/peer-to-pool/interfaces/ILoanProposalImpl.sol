@@ -7,10 +7,11 @@ interface ILoanProposalImpl {
     event LoanTermsProposed(DataTypesPeerToPool.LoanTerms loanTerms);
     event LoanTermsAccepted();
     event LoanTermsAndTransferCollFinalized(
-        uint256 finalLoanAmount,
+        uint256 grossLoanAmount,
         uint256 _finalCollAmountReservedForDefault,
         uint256 _finalCollAmountReservedForConversions,
-        uint256 _arrangerFee
+        uint256 _arrangerFee,
+        uint256 _protocolFee
     );
     event Rolledback();
     event LoanDeployed();
@@ -142,12 +143,13 @@ interface ILoanProposalImpl {
     /**
      * @notice Returns core dynamic data for given loan proposal
      * @return arrangerFee The arranger fee, which initially is expressed in relative terms (i.e., 100% = BASE) and once the proposal gets finalized is in absolute terms (e.g., 1000 USDC)
-     * @return finalLoanAmount The final loan amount, which initially is zero and gets set once the proposal gets finalized
+     * @return grossLoanAmount The final loan amount, which initially is zero and gets set once the proposal gets finalized
      * @return finalCollAmountReservedForDefault The final collateral amount reserved for default case, which initially is zero and gets set once the proposal gets finalized.
      * @return finalCollAmountReservedForConversions The final collateral amount reserved for lender conversions, which initially is zero and gets set once the proposal gets finalized
      * @return loanTermsLockedTime The timestamp when loan terms got locked in, which initially is zero and gets set once the proposal gets finalized
      * @return currentRepaymentIdx The current repayment index, which gets incremented on every repay
      * @return status The current loan proposal status.
+     * @return protocolFee The protocol fee, which initially is expressed in relative terms (i.e., 100% = BASE) and once the proposal gets finalized is in absolute terms (e.g., 1000 USDC). Note that the relative protocol fee is locked in at the time when the proposal is first created
      * @dev Note that finalCollAmountReservedForDefault is a lower bound for the collateral amount that lenders can claim in case of a default. This means that in case all lenders converted and the borrower defaults then this amount will be distributed as default recovery value on a pro-rata basis to lenders. In the other case where no lenders converted then finalCollAmountReservedForDefault plus finalCollAmountReservedForConversions will be available as default recovery value for lenders, hence finalCollAmountReservedForDefault is a lower bound for a lender's default recovery value.
      */
     function dynamicData()
@@ -155,12 +157,13 @@ interface ILoanProposalImpl {
         view
         returns (
             uint256 arrangerFee,
-            uint256 finalLoanAmount,
+            uint256 grossLoanAmount,
             uint256 finalCollAmountReservedForDefault,
             uint256 finalCollAmountReservedForConversions,
             uint256 loanTermsLockedTime,
             uint256 currentRepaymentIdx,
-            DataTypesPeerToPool.LoanStatus status
+            DataTypesPeerToPool.LoanStatus status,
+            uint256 protocolFee
         );
 
     /**
@@ -229,9 +232,9 @@ interface ILoanProposalImpl {
      * @param loanTokenDecimals The loan token decimals
      * @return loanTerms The loan terms in absolute terms
      * @return absArrangerFee The arranger fee in absolute terms
-     * @return absLoanAmount The loan amount in absolute terms
      * @return absCollAmountReservedForDefault The collateral token amount reserved for default claims in absolute terms
      * @return absCollAmountReservedForConversions The collateral token amount reserved for lender conversions
+     * @return absProtocolFee The protocol fee in absolute terms
      */
     function getAbsoluteLoanTerms(
         DataTypesPeerToPool.LoanTerms memory _tmpLoanTerms,
@@ -243,8 +246,8 @@ interface ILoanProposalImpl {
         returns (
             DataTypesPeerToPool.LoanTerms memory loanTerms,
             uint256 absArrangerFee,
-            uint256 absLoanAmount,
             uint256 absCollAmountReservedForDefault,
-            uint256 absCollAmountReservedForConversions
+            uint256 absCollAmountReservedForConversions,
+            uint256 absProtocolFee
         );
 }

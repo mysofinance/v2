@@ -179,12 +179,13 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
 
         (
             uint256 arrangerFee,
-            uint256 finalLoanAmount,
+            uint256 grossLoanAmount,
             ,
             ,
             ,
             ,
-
+            ,
+            uint256 protocolFee
         ) = ILoanProposalImpl(loanProposal).dynamicData();
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
@@ -192,27 +193,22 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         ILoanProposalImpl(loanProposal).checkAndUpdateStatus();
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
-            finalLoanAmount
+            grossLoanAmount - arrangerFee - protocolFee
         );
         (, , , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
-        uint256 protocolFeeShare = (arrangerFee *
-            IFactory(factory).arrangerFeeSplit()) / Constants.BASE;
-        IERC20Metadata(depositToken).safeTransfer(
-            arranger,
-            arrangerFee - protocolFeeShare
-        );
+        IERC20Metadata(depositToken).safeTransfer(arranger, arrangerFee);
         IERC20Metadata(depositToken).safeTransfer(
             IFactory(factory).owner(),
-            protocolFeeShare
+            protocolFee
         );
 
         emit LoanProposalExecuted(
             loanProposal,
             loanTerms.borrower,
-            finalLoanAmount,
-            arrangerFee - protocolFeeShare,
-            protocolFeeShare
+            grossLoanAmount,
+            arrangerFee,
+            protocolFee
         );
     }
 }
