@@ -15,7 +15,7 @@ interface IFactory {
     event FundingPoolCreated(
         address indexed newFundingPool,
         address indexed depositToken,
-        uint256 numFundngPools
+        uint256 numFundingPools
     );
     event ArrangerFeeSplitUpdated(
         uint256 oldArrangerFeeSplit,
