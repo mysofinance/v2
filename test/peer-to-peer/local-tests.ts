@@ -3311,17 +3311,24 @@ describe('Peer-to-Peer: Local Tests', function () {
         wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [])
       ).to.be.revertedWithCustomError(wrappedToken, 'InvalidArrayLength')
 
-      // toggle block transfer back for blocked tokens
+      // toggle block transfer back for first blocked token
       await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
-      await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
 
       // passing in token Ids that are not stuck should revert
       await expect(
         wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [1, 2])
       ).to.be.revertedWithCustomError(wrappedToken, 'TokenNotStuck')
 
-      // sweep stuck token
+      // sweep stuck token in first NFT contract
       await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
+
+      // sweep stuck token should go into the catch statement since still stuck and emit event
+      await expect(wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1]))
+        .to.emit(wrappedToken, 'TransferFromWrappedTokenFailed')
+        .withArgs(mySecondNFT.address, 1)
+
+      // toggle block transfer back for second blocked token
+      await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
       // sweep stuck token skipping a non-stuck token
       await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1])
 
