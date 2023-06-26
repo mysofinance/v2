@@ -5,6 +5,13 @@ pragma solidity 0.8.19;
 import {DataTypesPeerToPeer} from "../../../DataTypesPeerToPeer.sol";
 
 interface IERC721Wrapper {
+    event ERC721WrapperCreated(
+        address indexed newErc20Addr,
+        address indexed minter,
+        uint256 numTokensCreated,
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] wrappedTokensInfo
+    );
+
     /**
      * @notice Allows user to wrap (multiple) ERC721 into one ERC20
      * @param minter Address of the minter

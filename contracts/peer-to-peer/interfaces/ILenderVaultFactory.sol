@@ -5,7 +5,8 @@ pragma solidity ^0.8.19;
 interface ILenderVaultFactory {
     event NewVaultCreated(
         address indexed newLenderVaultAddr,
-        address vaultOwner
+        address vaultOwner,
+        uint256 numRegisteredVaults
     );
 
     /**

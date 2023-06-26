@@ -5,6 +5,13 @@ pragma solidity 0.8.19;
 import {DataTypesPeerToPeer} from "../../../../peer-to-peer/DataTypesPeerToPeer.sol";
 
 interface IERC20Wrapper {
+    event ERC20WrapperCreated(
+        address indexed newErc20Addr,
+        address indexed minter,
+        uint256 numTokensCreated,
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] wrappedTokensInfo
+    );
+
     /**
      * @notice Allows user to wrap multiple ERC20 into one ERC20
      * @param minter Address of the minter

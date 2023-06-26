@@ -9,11 +9,13 @@ interface IFactory {
         address indexed sender,
         address collToken,
         uint256 arrangerFee,
-        uint256 unsubscribeGracePeriod
+        uint256 unsubscribeGracePeriod,
+        uint256 numLoanProposals
     );
     event FundingPoolCreated(
         address indexed newFundingPool,
-        address indexed depositToken
+        address indexed depositToken,
+        uint256 numFundngPools
     );
     event ArrangerFeeSplitUpdated(
         uint256 oldArrangerFeeSplit,

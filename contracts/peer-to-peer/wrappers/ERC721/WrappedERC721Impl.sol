@@ -84,7 +84,7 @@ contract WrappedERC721Impl is
             }
         }
         _mutex = false;
-        emit Redeemed(msg.sender);
+        emit Redeemed(account, recipient);
     }
 
     function sweepTokensLeftAfterRedeem(
