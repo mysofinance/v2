@@ -220,6 +220,24 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
     await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
+    // deploy uni v3 twap
+    const TwapGetter = await ethers.getContractFactory('TwapGetter')
+    await TwapGetter.connect(team)
+    const twapGetter = await TwapGetter.deploy()
+    await twapGetter.deployed()
+
+    const poolFee = 500
+    const twapInterval = 60
+
+    const twapWethUsdc = await twapGetter.getTwap(weth.address, usdc.address, poolFee, twapInterval)
+    // const twapUsdcWeth = await twapGetter.getTwap(usdc.address, weth.address, poolFee, twapInterval)
+    // const twapWbtcUsdc = await twapGetter.getTwap(wbtc, usdc.address, poolFee, twapInterval)
+    // const twapUsdcWbtc = await twapGetter.getTwap(usdc.address, wbtc, poolFee, twapInterval)
+    console.log('twapWethUsdc', twapWethUsdc)
+    // console.log('twapUsdcWeth', twapUsdcWeth)
+    // console.log('twapWbtcUsdc', twapWbtcUsdc)
+    // console.log('twapUsdcWbtc', twapUsdcWbtc)
+
     return {
       addressRegistry,
       borrowerGateway,
