@@ -78,6 +78,7 @@ contract WrappedERC20Impl is
                 ++i;
             }
         }
+        emit Redeemed(account, recipient, amount);
     }
 
     function getWrappedTokensInfo()

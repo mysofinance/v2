@@ -63,7 +63,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
             _liqGaugeAddr,
             IERC20(loan.collToken).allowance(address(this), _liqGaugeAddr)
         );
-        emit Staked(gaugeIndex, liqGaugeAddr, amount);
+        emit Staked(gaugeIndex, _liqGaugeAddr, amount);
     }
 
     function toggleApprovedStaker(address _staker) external {
@@ -211,9 +211,9 @@ contract CurveLPStakingCompartment is BaseCompartment {
                 : (repayAmount * currentCompartmentBal) / repayAmountLeft
         );
 
-        // if unlock, send to vault, else if callback send directly there, else to borrower
+        // if unlock, send to vault (msg.sender), else if callback send directly there, else to borrower
         address lpTokenReceiver = isUnlock
-            ? vaultAddr
+            ? msg.sender
             : (callbackAddr == address(0) ? borrowerAddr : callbackAddr);
 
         IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
@@ -239,8 +239,8 @@ contract CurveLPStakingCompartment is BaseCompartment {
         address[8] memory _rewardTokenAddr
     ) internal {
         // rest of rewards are always sent to borrower, not for callback
-        // if unlock then sent to vaultAddr
-        address rewardReceiver = isUnlock ? vaultAddr : borrowerAddr;
+        // if unlock then sent to vaultAddr (msg.sender)
+        address rewardReceiver = isUnlock ? msg.sender : borrowerAddr;
         // check crv token balance
         uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
         // transfer proportion of crv token balance

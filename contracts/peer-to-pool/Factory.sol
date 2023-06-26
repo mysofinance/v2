@@ -50,15 +50,9 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         if (!isFundingPool[_fundingPool] || _collToken == address(0)) {
             revert Errors.InvalidAddress();
         }
-        uint256 numLoanProposals = loanProposals.length;
-        bytes32 salt = keccak256(
-            abi.encodePacked(loanProposalImpl, msg.sender, numLoanProposals)
-        );
-        address newLoanProposal = Clones.cloneDeterministic(
-            loanProposalImpl,
-            salt
-        );
+        address newLoanProposal = Clones.clone(loanProposalImpl);
         loanProposals.push(newLoanProposal);
+        uint256 numLoanProposals = loanProposals.length;
         isLoanProposal[newLoanProposal] = true;
         address _mysoTokenManager = mysoTokenManager;
         if (_mysoTokenManager != address(0)) {
@@ -89,7 +83,8 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             msg.sender,
             _collToken,
             _arrangerFee,
-            _unsubscribeGracePeriod
+            _unsubscribeGracePeriod,
+            numLoanProposals
         );
     }
 
@@ -97,13 +92,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         if (_depositTokenHasFundingPool[_depositToken]) {
             revert Errors.FundingPoolAlreadyExists();
         }
-        bytes32 salt = keccak256(
-            abi.encodePacked(_depositToken, fundingPools.length)
-        );
-        address newFundingPool = Clones.cloneDeterministic(
-            fundingPoolImpl,
-            salt
-        );
+        address newFundingPool = Clones.clone(fundingPoolImpl);
         fundingPools.push(newFundingPool);
         isFundingPool[newFundingPool] = true;
         _depositTokenHasFundingPool[_depositToken] = true;
@@ -112,7 +101,11 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             _depositToken
         );
 
-        emit FundingPoolCreated(newFundingPool, _depositToken);
+        emit FundingPoolCreated(
+            newFundingPool,
+            _depositToken,
+            fundingPools.length
+        );
     }
 
     function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external {

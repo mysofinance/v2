@@ -3200,6 +3200,151 @@ describe('Peer-to-Peer: Local Tests', function () {
       const totalSupplyPostRedeem = await wrappedToken.totalSupply()
       expect(totalSupplyPostRedeem).to.equal(0)
     })
+
+    it('Should handle sweeping and redeeming of blocked nfts correctly', async function () {
+      const { addressRegistry, borrower, team, erc721Wrapper, myFirstNFT, mySecondNFT } = await setupTest()
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
+
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([myFirstNFT.address, mySecondNFT.address], 6)
+
+      // mint tokens
+      await myFirstNFT.connect(team).safeMint(borrower.address, 1)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 2)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 1)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 2)
+
+      // set approval for wrapper contract
+      await myFirstNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+      await mySecondNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+
+      // sort ERC721_TOKEN token addresses
+      const sortedNFTAddrs = [myFirstNFT.address, mySecondNFT.address].sort((a, b) =>
+        ethers.BigNumber.from(a).lte(b) ? -1 : 1
+      )
+
+      // create wrapped token
+      expect(await erc721Wrapper.numTokensCreated()).to.be.equal(0)
+      await addressRegistry.connect(borrower).createWrappedTokenForERC721s(
+        [
+          { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+          { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+        ],
+        'testName',
+        'testSymbol'
+      )
+      expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
+
+      const tokensCreated1 = await erc721Wrapper.tokensCreated()
+      const newWrappedTokenAddr1 = tokensCreated1[0]
+      const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr1)
+      const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr1)
+
+      // new token should be whitelisted as ERC20_TOKEN
+      expect(whitelistTokenState).to.equal(1)
+
+      // check borrower has balance of 1
+      const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
+
+      expect(borrowerWrappedTokenBalance).to.equal(1)
+
+      // check total supply is 1
+      const totalSupply = await wrappedToken.totalSupply()
+
+      expect(totalSupply).to.equal(1)
+
+      // check wrapped token name, symbol and decimal overrides
+      const wrappedTokenName = await wrappedToken.name()
+      const wrappedTokenSymbol = await wrappedToken.symbol()
+      const wrappedTokenDecimals = await wrappedToken.decimals()
+      expect(wrappedTokenName).to.equal('testName')
+      expect(wrappedTokenSymbol).to.equal('testSymbol')
+      expect(wrappedTokenDecimals).to.equal(0)
+
+      const wrappedTokensInfo = await wrappedToken.getWrappedTokensInfo()
+      expect(wrappedTokensInfo.length).to.equal(2)
+
+      await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
+      await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
+
+      await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)
+
+      // check ownership of all unlocked NFTs have shifted back to borrower, but locked NFTs
+      const currOwnerFirstNFTIdx1PostRedeem = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostRedeem = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostRedeem = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostRedeem = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerFirstNFTIdx2PostRedeem).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1PostRedeem).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2PostRedeem).to.equal(borrower.address)
+
+      // check borrower has balance of 0
+      const borrowerWrappedTokenBalancePostRedeem = await wrappedToken.balanceOf(borrower.address)
+      expect(borrowerWrappedTokenBalancePostRedeem).to.equal(0)
+
+      // check total supply is 0
+      const totalSupplyPostRedeem = await wrappedToken.totalSupply()
+      expect(totalSupplyPostRedeem).to.equal(0)
+
+      // check stuckToken status
+      const stuckTokenStatusFirstNFTIdx1 = await wrappedToken.stuckTokens(myFirstNFT.address, 1)
+      const stuckTokenStatusFirstNFTIdx2PreSweep = await wrappedToken.stuckTokens(myFirstNFT.address, 2)
+      const stuckTokenStatusSecondNFTIdx1PreSweep = await wrappedToken.stuckTokens(mySecondNFT.address, 1)
+      const stuckTokenStatusSecondNFTIdx2 = await wrappedToken.stuckTokens(mySecondNFT.address, 2)
+
+      expect(stuckTokenStatusFirstNFTIdx1).to.be.false
+      expect(stuckTokenStatusFirstNFTIdx2PreSweep).to.be.true
+      expect(stuckTokenStatusSecondNFTIdx1PreSweep).to.be.true
+      expect(stuckTokenStatusSecondNFTIdx2).to.be.false
+
+      // expect sweep to revert if not called by redeemer
+      await expect(
+        wrappedToken.connect(team).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidSender')
+
+      // expect sweep to revert if empty token array
+      await expect(
+        wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [])
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidArrayLength')
+
+      // toggle block transfer back for first blocked token
+      await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
+
+      // passing in token Ids that are not stuck should revert
+      await expect(
+        wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [1, 2])
+      ).to.be.revertedWithCustomError(wrappedToken, 'TokenNotStuck')
+
+      // sweep stuck token in first NFT contract
+      await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
+
+      // sweep stuck token should go into the catch statement since still stuck and emit event
+      await expect(wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1]))
+        .to.emit(wrappedToken, 'TransferFromWrappedTokenFailed')
+        .withArgs(mySecondNFT.address, 1)
+
+      // toggle block transfer back for second blocked token
+      await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
+      // sweep stuck token skipping a non-stuck token
+      await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1])
+
+      const currOwnerFirstNFTIdx2PostSweep = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostSweep = await mySecondNFT.ownerOf(1)
+
+      expect(currOwnerFirstNFTIdx2PostSweep).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx1PostSweep).to.equal(borrower.address)
+
+      // check stuckToken status
+      const stuckTokenStatusFirstNFTIdx2PostSweep = await wrappedToken.stuckTokens(myFirstNFT.address, 2)
+      const stuckTokenStatusSecondNFTIdx1PostSweep = await wrappedToken.stuckTokens(mySecondNFT.address, 1)
+
+      expect(stuckTokenStatusFirstNFTIdx2PostSweep).to.be.false
+      expect(stuckTokenStatusSecondNFTIdx1PostSweep).to.be.false
+    })
   })
 
   describe('ERC20 Wrapper Testing', function () {

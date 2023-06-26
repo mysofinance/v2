@@ -5,6 +5,8 @@ pragma solidity 0.8.19;
 import {DataTypesPeerToPeer} from "../../../DataTypesPeerToPeer.sol";
 
 interface IWrappedERC20Impl {
+    event Redeemed(address indexed redeemer, address recipient, uint256 amount);
+
     /**
      * @notice Initializes the ERC20 wrapper
      * @param minter Address of the minter

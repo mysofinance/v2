@@ -165,14 +165,14 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         );
     }
 
-    function addLenderVault(address addr) external {
+    function addLenderVault(address addr) external returns (uint256) {
         // catches case where address registry is uninitialized (lenderVaultFactory == address(0))
         if (msg.sender != lenderVaultFactory) {
             revert Errors.InvalidSender();
         }
         isRegisteredVault[addr] = true;
         _registeredVaults.push(addr);
-        ++numRegisteredVaults;
+        return ++numRegisteredVaults;
     }
 
     function claimBorrowerWhitelistStatus(

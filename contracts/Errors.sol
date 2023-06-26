@@ -105,4 +105,6 @@ library Errors {
     error SequencerDown();
     error GracePeriodNotOver();
     error LoanExpired();
+    error Reentrancy();
+    error TokenNotStuck();
 }
