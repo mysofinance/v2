@@ -106,4 +106,5 @@ library Errors {
     error GracePeriodNotOver();
     error LoanExpired();
     error Reentrancy();
+    error TokenNotStuck();
 }

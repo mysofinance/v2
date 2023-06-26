@@ -3315,10 +3315,15 @@ describe('Peer-to-Peer: Local Tests', function () {
       await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
       await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
 
+      // passing in token Ids that are not stuck should revert
+      await expect(
+        wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [1, 2])
+      ).to.be.revertedWithCustomError(wrappedToken, 'TokenNotStuck')
+
       // sweep stuck token
       await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
       // sweep stuck token skipping a non-stuck token
-      await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1, 4])
+      await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1])
 
       const currOwnerFirstNFTIdx2PostSweep = await myFirstNFT.ownerOf(2)
       const currOwnerSecondNFTIdx1PostSweep = await mySecondNFT.ownerOf(1)

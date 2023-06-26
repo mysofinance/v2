@@ -104,19 +104,19 @@ contract WrappedERC721Impl is
             tokenAddr
         ];
         for (uint256 i = 0; i < tokenIds.length; ) {
-            // if not stuck, skip, else try to transfer
-            if (stuckTokenAddr[tokenIds[i]]) {
-                try
-                    IERC721(tokenAddr).transferFrom(
-                        address(this),
-                        msg.sender,
-                        tokenIds[i]
-                    )
-                {
-                    delete stuckTokenAddr[tokenIds[i]];
-                } catch {
-                    emit TransferFromWrappedTokenFailed(tokenAddr, tokenIds[i]);
-                }
+            if (!stuckTokenAddr[tokenIds[i]]) {
+                revert Errors.TokenNotStuck();
+            }
+            try
+                IERC721(tokenAddr).transferFrom(
+                    address(this),
+                    msg.sender,
+                    tokenIds[i]
+                )
+            {
+                delete stuckTokenAddr[tokenIds[i]];
+            } catch {
+                emit TransferFromWrappedTokenFailed(tokenAddr, tokenIds[i]);
             }
             unchecked {
                 ++i;
