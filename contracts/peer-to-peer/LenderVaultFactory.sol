@@ -27,14 +27,13 @@ contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
         nonReentrant
         returns (address newLenderVaultAddr)
     {
-        uint256 numRegisteredVaults = IAddressRegistry(addressRegistry)
-            .numRegisteredVaults();
         newLenderVaultAddr = Clones.clone(lenderVaultImpl);
         ILenderVaultImpl(newLenderVaultAddr).initialize(
             msg.sender,
             addressRegistry
         );
-        IAddressRegistry(addressRegistry).addLenderVault(newLenderVaultAddr);
+        uint256 numRegisteredVaults = IAddressRegistry(addressRegistry)
+            .addLenderVault(newLenderVaultAddr);
         address mysoTokenManager = IAddressRegistry(addressRegistry)
             .mysoTokenManager();
         if (mysoTokenManager != address(0)) {
@@ -44,6 +43,10 @@ contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
                 newLenderVaultAddr
             );
         }
-        emit NewVaultCreated(newLenderVaultAddr, msg.sender);
+        emit NewVaultCreated(
+            newLenderVaultAddr,
+            msg.sender,
+            numRegisteredVaults
+        );
     }
 }

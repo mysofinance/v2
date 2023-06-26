@@ -53,8 +53,11 @@ interface IAddressRegistry {
      * @notice adds new lender vault to registry
      * @dev can only be called lender vault factory
      * @param addr address of new lender vault
+     * @return numRegisteredVaults number of registered vaults
      */
-    function addLenderVault(address addr) external;
+    function addLenderVault(
+        address addr
+    ) external returns (uint256 numRegisteredVaults);
 
     /**
      * @notice Allows user to claim whitelisted status

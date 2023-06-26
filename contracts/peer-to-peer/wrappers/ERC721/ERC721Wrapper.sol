@@ -21,7 +21,6 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
     address public immutable addressRegistry;
     address public immutable wrappedErc721Impl;
     address[] public _tokensCreated;
-    uint256 public numTokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc721Impl) {
         if (
@@ -51,10 +50,8 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         if (numTokensToBeWrapped == 0) {
             revert Errors.InvalidArrayLength();
         }
-        bytes32 salt = keccak256(abi.encodePacked(_tokensCreated.length));
-        newErc20Addr = Clones.cloneDeterministic(wrappedErc721Impl, salt);
+        newErc20Addr = Clones.clone(wrappedErc721Impl);
         _tokensCreated.push(newErc20Addr);
-        ++numTokensCreated;
 
         IWrappedERC721Impl(newErc20Addr).initialize(
             minter,
@@ -69,10 +66,20 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
             tokensToBeWrapped,
             newErc20Addr
         );
+        emit ERC721WrapperCreated(
+            newErc20Addr,
+            minter,
+            _tokensCreated.length,
+            tokensToBeWrapped
+        );
     }
 
     function tokensCreated() external view returns (address[] memory) {
         return _tokensCreated;
+    }
+
+    function numTokensCreated() external view returns (uint256) {
+        return _tokensCreated.length;
     }
 
     function _transferTokens(

@@ -5,7 +5,7 @@ pragma solidity 0.8.19;
 import {DataTypesPeerToPeer} from "../../../DataTypesPeerToPeer.sol";
 
 interface IWrappedERC721Impl {
-    event Redeemed(address indexed redeemer);
+    event Redeemed(address indexed redeemer, address recipient);
 
     event TransferFromWrappedTokenFailed(
         address indexed tokenAddr,
