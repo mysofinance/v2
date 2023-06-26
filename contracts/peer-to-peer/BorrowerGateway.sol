@@ -188,7 +188,12 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         uint256 maxReclaimableCollAmount = noCompartment
             ? loan.initCollAmount - loan.amountReclaimedSoFar
             : IBaseCompartment(loan.collTokenCompartmentAddr)
-                .getReclaimableBalance(loan.collToken);
+                .getReclaimableBalance(
+                    loan.initCollAmount,
+                    loan.amountReclaimedSoFar,
+                    loan.collToken
+                );
+
         // @dev: amountRepaidSoFar cannot exceed initRepayAmount
         uint128 leftRepaymentAmount = loan.initRepayAmount -
             loan.amountRepaidSoFar;

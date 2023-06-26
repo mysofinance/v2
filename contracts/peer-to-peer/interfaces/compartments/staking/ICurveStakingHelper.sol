@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.19;
 
-interface IStakingHelper {
+interface ICurveStakingHelper {
     /**
      * @notice Deposit `value` LP tokens, curve type take pools
      * @param value Number of tokens to deposit
@@ -28,12 +28,6 @@ interface IStakingHelper {
      * @notice Claim all available reward tokens for msg.sender
      */
     function claim_rewards() external;
-
-    /**
-     * @notice Claim fee reward tokens
-     * @param _receiver address which is recipient of the claim
-     */
-    function claim(address _receiver) external returns (uint256);
 
     /**
      * @notice Mint allocated tokens for the caller based on a single gauge.

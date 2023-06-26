@@ -161,6 +161,146 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     }
   }
 
+  it('Should process GLP borrow/repay correctly when collateral weth was mistakenly whitelisted', async function () {
+    const { borrowerGateway, lender, borrower, quoteHandler, team, usdc, weth, lenderVault, addressRegistry } =
+      await setupTest()
+
+    // create glp staking implementation
+    const GlpStakingCompartmentImplementation = await ethers.getContractFactory('GLPStakingCompartment')
+    await GlpStakingCompartmentImplementation.connect(team)
+    const glpStakingCompartmentImplementation = await GlpStakingCompartmentImplementation.deploy()
+    await glpStakingCompartmentImplementation.deployed()
+
+    // whitelist tokens
+    await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
+    // whitelist compartment
+    await addressRegistry.connect(team).setWhitelistState([glpStakingCompartmentImplementation.address], 3)
+    // whitelist tokens for compartment
+    await addressRegistry
+      .connect(team)
+      .setAllowedTokensForCompartment(glpStakingCompartmentImplementation.address, [weth.address], true)
+
+    // lender deposits usdc
+    await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(10000000))
+
+    // get pre balances
+    const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+    const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+    const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+    const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+
+    expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(10000000))
+
+    // borrower approves borrower gateway
+    await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+    const onChainQuote = await createOnChainRequest({
+      lender,
+      collToken: weth.address,
+      loanToken: usdc.address,
+      borrowerCompartmentImplementation: glpStakingCompartmentImplementation.address,
+      lenderVault,
+      quoteHandler,
+      loanPerCollUnit: ONE_USDC.mul(1000),
+      validUntil: MAX_UINT256
+    })
+
+    // borrow with on chain quote
+    const collSendAmount = ONE_WETH
+    const expectedTransferFee = 0
+    const quoteTupleIdx = 0
+    const callbackAddr = ZERO_ADDR
+    const callbackData = ZERO_BYTES32
+    const borrowInstructions = {
+      collSendAmount,
+      expectedTransferFee,
+      deadline: MAX_UINT256,
+      minLoanAmount: 0,
+      callbackAddr,
+      callbackData
+    }
+
+    const borrowWithOnChainQuoteTransaction = await borrowerGateway
+      .connect(borrower)
+      .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+    const borrowWithOnChainQuoteReceipt = await borrowWithOnChainQuoteTransaction.wait()
+
+    const borrowEvent = borrowWithOnChainQuoteReceipt.events?.find(x => {
+      return x.event === 'Borrowed'
+    })
+
+    const loanId = borrowEvent?.args?.['loanId']
+    const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
+    const loanExpiry = borrowEvent?.args?.loan?.['expiry']
+    const initCollAmount = borrowEvent?.args?.loan?.['initCollAmount']
+
+    const coeffRepay = 2
+    const partialRepayAmount = BigNumber.from(repayAmount).div(coeffRepay)
+
+    // check balance post borrow
+    const borrowerCollBalPost = await weth.balanceOf(borrower.address)
+    expect(borrowerWethBalPre.sub(borrowerCollBalPost)).to.be.equal(ONE_WETH)
+    const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+    const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+    expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+    const expUpfrontFee = collSendAmount.mul(onChainQuote.quoteTuples[0].upfrontFeePctInBase).div(BASE)
+    const vaultCollBalPost = await weth.balanceOf(lenderVault.address)
+    expect(vaultCollBalPost.sub(vaultWethBalPre)).to.equal(expUpfrontFee)
+
+    // borrower approves borrower gateway
+    await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+    // mine 50000 blocks with an interval of 60 seconds, ~1 month
+    await hre.network.provider.send('hardhat_mine', [BigNumber.from(50000).toHexString(), BigNumber.from(60).toHexString()])
+
+    // increase borrower usdc balance to repay
+    await usdc.connect(lender).transfer(borrower.address, partialRepayAmount)
+
+    // partial repay
+    await expect(
+      borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: loanId,
+          targetRepayAmount: partialRepayAmount,
+          expectedTransferFee: 0,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+    )
+      .to.emit(borrowerGateway, 'Repaid')
+      .withArgs(lenderVault.address, loanId, partialRepayAmount)
+
+    // check balance post repay
+    const vaultUsdcBalPostRepay = await usdc.balanceOf(lenderVault.address)
+    const borrowerUsdcBalPostRepay = await usdc.balanceOf(borrower.address)
+    const borrowerCollRepayBalPost = await weth.balanceOf(borrower.address)
+    const expReclaimedColl = initCollAmount.mul(partialRepayAmount).div(repayAmount)
+    expect(borrowerUsdcBalPost).to.be.equal(borrowerUsdcBalPostRepay)
+    expect(vaultUsdcBalPostRepay.sub(vaultUsdcBalPost)).to.be.equal(partialRepayAmount)
+    expect(borrowerCollRepayBalPost.sub(borrowerCollBalPost)).to.be.equal(expReclaimedColl)
+
+    // move forward past loan expiry
+    await ethers.provider.send('evm_mine', [loanExpiry + 12])
+
+    // unlock unclaimed collateral
+    const lenderVaultWethBalPre = await weth.balanceOf(lenderVault.address)
+    const lenderCollBalPre = await weth.balanceOf(lender.address)
+
+    expect(lenderCollBalPre).to.equal(BigNumber.from(0))
+
+    await lenderVault.connect(lender).unlockCollateral(weth.address, [loanId])
+
+    const lenderCollBalPost = await weth.balanceOf(lender.address)
+    const lenderVaultCollBalPost = await weth.balanceOf(lenderVault.address)
+
+    // unlock collateral
+    expect(lenderCollBalPost).to.equal(lenderCollBalPre)
+    expect(lenderVaultCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
+  })
+
   it('Should process GLP borrow/repay correctly with rewards', async function () {
     const { borrowerGateway, lender, borrower, quoteHandler, team, usdc, weth, lenderVault, addressRegistry } =
       await setupTest()
@@ -322,8 +462,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const lenderVaultCollBalPost = await collInstance.balanceOf(lenderVault.address)
 
     expect(lenderVaultWethBalPost).to.be.above(lenderVaultWethBalPre)
-    // note that unlockCollateral() causes the entire "available collateral balance" to be withdrawn,
-    // NOT only the amount(s) associated from defaulted loans with unclaimed collateral
+    // unlock collateral
     expect(lenderCollBalPost).to.equal(lenderCollBalPre)
     expect(lenderVaultCollBalPost).to.equal(initCollAmount.sub(expReclaimedColl).add(expUpfrontFee))
   })
