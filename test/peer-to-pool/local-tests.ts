@@ -23,7 +23,6 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 
 // deployment parameterization constants
-const MIN_ARRANGER_FEE = BASE.mul(5).div(10000) // 5bps
 const MAX_ARRANGER_FEE = BASE.mul(5).div(10) // 50%
 const MIN_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY
 const MAX_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY.mul(14)
@@ -105,17 +104,17 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
     const factory = await Factory.connect(team).deploy(loanProposalImpl.address, fundingPoolImpl.address)
     await factory.deployed()
-    await expect(factory.connect(lender1).setArrangerFeeSplit(BASE.mul(20).div(100))).to.be.revertedWithCustomError(
+    await expect(factory.connect(lender1).setProtocolFee(BASE.mul(20).div(100))).to.be.revertedWithCustomError(
       factory,
       'InvalidSender'
     )
-    await expect(factory.connect(team).setArrangerFeeSplit(BASE.mul(80).div(100))).to.be.revertedWithCustomError(
+    await expect(factory.connect(team).setProtocolFee(BASE.mul(80).div(100))).to.be.revertedWithCustomError(
       factory,
       'InvalidFee'
     )
-    const newFee = BASE.mul(20).div(100)
-    await factory.connect(team).setArrangerFeeSplit(newFee)
-    await expect(factory.connect(team).setArrangerFeeSplit(newFee)).to.be.revertedWithCustomError(factory, 'InvalidFee')
+    const newFee = BASE.mul(5).div(100)
+    await factory.connect(team).setProtocolFee(newFee)
+    await expect(factory.connect(team).setProtocolFee(newFee)).to.be.revertedWithCustomError(factory, 'InvalidFee')
 
     // create a deposit pool
     await factory.createFundingPool(usdc.address)
@@ -187,60 +186,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       REPAYMENT_GRACE_PERIOD
     )
 
-    // revert on zero addresses
-    await expect(
-      factory
-        .connect(arranger)
-        .createLoanProposal(
-          ADDRESS_ZERO,
-          daoToken.address,
-          ADDRESS_ZERO,
-          BASE.mul(10).div(100),
-          MIN_UNSUBSCRIBE_GRACE_PERIOD,
-          MIN_CONVERSION_GRACE_PERIOD,
-          MIN_REPAYMENT_GRACE_PERIOD
-        )
-    ).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
-    await expect(
-      factory
-        .connect(arranger)
-        .createLoanProposal(
-          fundingPool.address,
-          ADDRESS_ZERO,
-          ADDRESS_ZERO,
-          BASE.mul(10).div(100),
-          MIN_UNSUBSCRIBE_GRACE_PERIOD,
-          MIN_CONVERSION_GRACE_PERIOD,
-          MIN_REPAYMENT_GRACE_PERIOD
-        )
-    ).to.be.revertedWithCustomError(loanProposal, 'InvalidAddress')
     // revert on too small arranger fee
-    await expect(
-      factory
-        .connect(arranger)
-        .createLoanProposal(
-          fundingPool.address,
-          daoToken.address,
-          ADDRESS_ZERO,
-          0,
-          MIN_UNSUBSCRIBE_GRACE_PERIOD,
-          MIN_CONVERSION_GRACE_PERIOD,
-          MIN_REPAYMENT_GRACE_PERIOD
-        )
-    ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
-    await expect(
-      factory
-        .connect(arranger)
-        .createLoanProposal(
-          fundingPool.address,
-          daoToken.address,
-          ADDRESS_ZERO,
-          MIN_ARRANGER_FEE.sub(1),
-          MIN_UNSUBSCRIBE_GRACE_PERIOD,
-          MIN_CONVERSION_GRACE_PERIOD,
-          MIN_REPAYMENT_GRACE_PERIOD
-        )
-    ).to.be.revertedWithCustomError(loanProposal, 'InvalidFee')
     await expect(
       factory
         .connect(arranger)
@@ -262,7 +208,7 @@ describe('Peer-to-Pool: Local Tests', function () {
           fundingPool.address,
           daoToken.address,
           ADDRESS_ZERO,
-          MIN_ARRANGER_FEE,
+          0,
           0,
           MIN_CONVERSION_GRACE_PERIOD,
           MIN_REPAYMENT_GRACE_PERIOD
@@ -275,7 +221,7 @@ describe('Peer-to-Pool: Local Tests', function () {
           fundingPool.address,
           daoToken.address,
           ADDRESS_ZERO,
-          MIN_ARRANGER_FEE,
+          0,
           MIN_UNSUBSCRIBE_GRACE_PERIOD.sub(1),
           MIN_CONVERSION_GRACE_PERIOD,
           MIN_REPAYMENT_GRACE_PERIOD
@@ -288,7 +234,7 @@ describe('Peer-to-Pool: Local Tests', function () {
           fundingPool.address,
           daoToken.address,
           ADDRESS_ZERO,
-          MIN_ARRANGER_FEE,
+          0,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD.sub(1),
           MIN_REPAYMENT_GRACE_PERIOD
@@ -301,7 +247,7 @@ describe('Peer-to-Pool: Local Tests', function () {
           fundingPool.address,
           daoToken.address,
           ADDRESS_ZERO,
-          MIN_ARRANGER_FEE,
+          0,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
           MIN_REPAYMENT_GRACE_PERIOD.sub(1)
@@ -314,7 +260,7 @@ describe('Peer-to-Pool: Local Tests', function () {
           fundingPool.address,
           daoToken.address,
           ADDRESS_ZERO,
-          MIN_ARRANGER_FEE,
+          0,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MIN_CONVERSION_GRACE_PERIOD,
           MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_CONVERSION_GRACE_PERIOD).add(1)
@@ -327,7 +273,7 @@ describe('Peer-to-Pool: Local Tests', function () {
           fundingPool.address,
           daoToken.address,
           ADDRESS_ZERO,
-          MIN_ARRANGER_FEE,
+          0,
           MIN_UNSUBSCRIBE_GRACE_PERIOD,
           MAX_CONVERSION_AND_REPAYMENT_GRACE_PERIOD.sub(MIN_REPAYMENT_GRACE_PERIOD).add(1),
           MIN_REPAYMENT_GRACE_PERIOD
@@ -341,7 +287,7 @@ describe('Peer-to-Pool: Local Tests', function () {
           fundingPool.address,
           daoToken.address,
           ADDRESS_ZERO,
-          MIN_ARRANGER_FEE,
+          0,
           MAX_UNSUBSCRIBE_GRACE_PERIOD.add(1),
           MIN_CONVERSION_GRACE_PERIOD,
           MIN_REPAYMENT_GRACE_PERIOD
@@ -350,7 +296,7 @@ describe('Peer-to-Pool: Local Tests', function () {
   })
 
   it('Should handle loan proposals correctly', async function () {
-    const { fundingPool, factory, daoToken, arranger, team } = await setupTest()
+    const { fundingPool, factory, usdc, daoToken, arranger, team, lender1 } = await setupTest()
 
     // arranger creates loan proposal
     await factory
@@ -519,6 +465,37 @@ describe('Peer-to-Pool: Local Tests', function () {
     loanTerms.repaymentSchedule = repaymentSchedule
     // now should pass
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+
+    // move forward past loan terms update cool off period
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
+    // check revert with loan terms that lead to zero repayment amount due to truncation
+    // TestToken
+    // decimals = 6
+    // finalLoanAmount = 9 * 10 ^ 6
+    // loanTokenDue = 1 * 10 ^ 11
+    // Constants.BASE = 10 ^ 18
+    // brokenRepayment = (9 * 10 ^ 6) * (1 * 10 ^ 11) / 10 ^ 18 = 0.9 = 0
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    firstDueDate = ethers.BigNumber.from(timestamp)
+      .add(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD)
+      .add(UNSUBSCRIBE_GRACE_PERIOD)
+      .add(LOAN_EXECUTION_GRACE_PERIOD)
+      .add(MIN_TIME_UNTIL_FIRST_DUE_DATE)
+      .add(60) // +60s
+    let badLoanTerms = await getDummyLoanTerms(ADDRESS_ZERO)
+    badLoanTerms.minTotalSubscriptions = ONE_USDC.mul(9)
+    let badRepaymentSchedule = [
+      getRepaymentScheduleEntry(ethers.BigNumber.from(10).pow(11), ethers.BigNumber.from(1), firstDueDate)
+    ]
+    badLoanTerms.repaymentSchedule = badRepaymentSchedule
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(badLoanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'LoanTokenDueIsZero'
+    )
   })
 
   it('Should handle loan term subscriptions and acceptance correctly', async function () {
@@ -667,12 +644,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     const prevMaxLoanAmount = loanTerms.maxTotalSubscriptions
     const currTotalSubscribed = await fundingPool.totalSubscriptions(loanProposal.address)
     const loanTokenDecimals = await usdc.decimals()
-    let [, , prospectiveFinalLoanAmount, ,] = await loanProposal.getAbsoluteLoanTerms(
-      loanTerms,
-      currTotalSubscribed,
-      loanTokenDecimals
-    )
-    loanTerms.maxTotalSubscriptions = prospectiveFinalLoanAmount.sub(1)
+    loanTerms.maxTotalSubscriptions = currTotalSubscribed.sub(1)
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidMaxTotalSubscriptions'
@@ -791,9 +763,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // get final amounts
-    let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
-    let [, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let lockedInLoanTerms = await loanProposal.loanTerms()
+    let [, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
 
@@ -1387,9 +1359,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     let [
       finalLoanTerms,
       arrangerFee,
-      finalLoanAmount,
       finalCollAmountReservedForDefault,
-      finalCollAmountReservedForConversions
+      finalCollAmountReservedForConversions,
+      protocolFee
     ] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao treasury executes loan proposal
@@ -1438,9 +1410,10 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(postDaoTokenDaoBal.sub(preDaoTokenDaoBal)).to.be.equal(0)
     // check usdc balance changes
     expect(postUsdcLoanProposalBal.sub(preUsdcLoanProposalBal)).to.be.equal(0)
-    expect(preUsdcFundingPoolBal.sub(postUsdcFundingPoolBal)).to.be.equal(finalLoanAmount.add(arrangerFee))
-    expect(postUsdcDaoBal.sub(preUsdcDaoBal)).to.be.equal(finalLoanAmount)
-    expect(postUsdcArrangerBal.sub(preUsdcArrangerBal).add(postUsdcTeamBal.sub(preUsdcTeamBal))).to.be.equal(arrangerFee)
+    expect(preUsdcFundingPoolBal.sub(postUsdcFundingPoolBal)).to.be.equal(totalSubscriptions)
+    expect(postUsdcDaoBal.sub(preUsdcDaoBal)).to.be.equal(totalSubscriptions.sub(arrangerFee).sub(protocolFee))
+    expect(postUsdcArrangerBal.sub(preUsdcArrangerBal)).to.be.equal(arrangerFee)
+    expect(postUsdcTeamBal.sub(preUsdcTeamBal)).to.be.equal(protocolFee)
   })
 
   it('Should handle loan execution correctly (2/3)', async function () {
@@ -1614,7 +1587,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -1732,7 +1705,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -1817,7 +1790,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -1891,7 +1864,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -1943,12 +1916,12 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(dynamicData.currentRepaymentIdx).to.be.equal(0)
 
     // approve and repay
-    let totalConvertedSubscriptionsOfPeriod = await loanProposal.totalConvertedSubscriptionsPerIdx(0)
-    let originalRepaymentAmountDue = finalLoanTerms.repaymentSchedule[0].loanTokenDue
-    let obsoleteRepaymentAmountDue = originalRepaymentAmountDue
-      .mul(totalConvertedSubscriptionsOfPeriod)
-      .div(totalSubscriptions)
-    let leftRepaymentAmountDue = originalRepaymentAmountDue.sub(obsoleteRepaymentAmountDue)
+    let totalCollTokenConvertable = await finalLoanTerms.repaymentSchedule[0].collTokenDueIfConverted
+    let totalCollTokenActuallyConverted = await loanProposal.collTokenConverted(0)
+    let totalCollTokenLeftUnconverted = totalCollTokenConvertable.sub(totalCollTokenActuallyConverted)
+    let leftRepaymentAmountDue = finalLoanTerms.repaymentSchedule[0].loanTokenDue
+      .mul(totalCollTokenLeftUnconverted)
+      .div(totalCollTokenConvertable)
     await usdc.connect(daoTreasury).approve(loanProposal.address, leftRepaymentAmountDue)
     // mint tokens
     await usdc.mint(daoTreasury.address, leftRepaymentAmountDue)
@@ -2005,6 +1978,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let postBal = await usdc.balanceOf(lender2.address)
 
     // check bal diff matches expected repayment claim
+    let totalConvertedSubscriptionsOfPeriod = await loanProposal.totalConvertedSubscriptionsPerIdx(0)
     let remainingEntitledSubscriptions = totalSubscriptions.sub(totalConvertedSubscriptionsOfPeriod)
     let expectedRepaymentClaim = leftRepaymentAmountDue.mul(subscriptionBalOf).div(remainingEntitledSubscriptions)
     expect(postBal.sub(preBal)).to.be.equal(expectedRepaymentClaim)
@@ -2064,7 +2038,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -2149,7 +2123,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -2235,7 +2209,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -2346,7 +2320,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -2469,7 +2443,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -2602,7 +2576,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
@@ -2666,12 +2640,18 @@ describe('Peer-to-Pool: Local Tests', function () {
         const postDaoTreasuryBal2 = await usdc.balanceOf(daoTreasury.address)
         // check collateral amount unlocked/returned to borrower
         expect(preProposalBal1.sub(postProposalBal1)).to.be.equal(postDaoTreasuryBal1.sub(preDaoTreasuryBal1))
-        // check that dao treasury reclaimed 1/3 of collateral tokens
-        expect(preProposalBal1.sub(postProposalBal1)).to.be.equal(conversionAmountForPeriod.mul(1).div(3))
+        // check amounts reclaimed by DAO treasury
+        const actualConvertedPerPeriod = await loanProposal.collTokenConverted(i)
+        const expectedReclaimableAmount = conversionAmountForPeriod.sub(actualConvertedPerPeriod)
+        expect(preProposalBal1.sub(postProposalBal1)).to.be.equal(expectedReclaimableAmount)
         // check repayment amount given
         expect(postProposalBal2.sub(preProposalBal2)).to.be.equal(preDaoTreasuryBal2.sub(postDaoTreasuryBal2))
-        // check that dao treasury effectively repaid 1/3 of overall possible repayment amount
-        expect(postProposalBal2.sub(preProposalBal2)).to.be.equal(repaymentAmountForPeriod.mul(1).div(3))
+        // check amount repaid by DAO Treasury
+        const actualUnconvertedPerPeriod = conversionAmountForPeriod.sub(actualConvertedPerPeriod)
+        const expectedRepaymentAmount = repaymentAmountForPeriod
+          .mul(actualUnconvertedPerPeriod)
+          .div(conversionAmountForPeriod)
+        expect(postProposalBal2.sub(preProposalBal2)).to.be.equal(expectedRepaymentAmount)
       }
     }
 

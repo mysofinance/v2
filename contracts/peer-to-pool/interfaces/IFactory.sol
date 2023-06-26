@@ -17,10 +17,7 @@ interface IFactory {
         address indexed depositToken,
         uint256 numFundingPools
     );
-    event ArrangerFeeSplitUpdated(
-        uint256 oldArrangerFeeSplit,
-        uint256 newArrangerFeeSplit
-    );
+    event ProtocolFeeUpdated(uint256 oldProtocolFee, uint256 newProtocolFee);
     event LenderWhitelistStatusClaimed(
         address indexed whitelistAuthority,
         address indexed lender,
@@ -63,11 +60,11 @@ interface IFactory {
     function createFundingPool(address _depositToken) external;
 
     /**
-     * @notice Sets the arranger fee split between the arranger and the protocol
+     * @notice Sets the protocol fee
      * @dev Can only be called by the loan proposal factory owner
-     * @param _newArrangerFeeSplit The given arranger fee split (e.g. 10% = BASE/10, meaning 10% of absolute arranger fee goes to protocol and rest to arranger); note that this amount must be smaller than Constants.MAX_ARRANGER_SPLIT (<50%)
+     * @param _newProtocolFee The given protocol fee; note that this amount must be smaller than Constants.MAX_P2POOL_PROTOCOL_FEE (<5%)
      */
-    function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external;
+    function setProtocolFee(uint256 _newProtocolFee) external;
 
     /**
      * @notice Allows user to claim whitelisted status
@@ -142,10 +139,10 @@ interface IFactory {
     function isFundingPool(address addr) external view returns (bool);
 
     /**
-     * @notice Returns the arranger fee split between the arranger and the protocol (e.g. 10% = BASE/10, meaning 10% of absolute arranger fee goes to protocol and rest to arranger)
-     * @return The arranger fee split between the arranger and the protocol
+     * @notice Returns the protocol fee
+     * @return The protocol fee
      */
-    function arrangerFeeSplit() external view returns (uint256);
+    function protocolFee() external view returns (uint256);
 
     /**
      * @notice Returns the address of the owner of this contract

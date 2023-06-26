@@ -52,7 +52,7 @@ interface IMysoTokenManager {
         address collToken,
         address arranger,
         address borrower,
-        uint256 finalLoanAmount,
+        uint256 grossLoanAmount,
         uint256 finalCollAmountReservedForDefault,
         uint256 finalCollAmountReservedForConversions
     ) external;
