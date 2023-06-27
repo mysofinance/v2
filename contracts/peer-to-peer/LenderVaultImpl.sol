@@ -214,13 +214,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         } else {
             revert Errors.InvalidUpfrontFee();
         }
-        emit QuoteProcessed(
-            borrower,
-            _loan,
-            loanId,
-            transferInstructions.collReceiver,
-            transferInstructions.isLoan
-        );
+
+        emit QuoteProcessed(transferInstructions);
     }
 
     function withdraw(address token, uint256 amount) external {

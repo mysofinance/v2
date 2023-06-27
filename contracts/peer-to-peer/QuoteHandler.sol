@@ -70,7 +70,8 @@ contract QuoteHandler is IQuoteHandler {
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 oldOnChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
         bytes32 newOnChainQuoteHash = _hashOnChainQuote(newOnChainQuote);
-        if (oldOnChainQuoteHash == newOnChainQuoteHash) {
+        // this check will catch the case where the old quote is the same as the new quote
+        if (isOnChainQuoteFromVault[newOnChainQuoteHash]) {
             revert Errors.OnChainQuoteAlreadyAdded();
         }
         if (!isOnChainQuoteFromVault[oldOnChainQuoteHash]) {
@@ -78,9 +79,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         isOnChainQuoteFromVault[oldOnChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, oldOnChainQuoteHash);
-        if (isOnChainQuoteFromVault[newOnChainQuoteHash]) {
-            revert Errors.OnChainQuoteAlreadyAdded();
-        }
+
         isOnChainQuoteFromVault[newOnChainQuoteHash] = true;
         emit OnChainQuoteAdded(
             lenderVault,

@@ -11,7 +11,10 @@ interface IQuoteHandler {
         bytes32 indexed onChainQuoteHash
     );
 
-    event OnChainQuoteDeleted(address lenderVault, bytes32 onChainQuoteHash);
+    event OnChainQuoteDeleted(
+        address indexed lenderVault,
+        bytes32 indexed onChainQuoteHash
+    );
 
     event OnChainQuoteInvalidated(
         address indexed lenderVault,
@@ -28,13 +31,13 @@ interface IQuoteHandler {
     event OnChainQuoteUsed(
         address indexed lenderVault,
         bytes32 indexed onChainQuoteHash,
-        uint256 nextLoanIdx,
+        uint256 indexed nextLoanIdx,
         uint256 quoteTupleIdx
     );
     event OffChainQuoteUsed(
         address indexed lenderVault,
         bytes32 indexed offChainQuoteHash,
-        uint256 nextLoanIdx,
+        uint256 indexed nextLoanIdx,
         DataTypesPeerToPeer.QuoteTuple quoteTuple
     );
 

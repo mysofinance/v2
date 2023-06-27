@@ -2026,9 +2026,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       let preWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
       let preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
 
-      await borrowerGateway
-        .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.emit(lenderVault, 'QuoteProcessed')
 
       // post callback allowances
       let postWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
