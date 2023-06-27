@@ -865,6 +865,19 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
+      let otherOnChainQuote = {
+        ...onChainQuote,
+        generalQuoteInfo: {
+          ...onChainQuote.generalQuoteInfo,
+          isSingleUse: true
+        }
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, otherOnChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
       let newOnChainQuote = {
         ...onChainQuote,
         generalQuoteInfo: {
@@ -912,6 +925,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // should revert if you add new quote same as old quote
       await expect(
         quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
+      // should revert if you add new quote which is already added
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, otherOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
 
       const updateOnChainQuoteTransaction = await quoteHandler
@@ -1076,7 +1093,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(borrowEvent).to.not.be.undefined
 
       // test partial repays with no compartment
-      console.log('borrowEvent', borrowEvent?.args)
       const loanId = borrowEvent?.args?.['loanId']
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanExpiry = borrowEvent?.args?.loan?.['expiry']

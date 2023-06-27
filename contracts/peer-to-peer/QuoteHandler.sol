@@ -69,20 +69,24 @@ contract QuoteHandler is IQuoteHandler {
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 oldOnChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
-        bytes32 onChainQuoteHash = _hashOnChainQuote(newOnChainQuote);
-        if (oldOnChainQuoteHash == onChainQuoteHash) {
+        bytes32 newOnChainQuoteHash = _hashOnChainQuote(newOnChainQuote);
+        if (oldOnChainQuoteHash == newOnChainQuoteHash) {
             revert Errors.OnChainQuoteAlreadyAdded();
         }
         if (!isOnChainQuoteFromVault[oldOnChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
-        isOnChainQuoteFromVault[onChainQuoteHash] = false;
-        emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
-        if (isOnChainQuoteFromVault[onChainQuoteHash]) {
+        isOnChainQuoteFromVault[oldOnChainQuoteHash] = false;
+        emit OnChainQuoteDeleted(lenderVault, oldOnChainQuoteHash);
+        if (isOnChainQuoteFromVault[newOnChainQuoteHash]) {
             revert Errors.OnChainQuoteAlreadyAdded();
         }
-        isOnChainQuoteFromVault[onChainQuoteHash] = true;
-        emit OnChainQuoteAdded(lenderVault, newOnChainQuote, onChainQuoteHash);
+        isOnChainQuoteFromVault[newOnChainQuoteHash] = true;
+        emit OnChainQuoteAdded(
+            lenderVault,
+            newOnChainQuote,
+            newOnChainQuoteHash
+        );
     }
 
     function deleteOnChainQuote(
