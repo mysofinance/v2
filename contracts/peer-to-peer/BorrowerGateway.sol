@@ -150,9 +150,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             calldata loanRepayInstructions,
         address vaultAddr
     ) external nonReentrant {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(vaultAddr)) {
-            revert Errors.UnregisteredVault();
-        }
+        _checkDeadlineAndRegisteredVault(
+            loanRepayInstructions.deadline,
+            vaultAddr
+        );
         if (
             loanRepayInstructions.callbackAddr != address(0) &&
             IAddressRegistry(addressRegistry).whitelistState(
