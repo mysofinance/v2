@@ -219,11 +219,12 @@ contract QuoteHandler is IQuoteHandler {
             offChainQuoteFromVaultIsInvalidated[offChainQuoteHash] = true;
             emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
         }
-        uint256 nextLoanIdx = ILenderVaultImpl(lenderVault).totalNumLoans();
+        uint256 toBeRegisteredLoanId = ILenderVaultImpl(lenderVault)
+            .totalNumLoans();
         emit OffChainQuoteUsed(
             lenderVault,
             offChainQuoteHash,
-            nextLoanIdx,
+            toBeRegisteredLoanId,
             quoteTuple
         );
     }
