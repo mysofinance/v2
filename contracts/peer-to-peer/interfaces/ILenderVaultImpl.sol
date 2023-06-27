@@ -23,7 +23,7 @@ interface ILenderVaultImpl {
     );
 
     event QuoteProcessed(
-        address borrower,
+        address indexed borrower,
         DataTypesPeerToPeer.Loan loan,
         uint256 loanId,
         address collReceiver,

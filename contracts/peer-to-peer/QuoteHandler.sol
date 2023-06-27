@@ -68,13 +68,19 @@ contract QuoteHandler is IQuoteHandler {
         }
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
-        bytes32 onChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
-        if (!isOnChainQuoteFromVault[onChainQuoteHash]) {
+        bytes32 oldOnChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
+        bytes32 onChainQuoteHash = _hashOnChainQuote(newOnChainQuote);
+        if (oldOnChainQuoteHash == onChainQuoteHash) {
+            revert Errors.OnChainQuoteAlreadyAdded();
+        }
+        if (!isOnChainQuoteFromVault[oldOnChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
         isOnChainQuoteFromVault[onChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
-        onChainQuoteHash = _hashOnChainQuote(newOnChainQuote);
+        if (isOnChainQuoteFromVault[onChainQuoteHash]) {
+            revert Errors.OnChainQuoteAlreadyAdded();
+        }
         isOnChainQuoteFromVault[onChainQuoteHash] = true;
         emit OnChainQuoteAdded(lenderVault, newOnChainQuote, onChainQuoteHash);
     }
@@ -241,7 +247,7 @@ contract QuoteHandler is IQuoteHandler {
         );
         address recoveredSigner;
         address prevSigner;
-        for (uint256 i = 0; i < compactSigs.length; ) {
+        for (uint256 i; i < compactSigs.length; ) {
             (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSigs[i]);
             recoveredSigner = messageHash.recover(r, vs);
             if (!ILenderVaultImpl(lenderVault).isSigner(recoveredSigner)) {
@@ -338,7 +344,7 @@ contract QuoteHandler is IQuoteHandler {
             return false;
         }
         bool isSwap;
-        for (uint256 k = 0; k < onChainQuote.quoteTuples.length; ) {
+        for (uint256 k; k < onChainQuote.quoteTuples.length; ) {
             (bool isValid, bool isSwapCurr) = _isValidOnChainQuoteTuple(
                 onChainQuote.generalQuoteInfo,
                 onChainQuote.quoteTuples[k]
@@ -440,9 +446,16 @@ contract QuoteHandler is IQuoteHandler {
         if (quoteTuple.loanPerCollUnitOrLtv == 0) {
             return (false, isSwap);
         }
-        // If the oracle address is set, the LTV can only be set to a value > 1 (undercollateralized)
-        // when there is a specified whitelist address.
-        // Otherwise, the LTV must be set to a value <= 100% (overcollateralized).
+        // If the oracle address is set and there is not specified whitelistAddr
+        // then LTV must be set to a value <= 100% (overcollateralized).
+        // note: Loans with whitelisted borrowers CAN be undercollateralized with oracles (LTV > 100%).
+        // oracle address is set
+        // ---> whitelistAddr is not set
+        // ---> ---> LTV must be overcollateralized
+        // ---> whitelistAddr is set
+        // ---> ---> LTV can be any
+        // oracle address is not set
+        // ---> loanPerCollUnit can be any with or without whitelistAddr
         if (
             generalQuoteInfo.oracleAddr != address(0) &&
             quoteTuple.loanPerCollUnitOrLtv > Constants.BASE &&

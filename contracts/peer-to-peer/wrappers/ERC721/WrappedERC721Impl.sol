@@ -57,10 +57,10 @@ contract WrappedERC721Impl is
         address tokenAddr;
         uint256 tokenId;
         uint256 idsLength;
-        for (uint256 i = 0; i < tokensLength; ) {
+        for (uint256 i; i < tokensLength; ) {
             idsLength = _wrappedTokens[i].tokenIds.length;
             tokenAddr = _wrappedTokens[i].tokenAddr;
-            for (uint256 j = 0; j < idsLength; ) {
+            for (uint256 j; j < idsLength; ) {
                 tokenId = _wrappedTokens[i].tokenIds[j];
                 try
                     IERC721(tokenAddr).transferFrom(
@@ -103,7 +103,7 @@ contract WrappedERC721Impl is
         mapping(uint256 => bool) storage stuckTokenAddr = stuckTokens[
             tokenAddr
         ];
-        for (uint256 i = 0; i < tokenIds.length; ) {
+        for (uint256 i; i < tokenIds.length; ) {
             if (!stuckTokenAddr[tokenIds[i]]) {
                 revert Errors.TokenNotStuck();
             }

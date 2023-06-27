@@ -39,7 +39,7 @@ contract UniV2Chainlink is ChainlinkBasic {
             revert Errors.InvalidOracleTolerance();
         }
         _tolerance = _toleranceAmount;
-        for (uint i = 0; i < _lpAddrs.length; ) {
+        for (uint256 i; i < _lpAddrs.length; ) {
             if (_lpAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }

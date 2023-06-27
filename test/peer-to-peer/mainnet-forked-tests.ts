@@ -909,6 +909,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       onChainQuote.generalQuoteInfo.loanToken = usdc.address
 
+      // should revert if you add new quote same as old quote
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
+
       const updateOnChainQuoteTransaction = await quoteHandler
         .connect(lender)
         .updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
@@ -1071,6 +1076,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(borrowEvent).to.not.be.undefined
 
       // test partial repays with no compartment
+      console.log('borrowEvent', borrowEvent?.args)
       const loanId = borrowEvent?.args?.['loanId']
       const repayAmount = borrowEvent?.args?.loan?.['initRepayAmount']
       const loanExpiry = borrowEvent?.args?.loan?.['expiry']
