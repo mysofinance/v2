@@ -107,7 +107,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             whitelistState[addrs[0]] = state;
         } else {
             // note (2/2): all other states can be "occupied" by multiple addresses
-            for (uint i = 0; i < addrs.length; ) {
+            for (uint256 i; i < addrs.length; ) {
                 if (addrs[i] == address(0)) {
                     revert Errors.InvalidAddress();
                 }
@@ -147,7 +147,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         if (tokens.length == 0) {
             revert Errors.InvalidArrayLength();
         }
-        for (uint i = 0; i < tokens.length; ) {
+        for (uint256 i; i < tokens.length; ) {
             if (allowTokensForCompartment && !isWhitelistedERC20(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
@@ -289,7 +289,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address[] calldata borrowers,
         uint256 whitelistedUntil
     ) external {
-        for (uint i = 0; i < borrowers.length; ) {
+        for (uint256 i; i < borrowers.length; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerBorrower = _borrowerWhitelistedUntil[
                     msg.sender

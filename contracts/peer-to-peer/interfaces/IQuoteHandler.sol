@@ -6,32 +6,38 @@ import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface IQuoteHandler {
     event OnChainQuoteAdded(
-        address lenderVault,
+        address indexed lenderVault,
         DataTypesPeerToPeer.OnChainQuote onChainQuote,
-        bytes32 onChainQuoteHash
+        bytes32 indexed onChainQuoteHash
     );
 
-    event OnChainQuoteDeleted(address lenderVault, bytes32 onChainQuoteHash);
+    event OnChainQuoteDeleted(
+        address indexed lenderVault,
+        bytes32 indexed onChainQuoteHash
+    );
 
     event OnChainQuoteInvalidated(
-        address lenderVault,
-        bytes32 onChainQuoteHash
+        address indexed lenderVault,
+        bytes32 indexed onChainQuoteHash
     );
-    event OffChainQuoteNonceIncremented(address lenderVault, uint256 newNonce);
+    event OffChainQuoteNonceIncremented(
+        address indexed lenderVault,
+        uint256 newNonce
+    );
     event OffChainQuoteInvalidated(
-        address lenderVault,
-        bytes32 offChainQuoteHash
+        address indexed lenderVault,
+        bytes32 indexed offChainQuoteHash
     );
     event OnChainQuoteUsed(
-        address lenderVault,
-        bytes32 onChainQuoteHash,
-        uint256 nextLoanIdx,
+        address indexed lenderVault,
+        bytes32 indexed onChainQuoteHash,
+        uint256 indexed nextLoanIdx,
         uint256 quoteTupleIdx
     );
     event OffChainQuoteUsed(
-        address lenderVault,
-        bytes32 offChainQuoteHash,
-        uint256 nextLoanIdx,
+        address indexed lenderVault,
+        bytes32 indexed offChainQuoteHash,
+        uint256 indexed nextLoanIdx,
         DataTypesPeerToPeer.QuoteTuple quoteTuple
     );
 

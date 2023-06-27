@@ -23,11 +23,7 @@ interface ILenderVaultImpl {
     );
 
     event QuoteProcessed(
-        address borrower,
-        DataTypesPeerToPeer.Loan loan,
-        uint256 loanId,
-        address collReceiver,
-        bool isLoan
+        DataTypesPeerToPeer.TransferInstructions transferInstructions
     );
 
     event Withdrew(address indexed tokenAddr, uint256 withdrawAmount);

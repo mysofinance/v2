@@ -28,7 +28,7 @@ abstract contract ChainlinkBase is IOracle {
         }
         uint8 oracleDecimals;
         uint256 version;
-        for (uint i = 0; i < tokenAddrsLength; ) {
+        for (uint256 i; i < tokenAddrsLength; ) {
             if (_tokenAddrs[i] == address(0) || _oracleAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }

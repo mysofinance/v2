@@ -88,7 +88,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         uint256 numTokensToBeWrapped = tokensToBeWrapped.length;
         isIOU = numTokensToBeWrapped == 0;
         if (!isIOU) {
-            for (uint256 i = 0; i < numTokensToBeWrapped; ) {
+            for (uint256 i; i < numTokensToBeWrapped; ) {
                 if (
                     addressRegistry != address(0) &&
                     !IAddressRegistry(addressRegistry).isWhitelistedERC20(

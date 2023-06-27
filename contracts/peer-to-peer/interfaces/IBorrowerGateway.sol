@@ -10,7 +10,7 @@ interface IBorrowerGateway {
         address indexed borrower,
         DataTypesPeerToPeer.Loan loan,
         uint256 upfrontFee,
-        uint256 loanId,
+        uint256 indexed loanId,
         address callbackAddr,
         bytes callbackData
     );

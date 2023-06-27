@@ -91,7 +91,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         address prevNftAddress;
         address currNftAddress;
         uint256 checkedId;
-        for (uint256 i = 0; i < numTokensToBeWrapped; ) {
+        for (uint256 i; i < numTokensToBeWrapped; ) {
             if (tokensToBeWrapped[i].tokenIds.length == 0) {
                 revert Errors.InvalidArrayLength();
             }
@@ -108,7 +108,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
             if (currNftAddress <= prevNftAddress) {
                 revert Errors.NonIncreasingTokenAddrs();
             }
-            for (uint256 j = 0; j < tokensToBeWrapped[i].tokenIds.length; ) {
+            for (uint256 j; j < tokensToBeWrapped[i].tokenIds.length; ) {
                 if (tokensToBeWrapped[i].tokenIds[j] <= checkedId && j != 0) {
                     revert Errors.NonIncreasingNonFungibleTokenIds();
                 }

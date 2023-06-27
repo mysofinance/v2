@@ -49,7 +49,7 @@ contract BalancerV2Looping is VaultCallback {
                 assetIn: IBalancerAsset(loan.loanToken),
                 assetOut: IBalancerAsset(loan.collToken),
                 amount: loanTokenBalance,
-                userData: "0x"
+                userData: ""
             });
         IBalancerVault(BALANCER_V2_VAULT).swap(
             singleSwap,
@@ -90,7 +90,7 @@ contract BalancerV2Looping is VaultCallback {
                 assetIn: IBalancerAsset(loan.collToken),
                 assetOut: IBalancerAsset(loan.loanToken),
                 amount: collBalance,
-                userData: "0x"
+                userData: ""
             });
         IERC20Metadata(loan.collToken).safeIncreaseAllowance(
             BALANCER_V2_VAULT,

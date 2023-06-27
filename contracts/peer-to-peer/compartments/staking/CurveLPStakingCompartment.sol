@@ -143,7 +143,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
             // versions 2, 3, 4, or 5
             _rewardTokenAddr[0] = rewardTokenAddrZeroIndex;
             address rewardTokenAddr;
-            for (uint256 i = 0; i < 7; ) {
+            for (uint256 i; i < 7; ) {
                 rewardTokenAddr = ICurveStakingHelper(_liqGaugeAddr)
                     .reward_tokens(i + 1);
                 if (rewardTokenAddr != address(0)) {
@@ -299,7 +299,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         }
         // check if reward token is a duplicate in previous entries
         if (index > 0) {
-            for (uint256 i = 0; i < index; ) {
+            for (uint256 i; i < index; ) {
                 if (rewardTokens[i] == rewardTokens[index]) {
                     return false;
                 }
