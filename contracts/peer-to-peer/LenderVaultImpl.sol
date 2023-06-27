@@ -62,7 +62,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             revert Errors.InvalidArrayLength();
         }
         uint256 totalUnlockableColl;
-        for (uint256 i = 0; i < _loanIds.length; ) {
+        for (uint256 i; i < _loanIds.length; ) {
             DataTypesPeerToPeer.Loan storage _loan = _loans[_loanIds[i]];
 
             if (_loan.collToken != collToken) {
@@ -214,13 +214,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         } else {
             revert Errors.InvalidUpfrontFee();
         }
-        emit QuoteProcessed(
-            borrower,
-            _loan,
-            loanId,
-            transferInstructions.collReceiver,
-            transferInstructions.isLoan
-        );
+
+        emit QuoteProcessed(transferInstructions);
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -286,7 +281,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function addSigners(address[] calldata _signers) external {
         _senderCheckOwner();
         address vaultOwner = _owner;
-        for (uint256 i = 0; i < _signers.length; ) {
+        for (uint256 i; i < _signers.length; ) {
             if (_signers[i] == address(0) || _signers[i] == vaultOwner) {
                 revert Errors.InvalidAddress();
             }
@@ -326,7 +321,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         uint256 loanId
     ) external view returns (DataTypesPeerToPeer.Loan memory _loan) {
         uint256 loanLen = _loans.length;
-        if (loanLen == 0 || loanId > loanLen - 1) {
+        if (loanId >= loanLen) {
             revert Errors.InvalidArrayIndex();
         }
         _loan = _loans[loanId];
@@ -358,7 +353,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         balances = new uint256[](tokens.length);
         _lockedAmounts = new uint256[](tokens.length);
         IAddressRegistry _addressRegistry = IAddressRegistry(addressRegistry);
-        for (uint256 i = 0; i < tokens.length; ) {
+        for (uint256 i; i < tokens.length; ) {
             if (
                 tokens[i] == address(0) ||
                 !_addressRegistry.isWhitelistedERC20(tokens[i])

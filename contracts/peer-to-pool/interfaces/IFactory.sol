@@ -24,7 +24,7 @@ interface IFactory {
         uint256 whitelistedUntil
     );
     event LenderWhitelistUpdated(
-        address whitelistAuthority,
+        address indexed whitelistAuthority,
         address[] indexed lender,
         uint256 whitelistedUntil
     );

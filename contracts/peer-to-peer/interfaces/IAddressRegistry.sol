@@ -10,7 +10,7 @@ interface IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState indexed whitelistState
     );
     event AllowedTokensForCompartmentUpdated(
-        address compartmentImpl,
+        address indexed compartmentImpl,
         address[] tokens,
         bool isWhitelisted
     );
@@ -20,8 +20,8 @@ interface IAddressRegistry {
         uint256 whitelistedUntil
     );
     event BorrowerWhitelistUpdated(
-        address whitelistAuthority,
-        address[] indexed borrower,
+        address indexed whitelistAuthority,
+        address[] borrowers,
         uint256 whitelistedUntil
     );
     event CreatedWrappedTokenForERC721s(

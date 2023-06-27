@@ -4089,11 +4089,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           borrowerGateway
             .connect(borrower)
             .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-        ).to.emit(lenderVault, 'QuoteProcessed')
+        ).to.emit(quoteHandler, 'OnChainQuoteUsed')
       })
 
       it('Should handle off-chain swap quotes correctly (1/2)', async function () {
-        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
+        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault, quoteHandler } = await setupTest()
 
         // lenderVault owner deposits usdc
         await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -4153,7 +4153,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           borrowerGateway
             .connect(borrower)
             .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-        ).to.emit(lenderVault, 'QuoteProcessed')
+        ).to.emit(quoteHandler, 'OffChainQuoteUsed')
 
         // borrower obtains proof for invalid quote tuple (tuple idx 5 has upfrontfee > 100%)
         quoteTupleIdx = 5

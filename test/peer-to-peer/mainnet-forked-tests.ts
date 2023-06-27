@@ -866,6 +866,19 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
+      let otherOnChainQuote = {
+        ...onChainQuote,
+        generalQuoteInfo: {
+          ...onChainQuote.generalQuoteInfo,
+          isSingleUse: true
+        }
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, otherOnChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
       let newOnChainQuote = {
         ...onChainQuote,
         generalQuoteInfo: {
@@ -909,6 +922,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'UnknownOnChainQuote')
 
       onChainQuote.generalQuoteInfo.loanToken = usdc.address
+
+      // should revert if you add new quote same as old quote
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
+      // should revert if you add new quote which is already added
+      await expect(
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, otherOnChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
 
       const updateOnChainQuoteTransaction = await quoteHandler
         .connect(lender)
@@ -2012,9 +2034,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       let preWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
       let preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
 
-      await borrowerGateway
-        .connect(borrower)
-        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.emit(lenderVault, 'QuoteProcessed')
 
       // post callback allowances
       let postWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)

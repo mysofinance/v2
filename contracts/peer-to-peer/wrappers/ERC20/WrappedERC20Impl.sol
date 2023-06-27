@@ -36,7 +36,7 @@ contract WrappedERC20Impl is
         string calldata _symbol,
         bool _isIOU
     ) external initializer {
-        for (uint256 i = 0; i < wrappedTokens.length; ) {
+        for (uint256 i; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
                 ++i;
@@ -67,7 +67,7 @@ contract WrappedERC20Impl is
             _spendAllowance(account, msg.sender, amount);
         }
         _burn(account, amount);
-        for (uint256 i = 0; i < _wrappedTokens.length; ) {
+        for (uint256 i; i < _wrappedTokens.length; ) {
             address tokenAddr = _wrappedTokens[i].tokenAddr;
             IERC20(tokenAddr).safeTransfer(
                 recipient,
