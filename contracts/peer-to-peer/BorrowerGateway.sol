@@ -80,8 +80,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             transferInstructions.upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
-            borrowInstructions.callbackData,
-            transferInstructions.isLoan
+            borrowInstructions.callbackData
         );
     }
 
@@ -142,8 +141,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             transferInstructions.upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
-            borrowInstructions.callbackData,
-            transferInstructions.isLoan
+            borrowInstructions.callbackData
         );
     }
 

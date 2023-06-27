@@ -12,8 +12,7 @@ interface IBorrowerGateway {
         uint256 upfrontFee,
         uint256 indexed loanId,
         address callbackAddr,
-        bytes callbackData,
-        bool isLoan
+        bytes callbackData
     );
 
     event Repaid(
