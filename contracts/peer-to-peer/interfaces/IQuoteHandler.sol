@@ -31,13 +31,13 @@ interface IQuoteHandler {
     event OnChainQuoteUsed(
         address indexed lenderVault,
         bytes32 indexed onChainQuoteHash,
-        uint256 indexed nextLoanIdx,
+        uint256 indexed toBeRegisteredLoanId,
         uint256 quoteTupleIdx
     );
     event OffChainQuoteUsed(
         address indexed lenderVault,
         bytes32 indexed offChainQuoteHash,
-        uint256 indexed nextLoanIdx,
+        uint256 indexed toBeRegisteredLoanId,
         DataTypesPeerToPeer.QuoteTuple quoteTuple
     );
 
