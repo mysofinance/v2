@@ -6,7 +6,6 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist } from './helpers/misc'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
-import { Signer } from 'ethers'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -1301,10 +1300,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // test add, remove, set min signer functionality
-      await expect(lenderVault.addSigners([lender.address, lender.address])).to.be.revertedWithCustomError(
-        lenderVault,
-        'AlreadySigner'
-      )
+      await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await expect(lenderVault.addSigners([ZERO_ADDRESS])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       await lenderVault.connect(lender).setMinNumOfSigners(4)
@@ -1312,6 +1308,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const minNumSigners = await lenderVault.minNumOfSigners()
       expect(minNumSigners).to.be.equal(4)
       await lenderVault.connect(lender).setMinNumOfSigners(1)
+      await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await lenderVault.connect(lender).addSigners([team.address, borrower.address])
       // errors in handling signers
       await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
@@ -2413,6 +2410,7 @@ describe('Peer-to-Peer: Local Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -3201,6 +3199,21 @@ describe('Peer-to-Peer: Local Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
             expectedTransferFee: 0,
+            deadline: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'DeadlinePassed')
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: loanInfo.initRepayAmount,
+            expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -4073,7 +4086,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       })
 
       it('Should handle off-chain swap quotes correctly (1/2)', async function () {
-        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
+        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault, quoteHandler } = await setupTest()
 
         // lenderVault owner deposits usdc
         await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
