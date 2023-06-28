@@ -300,10 +300,10 @@ describe('Peer-to-Peer: Local Tests', function () {
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
     await expect(
       addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'AlreadyInitialized')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
     await expect(
       addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWith('Ownable: caller is not the owner')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
 
     // test erc721 wrapper whitelisting
     let whitelistState
@@ -890,6 +890,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       }
       const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_WETH)
       const expectedReclaimableAmount = collSendAmount.sub(collSendAmount.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE))
+
+      // reverts when trying to borrow with out-of-bounds quote tuple idx
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx + 1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidArrayIndex')
 
       // check pre/post amounts on borrow
       let preLockedWethAmounts = await lenderVault.lockedAmounts(weth.address)

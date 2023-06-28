@@ -1005,7 +1005,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         whitelistAuthority,
         usdc,
         weth,
-        lenderVault
+        lenderVault,
+        uniV3Looping
       } = await setupTest()
 
       // lenderVault owner deposits usdc
@@ -2079,8 +2080,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       preWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
       preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
 
-      // check repay
+      // check repay callback reverts when called by anyone else than borrower gateway
       const loan = await lenderVault.loan(0)
+      await expect(uniV3Looping.connect(borrower).repayCallback(loan, callbackData)).to.be.revertedWithCustomError(
+        uniV3Looping,
+        'InvalidSender'
+      )
+      await expect(uniV3Looping.connect(lender).repayCallback(loan, callbackData)).to.be.revertedWithCustomError(
+        uniV3Looping,
+        'InvalidSender'
+      )
+
+      // check repay
       const minSwapReceiveLoanToken = 0
       const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
         ['uint256', 'uint256', 'uint24'],

@@ -113,6 +113,9 @@ contract QuoteHandler is IQuoteHandler {
         uint256 quoteTupleIdx,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
+        if (quoteTupleIdx >= onChainQuote.quoteTuples.length) {
+            revert Errors.InvalidArrayIndex();
+        }
         _checkSenderAndQuoteInfo(
             borrower,
             onChainQuote.generalQuoteInfo,
@@ -216,12 +219,7 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             return false;
         }
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(
-                "\x19Ethereum Signed Message:\n32",
-                offChainQuoteHash
-            )
-        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(offChainQuoteHash);
         address recoveredSigner;
         address prevSigner;
         for (uint256 i; i < compactSigs.length; ) {
