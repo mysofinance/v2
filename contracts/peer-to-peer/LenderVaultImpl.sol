@@ -129,20 +129,27 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         )
     {
         _senderCheckGateway();
-        transferInstructions.upfrontFee =
-            (borrowInstructions.collSendAmount *
-                quoteTuple.upfrontFeePctInBase) /
-            Constants.BASE;
         if (
             borrowInstructions.collSendAmount <
-            transferInstructions.upfrontFee +
-                borrowInstructions.expectedTransferFee
+            borrowInstructions.expectedTransferFee +
+                borrowInstructions.expectedUpfrontFeeToVaultTransferFee
         ) {
             revert Errors.InsufficientSendAmount();
         }
+        // this check early in function removes need for other checks on sum of upfront plus transfer fees underflowing coll send amount
+        if (quoteTuple.upfrontFeePctInBase > Constants.BASE) {
+            revert Errors.InvalidUpfrontFee();
+        }
+        transferInstructions.upfrontFee =
+            ((borrowInstructions.collSendAmount -
+                borrowInstructions.expectedTransferFee -
+                borrowInstructions.expectedTransferFee) *
+                quoteTuple.upfrontFeePctInBase) /
+            Constants.BASE;
         (uint256 loanAmount, uint256 repayAmount) = _getLoanAndRepayAmount(
             borrowInstructions.collSendAmount,
-            borrowInstructions.expectedTransferFee,
+            borrowInstructions.expectedTransferFee +
+                borrowInstructions.expectedUpfrontFeeToVaultTransferFee,
             generalQuoteInfo,
             quoteTuple
         );
@@ -164,7 +171,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan.initCollAmount = SafeCast.toUint128(
             borrowInstructions.collSendAmount -
                 transferInstructions.upfrontFee -
-                borrowInstructions.expectedTransferFee
+                borrowInstructions.expectedTransferFee -
+                borrowInstructions.expectedUpfrontFeeToVaultTransferFee
         );
         if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
             // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent
@@ -202,8 +210,9 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             loanId = _loans.length;
             _loans.push(_loan);
             transferInstructions.isLoan = true;
-        } else if (quoteTuple.upfrontFeePctInBase == Constants.BASE) {
-            // note: if upfrontFee=100% this corresponds to an outright swap; check that tenor is zero
+        } else {
+            // note: only case left is upfrontFee = 100% and this corresponds to an outright swap;
+            // check that tenor is zero and earliest repay is nonzero, and compartment is zero
             if (
                 _loan.initCollAmount != 0 ||
                 quoteTuple.tenor + generalQuoteInfo.earliestRepayTenor != 0 ||
@@ -211,10 +220,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             ) {
                 revert Errors.InvalidSwap();
             }
-        } else {
-            revert Errors.InvalidUpfrontFee();
         }
-
         emit QuoteProcessed(transferInstructions);
     }
 
@@ -383,7 +389,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
 
     function _getLoanAndRepayAmount(
         uint256 collSendAmount,
-        uint256 expectedTransferFee,
+        uint256 totalExpectedTransferFees,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal view returns (uint256 loanAmount, uint256 repayAmount) {
@@ -414,7 +420,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                 Constants.BASE;
         }
         uint256 unscaledLoanAmount = loanPerCollUnit *
-            (collSendAmount - expectedTransferFee);
+            (collSendAmount - totalExpectedTransferFees);
 
         // calculate loan amount
         loanAmount =

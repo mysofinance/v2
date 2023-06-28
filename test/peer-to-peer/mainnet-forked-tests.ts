@@ -957,6 +957,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
@@ -964,6 +965,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1057,6 +1059,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
@@ -1064,6 +1067,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1241,6 +1245,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
@@ -1248,6 +1253,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1392,6 +1398,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
@@ -1399,6 +1406,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1537,6 +1545,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
@@ -1544,6 +1553,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1730,6 +1740,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_WETH.div(1000000)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
@@ -1737,6 +1748,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2006,6 +2018,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
       const quoteTupleIdx = 0
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const deadline = MAX_UINT128
       const callbackAddr = uniV3Looping.address
 
@@ -2016,6 +2029,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount: collSendAmountBn,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2225,6 +2239,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const slippageTolerance = BASE.mul(30).div(10000)
       const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
@@ -2238,6 +2253,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2421,6 +2437,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_CRV
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
@@ -2428,6 +2445,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2828,12 +2846,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = BigNumber.from(10).pow(18)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3034,12 +3054,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = BigNumber.from(10).pow(18)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3197,12 +3219,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_UNI
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3411,6 +3435,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrow with on chain quote
       const collSendAmount = ONE_UNI
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
 
       const PRECISION = 10000
@@ -3429,6 +3454,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3684,16 +3710,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
-      // borrow with on chain quote no transfer fee
+      // borrow with on chain quote no token transfer fee
       const collSendAmount = BigNumber.from(10).pow(18)
       // 90 day tenor with 10 bps protocol fee
       const expectedTransferFee = collSendAmount.mul(90).div(365 * 1000)
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3735,15 +3763,46 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const compartmentTransferAmount = collSendAmount.sub(protocolFeeAmount).sub(upfrontFee)
       // paxg transfer fee is 2 bps
       const paxgFeeOnCompartmentTransferAmount = compartmentTransferAmount.mul(2).div(10000)
-      const paxgExpectedTransferFee = protocolFeeAmount.add(paxgFeeOnCompartmentTransferAmount)
+      let paxgExpectedTransferFee = protocolFeeAmount.add(paxgFeeOnCompartmentTransferAmount)
+
+      // initially no extra upfront fee to vault transfer fee will revert
       const paxgBorrowInstructions = {
         collSendAmount,
         expectedTransferFee: paxgExpectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee: BigNumber.from(0),
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            paxgBorrowInstructions,
+            paxgWithCompartmentOnChainQuote,
+            quoteTupleIdx
+          )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+
+      const upfrontFeeFromQuote = BASE.mul(1).div(100)
+      //const Y = collSendAmount.sub(protocolFeeAmount)
+      const commonFeeNumerator = collSendAmount.sub(protocolFeeAmount)
+      const commonFeeDenominator = BASE.mul(10000)
+
+      const paxgExpectedTransferFee1Numerator = commonFeeNumerator.mul(BASE.sub(upfrontFeeFromQuote))
+      const paxgExpectedTransferFee2Numerator = commonFeeNumerator.mul(upfrontFeeFromQuote)
+      const paxgExpectedTransferFee1 = paxgExpectedTransferFee1Numerator.mul(2).div(commonFeeDenominator)
+      const paxgExpectedTransferFee2 = paxgExpectedTransferFee2Numerator.mul(2).div(commonFeeDenominator)
+      // const paxgExpectedTransferFee1 = commonFeeNumerator.mul(99).div(500000)
+      // const paxgExpectedTransferFee2 = commonFeeNumerator.div(500000)
+      paxgExpectedTransferFee = paxgExpectedTransferFee1.add(protocolFeeAmount)
+
+      // now add in transfer fee on the upfront fee portion
+      paxgBorrowInstructions.expectedUpfrontFeeToVaultTransferFee = paxgExpectedTransferFee2
+      paxgBorrowInstructions.expectedTransferFee = paxgExpectedTransferFee
 
       const borrowWithPaxgOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -3852,12 +3911,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3946,6 +4007,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = ONE_PAXG.mul(2).div(9998)
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
@@ -3953,6 +4015,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4052,6 +4115,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee: totalExpectedFees,
+        expectedUpfrontFeeToVaultTransferFee: 0,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4134,6 +4198,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
@@ -4141,6 +4206,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4361,6 +4427,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = ONE_PAXG.mul(2).div(9998)
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
@@ -4368,6 +4435,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4377,6 +4445,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const badBorrowInstructionsTransferFee = {
         collSendAmount,
         expectedTransferFee: collSendAmount.mul(2),
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4386,6 +4455,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const badBorrowInstructionsBelowMinLoan = {
         collSendAmount: collSendAmount.div(1000),
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4395,6 +4465,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const badBorrowInstructionsTooSmallLoanAmount = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: MAX_UINT128,
         callbackAddr,
@@ -4514,6 +4585,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_WETH
       const callbackAddr = ZERO_ADDR
@@ -4521,6 +4593,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4646,6 +4719,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
@@ -4653,6 +4727,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4778,11 +4853,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4928,6 +5005,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await gohm.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_GOHM
       const callbackAddr = ZERO_ADDR
@@ -4935,6 +5013,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -5050,6 +5129,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
@@ -5057,6 +5137,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -5231,6 +5312,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await uniV2WethUsdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_WETH.div(1000)
       const callbackAddr = ZERO_ADDR
@@ -5238,6 +5320,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -5377,6 +5460,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
@@ -5384,6 +5468,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,

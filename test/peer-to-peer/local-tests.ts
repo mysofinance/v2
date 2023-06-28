@@ -881,12 +881,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1012,12 +1014,14 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1094,12 +1098,14 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1136,11 +1142,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1180,11 +1188,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1260,11 +1270,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       const proof = quoteTuplesTree.getProof(quoteTupleIdx)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1366,11 +1378,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1497,11 +1511,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1571,11 +1587,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1640,11 +1658,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1705,11 +1725,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1775,11 +1797,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1841,11 +1865,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1916,11 +1942,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2014,11 +2042,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2224,11 +2254,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2349,12 +2381,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2482,12 +2516,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2636,12 +2672,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3097,12 +3135,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       await wrappedToken.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = 1
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3631,12 +3671,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       // prepare borrow params
       const collTokenSendAmount = ONE_USDC.mul(1000)
       const expectedTransferFee = 0
+      const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount: collTokenSendAmount,
         expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3745,6 +3787,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const borrowInstructions = {
         collSendAmount: collTokenSendAmount,
         expectedTransferFee: 0,
+        expectedUpfrontFeeToVaultTransferFee: 0,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr: ZERO_ADDRESS,
@@ -3818,12 +3861,14 @@ describe('Peer-to-Peer: Local Tests', function () {
         await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
         const sellAmountOfCollToken = ONE_WETH
         const expectedTransferFee = 0
+        const expectedUpfrontFeeToVaultTransferFee = 0
         const quoteTupleIdx = 0
         const callbackAddr = ZERO_ADDRESS
         const callbackData = ZERO_BYTES32
         const borrowInstructions = {
           collSendAmount: sellAmountOfCollToken,
           expectedTransferFee,
+          expectedUpfrontFeeToVaultTransferFee,
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
@@ -4022,12 +4067,14 @@ describe('Peer-to-Peer: Local Tests', function () {
         await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
         const sellAmountOfCollToken = ONE_WETH
         const expectedTransferFee = 0
+        const expectedUpfrontFeeToVaultTransferFee = 0
         const quoteTupleIdx = 0
         const callbackAddr = ZERO_ADDRESS
         const callbackData = ZERO_BYTES32
         const borrowInstructions = {
           collSendAmount: sellAmountOfCollToken,
           expectedTransferFee,
+          expectedUpfrontFeeToVaultTransferFee,
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
@@ -4059,11 +4106,13 @@ describe('Peer-to-Peer: Local Tests', function () {
         await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
         const collSendAmount = ONE_WETH
         const expectedTransferFee = 0
+        const expectedUpfrontFeeToVaultTransferFee = 0
         const callbackAddr = ZERO_ADDRESS
         const callbackData = ZERO_BYTES32
         const borrowInstructions = {
           collSendAmount,
           expectedTransferFee,
+          expectedUpfrontFeeToVaultTransferFee,
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
@@ -4134,11 +4183,13 @@ describe('Peer-to-Peer: Local Tests', function () {
         await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
         const collSendAmount = ONE_WETH
         const expectedTransferFee = 0
+        const expectedUpfrontFeeToVaultTransferFee = 0
         const callbackAddr = ZERO_ADDRESS
         const callbackData = ZERO_BYTES32
         const borrowInstructions = {
           collSendAmount,
           expectedTransferFee,
+          expectedUpfrontFeeToVaultTransferFee,
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
@@ -4216,6 +4267,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const borrowInstructions1 = {
         collSendAmount: collSendAmount1,
         expectedTransferFee: 0,
+        expectedUpfrontFeeToVaultTransferFee: 0,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr: ZERO_ADDRESS,
@@ -4287,6 +4339,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const borrowInstructions2 = {
         collSendAmount: collSendAmount2,
         expectedTransferFee: 0,
+        expectedUpfrontFeeToVaultTransferFee: 0,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr: ZERO_ADDRESS,

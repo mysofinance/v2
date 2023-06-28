@@ -115,6 +115,8 @@ library DataTypesPeerToPeer {
         uint256 collSendAmount;
         // includes protocol fee and native token transfer fee
         uint256 expectedTransferFee;
+        // transfer fee for upfrontFee to vault if a compartment is used
+        uint256 expectedUpfrontFeeToVaultTransferFee;
         // deadline to prevent stale transactions
         uint256 deadline;
         // slippage protection if oracle price is too loose

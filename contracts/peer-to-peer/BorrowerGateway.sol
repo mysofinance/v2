@@ -17,6 +17,8 @@ import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 
+//import "hardhat/console.sol";
+
 contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     using SafeERC20 for IERC20Metadata;
 
@@ -313,6 +315,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         }
 
         if (protocolFeeAmount != 0) {
+            // note: if coll token has a transfer fee, then protocolFeeAmount will be slightly reduced
+            // this is by design since the protocol can choose to not whitelist the token with a transfer fee
+            // and this avoids borrower or lender feeling aggrieved by paying extra fee to protocol
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
                 registry.owner(),
@@ -335,14 +340,26 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             collReceiverTransferAmount -= transferInstructions.upfrontFee;
             collReceiverExpBalDiff -= transferInstructions.upfrontFee;
             // Note: if a compartment is used then we need to transfer the upfront fee to the vault separately;
-            // in the special case where the coll also has a token transfer fee then the vault will receive slightly
-            // less collToken than upfrontFee due to coll token transferFee, which, however can be counteracted with
-            // a slightly higher upfrontFee to compensate for this effect.
+            // in the special case where the coll also has a token transfer fee then the vault transfer fee of upfront
+            // fee to vault needs to be added here to account for loss of coll token due to transfer fee.
+            uint256 vaultPreBal = IERC20Metadata(loan.collToken).balanceOf(
+                lenderVault
+            );
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
                 lenderVault,
-                transferInstructions.upfrontFee
+                transferInstructions.upfrontFee +
+                    borrowInstructions.expectedUpfrontFeeToVaultTransferFee
             );
+            if (
+                IERC20Metadata(loan.collToken).balanceOf(lenderVault) !=
+                vaultPreBal + transferInstructions.upfrontFee
+            ) {
+                // console.log("vaultPreBal", vaultPreBal);
+                // console.log("upfrontFee", transferInstructions.upfrontFee);
+                // console.log("expectedUpfrontFeeToVaultTransferFee", borrowInstructions.expectedUpfrontFeeToVaultTransferFee);
+                revert Errors.InvalidSendAmount();
+            }
         }
         IERC20Metadata(loan.collToken).safeTransferFrom(
             loan.borrower,
