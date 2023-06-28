@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
@@ -27,11 +28,19 @@ import {IOracle} from "./interfaces/IOracle.sol";
  * by an EOA should have multiple signers to reduce chance of forged quotes. In the event that a signer is compromised,
  * the vault owner should immediately remove the compromised signer and if possible, add a new signer.
  */
-contract LenderVaultImpl is Initializable, Ownable2Step, ILenderVaultImpl {
+
+contract LenderVaultImpl is
+    Initializable,
+    Ownable2Step,
+    Pausable,
+    ILenderVaultImpl
+{
     using SafeERC20 for IERC20Metadata;
 
     address public addressRegistry;
     address[] public signers;
+    address public circuitBreaker;
+    address public reverseCircuitBreaker;
     uint256 public minNumOfSigners;
     mapping(address => bool) public isSigner;
     bool public withdrawEntered;
@@ -123,6 +132,7 @@ contract LenderVaultImpl is Initializable, Ownable2Step, ILenderVaultImpl {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     )
         external
+        whenNotPaused
         returns (
             DataTypesPeerToPeer.Loan memory _loan,
             uint256 loanId,
@@ -318,6 +328,44 @@ contract LenderVaultImpl is Initializable, Ownable2Step, ILenderVaultImpl {
         emit RemovedSigner(signer, signerIdx, signerWithSwappedPosition);
     }
 
+    function setCircuitBreaker(address newCircuitBreaker) external {
+        _checkOwner();
+        address oldCircuitBreaker = circuitBreaker;
+        _checkCircuitBreaker(newCircuitBreaker, oldCircuitBreaker);
+        circuitBreaker = newCircuitBreaker;
+        emit CircuitBreakerUpdated(newCircuitBreaker, oldCircuitBreaker);
+    }
+
+    function setReverseCircuitBreaker(
+        address newReverseCircuitBreaker
+    ) external {
+        _checkOwner();
+        address oldReverseCircuitBreaker = reverseCircuitBreaker;
+        _checkCircuitBreaker(
+            newReverseCircuitBreaker,
+            oldReverseCircuitBreaker
+        );
+        reverseCircuitBreaker = newReverseCircuitBreaker;
+        emit ReverseCircuitBreakerUpdated(
+            newReverseCircuitBreaker,
+            oldReverseCircuitBreaker
+        );
+    }
+
+    function pauseQuotes() external {
+        if (msg.sender != circuitBreaker && msg.sender != owner()) {
+            revert Errors.InvalidSender();
+        }
+        _pause();
+    }
+
+    function unpauseQuotes() external {
+        if (msg.sender != reverseCircuitBreaker && msg.sender != owner()) {
+            revert Errors.InvalidSender();
+        }
+        _unpause();
+    }
+
     function loan(
         uint256 loanId
     ) external view returns (DataTypesPeerToPeer.Loan memory _loan) {
@@ -444,5 +492,18 @@ contract LenderVaultImpl is Initializable, Ownable2Step, ILenderVaultImpl {
             (unscaledLoanAmount * interestRateFactor) /
             Constants.BASE /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+    }
+
+    function _checkCircuitBreaker(
+        address newCircuitBreaker,
+        address oldCircuitBreaker
+    ) internal view {
+        if (
+            newCircuitBreaker == oldCircuitBreaker ||
+            newCircuitBreaker == owner() ||
+            isSigner[newCircuitBreaker]
+        ) {
+            revert Errors.InvalidAddress();
+        }
     }
 }
