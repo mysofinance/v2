@@ -215,9 +215,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     await balancerV2Looping.deployed()
 
     // whitelist addrs
-    await expect(
-      addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWith(
+      'Ownable: caller is not the owner'
+    )
     await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
     return {
@@ -348,7 +348,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await expect(
         addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
-      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      ).to.be.revertedWith('Ownable: caller is not the owner')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
@@ -1131,9 +1131,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
       // only owner can unlock
-      await expect(lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId])).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId])).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // cannot pass empty loan array to bypass valid token check
@@ -4290,7 +4289,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await expect(
         addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
-      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      ).to.be.revertedWith('Ownable: caller is not the owner')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
@@ -4531,7 +4530,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(lenderVault, 'NonWhitelistedOracle')
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedOracle')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 

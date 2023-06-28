@@ -31,14 +31,8 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        IAddressRegistry registry = IAddressRegistry(addressRegistry);
-        if (!registry.isRegisteredVault(lenderVault)) {
-            revert Errors.UnregisteredVault();
-        }
-        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert Errors.InvalidSender();
-        }
-        if (!_isValidOnChainQuote(onChainQuote, registry)) {
+        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
+        if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -56,14 +50,8 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.OnChainQuote calldata oldOnChainQuote,
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external {
-        IAddressRegistry registry = IAddressRegistry(addressRegistry);
-        if (!registry.isRegisteredVault(lenderVault)) {
-            revert Errors.UnregisteredVault();
-        }
-        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert Errors.InvalidSender();
-        }
-        if (!_isValidOnChainQuote(newOnChainQuote, registry)) {
+        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
+        if (!_isValidOnChainQuote(newOnChainQuote)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -92,12 +80,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert Errors.UnregisteredVault();
-        }
-        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert Errors.InvalidSender();
-        }
+        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
@@ -109,12 +92,7 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function incrementOffChainQuoteNonce(address lenderVault) external {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert Errors.UnregisteredVault();
-        }
-        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert Errors.InvalidSender();
-        }
+        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
         uint256 newNonce = offChainQuoteNonce[lenderVault] + 1;
         offChainQuoteNonce[lenderVault] = newNonce;
         emit OffChainQuoteNonceIncremented(lenderVault, newNonce);
@@ -124,12 +102,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         bytes32 offChainQuoteHash
     ) external {
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert Errors.UnregisteredVault();
-        }
-        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
-            revert Errors.InvalidSender();
-        }
+        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
         offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
         emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
     }
@@ -289,14 +262,12 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal view {
-        IAddressRegistry registry = IAddressRegistry(addressRegistry);
-        if (msg.sender != registry.borrowerGateway()) {
+        if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
         }
         _checkTokensAndCompartmentWhitelist(
             generalQuoteInfo.collToken,
             generalQuoteInfo.loanToken,
-            registry,
             generalQuoteInfo.borrowerCompartmentImplementation,
             _isSwap(generalQuoteInfo, quoteTuple)
         );
@@ -315,18 +286,26 @@ contract QuoteHandler is IQuoteHandler {
             ((generalQuoteInfo.isWhitelistAddrSingleBorrower &&
                 generalQuoteInfo.whitelistAddr != borrower) ||
                 (!generalQuoteInfo.isWhitelistAddrSingleBorrower &&
-                    !registry.isWhitelistedBorrower(
+                    !IAddressRegistry(addressRegistry).isWhitelistedBorrower(
                         generalQuoteInfo.whitelistAddr,
                         borrower
                     )))
         ) {
             revert Errors.InvalidBorrower();
         }
+        if (
+            generalQuoteInfo.oracleAddr != address(0) &&
+            IAddressRegistry(addressRegistry).whitelistState(
+                generalQuoteInfo.oracleAddr
+            ) !=
+            DataTypesPeerToPeer.WhitelistState.ORACLE
+        ) {
+            revert Errors.NonWhitelistedOracle();
+        }
     }
 
     function _isValidOnChainQuote(
-        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote,
-        IAddressRegistry registry
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) internal view returns (bool) {
         if (
             onChainQuote.generalQuoteInfo.collToken ==
@@ -370,7 +349,6 @@ contract QuoteHandler is IQuoteHandler {
         _checkTokensAndCompartmentWhitelist(
             onChainQuote.generalQuoteInfo.collToken,
             onChainQuote.generalQuoteInfo.loanToken,
-            registry,
             onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
             isSwap
         );
@@ -380,13 +358,12 @@ contract QuoteHandler is IQuoteHandler {
     function _checkTokensAndCompartmentWhitelist(
         address collToken,
         address loanToken,
-        IAddressRegistry registry,
         address compartmentImpl,
         bool isSwap
     ) internal view {
         if (
-            !registry.isWhitelistedERC20(loanToken) ||
-            !registry.isWhitelistedERC20(collToken)
+            !IAddressRegistry(addressRegistry).isWhitelistedERC20(loanToken) ||
+            !IAddressRegistry(addressRegistry).isWhitelistedERC20(collToken)
         ) {
             revert Errors.NonWhitelistedToken();
         }
@@ -398,8 +375,9 @@ contract QuoteHandler is IQuoteHandler {
             return;
         }
         if (compartmentImpl == address(0)) {
-            DataTypesPeerToPeer.WhitelistState collTokenWhitelistState = registry
-                    .whitelistState(collToken);
+            DataTypesPeerToPeer.WhitelistState collTokenWhitelistState = IAddressRegistry(
+                    addressRegistry
+                ).whitelistState(collToken);
             if (
                 collTokenWhitelistState ==
                 DataTypesPeerToPeer
@@ -410,10 +388,24 @@ contract QuoteHandler is IQuoteHandler {
             }
         } else {
             if (
-                !registry.isWhitelistedCompartment(compartmentImpl, collToken)
+                !IAddressRegistry(addressRegistry).isWhitelistedCompartment(
+                    compartmentImpl,
+                    collToken
+                )
             ) {
                 revert Errors.InvalidCompartmentForToken();
             }
+        }
+    }
+
+    function _checkIsRegisteredVaultAndSenderIsOwner(
+        address lenderVault
+    ) internal view {
+        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
+            revert Errors.UnregisteredVault();
+        }
+        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
+            revert Errors.InvalidSender();
         }
     }
 

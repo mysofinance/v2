@@ -3,6 +3,8 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -10,7 +12,6 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Constants} from "../Constants.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
-import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IBaseCompartment} from "./interfaces/compartments/IBaseCompartment.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
@@ -26,7 +27,7 @@ import {IOracle} from "./interfaces/IOracle.sol";
  * by an EOA should have multiple signers to reduce chance of forged quotes. In the event that a signer is compromised,
  * the vault owner should immediately remove the compromised signer and if possible, add a new signer.
  */
-contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
+contract LenderVaultImpl is Initializable, Ownable2Step, ILenderVaultImpl {
     using SafeERC20 for IERC20Metadata;
 
     address public addressRegistry;
@@ -48,7 +49,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     ) external initializer {
         addressRegistry = _addressRegistry;
         minNumOfSigners = 1;
-        _initialize(_vaultOwner);
+        _transferOwnership(_vaultOwner);
     }
 
     function unlockCollateral(
@@ -56,7 +57,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         uint256[] calldata _loanIds
     ) external {
         // only owner can call this function
-        _senderCheckOwner();
+        _checkOwner();
         // if empty array is passed, revert
         if (_loanIds.length == 0) {
             revert Errors.InvalidArrayLength();
@@ -73,7 +74,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             }
             if (_loan.collTokenCompartmentAddr != address(0)) {
                 IBaseCompartment(_loan.collTokenCompartmentAddr)
-                    .unlockCollToVault(_loan.collToken);
+                    .unlockCollToVault(collToken);
             } else {
                 totalUnlockableColl +=
                     ((_loan.initRepayAmount - _loan.amountRepaidSoFar) *
@@ -89,7 +90,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         lockedAmounts[collToken] -= totalUnlockableColl;
 
         emit CollateralUnlocked(
-            _owner,
+            owner(),
             collToken,
             _loanIds,
             totalUnlockableColl
@@ -186,6 +187,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             if (_loan.initCollAmount == 0) {
                 revert Errors.ReclaimableCollateralAmountZero();
             }
+            loanId = _loans.length;
             if (
                 generalQuoteInfo.borrowerCompartmentImplementation == address(0)
             ) {
@@ -193,13 +195,12 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             } else {
                 transferInstructions.collReceiver = _createCollCompartment(
                     generalQuoteInfo.borrowerCompartmentImplementation,
-                    _loans.length
+                    loanId
                 );
                 _loan.collTokenCompartmentAddr = transferInstructions
                     .collReceiver;
             }
             _loan.initRepayAmount = SafeCast.toUint128(repayAmount);
-            loanId = _loans.length;
             _loans.push(_loan);
             transferInstructions.isLoan = true;
         } else if (quoteTuple.upfrontFeePctInBase == Constants.BASE) {
@@ -223,12 +224,12 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             revert Errors.WithdrawEntered();
         }
         withdrawEntered = true;
-        _senderCheckOwner();
+        _checkOwner();
         uint256 vaultBalance = IERC20Metadata(token).balanceOf(address(this));
         if (amount == 0 || amount > vaultBalance - lockedAmounts[token]) {
             revert Errors.InvalidWithdrawAmount();
         }
-        IERC20Metadata(token).safeTransfer(_owner, amount);
+        IERC20Metadata(token).safeTransfer(owner(), amount);
         withdrawEntered = false;
         emit Withdrew(token, amount);
     }
@@ -270,7 +271,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function setMinNumOfSigners(uint256 _minNumOfSigners) external {
-        _senderCheckOwner();
+        _checkOwner();
         if (_minNumOfSigners == 0 || _minNumOfSigners == minNumOfSigners) {
             revert Errors.InvalidNewMinNumOfSigners();
         }
@@ -279,7 +280,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function addSigners(address[] calldata _signers) external {
-        _senderCheckOwner();
+        _checkOwner();
         for (uint256 i; i < _signers.length; ) {
             if (_signers[i] == address(0)) {
                 revert Errors.InvalidAddress();
@@ -297,7 +298,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function removeSigner(address signer, uint256 signerIdx) external {
-        _senderCheckOwner();
+        _checkOwner();
         uint256 signersLen = signers.length;
         if (signerIdx >= signersLen) {
             revert Errors.InvalidArrayIndex();
@@ -330,15 +331,6 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         return _loans.length;
     }
 
-    function owner()
-        external
-        view
-        override(Ownable, ILenderVaultImpl)
-        returns (address)
-    {
-        return _owner;
-    }
-
     function getTokenBalancesAndLockedAmounts(
         address[] calldata tokens
     )
@@ -367,6 +359,29 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
     }
 
+    function transferOwnership(address _newOwnerProposal) public override {
+        _checkOwner();
+        if (
+            _newOwnerProposal == address(0) ||
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == pendingOwner() ||
+            _newOwnerProposal == owner() ||
+            isSigner[_newOwnerProposal]
+        ) {
+            revert Errors.InvalidNewOwnerProposal();
+        }
+        super.transferOwnership(_newOwnerProposal);
+    }
+
+    function owner()
+        public
+        view
+        override(Ownable, ILenderVaultImpl)
+        returns (address)
+    {
+        return super.owner();
+    }
+
     function _createCollCompartment(
         address borrowerCompartmentImplementation,
         uint256 loanId
@@ -391,13 +406,6 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         if (generalQuoteInfo.oracleAddr == address(0)) {
             loanPerCollUnit = quoteTuple.loanPerCollUnitOrLtv;
         } else {
-            if (
-                IAddressRegistry(addressRegistry).whitelistState(
-                    generalQuoteInfo.oracleAddr
-                ) != DataTypesPeerToPeer.WhitelistState.ORACLE
-            ) {
-                revert Errors.NonWhitelistedOracle();
-            }
             // arbitrage protection if LTV > 100% and no whitelist restriction
             if (
                 quoteTuple.loanPerCollUnitOrLtv > Constants.BASE &&
@@ -435,14 +443,5 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             (unscaledLoanAmount * interestRateFactor) /
             Constants.BASE /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
-    }
-
-    function _newOwnerProposalCheck(
-        address _newOwnerProposal
-    ) internal view override {
-        if (isSigner[_newOwnerProposal]) {
-            revert Errors.InvalidNewOwnerProposal();
-        }
-        super._newOwnerProposalCheck(_newOwnerProposal);
     }
 }
