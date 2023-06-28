@@ -33,6 +33,7 @@ contract LenderVaultImpl is Initializable, Ownable, Pausable, ILenderVaultImpl {
     address public addressRegistry;
     address[] public signers;
     address public circuitBreaker;
+    address public reverseCircuitBreaker;
     uint256 public minNumOfSigners;
     mapping(address => bool) public isSigner;
     bool public withdrawEntered;
@@ -319,28 +320,41 @@ contract LenderVaultImpl is Initializable, Ownable, Pausable, ILenderVaultImpl {
         emit RemovedSigner(signer, signerIdx, signerWithSwappedPosition);
     }
 
-    function setCircuitBreaker(address _newCircuitBreaker) external {
+    function setCircuitBreaker(address newCircuitBreaker) external {
         _senderCheckOwner();
-        address prevCircuitBreaker = circuitBreaker;
-        if (
-            _newCircuitBreaker == address(0) ||
-            _newCircuitBreaker == prevCircuitBreaker ||
-            _newCircuitBreaker == _owner ||
-            isSigner[_newCircuitBreaker]
-        ) {
-            revert Errors.InvalidAddress();
-        }
-        circuitBreaker = _newCircuitBreaker;
-        emit CircuitBreakerUpdated(prevCircuitBreaker, _newCircuitBreaker);
+        address oldCircuitBreaker = circuitBreaker;
+        _checkCircuitBreaker(newCircuitBreaker, oldCircuitBreaker);
+        circuitBreaker = newCircuitBreaker;
+        emit CircuitBreakerUpdated(newCircuitBreaker, oldCircuitBreaker);
+    }
+
+    function setReverseCircuitBreaker(
+        address newReverseCircuitBreaker
+    ) external {
+        _senderCheckOwner();
+        address oldReverseCircuitBreaker = reverseCircuitBreaker;
+        _checkCircuitBreaker(
+            newReverseCircuitBreaker,
+            oldReverseCircuitBreaker
+        );
+        reverseCircuitBreaker = newReverseCircuitBreaker;
+        emit ReverseCircuitBreakerUpdated(
+            newReverseCircuitBreaker,
+            oldReverseCircuitBreaker
+        );
     }
 
     function pauseQuotes() external {
-        _senderCheckCircuitBreaker();
+        if (msg.sender != circuitBreaker && msg.sender != _owner) {
+            revert Errors.InvalidSender();
+        }
         _pause();
     }
 
     function unpauseQuotes() external {
-        _senderCheckCircuitBreaker();
+        if (msg.sender != reverseCircuitBreaker && msg.sender != _owner) {
+            revert Errors.InvalidSender();
+        }
         _unpause();
     }
 
@@ -409,12 +423,6 @@ contract LenderVaultImpl is Initializable, Ownable, Pausable, ILenderVaultImpl {
         }
     }
 
-    function _senderCheckCircuitBreaker() internal view {
-        if (msg.sender != circuitBreaker) {
-            revert Errors.InvalidSender();
-        }
-    }
-
     function _getLoanAndRepayAmount(
         uint256 collSendAmount,
         uint256 expectedTransferFee,
@@ -478,5 +486,18 @@ contract LenderVaultImpl is Initializable, Ownable, Pausable, ILenderVaultImpl {
             revert Errors.InvalidNewOwnerProposal();
         }
         super._newOwnerProposalCheck(_newOwnerProposal);
+    }
+
+    function _checkCircuitBreaker(
+        address newCircuitBreaker,
+        address oldCircuitBreaker
+    ) internal view {
+        if (
+            newCircuitBreaker == oldCircuitBreaker ||
+            newCircuitBreaker == _owner ||
+            isSigner[newCircuitBreaker]
+        ) {
+            revert Errors.InvalidAddress();
+        }
     }
 }
