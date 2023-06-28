@@ -62,7 +62,9 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         staticData.fundingPool = _fundingPool;
         staticData.collToken = _collToken;
         staticData.arranger = _arranger;
-        staticData.whitelistAuthority = _whitelistAuthority;
+        if (_whitelistAuthority != address(0)) {
+            staticData.whitelistAuthority = _whitelistAuthority;
+        }
         staticData.unsubscribeGracePeriod = _unsubscribeGracePeriod;
         staticData.conversionGracePeriod = _conversionGracePeriod;
         staticData.repaymentGracePeriod = _repaymentGracePeriod;

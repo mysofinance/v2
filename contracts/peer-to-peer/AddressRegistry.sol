@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Helpers} from "../Helpers.sol";
@@ -18,10 +19,9 @@ import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
  * with that token (repays and withdrawals would still be allowed). In the limit of a total de-whitelisting of all
  * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
  */
-contract AddressRegistry is Ownable, IAddressRegistry {
+contract AddressRegistry is Initializable, Ownable, IAddressRegistry {
     using ECDSA for bytes32;
 
-    bool internal _isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
@@ -44,11 +44,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address _lenderVaultFactory,
         address _borrowerGateway,
         address _quoteHandler
-    ) external {
+    ) external initializer {
         _senderCheckOwner();
-        if (_isInitialized) {
-            revert Errors.AlreadyInitialized();
-        }
         if (
             _lenderVaultFactory == address(0) ||
             _borrowerGateway == address(0) ||
@@ -66,7 +63,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         lenderVaultFactory = _lenderVaultFactory;
         borrowerGateway = _borrowerGateway;
         quoteHandler = _quoteHandler;
-        _isInitialized = true;
     }
 
     function setWhitelistState(
@@ -193,9 +189,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 salt
             )
         );
-        bytes32 messageHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
-        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(payloadHash);
         (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSig);
         address recoveredSigner = messageHash.recover(r, vs);
         if (
@@ -403,7 +397,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
 
     function _checkSenderAndIsInitialized() internal view {
         _senderCheckOwner();
-        if (!_isInitialized) {
+        if (_getInitializedVersion() == 0) {
             revert Errors.Uninitialized();
         }
     }

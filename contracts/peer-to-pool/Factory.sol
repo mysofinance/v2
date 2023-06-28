@@ -139,9 +139,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
                 salt
             )
         );
-        bytes32 messageHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
-        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(payloadHash);
         (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSig);
         address recoveredSigner = messageHash.recover(r, vs);
         if (

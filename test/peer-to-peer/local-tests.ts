@@ -298,10 +298,10 @@ describe('Peer-to-Peer: Local Tests', function () {
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
     await expect(
       addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'AlreadyInitialized')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
     await expect(
       addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
 
     // test erc721 wrapper whitelisting
     let whitelistState
