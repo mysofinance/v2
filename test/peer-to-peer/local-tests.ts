@@ -906,20 +906,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       let preBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
 
       // should revert when trying to set invalid circuit breaker address
-      await expect(lenderVault.connect(lender).setCircuitBreaker(ZERO_ADDRESS)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidAddress'
-      )
       await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidAddress'
       )
 
       // should revert when trying to set invalid reverse circuit breaker address
-      await expect(lenderVault.connect(lender).setReverseCircuitBreaker(ZERO_ADDRESS)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidAddress'
-      )
       await expect(lenderVault.connect(lender).setReverseCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidAddress'
@@ -954,13 +946,21 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
       ).to.be.revertedWith('Pausable: paused')
 
-      // set valid reverse circuit breaker
+      // authorize circuit breaker also for reverse circuit breaker role
       await lenderVault.connect(lender).setReverseCircuitBreaker(circuitBreaker.address)
+
+      // should revert when trying to set same address again
+      await expect(
+        lenderVault.connect(lender).setReverseCircuitBreaker(circuitBreaker.address)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+
+      // should allow setting circuit breaker to zero address
+      await lenderVault.connect(lender).setCircuitBreaker(ZERO_ADDRESS)
 
       // check revert when circuit breaker or any other unauthorized party tries to unpause
       await expect(lenderVault.connect(borrower).unpauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
 
-      // check circuit breaker can now unpause
+      // circuit breaker can now unpause because it is also authorized as reverse circuit breaker
       await lenderVault.connect(circuitBreaker).unpauseQuotes()
 
       await borrowerGateway
@@ -1572,20 +1572,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       }
 
       // should revert when trying to set invalid circuit breaker address
-      await expect(lenderVault.connect(lender).setCircuitBreaker(ZERO_ADDRESS)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidAddress'
-      )
       await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidAddress'
       )
 
       // should revert when trying to set invalid reverse circuit breaker address
-      await expect(lenderVault.connect(lender).setCircuitBreaker(ZERO_ADDRESS)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidAddress'
-      )
       await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidAddress'
