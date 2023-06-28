@@ -14,7 +14,7 @@ contract MyERC721 is ERC721, ERC721Burnable, Ownable {
         string memory _name,
         string memory _symbol
     ) ERC721(_name, _symbol) {
-        _owner = msg.sender;
+        _transferOwnership(msg.sender);
     }
 
     function safeMint(address to, uint256 tokenId) public onlyOwner {

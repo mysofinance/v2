@@ -104,9 +104,8 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
     const factory = await Factory.connect(team).deploy(loanProposalImpl.address, fundingPoolImpl.address)
     await factory.deployed()
-    await expect(factory.connect(lender1).setProtocolFee(BASE.mul(20).div(100))).to.be.revertedWithCustomError(
-      factory,
-      'InvalidSender'
+    await expect(factory.connect(lender1).setProtocolFee(BASE.mul(20).div(100))).to.be.revertedWith(
+      'Ownable: caller is not the owner'
     )
     await expect(factory.connect(team).setProtocolFee(BASE.mul(80).div(100))).to.be.revertedWithCustomError(
       factory,
