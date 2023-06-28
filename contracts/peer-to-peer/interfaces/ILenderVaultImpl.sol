@@ -28,6 +28,11 @@ interface ILenderVaultImpl {
 
     event Withdrew(address indexed tokenAddr, uint256 withdrawAmount);
 
+    event CircuitBreakerUpdated(
+        address indexed oldCircuitBreaker,
+        address indexed newCircuitBreaker
+    );
+
     /**
      * @notice function to initialize lender vault
      * @dev factory creates clone and then initializes the vault
@@ -157,6 +162,25 @@ interface ILenderVaultImpl {
     function removeSigner(address signer, uint256 signerIdx) external;
 
     /**
+     * @notice function to set a circuit breaker
+     * @dev the circuit breaker can pause all loan offers
+     * @param circuitBreaker address of the circuit breaker
+     */
+    function setCircuitBreaker(address circuitBreaker) external;
+
+    /**
+     * @notice function to pause all quotes from lendervault
+     * @dev can only be called by the circuit breaker
+     */
+    function pauseQuotes() external;
+
+    /**
+     * @notice function to unpause all quotes from lendervault
+     * @dev can only be called by the circuit breaker
+     */
+    function unpauseQuotes() external;
+
+    /**
      * @notice function to retrieve loan from loans array in vault
      * @dev this function reverts on invalid index
      * @param index index of loan
@@ -190,6 +214,12 @@ interface ILenderVaultImpl {
      * @return registry address
      */
     function addressRegistry() external view returns (address);
+
+    /**
+     * @notice function to return address of circuit breaker
+     * @return circuit breaker address
+     */
+    function circuitBreaker() external view returns (address);
 
     /**
      * @notice function returns signer at given index

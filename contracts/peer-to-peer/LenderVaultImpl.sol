@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -26,11 +27,12 @@ import {IOracle} from "./interfaces/IOracle.sol";
  * by an EOA should have multiple signers to reduce chance of forged quotes. In the event that a signer is compromised,
  * the vault owner should immediately remove the compromised signer and if possible, add a new signer.
  */
-contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
+contract LenderVaultImpl is Initializable, Ownable, Pausable, ILenderVaultImpl {
     using SafeERC20 for IERC20Metadata;
 
     address public addressRegistry;
     address[] public signers;
+    address public circuitBreaker;
     uint256 public minNumOfSigners;
     mapping(address => bool) public isSigner;
     bool public withdrawEntered;
@@ -122,6 +124,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     )
         external
+        whenNotPaused
         returns (
             DataTypesPeerToPeer.Loan memory _loan,
             uint256 loanId,
@@ -316,6 +319,31 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         emit RemovedSigner(signer, signerIdx, signerWithSwappedPosition);
     }
 
+    function setCircuitBreaker(address _newCircuitBreaker) external {
+        _senderCheckOwner();
+        address prevCircuitBreaker = circuitBreaker;
+        if (
+            _newCircuitBreaker == address(0) ||
+            _newCircuitBreaker == prevCircuitBreaker ||
+            _newCircuitBreaker == _owner ||
+            isSigner[_newCircuitBreaker]
+        ) {
+            revert Errors.InvalidAddress();
+        }
+        circuitBreaker = _newCircuitBreaker;
+        emit CircuitBreakerUpdated(prevCircuitBreaker, _newCircuitBreaker);
+    }
+
+    function pauseQuotes() external {
+        _senderCheckCircuitBreaker();
+        _pause();
+    }
+
+    function unpauseQuotes() external {
+        _senderCheckCircuitBreaker();
+        _unpause();
+    }
+
     function loan(
         uint256 loanId
     ) external view returns (DataTypesPeerToPeer.Loan memory _loan) {
@@ -378,6 +406,12 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     function _senderCheckGateway() internal view {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.UnregisteredGateway();
+        }
+    }
+
+    function _senderCheckCircuitBreaker() internal view {
+        if (msg.sender != circuitBreaker) {
+            revert Errors.InvalidSender();
         }
     }
 
