@@ -4,17 +4,18 @@ pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
 import {Helpers} from "../Helpers.sol";
-import {Ownable} from "../Ownable.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
-contract Factory is Ownable, ReentrancyGuard, IFactory {
+contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
     using ECDSA for bytes32;
 
     uint256 public protocolFee;
@@ -36,6 +37,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         }
         loanProposalImpl = _loanProposalImpl;
         fundingPoolImpl = _fundingPoolImpl;
+        _transferOwnership(msg.sender);
     }
 
     function createLoanProposal(
@@ -109,7 +111,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     }
 
     function setProtocolFee(uint256 _newprotocolFee) external {
-        _senderCheckOwner();
+        _checkOwner();
         uint256 oldprotocolFee = protocolFee;
         if (
             _newprotocolFee > Constants.MAX_P2POOL_PROTOCOL_FEE ||
@@ -194,22 +196,13 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     }
 
     function setMysoTokenManager(address newTokenManager) external {
-        _senderCheckOwner();
+        _checkOwner();
         address oldTokenManager = mysoTokenManager;
         if (oldTokenManager == newTokenManager) {
             revert Errors.InvalidAddress();
         }
         mysoTokenManager = newTokenManager;
         emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
-    }
-
-    function owner()
-        external
-        view
-        override(Ownable, IFactory)
-        returns (address)
-    {
-        return _owner;
     }
 
     function isWhitelistedLender(
@@ -219,5 +212,21 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         return
             _lenderWhitelistedUntil[whitelistAuthority][lender] >=
             block.timestamp;
+    }
+
+    function transferOwnership(address _newOwnerProposal) public override {
+        if (
+            _newOwnerProposal == address(0) ||
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == pendingOwner() ||
+            _newOwnerProposal == owner()
+        ) {
+            revert Errors.InvalidNewOwnerProposal();
+        }
+        super.transferOwnership(_newOwnerProposal);
+    }
+
+    function owner() public view override(Ownable, IFactory) returns (address) {
+        return super.owner();
     }
 }

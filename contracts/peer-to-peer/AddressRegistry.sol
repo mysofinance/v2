@@ -3,10 +3,11 @@ pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Helpers} from "../Helpers.sol";
-import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IERC721Wrapper} from "./interfaces/wrappers/ERC721/IERC721Wrapper.sol";
 import {IERC20Wrapper} from "./interfaces/wrappers/ERC20/IERC20Wrapper.sol";
@@ -19,7 +20,7 @@ import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
  * with that token (repays and withdrawals would still be allowed). In the limit of a total de-whitelisting of all
  * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
  */
-contract AddressRegistry is Initializable, Ownable, IAddressRegistry {
+contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     using ECDSA for bytes32;
 
     address public lenderVaultFactory;
@@ -40,12 +41,16 @@ contract AddressRegistry is Initializable, Ownable, IAddressRegistry {
         internal _isTokenWhitelistedForCompartment;
     address[] internal _registeredVaults;
 
+    constructor() {
+        _transferOwnership(msg.sender);
+    }
+
     function initialize(
         address _lenderVaultFactory,
         address _borrowerGateway,
         address _quoteHandler
     ) external initializer {
-        _senderCheckOwner();
+        _checkOwner();
         if (
             _lenderVaultFactory == address(0) ||
             _borrowerGateway == address(0) ||
@@ -325,13 +330,25 @@ contract AddressRegistry is Initializable, Ownable, IAddressRegistry {
         return _registeredVaults;
     }
 
+    function transferOwnership(address _newOwnerProposal) public override {
+        if (
+            _newOwnerProposal == address(0) ||
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == pendingOwner() ||
+            _newOwnerProposal == owner()
+        ) {
+            revert Errors.InvalidNewOwnerProposal();
+        }
+        super.transferOwnership(_newOwnerProposal);
+    }
+
     function owner()
-        external
+        public
         view
         override(Ownable, IAddressRegistry)
         returns (address)
     {
-        return _owner;
+        return super.owner();
     }
 
     function isWhitelistedERC20(address token) public view returns (bool) {
@@ -396,7 +413,7 @@ contract AddressRegistry is Initializable, Ownable, IAddressRegistry {
     }
 
     function _checkSenderAndIsInitialized() internal view {
-        _senderCheckOwner();
+        _checkOwner();
         if (_getInitializedVersion() == 0) {
             revert Errors.Uninitialized();
         }
