@@ -264,6 +264,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: partialRepayAmount,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -424,6 +425,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: partialRepayAmount,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -623,6 +625,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
           targetLoanId: 0,
           targetRepayAmount: loan.initRepayAmount,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
