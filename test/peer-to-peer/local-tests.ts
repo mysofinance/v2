@@ -19,6 +19,7 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+const YEAR_IN_SECONDS = 31_536_000
 
 async function generateOffChainQuote({
   lenderVault,
@@ -1046,17 +1047,21 @@ describe('Peer-to-Peer: Local Tests', function () {
     it('Should not process with bigger fee than max fee', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
-      await expect(borrowerGateway.connect(lender).setProtocolFee(0)).to.be.revertedWithCustomError(
+      await expect(borrowerGateway.connect(lender).setProtocolFeeParams([0, 0])).to.be.revertedWithCustomError(
         borrowerGateway,
         'InvalidSender'
       )
-      await expect(borrowerGateway.connect(team).setProtocolFee(BASE)).to.be.revertedWithCustomError(
+      await expect(borrowerGateway.connect(team).setProtocolFeeParams([0, BASE])).to.be.revertedWithCustomError(
+        borrowerGateway,
+        'InvalidFee'
+      )
+      await expect(borrowerGateway.connect(team).setProtocolFeeParams([BASE, 0])).to.be.revertedWithCustomError(
         borrowerGateway,
         'InvalidFee'
       )
 
       // set max protocol fee p.a.
-      await borrowerGateway.connect(team).setProtocolFee(BASE.mul(5).div(100))
+      await borrowerGateway.connect(team).setProtocolFeeParams([0, BASE.mul(5).div(100)])
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1096,8 +1101,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
-      const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const collSendAmount = ONE_WETH.mul(2)
+      const expectedTransferFee = ONE_WETH.mul(2)
+        .mul(ONE_DAY)
+        .mul(180)
+        .mul(BASE.mul(5).div(100))
+        .div(BASE.mul(YEAR_IN_SECONDS))
       const expectedUpfrontFeeToVaultTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
@@ -1112,12 +1121,12 @@ describe('Peer-to-Peer: Local Tests', function () {
         callbackData
       }
 
-      // reverts if trying to borrow with quote where protocol fee would exceed pledge amount
+      // should process even for very long tenors now that protocolFee max time is capped at 180 days
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+      ).to.emit(borrowerGateway, 'Borrowed')
     })
 
     it('Should not process off-chain quote with invalid min/max loan amount (1/2)', async function () {
@@ -4160,7 +4169,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           borrowerGateway
             .connect(borrower)
             .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-        ).to.be.revertedWithCustomError(lenderVault, 'InsufficientSendAmount')
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidUpfrontFee')
       })
 
       it('Should handle off-chain swap quotes correctly (2/2)', async function () {

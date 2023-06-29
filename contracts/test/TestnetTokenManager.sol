@@ -25,13 +25,13 @@ contract TestnetTokenManager is ERC20, Ownable, IMysoTokenManager {
     }
 
     function processP2PBorrow(
-        uint256 currProtocolFee,
+        uint256[2] memory currProtocolFeeParams,
         DataTypesPeerToPeer.BorrowTransferInstructions
             calldata /*borrowInstructions*/,
         DataTypesPeerToPeer.Loan calldata loan,
         address lenderVault
-    ) external returns (uint256 applicableProtocolFee) {
-        applicableProtocolFee = currProtocolFee;
+    ) external returns (uint256[2] memory applicableProtocolFeeParams) {
+        applicableProtocolFeeParams = currProtocolFeeParams;
         if (totalSupply() + _borrowerReward + _lenderReward < MAX_SUPPLY) {
             _mint(loan.borrower, _borrowerReward);
             _mint(lenderVault, _lenderReward);

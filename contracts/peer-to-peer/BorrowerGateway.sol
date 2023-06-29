@@ -17,14 +17,14 @@ import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
 import {IVaultCallback} from "./interfaces/IVaultCallback.sol";
 
-//import "hardhat/console.sol";
-
 contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     using SafeERC20 for IERC20Metadata;
 
     // putting fee info in borrow gateway since borrower always pays this upfront
     address public immutable addressRegistry;
-    uint256 public protocolFee; // in BASE
+    // index 0: base protocol fee is paid even for swap (no tenor)
+    // index 1: protocol fee slope scales protocol fee with tenor
+    uint256[2] internal protocolFeeParams;
 
     constructor(address _addressRegistry) {
         if (_addressRegistry == address(0)) {
@@ -238,17 +238,24 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     }
 
     /**
-     * @notice Protocol fee is allowed to be zero, so no min fee check, only a max fee check
+     * @notice Protocol fee is allowed to be zero, so no min fee checks, only max fee checks
      */
-    function setProtocolFee(uint256 _newFee) external {
+    function setProtocolFeeParams(uint256[2] calldata _newFeeParams) external {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
             revert Errors.InvalidSender();
         }
-        if (_newFee > Constants.MAX_FEE_PER_ANNUM) {
+        if (
+            _newFeeParams[0] > Constants.MAX_SWAP_PROTOCOL_FEE ||
+            _newFeeParams[1] > Constants.MAX_FEE_PER_ANNUM
+        ) {
             revert Errors.InvalidFee();
         }
-        protocolFee = _newFee;
-        emit ProtocolFeeSet(_newFee);
+        protocolFeeParams = _newFeeParams;
+        emit ProtocolFeeSet(_newFeeParams);
+    }
+
+    function getProtocolFeeParams() external view returns (uint256[2] memory) {
+        return protocolFeeParams;
     }
 
     function _processTransfers(
@@ -280,37 +287,40 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
-        uint256 currProtocolFee = protocolFee;
-        uint256 applicableProtocolFee = currProtocolFee;
+        uint256[2] memory currProtocolFeeParams = protocolFeeParams;
+        uint256[2] memory applicableProtocolFeeParams = currProtocolFeeParams;
 
         address mysoTokenManager = registry.mysoTokenManager();
         if (mysoTokenManager != address(0)) {
-            applicableProtocolFee = IMysoTokenManager(mysoTokenManager)
+            applicableProtocolFeeParams = IMysoTokenManager(mysoTokenManager)
                 .processP2PBorrow(
-                    currProtocolFee,
+                    applicableProtocolFeeParams,
                     borrowInstructions,
                     loan,
                     lenderVault
                 );
-            if (applicableProtocolFee > currProtocolFee) {
-                revert Errors.InvalidFee();
+            for (uint256 i; i < 2; ) {
+                if (applicableProtocolFeeParams[i] > currProtocolFeeParams[i]) {
+                    revert Errors.InvalidFee();
+                }
+                unchecked {
+                    ++i;
+                }
             }
         }
 
         // protocol fees on whole sendAmount
-        // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
-        uint256 protocolFeeAmount = ((borrowInstructions.collSendAmount *
-            applicableProtocolFee *
-            (loan.initCollAmount == 0 ? 1 : (loan.expiry - block.timestamp))) /
-            (Constants.BASE * Constants.YEAR_IN_SECONDS));
+        // protocol fees are embedded with expected transfer fee in borrowInstructions
+        // for a full breakdown of how all fee cases are handled, see gitbook
+        // myso-v2-docs p2p-borrowing-and-lending -> fee-mechanics
+        uint256 protocolFeeAmount = _calculateProtocolFeeAmount(
+            applicableProtocolFeeParams,
+            borrowInstructions.collSendAmount,
+            loan.initCollAmount == 0 ? 0 : loan.expiry - block.timestamp
+        );
 
-        // should only happen when tenor >> 1 year or very large upfront fees with more reasonable protocol fees
-        // e.g. at 5% MAX_FEE_PER_ANNUM, tenor still needs to be 20 years with no upfront fee
-        // but a high upfrontFee could also make this fail for smaller protocolFee amounts
-        if (
-            borrowInstructions.collSendAmount <
-            protocolFeeAmount + transferInstructions.upfrontFee
-        ) {
+        // check protocolFeeAmount <= expectedTransferFee
+        if (protocolFeeAmount > borrowInstructions.expectedTransferFee) {
             revert Errors.InsufficientSendAmount();
         }
 
@@ -337,7 +347,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             transferInstructions.collReceiver != lenderVault &&
             transferInstructions.upfrontFee != 0
         ) {
-            collReceiverTransferAmount -= transferInstructions.upfrontFee;
+            collReceiverTransferAmount -= (transferInstructions.upfrontFee +
+                borrowInstructions.expectedUpfrontFeeToVaultTransferFee);
             collReceiverExpBalDiff -= transferInstructions.upfrontFee;
             // Note: if a compartment is used then we need to transfer the upfront fee to the vault separately;
             // in the special case where the coll also has a token transfer fee then the vault transfer fee of upfront
@@ -355,9 +366,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 IERC20Metadata(loan.collToken).balanceOf(lenderVault) !=
                 vaultPreBal + transferInstructions.upfrontFee
             ) {
-                // console.log("vaultPreBal", vaultPreBal);
-                // console.log("upfrontFee", transferInstructions.upfrontFee);
-                // console.log("expectedUpfrontFeeToVaultTransferFee", borrowInstructions.expectedUpfrontFeeToVaultTransferFee);
                 revert Errors.InvalidSendAmount();
             }
         }
@@ -435,5 +443,23 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert Errors.UnregisteredVault();
         }
+    }
+
+    function _calculateProtocolFeeAmount(
+        uint256[2] memory _protocolFeeParams,
+        uint256 collSendAmount,
+        uint256 borrowDuration
+    ) internal pure returns (uint256 protocolFeeAmount) {
+        protocolFeeAmount =
+            (_protocolFeeParams[0] * collSendAmount) /
+            Constants.BASE;
+        uint256 additionalLoanProtocolFee = (collSendAmount *
+            (
+                borrowDuration > Constants.MAX_TIME_BEFORE_PROTOCOL_FEE_CAP
+                    ? _protocolFeeParams[1] *
+                        Constants.MAX_TIME_BEFORE_PROTOCOL_FEE_CAP
+                    : _protocolFeeParams[1] * borrowDuration
+            )) / (Constants.BASE * Constants.YEAR_IN_SECONDS);
+        protocolFeeAmount += additionalLoanProtocolFee;
     }
 }

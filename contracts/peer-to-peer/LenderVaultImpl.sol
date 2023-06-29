@@ -143,7 +143,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         transferInstructions.upfrontFee =
             ((borrowInstructions.collSendAmount -
                 borrowInstructions.expectedTransferFee -
-                borrowInstructions.expectedTransferFee) *
+                borrowInstructions.expectedUpfrontFeeToVaultTransferFee) *
                 quoteTuple.upfrontFeePctInBase) /
             Constants.BASE;
         (uint256 loanAmount, uint256 repayAmount) = _getLoanAndRepayAmount(

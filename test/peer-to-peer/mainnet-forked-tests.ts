@@ -24,7 +24,8 @@ import {
   getExactLpTokenPriceInEth,
   getFairReservesPriceAndEthValue,
   getDeltaBNComparison,
-  setupBorrowerWhitelist
+  setupBorrowerWhitelist,
+  getTwoFeesIfPossible
 } from './helpers/misc'
 
 // test config constants & vars
@@ -3688,7 +3689,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
       // set protocol fee 10 bps
-      await borrowerGateway.connect(team).setProtocolFee(BASE.div(1000))
+      await borrowerGateway.connect(team).setProtocolFeeParams([0, BASE.div(1000)])
 
       const onChainQuote = await createOnChainRequest({
         lender,
@@ -3787,8 +3788,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           )
       ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
-      const upfrontFeeFromQuote = BASE.mul(1).div(100)
-      //const Y = collSendAmount.sub(protocolFeeAmount)
+      const upfrontFeeFromQuote = paxgWithCompartmentOnChainQuote.quoteTuples[quoteTupleIdx].upfrontFeePctInBase
       const commonFeeNumerator = collSendAmount.sub(protocolFeeAmount)
       const commonFeeDenominator = BASE.mul(10000)
 
@@ -3796,13 +3796,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const paxgExpectedTransferFee2Numerator = commonFeeNumerator.mul(upfrontFeeFromQuote)
       const paxgExpectedTransferFee1 = paxgExpectedTransferFee1Numerator.mul(2).div(commonFeeDenominator)
       const paxgExpectedTransferFee2 = paxgExpectedTransferFee2Numerator.mul(2).div(commonFeeDenominator)
-      // const paxgExpectedTransferFee1 = commonFeeNumerator.mul(99).div(500000)
-      // const paxgExpectedTransferFee2 = commonFeeNumerator.div(500000)
       paxgExpectedTransferFee = paxgExpectedTransferFee1.add(protocolFeeAmount)
 
       // now add in transfer fee on the upfront fee portion
       paxgBorrowInstructions.expectedUpfrontFeeToVaultTransferFee = paxgExpectedTransferFee2
       paxgBorrowInstructions.expectedTransferFee = paxgExpectedTransferFee
+
+      const collateralUsedForLoan = collSendAmount.sub(paxgExpectedTransferFee).sub(paxgExpectedTransferFee2)
 
       const borrowWithPaxgOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -3816,7 +3816,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const paxgUpfrontFee = borrowPaxgEvent?.args?.['upfrontFee']
       const paxgCollTokenCompartmentAddr = borrowPaxgEvent?.args?.loan?.['collTokenCompartmentAddr']
 
-      expect(paxgUpfrontFee).to.equal(upfrontFee)
+      expect(paxgUpfrontFee).to.equal(collateralUsedForLoan.mul(upfrontFeeFromQuote).div(BASE))
 
       // check balance post borrow
       const borrowerUsdcBalPostPaxg = await usdc.balanceOf(borrower.address)
@@ -3826,22 +3826,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // checks that loan currency delta is equal magnitude, but opposite sign for borrower and vault
       expect(borrowerUsdcBalPostPaxg.sub(borrowerUsdcBalPost)).to.equal(vaultUsdcBalPost.sub(vaultUsdcBalPostPaxg))
-      // checks that loan amount = (sendAmount - transfer fee) * loanPerColl
+      // checks that loan amount = (sendAmount - transfer fee - transfer fee for upfront coll) * loanPerColl
       // note: expected transfer fee is just protocol fee since no coll token transfer fee
       expect(vaultUsdcBalPost.sub(vaultUsdcBalPostPaxg)).to.equal(
-        collSendAmount.sub(paxgExpectedTransferFee).mul(ONE_USDC.mul(1000)).div(BASE)
+        collSendAmount.sub(paxgExpectedTransferFee).sub(paxgExpectedTransferFee2).mul(ONE_USDC.mul(1000)).div(BASE)
       )
-      // compartment coll (paxg) balance = sendAmount - transfer fee - upfront fee
+      // compartment coll (paxg) balance = sendAmount - transfer fee - transfer fee for upfront coll - upfront fee
       // note this still equals loan.initCollAmount
-      expect(compartmentPaxgBal).to.equal(collSendAmount.sub(paxgExpectedTransferFee).sub(paxgUpfrontFee))
-      // vault coll (paxg) balance = upfrontFee - paxg token transfer fee
-      // this case (compartment with a token transfer fee and upfront fee) is only case where
-      // lender is affected by transfer fees...so in this situation would need to either
-      // 1) not use upfront fee
-      // 2) set upfront fee slightly higher to accomodate for coll token transfer fee
-      // note: currently we do not plan to have compartments with any known coll tokens with transfer fees
-      // but this case covers a possible future token that might fall into that category
-      expect(vaultPaxgBalPost).to.equal(upfrontFee.mul(9998).div(10000))
+      expect(compartmentPaxgBal).to.equal(
+        collSendAmount.sub(paxgExpectedTransferFee).sub(paxgExpectedTransferFee2).sub(paxgUpfrontFee)
+      )
+      // vault coll (paxg) balance = upfrontFee
+      expect(vaultPaxgBalPost).to.equal(paxgUpfrontFee)
     })
 
     it('Should not allow callbacks into transferCollFromCompartment(...)', async function () {
@@ -4058,7 +4054,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       //team sets protocolFee
       const protocolFee = BigNumber.from(10).pow(16)
-      await borrowerGateway.connect(team).setProtocolFee(protocolFee) // 1% or 100 bp protocolFee
+      await borrowerGateway.connect(team).setProtocolFeeParams([0, protocolFee]) // 1% or 100 bp protocolFee
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
