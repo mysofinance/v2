@@ -3870,8 +3870,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves borrower gateway
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
-      // set protocol fee 10 bps
-      await borrowerGateway.connect(team).setProtocolFeeParams([0, BASE.div(1000)])
+      // set protocol fee of 10 bps annulized and 2bp fixed protocol fee
+      await borrowerGateway.connect(team).setProtocolFeeParams([BASE.div(5000), BASE.div(1000)])
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -3909,8 +3909,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
 
       // borrow with on chain quote with token transfer fee
-      // 90 day tenor with 10 bps protocol fee
-      const protocolFeeAmount = ONE_PAXG.mul(quoteTuples[0].tenor).div(BigNumber.from(YEAR_IN_SECONDS).mul(1000))
+      // fixed part has 2bp protocol fee
+      const fixedProtocolFeeAmount = ONE_PAXG.div(5000)
+      // 90 day tenor with 10 bps variable protocol fee
+      const variableProtocolFeeAmount = ONE_PAXG.mul(quoteTuples[0].tenor).div(BigNumber.from(YEAR_IN_SECONDS).mul(1000))
+      const protocolFeeAmount = fixedProtocolFeeAmount.add(variableProtocolFeeAmount)
       const collSendAmount = ONE_PAXG
       const sendAmountAfterProtcolFee = collSendAmount.sub(protocolFeeAmount)
       const sendAmountForVault = sendAmountAfterProtcolFee.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE)
