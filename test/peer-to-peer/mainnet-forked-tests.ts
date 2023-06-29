@@ -3662,8 +3662,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await weth.connect(borrower).approve(poolAddress, MAX_UINT256)
       await poolInstance.connect(borrower).supply(weth.address, locallyCollBalance, borrower.address, '0')
 
-      //supply paxg pool
-
       // lender deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
@@ -3838,6 +3836,137 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       // vault coll (paxg) balance = upfrontFee
       expect(vaultPaxgBalPost).to.equal(paxgUpfrontFee)
+    })
+
+    it('Should handle swap with protocol fee and transfer fee correctly', async function () {
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, team, borrower, usdc, paxg, lenderVault } =
+        await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).setWhitelistState([usdc.address, paxg.address], 1)
+
+      await borrowerGateway.connect(team).setProtocolFeeParams([BASE.div(500), BASE.div(100)])
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const buyPricePerCollToken = ONE_USDC.mul(1890)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE,
+          tenor: 0
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: paxg.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPre = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+      const numLoansPre = await lenderVault.totalNumLoans()
+      const lockedAmountsWethPre = await lenderVault.lockedAmounts(paxg.address)
+      const lockedAmountsUsdcPre = await lenderVault.lockedAmounts(usdc.address)
+
+      // borrower approves gateway and executes quote
+      await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const sellAmountOfCollToken = ONE_PAXG.mul(499).div(500).mul(4999).div(5000)
+      const expectedTransferFee = ONE_PAXG.div(500).add(ONE_PAXG.mul(499).mul(2).div(10000).div(500))
+      const expectedUpfrontFeeToVaultTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount: ONE_PAXG,
+        expectedTransferFee,
+        expectedUpfrontFeeToVaultTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPost = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const numLoansPost = await lenderVault.totalNumLoans()
+      const lockedAmountsPaxgPost = await lenderVault.lockedAmounts(paxg.address)
+      const lockedAmountsUsdcPost = await lenderVault.lockedAmounts(usdc.address)
+
+      // check balance post borrow
+      expect(borrowerPaxgBalPre.sub(borrowerPaxgBalPost)).to.equal(
+        vaultPaxgBalPost.sub(vaultPaxgBalPre).add(expectedTransferFee)
+      )
+      expect(vaultPaxgBalPost.sub(vaultPaxgBalPre)).to.equal(sellAmountOfCollToken)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(
+        buyPricePerCollToken.mul(sellAmountOfCollToken).div(ONE_PAXG)
+      )
+
+      // check no change in locked amounts
+      expect(lockedAmountsPaxgPost).to.equal(lockedAmountsWethPre)
+      expect(lockedAmountsPaxgPost).to.equal(0)
+      expect(lockedAmountsUsdcPost).to.equal(lockedAmountsUsdcPre)
+      expect(lockedAmountsUsdcPost).to.equal(0)
+
+      // check no loan was pushed
+      expect(numLoansPost).to.equal(numLoansPre)
+      expect(numLoansPost).to.equal(0)
+
+      // check no repay possible
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: 0,
+            targetRepayAmount: buyPricePerCollToken,
+            expectedTransferFee: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
+
+      // check lender can unlock swapped amount (=upfront fee) immediately
+      const userPaxgBalPreWithdraw = await paxg.balanceOf(lender.address)
+      const vaultPaxgBalPreWithdraw = await paxg.balanceOf(lenderVault.address)
+      await lenderVault.connect(lender).withdraw(paxg.address, sellAmountOfCollToken)
+      const userPaxgBalPostWithdraw = await paxg.balanceOf(lender.address)
+      const vaultPaxgBalPostWithdraw = await paxg.balanceOf(lenderVault.address)
+      // must account for paxg transfer fees on withdrawal
+      expect(userPaxgBalPostWithdraw.sub(userPaxgBalPreWithdraw)).to.be.equal(
+        vaultPaxgBalPreWithdraw.sub(vaultPaxgBalPostWithdraw).mul(4999).div(5000)
+      )
+      expect(userPaxgBalPostWithdraw.sub(userPaxgBalPreWithdraw)).to.be.equal(sellAmountOfCollToken.mul(4999).div(5000))
     })
 
     it('Should not allow callbacks into transferCollFromCompartment(...)', async function () {
