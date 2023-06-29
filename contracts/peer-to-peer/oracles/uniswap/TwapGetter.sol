@@ -11,8 +11,6 @@ import {IUniswapV3Factory} from "../../interfaces/oracles/uniswap/IUniswapV3Fact
 import {IUniswapV3Pool} from "../../interfaces/oracles/uniswap/IUniswapV3Pool.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 
-//import "hardhat/console.sol";
-
 contract TwapGetter {
     uint256 internal constant BASE_CURRENCY_UNIT = 10 ** 18;
 
@@ -40,13 +38,7 @@ contract TwapGetter {
         // note: this returns the price in base 2**96 and denominated in token1
         // i.e., `1 unit of token0` corresponds to `sqrtPriceX96 units (divided by 2**96) of token1`
         uint256 priceX96 = getPriceX96FromSqrtPriceX96(sqrtPriceX96);
-        //uint256 priceX96 = sqrtPriceX96;
 
-        //console.log("priceX96: %s", priceX96);
-
-        //uint256 units = 10 ** IERC20Metadata(outToken).decimals();
-
-        // scale up by decimals of token0, such that `1 whole unit of token0` corresponds to given units of token1
         (uint256 nominator, uint256 denominator) = inToken == token0
             ? (
                 priceX96 * 10 ** IERC20Metadata(token0).decimals(),
@@ -75,20 +67,13 @@ contract TwapGetter {
             (int56[] memory tickCumulatives, ) = IUniswapV3Pool(uniswapV3Pool)
                 .observe(secondsAgo);
 
-            //console.log("tick: ", uint256(uint24(tick)));
-            //console.log("lastIndex: ", lastIndex);
-            int24 tickCumulativesDelta = int24(
+            int56 tickCumulativesDelta = int56(
                 tickCumulatives[1] - tickCumulatives[0]
             );
-            //console.log("%s seconds ago: ", twapInterval);
-            //console.log("tick Cumulatives[0]: ", uint256(uint56(tickCumulatives[0])));
-            //console.log("tick Cumulatives[1]: ", uint256(uint56(tickCumulatives[1])));
-            //console.log("tickCumulativesDelta: %s", uint256(uint24(tickCumulativesDelta)));
-            int24 averageTick = tickCumulativesDelta /
+            int56 averageTick = tickCumulativesDelta /
                 int24(int32(twapInterval));
-            //console.log("tickCumulativesAverage: %s", uint256(uint24(averageTick)));
 
-            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(averageTick);
+            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(int24(averageTick));
         }
     }
 

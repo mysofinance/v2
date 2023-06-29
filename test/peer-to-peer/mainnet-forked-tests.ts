@@ -220,24 +220,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
     await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
-    // deploy uni v3 twap
-    const TwapGetter = await ethers.getContractFactory('TwapGetter')
-    await TwapGetter.connect(team)
-    const twapGetter = await TwapGetter.deploy()
-    await twapGetter.deployed()
-
-    const poolFee = 500
-    const twapInterval = 60
-
-    const twapWethUsdc = await twapGetter.getTwap(weth.address, usdc.address, poolFee, twapInterval)
-    // const twapUsdcWeth = await twapGetter.getTwap(usdc.address, weth.address, poolFee, twapInterval)
-    // const twapWbtcUsdc = await twapGetter.getTwap(wbtc, usdc.address, poolFee, twapInterval)
-    // const twapUsdcWbtc = await twapGetter.getTwap(usdc.address, wbtc, poolFee, twapInterval)
-    console.log('twapWethUsdc', twapWethUsdc)
-    // console.log('twapUsdcWeth', twapUsdcWeth)
-    // console.log('twapWbtcUsdc', twapWbtcUsdc)
-    // console.log('twapUsdcWbtc', twapUsdcWbtc)
-
     return {
       addressRegistry,
       borrowerGateway,
@@ -347,6 +329,33 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       uniV3Looping
     }
   }
+
+  describe('TWAP Testing', function () {
+    it('Should validate correctly the TWAP', async function () {
+      const [team] = await ethers.getSigners()
+      const weth = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
+      const usdc = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+      const wbtc = '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599'
+      // deploy uni v3 twap
+      const TwapGetter = await ethers.getContractFactory('TwapGetter')
+      await TwapGetter.connect(team)
+      const twapGetter = await TwapGetter.deploy()
+      await twapGetter.deployed()
+
+      const poolFee = 500
+      const twapInterval = 3600
+
+      const twapWethUsdc = await twapGetter.getTwap(weth, usdc, poolFee, twapInterval)
+      const twapUsdcWeth = await twapGetter.getTwap(usdc, weth, poolFee, twapInterval)
+      const twapWbtcUsdc = await twapGetter.getTwap(wbtc, usdc, poolFee, twapInterval)
+      const twapUsdcWbtc = await twapGetter.getTwap(usdc, wbtc, poolFee, twapInterval)
+      console.log('twap interval', twapInterval)
+      console.log('twapWethUsdc', twapWethUsdc)
+      console.log('twapUsdcWeth', twapUsdcWeth)
+      console.log('twapWbtcUsdc', twapWbtcUsdc)
+      console.log('twapUsdcWbtc', twapUsdcWbtc)
+    })
+  })
 
   describe('On-Chain Quote Testing', function () {
     it('Should validate correctly the quote loanPerCollUnitOrLtv', async function () {

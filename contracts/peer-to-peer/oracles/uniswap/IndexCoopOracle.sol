@@ -11,7 +11,7 @@ import {Errors} from "../../../Errors.sol";
 contract IndexCoopOracle is ChainlinkBase {
     // solhint-disable no-empty-blocks
 
-    address[] public _uniswapV3PairAddrs;
+    address[] public uniswapV3PairAddrs;
     address internal constant DS_ETH =
         0x341c05c0E9b33C0E38d64de76516b2Ce970bB3BE;
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
@@ -44,7 +44,7 @@ contract IndexCoopOracle is ChainlinkBase {
     function _getPriceOfToken(
         address token
     ) internal view virtual override returns (uint256 tokenPriceRaw) {
-        tokenPriceRaw = token == BASE_CURRENCY
+        tokenPriceRaw = token == WETH
             ? BASE_CURRENCY_UNIT
             : super._getPriceOfToken(token);
     }
