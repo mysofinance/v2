@@ -208,9 +208,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                     uint256(loanRepayInstructions.targetRepayAmount)) /
                     uint256(leftRepaymentAmount)
             );
-            if (noCompartment && reclaimCollAmount == 0) {
-                revert Errors.ReclaimAmountIsZero();
-            }
+        }
+        if (reclaimCollAmount == 0) {
+            revert Errors.ReclaimAmountIsZero();
         }
 
         lenderVault.updateLoanInfo(
@@ -265,13 +265,21 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.Loan memory loan,
         DataTypesPeerToPeer.TransferInstructions memory transferInstructions
     ) internal {
-        IAddressRegistry registry = IAddressRegistry(addressRegistry);
         if (
             borrowInstructions.callbackAddr != address(0) &&
-            registry.whitelistState(borrowInstructions.callbackAddr) !=
+            IAddressRegistry(addressRegistry).whitelistState(
+                borrowInstructions.callbackAddr
+            ) !=
             DataTypesPeerToPeer.WhitelistState.CALLBACK
         ) {
             revert Errors.NonWhitelistedCallback();
+        }
+        bool useCompartment = transferInstructions.collReceiver != lenderVault;
+        if (
+            !useCompartment &&
+            borrowInstructions.expectedCompartmentTransferFee > 0
+        ) {
+            revert Errors.InconsistentExpTransferFee();
         }
         ILenderVaultImpl(lenderVault).transferTo(
             loan.loanToken,
@@ -290,7 +298,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         uint256[2] memory currProtocolFeeParams = protocolFeeParams;
         uint256[2] memory applicableProtocolFeeParams = currProtocolFeeParams;
 
-        address mysoTokenManager = registry.mysoTokenManager();
+        address mysoTokenManager = IAddressRegistry(addressRegistry)
+            .mysoTokenManager();
         if (mysoTokenManager != address(0)) {
             applicableProtocolFeeParams = IMysoTokenManager(mysoTokenManager)
                 .processP2PBorrow(
@@ -309,10 +318,28 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             }
         }
 
-        // protocol fees on whole sendAmount
-        // protocol fees are embedded with expected transfer fee in borrowInstructions
-        // for a full breakdown of how all fee cases are handled, see gitbook
-        // myso-v2-docs p2p-borrowing-and-lending -> fee-mechanics
+        // Note: Collateral and fees flow and breakdown is as follows:
+        //
+        // collSendAmount ("collSendAmount")
+        // |
+        // |-- protocolFeeAmount ("protocolFeeAmount")
+        // |
+        // |-- gross pledge amount
+        //     |
+        //     |-- gross upfront fee
+        //     |   |
+        //     |   |-- net upfront fee ("upfrontFee")
+        //     |   |
+        //     |   |-- transfer fee 1
+        //     |
+        //     |-- gross reclaimable collateral
+        //         |
+        //         |-- net reclaimable collateral ("initCollAmount")
+        //         |
+        //         |-- transfer fee 2 ("expectedCompartmentTransferFee")
+        //
+        // where expectedProtocolAndVaultTransferFee = protocolFeeAmount + transfer fee 1
+
         uint256 protocolFeeAmount = _calculateProtocolFeeAmount(
             applicableProtocolFeeParams,
             borrowInstructions.collSendAmount,
@@ -332,7 +359,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             // protocolFeeAmount; this is by design to not tax borrowers or lenders for transfer fees on protocol fees
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
-                registry.owner(),
+                IAddressRegistry(addressRegistry).owner(),
                 protocolFeeAmount
             );
         }
@@ -346,7 +373,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // Note: initialize the vault's expected coll balance increase in case there's no compartment
         uint256 expVaultCollBalIncrease = loan.initCollAmount +
             transferInstructions.upfrontFee;
-        if (transferInstructions.collReceiver != lenderVault) {
+        if (useCompartment) {
             // Note: if there's a compartment then adjust the coll amount that is sent to vault by deducting the amount
             // that goes to the compartment, i.e., the borrower's reclaimable coll amount and any associated transfer fees
             grossCollTransferAmountToVault -= loan.initCollAmount;
@@ -374,6 +401,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
         if (grossCollTransferAmountToVault > 0) {
             // @dev: grossCollTransferAmountToVault can be zero in case no upfront fee and compartment is used
+            if (expVaultCollBalIncrease == 0) {
+                revert Errors.InconsistentExpVaultBalIncrease();
+            }
             uint256 vaultPreBal = IERC20Metadata(loan.collToken).balanceOf(
                 lenderVault
             );
