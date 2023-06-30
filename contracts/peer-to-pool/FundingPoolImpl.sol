@@ -273,12 +273,17 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         );
         (, , , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
+        
         address _depositToken = depositToken;
-        IERC20Metadata(_depositToken).safeTransfer(arranger, arrangerFee);
-        IERC20Metadata(_depositToken).safeTransfer(
-            IFactory(_factory).owner(),
-            protocolFee
-        );
+        if (arrangerFee > 0) {
+            IERC20Metadata(_depositToken).safeTransfer(arranger, arrangerFee);
+        }
+        if (protocolFee > 0) {
+            IERC20Metadata(_depositToken).safeTransfer(
+                IFactory(factory).owner(),
+                protocolFee
+            );
+        }
 
         emit LoanProposalExecuted(
             loanProposal,
