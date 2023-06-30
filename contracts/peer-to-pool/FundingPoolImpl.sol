@@ -85,9 +85,10 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
 
     function subscribe(
         address loanProposal,
-        uint256 amount
+        uint256 minAmount,
+        uint256 maxAmount
     ) external nonReentrant {
-        if (amount == 0) {
+        if (maxAmount == 0 || minAmount > maxAmount) {
             revert Errors.InvalidAmount();
         }
         if (!IFactory(factory).isLoanProposal(loanProposal)) {
@@ -109,35 +110,40 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             revert Errors.InvalidLender();
         }
         uint256 _balanceOf = balanceOf[msg.sender];
-        if (amount > _balanceOf) {
+        if (maxAmount > _balanceOf) {
             revert Errors.InsufficientBalance();
         }
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
         uint256 _totalSubscriptions = totalSubscriptions[loanProposal];
-        if (amount + _totalSubscriptions > loanTerms.maxTotalSubscriptions) {
-            revert Errors.SubscriptionAmountTooHigh();
+        uint256 _freeSubscriptionSpace = loanTerms.maxTotalSubscriptions -
+            _totalSubscriptions;
+        if (_freeSubscriptionSpace < minAmount) {
+            revert Errors.InsufficientFreeSubscriptionSpace();
         }
+        uint256 _subscription = maxAmount < _freeSubscriptionSpace
+            ? maxAmount
+            : _freeSubscriptionSpace;
         address mysoTokenManager = IFactory(factory).mysoTokenManager();
         if (mysoTokenManager != address(0)) {
             IMysoTokenManager(mysoTokenManager).processP2PoolSubscribe(
                 address(this),
                 msg.sender,
                 loanProposal,
-                amount,
+                _subscription,
                 _totalSubscriptions,
                 loanTerms
             );
         }
-        balanceOf[msg.sender] = _balanceOf - amount;
-        totalSubscriptions[loanProposal] = _totalSubscriptions + amount;
-        subscriptionAmountOf[loanProposal][msg.sender] += amount;
+        balanceOf[msg.sender] = _balanceOf - _subscription;
+        totalSubscriptions[loanProposal] = _totalSubscriptions + _subscription;
+        subscriptionAmountOf[loanProposal][msg.sender] += _subscription;
         _earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
             Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
 
-        emit Subscribed(msg.sender, loanProposal, amount);
+        emit Subscribed(msg.sender, loanProposal, _subscription);
     }
 
     function unsubscribe(address loanProposal, uint256 amount) external {

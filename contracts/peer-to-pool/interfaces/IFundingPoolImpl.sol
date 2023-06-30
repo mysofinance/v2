@@ -45,9 +45,14 @@ interface IFundingPoolImpl {
     /**
      * @notice function allows users from funding pool to subscribe as lenders to a proposal
      * @param loanProposal address of the proposal to which user wants to subscribe
-     * @param amount amount of subscription
+     * @param minAmount the desired minimum subscription amount
+     * @param maxAmount the desired maximum subscription amount
      */
-    function subscribe(address loanProposal, uint256 amount) external;
+    function subscribe(
+        address loanProposal,
+        uint256 minAmount,
+        uint256 maxAmount
+    ) external;
 
     /**
      * @notice function allows subscribed lenders to unsubscribe from a proposal

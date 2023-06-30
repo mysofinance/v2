@@ -345,12 +345,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       loanProposal,
       'InvalidSubscriptionRange'
     )
-    loanTerms.maxTotalSubscriptions = loanTerms.minTotalSubscriptions
-    // revert if same min and max loan amount
-    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidSubscriptionRange'
-    )
+
     loanTerms.minTotalSubscriptions = loanTerms.maxTotalSubscriptions.add(1)
     // revert if min loan amount less than max loan amount
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
@@ -495,6 +490,30 @@ describe('Peer-to-Pool: Local Tests', function () {
       loanProposal,
       'LoanTokenDueIsZero'
     )
+
+    // move forward past loan terms update cool off period
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
+    // set valid repayment schedule
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    firstDueDate = ethers.BigNumber.from(timestamp)
+      .add(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD)
+      .add(UNSUBSCRIBE_GRACE_PERIOD)
+      .add(LOAN_EXECUTION_GRACE_PERIOD)
+      .add(MIN_TIME_UNTIL_FIRST_DUE_DATE)
+      .add(60) // +60s
+    firstRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue1, relCollTokenDueIfConverted1, firstDueDate)
+    nextDueDate = firstDueDate.add(MIN_TIME_BETWEEN_DUE_DATES)
+    secondRepaymentScheduleEntry = getRepaymentScheduleEntry(relLoanTokenDue2, relCollTokenDueIfConverted2, nextDueDate)
+    repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
+    loanTerms.repaymentSchedule = repaymentSchedule
+
+    // should not revert if same min and max loan amount
+    loanTerms.maxTotalSubscriptions = loanTerms.minTotalSubscriptions
+    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
   })
 
   it('Should handle loan term subscriptions and acceptance correctly', async function () {
@@ -520,7 +539,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await usdc.connect(lender0).approve(fundingPool.address, MAX_UINT256)
     let bal = await usdc.balanceOf(lender0.address)
     await fundingPool.connect(lender0).deposit(bal, 0)
-    await expect(fundingPool.connect(lender0).subscribe(loanProposal.address, bal)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender0).subscribe(loanProposal.address, bal, bal)).to.be.revertedWithCustomError(
       fundingPool,
       'NotInSubscriptionPhase'
     )
@@ -616,28 +635,33 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(poolBal).to.be.equal(totalDeposited)
 
     // lender subscribes
-    await expect(fundingPool.connect(lender2).subscribe(lender2.address, ONE_USDC.mul(80000))).to.be.revertedWithCustomError(
-      fundingPool,
-      'UnregisteredLoanProposal'
-    )
+    await expect(
+      fundingPool.connect(lender2).subscribe(lender2.address, ONE_USDC.mul(80000), ONE_USDC.mul(80000))
+    ).to.be.revertedWithCustomError(fundingPool, 'UnregisteredLoanProposal')
     // users without or too low balance can't subscribe
     let subscriptionAmount = ONE_USDC.mul(80000)
     await expect(
-      fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionAmount)
+      fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionAmount, subscriptionAmount)
     ).to.be.revertedWithCustomError(fundingPool, 'InsufficientBalance')
     let depositedBalance = await fundingPool.balanceOf(lender2.address)
     await expect(
-      fundingPool.connect(lender1).subscribe(loanProposal.address, depositedBalance.add(1))
+      fundingPool.connect(lender1).subscribe(loanProposal.address, depositedBalance.add(1), depositedBalance.add(1))
     ).to.be.revertedWithCustomError(fundingPool, 'InsufficientBalance')
 
     // check can't subscribe with zero amount
-    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 0)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 0, 0)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidAmount'
+    )
+
+    // check can't subscribe when min subscription amount > max subscription amount
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 1, 0)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidAmount'
     )
 
     // check valid subscribe works
-    await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount, subscriptionAmount)
 
     // revert when trying to propose new loan terms with max loan amount smaller than prospective loan amount based on current subscriptions
     const prevMaxLoanAmount = loanTerms.maxTotalSubscriptions
@@ -682,7 +706,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let postSubscribedBal = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     expect(preSubscribedBal.sub(postSubscribedBal)).to.be.equal(postBal.sub(preBal))
     // subscribe again
-    await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount)
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount, subscriptionAmount)
 
     // check subscriptions don't change pool balance, only shift regular balance and subscription balance
     let remainingDepositBalance = await fundingPool.balanceOf(lender2.address)
@@ -690,8 +714,21 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)).to.be.equal(subscriptionAmount)
     expect(await usdc.balanceOf(fundingPool.address)).to.be.equal(poolBal)
     await expect(
-      fundingPool.connect(lender2).subscribe(loanProposal.address, remainingDepositBalance)
-    ).to.be.revertedWithCustomError(fundingPool, 'SubscriptionAmountTooHigh')
+      fundingPool.connect(lender2).subscribe(loanProposal.address, remainingDepositBalance, remainingDepositBalance)
+    ).to.be.revertedWithCustomError(fundingPool, 'InsufficientFreeSubscriptionSpace')
+
+    let lenderBalancePre = await fundingPool.balanceOf(lender2.address)
+    let lenderSubscriptionPre = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
+    let maxTotalSubscriptions = (await loanProposal.loanTerms()).maxTotalSubscriptions
+    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
+    let freeSubscriptionSpace = maxTotalSubscriptions.sub(totalSubscriptions)
+
+    // check subscription with valid min/max range will allow lender to take remaining free subscription space
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, 0, remainingDepositBalance)
+    let lenderSubscriptionPost = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
+    let lenderBalancePost = await fundingPool.balanceOf(lender2.address)
+    expect(lenderSubscriptionPost.sub(lenderSubscriptionPre)).to.be.equal(freeSubscriptionSpace)
+    expect(lenderSubscriptionPost.sub(lenderSubscriptionPre)).to.be.equal(lenderBalancePre.sub(lenderBalancePost))
 
     // reverts if trying to finalize loan terms prior to acceptance
     await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
@@ -762,7 +799,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // get final amounts
-    let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
+    totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let [, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
@@ -894,17 +931,17 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // lenders that aren't on whitelist can't subscribe
     bal = await fundingPool.balanceOf(lender1.address)
-    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, bal)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, bal, bal)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidLender'
     )
     bal = await fundingPool.balanceOf(lender1.address)
-    await expect(fundingPool.connect(lender2).subscribe(loanProposal.address, bal)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender2).subscribe(loanProposal.address, bal, bal)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidLender'
     )
     bal = await fundingPool.balanceOf(lender1.address)
-    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, bal)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, bal, bal)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidLender'
     )
@@ -918,7 +955,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // whitelist lender 1
     await whitelistLender(factory, whitelistAuthority, lender1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, MAX_UINT256)
     // check subscription now works
-    await fundingPool.connect(lender1).subscribe(loanProposal.address, 1)
+    await fundingPool.connect(lender1).subscribe(loanProposal.address, 1, 1)
     let subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     expect(subscriptionAmountOf).to.be.equal(1)
@@ -927,7 +964,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // whitelist lender 2
     await whitelistLender(factory, whitelistAuthority, lender2, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, MAX_UINT256)
     // check subscription now works
-    await fundingPool.connect(lender2).subscribe(loanProposal.address, 1)
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, 1, 1)
     subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
     totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     expect(subscriptionAmountOf).to.be.equal(1)
@@ -936,7 +973,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // whitelist lender 3
     await whitelistLender(factory, whitelistAuthority, lender3, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, MAX_UINT256)
     // check subscription now works
-    await fundingPool.connect(lender3).subscribe(loanProposal.address, 1)
+    await fundingPool.connect(lender3).subscribe(loanProposal.address, 1, 1)
     subscriptionAmountOf = await fundingPool.subscriptionAmountOf(loanProposal.address, lender1.address)
     totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     expect(subscriptionAmountOf).to.be.equal(1)
@@ -946,15 +983,15 @@ describe('Peer-to-Pool: Local Tests', function () {
     await factory.connect(whitelistAuthority).updateLenderWhitelist([lender1.address, lender2.address, lender3.address], 0)
 
     // check lenders can't subscribe anymore
-    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 1)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 1, 1)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidLender'
     )
-    await expect(fundingPool.connect(lender2).subscribe(loanProposal.address, 1)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender2).subscribe(loanProposal.address, 1, 1)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidLender'
     )
-    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, 1)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, 1, 1)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidLender'
     )
@@ -1765,12 +1802,12 @@ describe('Peer-to-Pool: Local Tests', function () {
     await usdc.mint(lender1.address, subscriptionLender1)
     await usdc.connect(lender1).approve(fundingPool.address, subscriptionLender1)
     await fundingPool.connect(lender1).deposit(subscriptionLender1, 0)
-    await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionLender1)
+    await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionLender1, subscriptionLender1)
 
     // add smaller lender
     await usdc.connect(lender2).approve(fundingPool.address, subscriptionLender2)
     await fundingPool.connect(lender2).deposit(subscriptionLender2, 0)
-    await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionLender2)
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionLender2, subscriptionLender2)
 
     // move forward past loan terms update cool off period
     let blocknum = await ethers.provider.getBlockNumber()
