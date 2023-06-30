@@ -168,10 +168,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan.collToken = generalQuoteInfo.collToken;
         _loan.initLoanAmount = SafeCast.toUint128(loanAmount);
         _loan.initCollAmount = SafeCast.toUint128(
-            borrowInstructions.collSendAmount -
-                transferInstructions.upfrontFee -
-                borrowInstructions.expectedProtocolAndVaultTransferFee -
-                borrowInstructions.expectedCompartmentTransferFee
+            netPledgeAmount - transferInstructions.upfrontFee
         );
         if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
             // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent
@@ -220,7 +217,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                 revert Errors.InvalidSwap();
             }
         }
-        emit QuoteProcessed(transferInstructions);
+        emit QuoteProcessed(netPledgeAmount, transferInstructions);
     }
 
     function withdraw(address token, uint256 amount) external {
