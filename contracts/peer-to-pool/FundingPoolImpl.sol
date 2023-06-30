@@ -206,7 +206,20 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             storage earliestUnsubscribePerLender = _earliestUnsubscribe[
                 loanProposal
             ];
-        if (block.timestamp < earliestUnsubscribePerLender[msg.sender]) {
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            DataTypesPeerToPool.LoanStatus status,
+
+        ) = ILoanProposalImpl(loanProposal).dynamicData();
+        if (
+            status != DataTypesPeerToPool.LoanStatus.ROLLBACK &&
+            block.timestamp < earliestUnsubscribePerLender[msg.sender]
+        ) {
             revert Errors.BeforeEarliestUnsubscribe();
         }
         balanceOf[msg.sender] += amount;
