@@ -107,4 +107,6 @@ library Errors {
     error LoanExpired();
     error Reentrancy();
     error TokenNotStuck();
+    error InconsistentExpTransferFee();
+    error InconsistentExpVaultBalIncrease();
 }

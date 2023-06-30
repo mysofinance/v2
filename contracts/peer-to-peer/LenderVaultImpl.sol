@@ -131,8 +131,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _senderCheckGateway();
         if (
             borrowInstructions.collSendAmount <
-            borrowInstructions.expectedTransferFee +
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee
+            borrowInstructions.expectedProtocolAndVaultTransferFee +
+                borrowInstructions.expectedCompartmentTransferFee
         ) {
             revert Errors.InsufficientSendAmount();
         }
@@ -140,16 +140,15 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         if (quoteTuple.upfrontFeePctInBase > Constants.BASE) {
             revert Errors.InvalidUpfrontFee();
         }
+        // determine the effective net pledge amount on which loan amount and upfront fee calculation is based
+        uint256 netPledgeAmount = borrowInstructions.collSendAmount -
+            borrowInstructions.expectedProtocolAndVaultTransferFee -
+            borrowInstructions.expectedCompartmentTransferFee;
         transferInstructions.upfrontFee =
-            ((borrowInstructions.collSendAmount -
-                borrowInstructions.expectedTransferFee -
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee) *
-                quoteTuple.upfrontFeePctInBase) /
+            (netPledgeAmount * quoteTuple.upfrontFeePctInBase) /
             Constants.BASE;
         (uint256 loanAmount, uint256 repayAmount) = _getLoanAndRepayAmount(
-            borrowInstructions.collSendAmount,
-            borrowInstructions.expectedTransferFee +
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee,
+            netPledgeAmount,
             generalQuoteInfo,
             quoteTuple
         );
@@ -169,10 +168,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan.collToken = generalQuoteInfo.collToken;
         _loan.initLoanAmount = SafeCast.toUint128(loanAmount);
         _loan.initCollAmount = SafeCast.toUint128(
-            borrowInstructions.collSendAmount -
-                transferInstructions.upfrontFee -
-                borrowInstructions.expectedTransferFee -
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee
+            netPledgeAmount - transferInstructions.upfrontFee
         );
         if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
             // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent
@@ -221,7 +217,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                 revert Errors.InvalidSwap();
             }
         }
-        emit QuoteProcessed(transferInstructions);
+        emit QuoteProcessed(netPledgeAmount, transferInstructions);
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -388,8 +384,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function _getLoanAndRepayAmount(
-        uint256 collSendAmount,
-        uint256 totalExpectedTransferFees,
+        uint256 netPledgeAmount,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal view returns (uint256 loanAmount, uint256 repayAmount) {
@@ -419,8 +414,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                     )) /
                 Constants.BASE;
         }
-        uint256 unscaledLoanAmount = loanPerCollUnit *
-            (collSendAmount - totalExpectedTransferFees);
+        uint256 unscaledLoanAmount = loanPerCollUnit * netPledgeAmount;
 
         // calculate loan amount
         loanAmount =
