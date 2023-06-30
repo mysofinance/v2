@@ -104,6 +104,8 @@ library DataTypesPeerToPeer {
         // expected transfer fees in loan token (=0 for tokens without transfer fee)
         // note: amount that borrower sends is targetRepayAmount + expectedTransferFee
         uint128 expectedTransferFee;
+        // deadline to prevent stale transactions
+        uint256 deadline;
         // e.g., for using collateral to payoff debt via DEX
         address callbackAddr;
         // any data needed by callback

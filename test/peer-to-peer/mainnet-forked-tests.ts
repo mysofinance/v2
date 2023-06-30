@@ -99,7 +99,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, borrower, team, whitelistAuthority] = await ethers.getSigners()
+    const [lender, signer, borrower, team, whitelistAuthority] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -216,9 +216,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     await balancerV2Looping.deployed()
 
     // whitelist addrs
-    await expect(
-      addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWith(
+      'Ownable: caller is not the owner'
+    )
     await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
 
     return {
@@ -227,6 +227,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       quoteHandler,
       lenderVaultImplementation,
       lender,
+      signer,
       borrower,
       team,
       whitelistAuthority,
@@ -349,7 +350,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await expect(
         addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
-      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      ).to.be.revertedWith('Ownable: caller is not the owner')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
@@ -1007,7 +1008,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         whitelistAuthority,
         usdc,
         weth,
-        lenderVault
+        lenderVault,
+        uniV3Looping
       } = await setupTest()
 
       // lenderVault owner deposits usdc
@@ -1121,6 +1123,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: repayAmount.div(2),
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -1136,9 +1139,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await ethers.provider.send('evm_mine', [loanExpiry + 12])
 
       // only owner can unlock
-      await expect(lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId])).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).unlockCollateral(weth.address, [loanId])).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // cannot pass empty loan array to bypass valid token check
@@ -1607,6 +1609,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: repayAmount.div(2),
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -1627,6 +1630,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: repayAmount.div(4),
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -1648,6 +1652,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: repayAmount.div(16),
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -1672,6 +1677,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: repayAmount.mul(3).div(16),
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -1791,6 +1797,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: 0,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -1805,6 +1812,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: 1,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -2087,8 +2095,18 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       preWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
       preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
 
-      // check repay
+      // check repay callback reverts when called by anyone else than borrower gateway
       const loan = await lenderVault.loan(0)
+      await expect(uniV3Looping.connect(borrower).repayCallback(loan, callbackData)).to.be.revertedWithCustomError(
+        uniV3Looping,
+        'InvalidSender'
+      )
+      await expect(uniV3Looping.connect(lender).repayCallback(loan, callbackData)).to.be.revertedWithCustomError(
+        uniV3Looping,
+        'InvalidSender'
+      )
+
+      // check repay
       const minSwapReceiveLoanToken = 0
       const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
         ['uint256', 'uint256', 'uint24'],
@@ -2100,6 +2118,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: 0,
             targetRepayAmount: loan.initRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -2561,6 +2580,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
               targetLoanId: loanId,
               targetRepayAmount: repayAmount,
               expectedTransferFee: 0,
+              deadline: MAX_UINT256,
               callbackAddr: callbackAddr,
               callbackData: callbackData
             },
@@ -2601,6 +2621,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
               targetLoanId: loanId,
               targetRepayAmount: MAX_UINT128,
               expectedTransferFee: 0,
+              deadline: MAX_UINT256,
               callbackAddr: callbackAddr,
               callbackData: callbackData
             },
@@ -2619,6 +2640,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
               targetLoanId: loanId,
               targetRepayAmount: partialRepayAmount,
               expectedTransferFee: 0,
+              deadline: MAX_UINT256,
               callbackAddr: callbackAddr,
               callbackData: callbackData
             },
@@ -2658,6 +2680,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
               targetLoanId: loanId,
               targetRepayAmount: partialRepayAmount,
               expectedTransferFee: 0,
+              deadline: MAX_UINT256,
               callbackAddr: callbackAddr,
               callbackData: callbackData
             },
@@ -2908,6 +2931,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -3110,6 +3134,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -3306,6 +3331,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -3531,6 +3557,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackDataRepay
           },
@@ -3546,6 +3573,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
             expectedTransferFee: BigNumber.from(0).add(1),
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackDataRepay
           },
@@ -3564,6 +3592,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: partialRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackDataRepay
           },
@@ -4632,6 +4661,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         targetLoanId: loanId,
         targetRepayAmount: ONE_PAXG.mul(10).mul(110).div(100),
         expectedTransferFee: transferFeeHelper(ONE_PAXG.mul(10).mul(110).div(100), 2),
+        deadline: MAX_UINT256,
         callbackAddr: callbackAddr,
         callbackData: callbackData
       }
@@ -4740,7 +4770,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       await expect(
         addressRegistry.connect(borrower).setWhitelistState([chainlinkBasicImplementation.address], 2)
-      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+      ).to.be.revertedWith('Ownable: caller is not the owner')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
@@ -4988,7 +5018,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(lenderVault, 'NonWhitelistedOracle')
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedOracle')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
 
@@ -5139,7 +5169,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
     })
 
     it('Should process off-chain quote with too high ltv or negative rate correctly', async function () {
-      const { borrowerGateway, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
+      const { borrowerGateway, lender, signer, borrower, team, usdc, weth, lenderVault, addressRegistry } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -5216,14 +5246,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ])
 
       const payloadHash = ethers.utils.keccak256(payload)
-      const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+      const signature = await signer.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
       const compactSig = sig.compact
       const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
-      expect(recoveredAddr).to.equal(lender.address)
+      expect(recoveredAddr).to.equal(signer.address)
 
       // add signer
-      await lenderVault.connect(lender).addSigners([lender.address])
+      await lenderVault.connect(lender).addSigners([signer.address])
 
       // lender add sig to quote and pass to borrower
       offChainQuoteWithBadTuples.compactSigs = [compactSig]

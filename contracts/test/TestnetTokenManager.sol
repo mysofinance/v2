@@ -3,12 +3,13 @@
 pragma solidity 0.8.19;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {DataTypesPeerToPeer} from "../peer-to-peer/DataTypesPeerToPeer.sol";
 import {DataTypesPeerToPool} from "../peer-to-pool/DataTypesPeerToPool.sol";
-import {Ownable} from "../Ownable.sol";
+import {Errors} from "../Errors.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
-contract TestnetTokenManager is ERC20, Ownable, IMysoTokenManager {
+contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
     uint8 internal _decimals;
     address internal _vaultCompartmentVictim;
     address internal _vaultAddr;
@@ -17,11 +18,12 @@ contract TestnetTokenManager is ERC20, Ownable, IMysoTokenManager {
     uint256 internal _vaultCreationReward;
     uint256 internal constant MAX_SUPPLY = 100_000_000 ether;
 
-    constructor() ERC20("TYSO", "TYSO") Ownable() {
+    constructor() ERC20("TYSO", "TYSO") {
         _decimals = 18;
         _borrowerReward = 1 ether;
         _lenderReward = 1 ether;
         _vaultCreationReward = 1 ether;
+        _transferOwnership(msg.sender);
     }
 
     function processP2PBorrow(
@@ -98,14 +100,22 @@ contract TestnetTokenManager is ERC20, Ownable, IMysoTokenManager {
         uint256 lenderReward,
         uint256 vaultCreationReward
     ) external {
-        _senderCheckOwner();
+        _checkOwner();
         _borrowerReward = borrowerReward;
         _lenderReward = lenderReward;
         _vaultCreationReward = vaultCreationReward;
     }
 
-    function owner() external view override returns (address) {
-        return _owner;
+    function transferOwnership(address _newOwnerProposal) public override {
+        if (
+            _newOwnerProposal == address(0) ||
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == pendingOwner() ||
+            _newOwnerProposal == owner()
+        ) {
+            revert Errors.InvalidNewOwnerProposal();
+        }
+        super.transferOwnership(_newOwnerProposal);
     }
 
     function decimals() public view override returns (uint8) {

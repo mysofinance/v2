@@ -24,6 +24,7 @@ const YEAR_IN_SECONDS = 31_536_000
 async function generateOffChainQuote({
   lenderVault,
   lender,
+  signer,
   whitelistAuthority = ZERO_ADDRESS,
   weth,
   usdc,
@@ -36,6 +37,7 @@ async function generateOffChainQuote({
 }: {
   lenderVault: LenderVaultImpl
   lender: SignerWithAddress
+  signer: SignerWithAddress
   whitelistAuthority?: any
   weth: MyERC20
   usdc: MyERC20
@@ -131,15 +133,15 @@ async function generateOffChainQuote({
   ])
 
   const payloadHash = ethers.utils.keccak256(payload)
-  const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+  const signature = await signer.signMessage(ethers.utils.arrayify(payloadHash))
   const sig = ethers.utils.splitSignature(signature)
   const compactSig = sig.compact
 
   const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
-  expect(recoveredAddr).to.equal(lender.address)
+  expect(recoveredAddr).to.equal(signer.address)
 
   // add signer
-  await lenderVault.connect(lender).addSigners([lender.address])
+  await lenderVault.connect(lender).addSigners([signer.address])
 
   // lender add sig to quote and pass to borrower
   offChainQuote.compactSigs = customSignatures.length != 0 ? customSignatures : [compactSig]
@@ -166,7 +168,8 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, borrower, team, whitelistAuthority, addr1, addr2, addr3] = await ethers.getSigners()
+    const [lender, signer, borrower, team, circuitBreaker, whitelistAuthority, addr1, addr2, addr3] =
+      await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -275,7 +278,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     // initialize address registry
     await expect(
       addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    ).to.be.revertedWith('Ownable: caller is not the owner')
     await expect(
       addressRegistry.connect(team).initialize(ZERO_ADDRESS, borrowerGateway.address, quoteHandler.address)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
@@ -299,10 +302,10 @@ describe('Peer-to-Peer: Local Tests', function () {
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
     await expect(
       addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'AlreadyInitialized')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
     await expect(
       addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
 
     // test erc721 wrapper whitelisting
     let whitelistState
@@ -475,9 +478,8 @@ describe('Peer-to-Peer: Local Tests', function () {
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).setWhitelistState([weth.address], 1)).to.be.revertedWithCustomError(
-      addressRegistry,
-      'InvalidSender'
+    await expect(addressRegistry.connect(lender).setWhitelistState([weth.address], 1)).to.be.revertedWith(
+      'Ownable: caller is not the owner'
     )
     await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
     await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 1)).to.be.revertedWithCustomError(
@@ -495,18 +497,19 @@ describe('Peer-to-Peer: Local Tests', function () {
     )
 
     const sortedAddrs = [addr1, addr2, addr3].sort((a, b) => (ethers.BigNumber.from(a.address).lt(b.address) ? -1 : 1))
-
     return {
       addressRegistry,
       borrowerGateway,
       quoteHandler,
       lender,
+      signer,
       borrower,
       team,
       whitelistAuthority,
       signer1: sortedAddrs[0],
       signer2: sortedAddrs[1],
       signer3: sortedAddrs[2],
+      circuitBreaker,
       usdc,
       weth,
       lenderVault,
@@ -637,19 +640,18 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { lender, team, borrower, lenderVault } = await setupTest()
 
       // check that only owner can propose new owner
-      await expect(lenderVault.connect(team).proposeNewOwner(team.address)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(team).transferOwnership(team.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // check that new owner can't be zero address
-      await expect(lenderVault.connect(lender).proposeNewOwner(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(ZERO_ADDRESS)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
 
       // check that new owner can't be lender vault address itself
-      await expect(lenderVault.connect(lender).proposeNewOwner(lenderVault.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(lenderVault.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
@@ -658,27 +660,29 @@ describe('Peer-to-Peer: Local Tests', function () {
       await lenderVault.connect(lender).addSigners([borrower.address])
 
       // check that new owner can't be a signer
-      await expect(lenderVault.connect(lender).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(borrower.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
 
       // make valid owner proposal
-      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.emit(lenderVault, 'NewOwnerProposed')
+      await expect(lenderVault.connect(lender).transferOwnership(team.address)).to.emit(
+        lenderVault,
+        'OwnershipTransferStarted'
+      )
 
       // check that you can't re-submit same new owner proposal
-      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(team.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
 
       // claim ownership
-      await expect(lenderVault.connect(team).claimOwnership()).to.emit(lenderVault, 'ClaimedOwnership')
+      await expect(lenderVault.connect(team).acceptOwnership()).to.emit(lenderVault, 'OwnershipTransferred')
 
       // check that old owner can't propose new owner anymore
-      await expect(lenderVault.connect(lender).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(lender).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
     })
 
@@ -703,21 +707,18 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // reverts if non-owner tries to withdraw
       withdrawAmount = depositAmount.div(3)
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // reverts if non-owner tries to withdraw invalid amount
       withdrawAmount = 0
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
       withdrawAmount = depositAmount.add(1)
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // reverts if owner tries to withdraw invalid token
@@ -752,13 +753,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
 
       // transfer ownership to new vault owner
-      await lenderVault.connect(lender).proposeNewOwner(team.address)
-      await lenderVault.connect(team).claimOwnership()
+      await lenderVault.connect(lender).transferOwnership(team.address)
+      await lenderVault.connect(team).acceptOwnership()
 
       // reverts if old owner tries to withdraw
-      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // new owner can withdraw
@@ -780,6 +780,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         lender,
         borrower,
         whitelistAuthority,
+        circuitBreaker,
         usdc,
         weth,
         lenderVault
@@ -813,14 +814,12 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // reverts if non-owner tries to withdraw
       withdrawAmount = usdc.balanceOf(lenderVault.address)
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
       withdrawAmount = weth.balanceOf(lenderVault.address)
-      await expect(lenderVault.connect(borrower).withdraw(weth.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(weth.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // reverts if owner tries to withdraw invalid amount
@@ -898,6 +897,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_WETH)
       const expectedReclaimableAmount = collSendAmount.sub(collSendAmount.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE))
 
+      // reverts when trying to borrow with out-of-bounds quote tuple idx
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx + 1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidArrayIndex')
+
       // check pre/post amounts on borrow
       let preLockedWethAmounts = await lenderVault.lockedAmounts(weth.address)
       let preLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
@@ -917,6 +923,64 @@ describe('Peer-to-Peer: Local Tests', function () {
             quoteTupleIdx
           )
       ).to.be.revertedWithCustomError(lenderVault, 'InconsistentExpTransferFee')
+      
+      // should revert when trying to set invalid circuit breaker address
+      await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // should revert when trying to set invalid reverse circuit breaker address
+      await expect(lenderVault.connect(lender).setReverseCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // set valid circuit breaker
+      await lenderVault.connect(lender).setCircuitBreaker(circuitBreaker.address)
+
+      // check revert on unauthorized pause calls
+      await expect(lenderVault.connect(team).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+      await expect(lenderVault.connect(borrower).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // check that circuit breaker can pause
+      await lenderVault.connect(circuitBreaker).pauseQuotes()
+
+      // check revert that circuit breaker cannot unpause if not explicitly set as reverse circuit breaker
+      await expect(lenderVault.connect(circuitBreaker).unpauseQuotes()).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+
+      // check that vault owner can unpause
+      await lenderVault.connect(lender).unpauseQuotes()
+
+      // check that vault owner can pause
+      await lenderVault.connect(lender).pauseQuotes()
+
+      // trying to execute borrow should revert
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWith('Pausable: paused')
+
+      // authorize circuit breaker also for reverse circuit breaker role
+      await lenderVault.connect(lender).setReverseCircuitBreaker(circuitBreaker.address)
+
+      // should revert when trying to set same address again
+      await expect(
+        lenderVault.connect(lender).setReverseCircuitBreaker(circuitBreaker.address)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+
+      // should allow setting circuit breaker to zero address
+      await lenderVault.connect(lender).setCircuitBreaker(ZERO_ADDRESS)
+
+      // check revert when circuit breaker or any other unauthorized party tries to unpause
+      await expect(lenderVault.connect(borrower).unpauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // circuit breaker can now unpause because it is also authorized as reverse circuit breaker
+      await lenderVault.connect(circuitBreaker).unpauseQuotes()
 
       await borrowerGateway
         .connect(borrower)
@@ -979,9 +1043,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // check that only owner can propose new owner
-      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // lenderVault owner gives quote
@@ -1049,10 +1112,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(lenderVault, 'InsufficientVaultFunds')
 
       // allow for transfer of vault ownership
-      await lenderVault.connect(lender).proposeNewOwner(borrower.address)
+      await lenderVault.connect(lender).transferOwnership(borrower.address)
       // only new proposed owner can claim vault
-      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
-      await lenderVault.connect(borrower).claimOwnership()
+      await expect(lenderVault.connect(lender).acceptOwnership()).to.be.revertedWith(
+        'Ownable2Step: caller is not the new owner'
+      )
+      await lenderVault.connect(borrower).acceptOwnership()
     })
   })
 
@@ -1143,7 +1208,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should not process off-chain quote with invalid min/max loan amount (1/2)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1152,6 +1217,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         weth,
         usdc,
         minLoan: 2,
@@ -1189,7 +1255,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should not process off-chain quote with invalid min/max loan amount (2/2)', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1198,6 +1264,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         weth,
         usdc,
         minLoan: 0,
@@ -1235,7 +1302,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should not process zero loan amounts', async function () {
-      const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+      const { borrowerGateway, quoteHandler, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1281,6 +1348,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         weth,
         usdc,
         minLoan: 0
@@ -1321,6 +1389,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         team,
         whitelistAuthority,
@@ -1333,10 +1402,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // test add, remove, set min signer functionality
-      await expect(lenderVault.addSigners([lender.address, lender.address])).to.be.revertedWithCustomError(
-        lenderVault,
-        'AlreadySigner'
-      )
+      await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await expect(lenderVault.addSigners([ZERO_ADDRESS])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       await lenderVault.connect(lender).setMinNumOfSigners(4)
@@ -1344,6 +1410,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const minNumSigners = await lenderVault.minNumOfSigners()
       expect(minNumSigners).to.be.equal(4)
       await lenderVault.connect(lender).setMinNumOfSigners(1)
+      await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await lenderVault.connect(lender).addSigners([team.address, borrower.address])
       // errors in handling signers
       await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
@@ -1380,6 +1447,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc
@@ -1494,8 +1562,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
+        team,
         whitelistAuthority,
+        circuitBreaker,
         usdc,
         weth,
         lenderVault
@@ -1519,6 +1590,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc
@@ -1546,6 +1618,50 @@ describe('Peer-to-Peer: Local Tests', function () {
         callbackData
       }
 
+      // should revert when trying to set invalid circuit breaker address
+      await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // should revert when trying to set invalid reverse circuit breaker address
+      await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // set valid circuit breaker
+      await lenderVault.connect(lender).setCircuitBreaker(circuitBreaker.address)
+
+      // check revert on unauthorized pause calls
+      await expect(lenderVault.connect(team).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+      await expect(lenderVault.connect(borrower).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // check that circuit breaker can pause
+      await lenderVault.connect(circuitBreaker).pauseQuotes()
+
+      // check that vault owner can unpause
+      await lenderVault.connect(lender).unpauseQuotes()
+
+      // check that vault owner can pause
+      await lenderVault.connect(lender).pauseQuotes()
+
+      // trying to execute borrow should revert
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWith('Pausable: paused')
+
+      // set valid reverse circuit breaker
+      await lenderVault.connect(lender).setReverseCircuitBreaker(team.address)
+
+      // check revert when circuit breaker or any other unauthorized party tries to unpause
+      await expect(lenderVault.connect(borrower).unpauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // check that reverse circuit breaker can unpause
+      await lenderVault.connect(team).unpauseQuotes()
+
       // borrower executes valid off chain quote
       await borrowerGateway
         .connect(borrower)
@@ -1568,6 +1684,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1592,6 +1709,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1639,6 +1757,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1663,6 +1782,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1706,6 +1826,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1730,6 +1851,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1780,7 +1902,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should validate off-chain earliest repay correctly', async function () {
-      const { addressRegistry, borrowerGateway, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } =
+      const { addressRegistry, borrowerGateway, lender, signer, borrower, whitelistAuthority, usdc, weth, lenderVault } =
         await setupTest()
 
       // lenderVault owner deposits usdc
@@ -1801,6 +1923,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1846,6 +1969,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1870,6 +1994,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1919,6 +2044,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         team,
         whitelistAuthority,
@@ -1949,6 +2075,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1990,6 +2117,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -2017,13 +2145,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc
       })
 
       // define signer setup without lender
-      await lenderVault.connect(lender).removeSigner(lender.address, 0)
+      await lenderVault.connect(lender).removeSigner(signer.address, 0)
       await lenderVault.connect(lender).addSigners([signer1.address, signer2.address, signer3.address])
       await lenderVault.connect(lender).setMinNumOfSigners(3)
 
@@ -2182,8 +2311,18 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should process off-chain quote with zero or negative interest rate factor correctly', async function () {
-      const { addressRegistry, borrowerGateway, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
-        await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        lender,
+        signer,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -2246,14 +2385,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       ])
 
       const payloadHash = ethers.utils.keccak256(payload)
-      const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+      const signature = await signer.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
       const compactSig = sig.compact
       const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
-      expect(recoveredAddr).to.equal(lender.address)
+      expect(recoveredAddr).to.equal(signer.address)
 
       // add signer
-      await lenderVault.connect(lender).addSigners([lender.address])
+      await lenderVault.connect(lender).addSigners([signer.address])
 
       // lender add sig to quote and pass to borrower
       offChainQuoteWithBadTuples.compactSigs = [compactSig]
@@ -2441,6 +2580,7 @@ describe('Peer-to-Peer: Local Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -3219,6 +3359,7 @@ describe('Peer-to-Peer: Local Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount.div(2),
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -3234,6 +3375,21 @@ describe('Peer-to-Peer: Local Tests', function () {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
             expectedTransferFee: 0,
+            deadline: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'DeadlinePassed')
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: loanInfo.initRepayAmount,
+            expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
@@ -3727,6 +3883,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           targetLoanId: 0,
           targetRepayAmount: repayAmount1,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -3744,6 +3901,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           targetLoanId: 0,
           targetRepayAmount: repayAmount2,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -3932,6 +4090,7 @@ describe('Peer-to-Peer: Local Tests', function () {
               targetLoanId: 0,
               targetRepayAmount: buyPricePerCollToken,
               expectedTransferFee: 0,
+              deadline: MAX_UINT256,
               callbackAddr: callbackAddr,
               callbackData: callbackData
             },
@@ -4118,11 +4277,11 @@ describe('Peer-to-Peer: Local Tests', function () {
           borrowerGateway
             .connect(borrower)
             .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-        ).to.emit(quoteHandler, 'OnChainQuoteUsed')
+        ).to.emit(lenderVault, 'QuoteProcessed')
       })
 
       it('Should handle off-chain swap quotes correctly (1/2)', async function () {
-        const { borrowerGateway, lender, borrower, usdc, weth, lenderVault, quoteHandler } = await setupTest()
+        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault, quoteHandler } = await setupTest()
 
         // lenderVault owner deposits usdc
         await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -4131,6 +4290,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
           lenderVault,
           lender,
+          signer,
           whitelistAuthority: ZERO_ADDRESS,
           weth,
           usdc
@@ -4183,7 +4343,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           borrowerGateway
             .connect(borrower)
             .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-        ).to.emit(quoteHandler, 'OffChainQuoteUsed')
+        ).to.emit(lenderVault, 'QuoteProcessed')
 
         // borrower obtains proof for invalid quote tuple (tuple idx 5 has upfrontfee > 100%)
         quoteTupleIdx = 5
@@ -4198,7 +4358,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       })
 
       it('Should handle off-chain swap quotes correctly (2/2)', async function () {
-        const { borrowerGateway, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
 
         // lenderVault owner deposits usdc
         await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -4207,6 +4367,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
           lenderVault,
           lender,
+          signer,
           whitelistAuthority: ZERO_ADDRESS,
           weth,
           usdc,
@@ -4487,7 +4648,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // step 5: lender transfers vault ownership to malicious callback contract that gets called on
       // compartment initialize
-      await lenderVault.connect(lender).proposeNewOwner(maliciousOwnerContract.address)
+      await lenderVault.connect(lender).transferOwnership(maliciousOwnerContract.address)
       await maliciousOwnerContract.connect(lender).claimVaultOwnership(lenderVault.address)
       expect(await lenderVault.owner()).to.be.equal(maliciousOwnerContract.address)
 

@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 library Errors {
-    error AlreadyInitialized();
     error UnregisteredVault();
     error InvalidDelegatee();
     error InvalidSender();
