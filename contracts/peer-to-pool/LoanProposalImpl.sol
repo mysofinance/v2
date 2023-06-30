@@ -349,16 +349,32 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             repaymentIdx
         ];
         uint256 conversionAmount;
+        address collToken = staticData.collToken;
         if (
             dynamicData.grossLoanAmount ==
             totalConvertedSubscriptions + lenderContribution
         ) {
-            // case where "last lender" converts then provide remaining amount to mitigate potential rounding errors
+            // Note: case where "last lender" converts
+            // @dev: use remainder (rather than pro-rata) to mitigate potential rounding errors
             conversionAmount =
                 _repayment.collTokenDueIfConverted -
                 collTokenConverted[repaymentIdx];
+            ++dynamicData.currentRepaymentIdx;
+            // @dev: increment repayment idx (no need to do repay with 0 amount)
+            if (
+                _loanTerms.repaymentSchedule.length - 1 ==
+                // @dev: if "last lender" converts in last period then send remaining collateral back to borrower and
+                repaymentIdx
+            ) {
+                IERC20Metadata(collToken).safeTransfer(
+                    _loanTerms.borrower,
+                    IERC20Metadata(collToken).balanceOf(address(this)) -
+                        conversionAmount
+                );
+            }
         } else {
-            // in all other cases, distribute collateral token on pro rata basis
+            // Note: all other cases
+            // @dev: distribute collateral token on pro-rata basis
             conversionAmount =
                 (_repayment.collTokenDueIfConverted * lenderContribution) /
                 dynamicData.grossLoanAmount;
@@ -433,6 +449,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             : collTokenLeftUnconverted;
         IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
 
+        emit CurrRepaymentIdxIncremented(repaymentIdx);
         emit Repaid(remainingLoanTokenDue, collSendAmount);
     }
 
@@ -443,9 +460,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (lenderContribution == 0) {
             revert Errors.InvalidSender();
         }
-        // the currentRepaymentIdx (initially 0) only ever gets incremented on repay;
-        // hence any `repaymentIdx` smaller than `currentRepaymentIdx` will always
-        // map to a valid repayment claim
+        // the currentRepaymentIdx (initially 0) gets incremented on repay or if all lenders converted for given period;
+        // hence any `repaymentIdx` smaller than `currentRepaymentIdx` will always map to a valid repayment claim
         if (repaymentIdx >= dynamicData.currentRepaymentIdx) {
             revert Errors.RepaymentIdxTooLarge();
         }

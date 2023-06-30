@@ -27,6 +27,7 @@ interface ILoanProposalImpl {
     );
     event LoanDefaulted();
     event DefaultProceedsClaimed(address indexed sender);
+    event CurrRepaymentIdxIncremented(uint256 currRepaymentIdx);
 
     /**
      * @notice Initializes loan proposal
