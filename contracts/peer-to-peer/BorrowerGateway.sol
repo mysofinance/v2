@@ -342,16 +342,14 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // Note: initialize the coll amount that is sent to vault in case there's no compartment
         uint256 grossCollTransferAmountToVault = loan.initCollAmount +
             transferInstructions.upfrontFee +
-            collTransferFeeForSendingToVault +
-            borrowInstructions.expectedCompartmentTransferFee;
+            collTransferFeeForSendingToVault;
         // Note: initialize the vault's expected coll balance increase in case there's no compartment
         uint256 expVaultCollBalIncrease = loan.initCollAmount +
             transferInstructions.upfrontFee;
         if (transferInstructions.collReceiver != lenderVault) {
             // Note: if there's a compartment then adjust the coll amount that is sent to vault by deducting the amount
             // that goes to the compartment, i.e., the borrower's reclaimable coll amount and any associated transfer fees
-            grossCollTransferAmountToVault -= (loan.initCollAmount +
-                borrowInstructions.expectedCompartmentTransferFee);
+            grossCollTransferAmountToVault -= loan.initCollAmount;
             // Note: similarly, adjust the vault's expected coll balance diff by deducting the reclaimable coll amount that
             // goes to the compartment
             expVaultCollBalIncrease -= loan.initCollAmount;

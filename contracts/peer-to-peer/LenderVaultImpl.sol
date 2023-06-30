@@ -140,16 +140,15 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         if (quoteTuple.upfrontFeePctInBase > Constants.BASE) {
             revert Errors.InvalidUpfrontFee();
         }
+        // determine the effective net pledge amount on which loan amount and upfront fee calculation is based
+        uint256 netPledgeAmount = borrowInstructions.collSendAmount -
+            borrowInstructions.expectedProtocolAndVaultTransferFee -
+            borrowInstructions.expectedCompartmentTransferFee;
         transferInstructions.upfrontFee =
-            ((borrowInstructions.collSendAmount -
-                borrowInstructions.expectedProtocolAndVaultTransferFee -
-                borrowInstructions.expectedCompartmentTransferFee) *
-                quoteTuple.upfrontFeePctInBase) /
+            (netPledgeAmount * quoteTuple.upfrontFeePctInBase) /
             Constants.BASE;
         (uint256 loanAmount, uint256 repayAmount) = _getLoanAndRepayAmount(
-            borrowInstructions.collSendAmount,
-            borrowInstructions.expectedProtocolAndVaultTransferFee +
-                borrowInstructions.expectedCompartmentTransferFee,
+            netPledgeAmount,
             generalQuoteInfo,
             quoteTuple
         );
@@ -388,8 +387,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
     }
 
     function _getLoanAndRepayAmount(
-        uint256 collSendAmount,
-        uint256 totalExpectedTransferFees,
+        uint256 netPledgeAmount,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal view returns (uint256 loanAmount, uint256 repayAmount) {
@@ -419,8 +417,7 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
                     )) /
                 Constants.BASE;
         }
-        uint256 unscaledLoanAmount = loanPerCollUnit *
-            (collSendAmount - totalExpectedTransferFees);
+        uint256 unscaledLoanAmount = loanPerCollUnit * netPledgeAmount;
 
         // calculate loan amount
         loanAmount =
