@@ -131,8 +131,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _senderCheckGateway();
         if (
             borrowInstructions.collSendAmount <
-            borrowInstructions.expectedTransferFee +
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee
+            borrowInstructions.expectedProtocolAndVaultTransferFee +
+                borrowInstructions.expectedCompartmentTransferFee
         ) {
             revert Errors.InsufficientSendAmount();
         }
@@ -142,14 +142,14 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         }
         transferInstructions.upfrontFee =
             ((borrowInstructions.collSendAmount -
-                borrowInstructions.expectedTransferFee -
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee) *
+                borrowInstructions.expectedProtocolAndVaultTransferFee -
+                borrowInstructions.expectedCompartmentTransferFee) *
                 quoteTuple.upfrontFeePctInBase) /
             Constants.BASE;
         (uint256 loanAmount, uint256 repayAmount) = _getLoanAndRepayAmount(
             borrowInstructions.collSendAmount,
-            borrowInstructions.expectedTransferFee +
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee,
+            borrowInstructions.expectedProtocolAndVaultTransferFee +
+                borrowInstructions.expectedCompartmentTransferFee,
             generalQuoteInfo,
             quoteTuple
         );
@@ -171,8 +171,8 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
         _loan.initCollAmount = SafeCast.toUint128(
             borrowInstructions.collSendAmount -
                 transferInstructions.upfrontFee -
-                borrowInstructions.expectedTransferFee -
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee
+                borrowInstructions.expectedProtocolAndVaultTransferFee -
+                borrowInstructions.expectedCompartmentTransferFee
         );
         if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
             // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent

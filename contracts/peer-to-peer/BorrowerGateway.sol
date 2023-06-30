@@ -319,65 +319,71 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             loan.initCollAmount == 0 ? 0 : loan.expiry - block.timestamp
         );
 
-        // check protocolFeeAmount <= expectedTransferFee
-        if (protocolFeeAmount > borrowInstructions.expectedTransferFee) {
+        // check protocolFeeAmount <= expectedProtocolAndVaultTransferFee
+        if (
+            protocolFeeAmount >
+            borrowInstructions.expectedProtocolAndVaultTransferFee
+        ) {
             revert Errors.InsufficientSendAmount();
         }
 
         if (protocolFeeAmount != 0) {
-            // note: if coll token has a transfer fee, then protocolFeeAmount will be slightly reduced
-            // this is by design since the protocol can choose to not whitelist the token with a transfer fee
-            // and this avoids borrower or lender feeling aggrieved by paying extra fee to protocol
+            // note: if coll token has a transfer fee, then protocolFeeAmount received by the protocol will be less than
+            // protocolFeeAmount; this is by design to not tax borrowers or lenders for transfer fees on protocol fees
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
                 registry.owner(),
                 protocolFeeAmount
             );
         }
-
-        uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
-            transferInstructions.collReceiver
-        );
-
-        uint256 collReceiverTransferAmount = borrowInstructions.collSendAmount -
-            protocolFeeAmount;
-        uint256 collReceiverExpBalDiff = loan.initCollAmount +
+        // determine any transfer fee for sending collateral to vault
+        uint256 collTransferFeeForSendingToVault = borrowInstructions
+            .expectedProtocolAndVaultTransferFee - protocolFeeAmount;
+        // Note: initialize the coll amount that is sent to vault in case there's no compartment
+        uint256 grossCollTransferAmountToVault = loan.initCollAmount +
+            transferInstructions.upfrontFee +
+            collTransferFeeForSendingToVault +
+            borrowInstructions.expectedCompartmentTransferFee;
+        // Note: initialize the vault's expected coll balance increase in case there's no compartment
+        uint256 expVaultCollBalIncrease = loan.initCollAmount +
             transferInstructions.upfrontFee;
-        if (
-            transferInstructions.collReceiver != lenderVault &&
-            transferInstructions.upfrontFee != 0
-        ) {
-            collReceiverTransferAmount -= (transferInstructions.upfrontFee +
-                borrowInstructions.expectedUpfrontFeeToVaultTransferFee);
-            collReceiverExpBalDiff -= transferInstructions.upfrontFee;
-            // Note: if a compartment is used then we need to transfer the upfront fee to the vault separately;
-            // in the special case where the coll also has a token transfer fee then the vault transfer fee of upfront
-            // fee to vault needs to be added here to account for loss of coll token due to transfer fee.
-            uint256 vaultPreBal = IERC20Metadata(loan.collToken).balanceOf(
-                lenderVault
-            );
+        if (transferInstructions.collReceiver != lenderVault) {
+            // Note: if there's a compartment then adjust the coll amount that is sent to vault by deducting the amount
+            // that goes to the compartment, i.e., the borrower's reclaimable coll amount and any associated transfer fees
+            grossCollTransferAmountToVault -= (loan.initCollAmount +
+                borrowInstructions.expectedCompartmentTransferFee);
+            // Note: similarly, adjust the vault's expected coll balance diff by deducting the reclaimable coll amount that
+            // goes to the compartment
+            expVaultCollBalIncrease -= loan.initCollAmount;
+
+            uint256 collReceiverPreBal = IERC20Metadata(loan.collToken)
+                .balanceOf(transferInstructions.collReceiver);
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
-                lenderVault,
-                transferInstructions.upfrontFee +
-                    borrowInstructions.expectedUpfrontFeeToVaultTransferFee
+                transferInstructions.collReceiver,
+                loan.initCollAmount +
+                    borrowInstructions.expectedCompartmentTransferFee
             );
+            // check that compartment balance increase matches the intended reclaimable collateral amount
             if (
-                IERC20Metadata(loan.collToken).balanceOf(lenderVault) !=
-                vaultPreBal + transferInstructions.upfrontFee
+                IERC20Metadata(loan.collToken).balanceOf(
+                    transferInstructions.collReceiver
+                ) != loan.initCollAmount + collReceiverPreBal
             ) {
                 revert Errors.InvalidSendAmount();
             }
         }
+        uint256 vaultPreBal = IERC20Metadata(loan.collToken).balanceOf(
+            lenderVault
+        );
         IERC20Metadata(loan.collToken).safeTransferFrom(
             loan.borrower,
-            transferInstructions.collReceiver,
-            collReceiverTransferAmount
+            lenderVault,
+            grossCollTransferAmountToVault
         );
         if (
-            IERC20Metadata(loan.collToken).balanceOf(
-                transferInstructions.collReceiver
-            ) != collReceiverExpBalDiff + collReceiverPreBal
+            IERC20Metadata(loan.collToken).balanceOf(lenderVault) !=
+            vaultPreBal + expVaultCollBalIncrease
         ) {
             revert Errors.InvalidSendAmount();
         }
