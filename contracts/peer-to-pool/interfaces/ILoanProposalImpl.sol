@@ -5,7 +5,7 @@ import {DataTypesPeerToPool} from "../DataTypesPeerToPool.sol";
 
 interface ILoanProposalImpl {
     event LoanTermsProposed(DataTypesPeerToPool.LoanTerms loanTerms);
-    event LoanTermsAccepted();
+    event LoanTermsLocked();
     event LoanTermsAndTransferCollFinalized(
         uint256 grossLoanAmount,
         uint256 _finalCollAmountReservedForDefault,
@@ -63,11 +63,11 @@ interface ILoanProposalImpl {
     ) external;
 
     /**
-     * @notice Accept loan terms
-     * @param loanTermsUpdateTime The timestamp of the loan terms that are to be accepted
-     * @dev Can only be called by the borrower
+     * @notice Lock loan terms
+     * @param loanTermsUpdateTime The timestamp at which loan terms are locked
+     * @dev Can only be called by the arranger or borrower
      */
-    function acceptLoanTerms(uint256 loanTermsUpdateTime) external;
+    function lockLoanTerms(uint256 loanTermsUpdateTime) external;
 
     /**
      * @notice Finalize the loan terms and transfer final collateral amount

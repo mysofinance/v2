@@ -18,10 +18,9 @@ library DataTypesPeerToPool {
         uint128 minTotalSubscriptions;
         // Max subscription amount (in loan token) that the borrower deems acceptable
         uint128 maxTotalSubscriptions;
-        // The number of collateral tokens the borrower pledges per loan token borrowed as collateral for default
-        // case
+        // The number of collateral tokens the borrower pledges per loan token borrowed as collateral for default case
         uint128 collPerLoanToken;
-        // Borrower who can accept given loan proposal
+        // Borrower who can finalize given loan proposal
         address borrower;
         // Array of scheduled repayments
         Repayment[] repaymentSchedule;
@@ -78,7 +77,7 @@ library DataTypesPeerToPool {
     enum LoanStatus {
         WITHOUT_LOAN_TERMS,
         IN_NEGOTIATION,
-        BORROWER_ACCEPTED,
+        LOAN_TERMS_LOCKED,
         READY_TO_EXECUTE,
         ROLLBACK,
         LOAN_DEPLOYED,
