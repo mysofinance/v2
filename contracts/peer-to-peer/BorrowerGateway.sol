@@ -371,19 +371,23 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 revert Errors.InvalidSendAmount();
             }
         }
-        uint256 vaultPreBal = IERC20Metadata(loan.collToken).balanceOf(
-            lenderVault
-        );
-        IERC20Metadata(loan.collToken).safeTransferFrom(
-            loan.borrower,
-            lenderVault,
-            grossCollTransferAmountToVault
-        );
-        if (
-            IERC20Metadata(loan.collToken).balanceOf(lenderVault) !=
-            vaultPreBal + expVaultCollBalIncrease
-        ) {
-            revert Errors.InvalidSendAmount();
+
+        if (grossCollTransferAmountToVault > 0) {
+            // @dev: grossCollTransferAmountToVault can be zero in case no upfront fee and compartment is used
+            uint256 vaultPreBal = IERC20Metadata(loan.collToken).balanceOf(
+                lenderVault
+            );
+            IERC20Metadata(loan.collToken).safeTransferFrom(
+                loan.borrower,
+                lenderVault,
+                grossCollTransferAmountToVault
+            );
+            if (
+                IERC20Metadata(loan.collToken).balanceOf(lenderVault) !=
+                vaultPreBal + expVaultCollBalIncrease
+            ) {
+                revert Errors.InvalidSendAmount();
+            }
         }
     }
 
