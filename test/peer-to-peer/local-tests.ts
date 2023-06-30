@@ -905,6 +905,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       let preBorrowerWethBal = await weth.balanceOf(borrower.address)
       let preVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
       let preBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+
+      // if no compartment, then a compartment transfer fee should revert
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            { ...borrowInstructions, collSendAmount: ONE_WETH.add(1), expectedCompartmentTransferFee: 1 },
+            onChainQuote,
+            quoteTupleIdx
+          )
+      ).to.be.revertedWithCustomError(lenderVault, 'InconsistentExpTransferFee')
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -4089,6 +4102,18 @@ describe('Peer-to-Peer: Local Tests', function () {
           callbackAddr,
           callbackData
         }
+
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOnChainQuote(
+              lenderVault.address,
+              { ...borrowInstructions, expectedCompartmentTransferFee: 1 },
+              onChainQuote,
+              quoteTupleIdx
+            )
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
+
         await expect(
           borrowerGateway
             .connect(borrower)

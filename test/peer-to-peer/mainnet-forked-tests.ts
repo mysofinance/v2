@@ -3727,6 +3727,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         callbackData
       }
 
+      const borrowInstructionsWithExtraVaultTransferFee = {
+        ...borrowInstructions,
+        expectedProtocolAndVaultTransferFee: expectedProtocolAndVaultTransferFee.add(1)
+      }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            borrowInstructionsWithExtraVaultTransferFee,
+            onChainQuote,
+            quoteTupleIdx
+          )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -3979,6 +3995,106 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       // vault coll (paxg) balance = upfrontFee
       expect(vaultPaxgBalPost).to.equal(paxgUpfrontFee)
+    })
+
+    it('Should process correctly excess vault fee when no vault transfer (compartment, no upfront fee)', async () => {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } =
+        await setupTest()
+
+      // create curve staking implementation
+      const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
+      await AaveStakingCompartmentImplementation.connect(team)
+      const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
+      await aaveStakingCompartmentImplementation.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
+
+      // lender deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).setWhitelistState([usdc.address, weth.address], 1)
+
+      // whitelist compartment for tokens
+      await addressRegistry
+        .connect(team)
+        .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // set protocol fee of 10 bps annulized and 2bp fixed protocol fee
+      await borrowerGateway.connect(team).setProtocolFeeParams([BASE.div(5000), BASE.div(1000)])
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const buyPricePerCollToken = ONE_USDC.mul(1200)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: aaveStakingCompartmentImplementation.address,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrow with on chain quote with token transfer fee
+      // fixed part has 2bp protocol fee
+      const fixedProtocolFeeAmount = ONE_PAXG.div(5000)
+      // 90 day tenor with 10 bps variable protocol fee
+      const variableProtocolFeeAmount = ONE_PAXG.mul(quoteTuples[0].tenor).div(BigNumber.from(YEAR_IN_SECONDS).mul(1000))
+      const protocolFeeAmount = fixedProtocolFeeAmount.add(variableProtocolFeeAmount)
+      const collSendAmount = ONE_WETH
+
+      const expectedProtocolAndVaultTransferFee = protocolFeeAmount.add(1)
+      const expectedCompartmentTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InconsistentExpVaultBalIncrease')
     })
 
     it('Should handle swap with protocol fee and transfer fee correctly', async function () {

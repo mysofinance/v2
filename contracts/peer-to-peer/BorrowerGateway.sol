@@ -274,13 +274,6 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         ) {
             revert Errors.NonWhitelistedCallback();
         }
-        bool useCompartment = transferInstructions.collReceiver != lenderVault;
-        if (
-            !useCompartment &&
-            borrowInstructions.expectedCompartmentTransferFee > 0
-        ) {
-            revert Errors.InconsistentExpTransferFee();
-        }
         ILenderVaultImpl(lenderVault).transferTo(
             loan.loanToken,
             borrowInstructions.callbackAddr == address(0)
@@ -373,7 +366,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // Note: initialize the vault's expected coll balance increase in case there's no compartment
         uint256 expVaultCollBalIncrease = loan.initCollAmount +
             transferInstructions.upfrontFee;
-        if (useCompartment) {
+        if (transferInstructions.collReceiver != lenderVault) {
             // Note: if there's a compartment then adjust the coll amount that is sent to vault by deducting the amount
             // that goes to the compartment, i.e., the borrower's reclaimable coll amount and any associated transfer fees
             grossCollTransferAmountToVault -= loan.initCollAmount;

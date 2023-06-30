@@ -193,6 +193,9 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             if (
                 generalQuoteInfo.borrowerCompartmentImplementation == address(0)
             ) {
+                if (borrowInstructions.expectedCompartmentTransferFee > 0) {
+                    revert Errors.InconsistentExpTransferFee();
+                }
                 lockedAmounts[_loan.collToken] += _loan.initCollAmount;
             } else {
                 transferInstructions.collReceiver = _createCollCompartment(
@@ -208,11 +211,13 @@ contract LenderVaultImpl is Initializable, Ownable, ILenderVaultImpl {
             transferInstructions.isLoan = true;
         } else {
             // note: only case left is upfrontFee = 100% and this corresponds to an outright swap;
-            // check that tenor is zero and earliest repay is nonzero, and compartment is zero
+            // check that tenor is zero and earliest repay is nonzero, and compartment is zero, with no compartment transfer fee
             if (
                 _loan.initCollAmount != 0 ||
                 quoteTuple.tenor + generalQuoteInfo.earliestRepayTenor != 0 ||
-                generalQuoteInfo.borrowerCompartmentImplementation != address(0)
+                generalQuoteInfo.borrowerCompartmentImplementation !=
+                address(0) ||
+                borrowInstructions.expectedCompartmentTransferFee != 0
             ) {
                 revert Errors.InvalidSwap();
             }
