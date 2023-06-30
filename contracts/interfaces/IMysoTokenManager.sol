@@ -34,6 +34,7 @@ interface IMysoTokenManager {
         address fundingPool,
         address depositor,
         uint256 depositAmount,
+        uint256 depositLockupDuration,
         uint256 transferFee
     ) external;
 
@@ -42,6 +43,7 @@ interface IMysoTokenManager {
         address subscriber,
         address loanProposal,
         uint256 subscriptionAmount,
+        uint256 subscriptionLockupDuration,
         uint256 totalSubscriptions,
         DataTypesPeerToPool.LoanTerms calldata loanTerms
     ) external;
