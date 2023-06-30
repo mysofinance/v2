@@ -94,7 +94,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         if (
             newLoanTerms.minTotalSubscriptions == 0 ||
-            newLoanTerms.minTotalSubscriptions >=
+            newLoanTerms.minTotalSubscriptions >
             newLoanTerms.maxTotalSubscriptions
         ) {
             revert Errors.InvalidSubscriptionRange();

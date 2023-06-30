@@ -60,7 +60,7 @@ library Errors {
     error NotInSubscriptionPhase();
     error NotInUnsubscriptionPhase();
     error InsufficientBalance();
-    error SubscriptionAmountTooHigh();
+    error InsufficientFreeSubscriptionSpace();
     error BeforeEarliestUnsubscribe();
     error InconsistentLastLoanTermsUpdateTime();
     error InvalidActionForCurrentStatus();
