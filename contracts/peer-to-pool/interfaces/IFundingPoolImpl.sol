@@ -2,12 +2,17 @@
 pragma solidity 0.8.19;
 
 interface IFundingPoolImpl {
-    event Deposited(address user, uint256 amount);
+    event Deposited(
+        address user,
+        uint256 amount,
+        uint256 depositLockupDuration
+    );
     event Withdrawn(address user, uint256 amount);
     event Subscribed(
         address indexed user,
         address indexed loanProposalAddr,
-        uint256 amount
+        uint256 amount,
+        uint256 subscriptionLockupDuration
     );
     event Unsubscribed(
         address indexed user,
@@ -33,8 +38,13 @@ interface IFundingPoolImpl {
      * @notice function allows users to deposit into funding pool
      * @param amount amount to deposit
      * @param transferFee this accounts for any transfer fee token may have (e.g. paxg token)
+     * @param depositLockupDuration the duration for which the deposit shall be locked (optional for tokenomics)
      */
-    function deposit(uint256 amount, uint256 transferFee) external;
+    function deposit(
+        uint256 amount,
+        uint256 transferFee,
+        uint256 depositLockupDuration
+    ) external;
 
     /**
      * @notice function allows users to withdraw from funding pool
@@ -47,11 +57,13 @@ interface IFundingPoolImpl {
      * @param loanProposal address of the proposal to which user wants to subscribe
      * @param minAmount the desired minimum subscription amount
      * @param maxAmount the desired maximum subscription amount
+     * @param subscriptionLockupDuration the duration for which the subscription shall be locked (optional for tokenomics)
      */
     function subscribe(
         address loanProposal,
         uint256 minAmount,
-        uint256 maxAmount
+        uint256 maxAmount,
+        uint256 subscriptionLockupDuration
     ) external;
 
     /**

@@ -63,7 +63,6 @@ library Errors {
     error InsufficientFreeSubscriptionSpace();
     error BeforeEarliestUnsubscribe();
     error InconsistentLastLoanTermsUpdateTime();
-    error NotEnoughSubscriptions();
     error InvalidActionForCurrentStatus();
     error FellShortOfTotalSubscriptionTarget();
     error InvalidRollBackRequest();
@@ -106,4 +105,7 @@ library Errors {
     error LoanExpired();
     error Reentrancy();
     error TokenNotStuck();
+    error DepositLockActive();
+    error DisallowedSubscriptionLockup();
+    error IncorrectLoanAmount();
 }
