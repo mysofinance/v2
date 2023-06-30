@@ -923,7 +923,7 @@ describe('Peer-to-Peer: Local Tests', function () {
             quoteTupleIdx
           )
       ).to.be.revertedWithCustomError(lenderVault, 'InconsistentExpTransferFee')
-      
+
       // should revert when trying to set invalid circuit breaker address
       await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
         lenderVault,
@@ -4521,6 +4521,7 @@ describe('Peer-to-Peer: Local Tests', function () {
             targetLoanId: 0,
             targetRepayAmount: buyPricePerCollToken,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },

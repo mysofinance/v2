@@ -4237,6 +4237,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             targetLoanId: 0,
             targetRepayAmount: buyPricePerCollToken,
             expectedTransferFee: 0,
+            deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
             callbackData: callbackData
           },
