@@ -294,7 +294,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             revert Errors.InvalidRollBackRequest();
         }
 
-        emit Rolledback();
+        emit Rolledback(msg.sender);
     }
 
     function checkAndUpdateStatus() external {
@@ -350,6 +350,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ];
         uint256 conversionAmount;
         address collToken = staticData.collToken;
+
         if (
             dynamicData.grossLoanAmount ==
             totalConvertedSubscriptions + lenderContribution
@@ -390,7 +391,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             conversionAmount
         );
 
-        emit ConversionExercised(msg.sender, repaymentIdx, conversionAmount);
+        emit ConversionExercised(msg.sender, conversionAmount, repaymentIdx);
     }
 
     function repay(uint256 expectedTransferFee) external {
@@ -449,8 +450,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             : collTokenLeftUnconverted;
         IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
 
-        emit CurrRepaymentIdxIncremented(repaymentIdx);
-        emit Repaid(remainingLoanTokenDue, collSendAmount);
+        emit Repaid(remainingLoanTokenDue, collSendAmount, repaymentIdx);
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
@@ -485,7 +485,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         IERC20Metadata(IFundingPoolImpl(fundingPool).depositToken())
             .safeTransfer(msg.sender, claimAmount);
 
-        emit RepaymentClaimed(msg.sender, claimAmount);
+        emit RepaymentClaimed(msg.sender, claimAmount, repaymentIdx);
     }
 
     function markAsDefaulted() external {
