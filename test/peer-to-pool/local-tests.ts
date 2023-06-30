@@ -538,7 +538,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // reverts if lender tries to subscribe to proposal without loan terms
     await usdc.connect(lender0).approve(fundingPool.address, MAX_UINT256)
     let bal = await usdc.balanceOf(lender0.address)
-    await fundingPool.connect(lender0).deposit(bal, 0)
+    await fundingPool.connect(lender0).deposit(bal, 0, 0)
     await expect(fundingPool.connect(lender0).subscribe(loanProposal.address, bal, bal, 0)).to.be.revertedWithCustomError(
       fundingPool,
       'NotInSubscriptionPhase'
@@ -563,7 +563,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(dynamicData.status).to.be.equal(0)
     // propose 1st loan terms
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
-    const lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
+    let lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
 
     // check that status was updated
     dynamicData = await loanProposal.dynamicData()
@@ -678,7 +678,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await fundingPool.connect(lender0).deposit(bal, 0, 0)
     // revert when trying to subscribe with timelock although loan proposal isn't locked yet and is still in negotiation
     await expect(
-      fundingPool.connect(lender0).subscribe(loanProposal.address, bal, 60 * 60 * 24)
+      fundingPool.connect(lender0).subscribe(loanProposal.address, bal, bal, 60 * 60 * 24)
     ).to.be.revertedWithCustomError(fundingPool, 'DisallowedSubscriptionLockup')
     await fundingPool.connect(lender0).withdraw(bal)
 
@@ -743,7 +743,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let freeSubscriptionSpace = maxTotalSubscriptions.sub(totalSubscriptions)
 
     // check subscription with valid min/max range will allow lender to take remaining free subscription space
-    await fundingPool.connect(lender2).subscribe(loanProposal.address, 0, remainingDepositBalance)
+    await fundingPool.connect(lender2).subscribe(loanProposal.address, 0, remainingDepositBalance, 0)
     let lenderSubscriptionPost = await fundingPool.subscriptionAmountOf(loanProposal.address, lender2.address)
     let lenderBalancePost = await fundingPool.balanceOf(lender2.address)
     expect(lenderSubscriptionPost.sub(lenderSubscriptionPre)).to.be.equal(freeSubscriptionSpace)
@@ -774,7 +774,22 @@ describe('Peer-to-Pool: Local Tests', function () {
     dynamicData = await loanProposal.dynamicData()
     expect(dynamicData.status).to.be.equal(1)
 
+    // move forward past cool down period to update max subscription limit
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
+    // increase max subscription limit
+    loanTerms.maxTotalSubscriptions = loanTerms.maxTotalSubscriptions.add(1)
+    await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+
+    // move forward past cool down period to lock terms
+    blocknum = await ethers.provider.getBlockNumber()
+    timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    await ethers.provider.send('evm_mine', [timestamp + Number(LOAN_TERMS_UPDATE_COOL_OFF_PERIOD.toString())])
+
     // test that arranger can lock loan terms and move forward
+    lastLoanTermsUpdateTime = await loanProposal.lastLoanTermsUpdateTime()
     let tx = await loanProposal.connect(arranger).lockLoanTerms(lastLoanTermsUpdateTime)
     let receipt = await tx.wait()
     timestamp = (await ethers.provider.getBlock(receipt.blockNumber)).timestamp
@@ -786,7 +801,8 @@ describe('Peer-to-Pool: Local Tests', function () {
     // check subscription with timelock (2/2)
     bal = await usdc.balanceOf(lender0.address)
     await fundingPool.connect(lender0).deposit(1, 0, 0)
-    await fundingPool.connect(lender0).subscribe(loanProposal.address, 1, 60)
+    await fundingPool.connect(lender0).subscribe(loanProposal.address, 1, 1, 60)
+
     // revert when unsubscribing during lock time
     await expect(fundingPool.connect(lender0).unsubscribe(loanProposal.address, 1)).to.be.revertedWithCustomError(
       fundingPool,
@@ -1027,7 +1043,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       fundingPool,
       'InvalidLender'
     )
-    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, 1, 1)).to.be.revertedWithCustomError(
+    await expect(fundingPool.connect(lender3).subscribe(loanProposal.address, 1, 1, 0)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidLender'
     )
@@ -1837,12 +1853,12 @@ describe('Peer-to-Pool: Local Tests', function () {
     // add large lender
     await usdc.mint(lender1.address, subscriptionLender1)
     await usdc.connect(lender1).approve(fundingPool.address, subscriptionLender1)
-    await fundingPool.connect(lender1).deposit(subscriptionLender1, 0)
+    await fundingPool.connect(lender1).deposit(subscriptionLender1, 0, 0)
     await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionLender1, subscriptionLender1, 0)
 
     // add smaller lender
     await usdc.connect(lender2).approve(fundingPool.address, subscriptionLender2)
-    await fundingPool.connect(lender2).deposit(subscriptionLender2, 0)
+    await fundingPool.connect(lender2).deposit(subscriptionLender2, 0, 0)
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionLender2, subscriptionLender2, 0)
 
     // move forward past loan terms update cool off period

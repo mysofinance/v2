@@ -103,11 +103,14 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
 
     function subscribe(
         address loanProposal,
-        uint256 minAmount,
-        uint256 maxAmount
+        uint256 minSubscriptionAmount,
+        uint256 maxSubscriptionAmount,
         uint256 subscriptionLockupDuration
     ) external nonReentrant {
-        if (maxAmount == 0 || minAmount > maxAmount) {
+        if (
+            maxSubscriptionAmount == 0 ||
+            minSubscriptionAmount > maxSubscriptionAmount
+        ) {
             revert Errors.InvalidAmount();
         }
         address _factory = factory;
@@ -130,7 +133,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             revert Errors.InvalidLender();
         }
         uint256 _balanceOf = balanceOf[msg.sender];
-        if (maxAmount > _balanceOf) {
+        if (maxSubscriptionAmount > _balanceOf) {
             revert Errors.InsufficientBalance();
         }
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
@@ -154,11 +157,12 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         uint256 _totalSubscriptions = totalSubscriptions[loanProposal];
         uint256 _freeSubscriptionSpace = loanTerms.maxTotalSubscriptions -
             _totalSubscriptions;
-        if (_freeSubscriptionSpace < minAmount) {
+        if (_freeSubscriptionSpace < minSubscriptionAmount) {
             revert Errors.InsufficientFreeSubscriptionSpace();
         }
-        uint256 _subscription = maxAmount < _freeSubscriptionSpace
-            ? maxAmount
+        uint256 effectiveSubscriptionAmount = maxSubscriptionAmount <
+            _freeSubscriptionSpace
+            ? maxSubscriptionAmount
             : _freeSubscriptionSpace;
         address mysoTokenManager = IFactory(factory).mysoTokenManager();
         if (mysoTokenManager != address(0)) {
@@ -166,15 +170,19 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
                 address(this),
                 msg.sender,
                 loanProposal,
-                _subscription,
+                effectiveSubscriptionAmount,
                 subscriptionLockupDuration,
                 _totalSubscriptions,
                 loanTerms
             );
         }
-        balanceOf[msg.sender] = _balanceOf - _subscription;
-        totalSubscriptions[loanProposal] = _totalSubscriptions + _subscription;
-        subscriptionAmountOf[loanProposal][msg.sender] += _subscription;
+        balanceOf[msg.sender] = _balanceOf - effectiveSubscriptionAmount;
+        totalSubscriptions[loanProposal] =
+            _totalSubscriptions +
+            effectiveSubscriptionAmount;
+        subscriptionAmountOf[loanProposal][
+            msg.sender
+        ] += effectiveSubscriptionAmount;
         _earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
             (
@@ -186,7 +194,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         emit Subscribed(
             msg.sender,
             loanProposal,
-            amount,
+            effectiveSubscriptionAmount,
             subscriptionLockupDuration
         );
     }

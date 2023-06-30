@@ -116,15 +116,15 @@ export const addSubscriptionsToLoanProposal = async (
   const subscriptionAmount = loanTerms.maxTotalSubscriptions.div(3)
   await fundingToken.connect(lender1).approve(fundingPool.address, subscriptionAmount)
 
-  await fundingPool.connect(lender1).deposit(subscriptionAmount, 0)
+  await fundingPool.connect(lender1).deposit(subscriptionAmount, 0, 0)
   await fundingPool.connect(lender1).subscribe(loanProposal.address, subscriptionAmount, subscriptionAmount, 0)
 
   await fundingToken.connect(lender2).approve(fundingPool.address, subscriptionAmount)
-  await fundingPool.connect(lender2).deposit(subscriptionAmount, 0)
+  await fundingPool.connect(lender2).deposit(subscriptionAmount, 0, 0)
   await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount, subscriptionAmount, 0)
 
   await fundingToken.connect(lender3).approve(fundingPool.address, subscriptionAmount)
-  await fundingPool.connect(lender3).deposit(subscriptionAmount, 0)
+  await fundingPool.connect(lender3).deposit(subscriptionAmount, 0, 0)
   await fundingPool.connect(lender3).subscribe(loanProposal.address, subscriptionAmount, subscriptionAmount, 0)
 }
 
