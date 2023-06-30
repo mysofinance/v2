@@ -2142,19 +2142,29 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [firstDueDate])
 
     // all lenders convert
+    let currRepaymentIdx = (await loanProposal.dynamicData()).currentRepaymentIdx
     await loanProposal.connect(lender1).exerciseConversion()
+    expect((await loanProposal.dynamicData()).currentRepaymentIdx).to.be.equal(currRepaymentIdx)
+
+    currRepaymentIdx = (await loanProposal.dynamicData()).currentRepaymentIdx
     await loanProposal.connect(lender2).exerciseConversion()
+    expect((await loanProposal.dynamicData()).currentRepaymentIdx).to.be.equal(currRepaymentIdx)
+
+    currRepaymentIdx = (await loanProposal.dynamicData()).currentRepaymentIdx
     await loanProposal.connect(lender3).exerciseConversion()
+    expect((await loanProposal.dynamicData()).currentRepaymentIdx).to.be.equal(currRepaymentIdx.add(1))
 
     // move forward to repayment window
     let earliestRepaymentTime = finalLoanTerms.repaymentSchedule[0].dueTimestamp + Number(CONVERSION_GRACE_PERIOD.toString())
     await ethers.provider.send('evm_mine', [earliestRepaymentTime])
 
-    // if all lenders converted, effective repayment amount due is 0, but borrower still needs to trigger call to not default
-    // bal check
+    // if all lenders converted check that repayment idx incremented and "too early" for next repayment
     let preUsdcDaoBal = await usdc.balanceOf(daoTreasury.address)
     let preDaoTokenDaoBal = await daoToken.balanceOf(daoTreasury.address)
-    await loanProposal.connect(daoTreasury).repay(0)
+    await expect(loanProposal.connect(daoTreasury).repay(0)).to.be.revertedWithCustomError(
+      loanProposal,
+      'OutsideRepaymentTimeWindow'
+    )
     let postUsdDaoBal = await usdc.balanceOf(daoTreasury.address)
     let postDaoTokenDaoBal = await daoToken.balanceOf(daoTreasury.address)
     // check no usdc bal diff
@@ -2545,7 +2555,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // execute loan
     await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
 
-    // move forward to conversion time windows and have all lenders always convert
+    // have all lenders convert in all periods
     let actualConvertedAmountsTotal = ethers.BigNumber.from(0)
     for (var i = 0; i < finalLoanTerms.repaymentSchedule.length; i++) {
       const conversionStartTime = finalLoanTerms.repaymentSchedule[i].dueTimestamp
@@ -2578,10 +2588,20 @@ describe('Peer-to-Pool: Local Tests', function () {
       // lender 3 converts, do pre/post bal checks
       preProposalBal = await daoToken.balanceOf(loanProposal.address)
       preLenderBal = await daoToken.balanceOf(lender3.address)
+      const preLastLenderConversionRepaymentIdx = (await loanProposal.dynamicData()).currentRepaymentIdx
+      const preBorrowerBal = await daoToken.balanceOf(daoTreasury.address)
       await loanProposal.connect(lender3).exerciseConversion()
       postLenderBal = await daoToken.balanceOf(lender3.address)
       postProposalBal = await daoToken.balanceOf(loanProposal.address)
+      const postLastLenderConversionRepaymentIdx = (await loanProposal.dynamicData()).currentRepaymentIdx
+      const postBorrowerBal = await daoToken.balanceOf(daoTreasury.address)
       expect(preProposalBal.sub(postProposalBal)).to.be.equal(postLenderBal.sub(preLenderBal))
+      expect(postLastLenderConversionRepaymentIdx).to.be.equal(preLastLenderConversionRepaymentIdx.add(1))
+      if (i < finalLoanTerms.repaymentSchedule.length - 1) {
+        expect(postBorrowerBal).to.be.equal(preBorrowerBal)
+      } else {
+        expect(postBorrowerBal.sub(preBorrowerBal)).to.be.equal(finalCollAmountReservedForDefault)
+      }
       actualConvertedAmounts = actualConvertedAmounts.add(postLenderBal.sub(preLenderBal))
 
       // check total conversion amounts
@@ -2589,29 +2609,33 @@ describe('Peer-to-Pool: Local Tests', function () {
       actualConvertedAmountsTotal = actualConvertedAmountsTotal.add(conversionAmountForPeriod)
 
       // move forward to repayment, trigger repayment to update state/curr idx
-      const repaymentStartTime =
-        finalLoanTerms.repaymentSchedule[i].dueTimestamp + Number(CONVERSION_GRACE_PERIOD.toString())
+      const repaymentCutoffTime =
+        finalLoanTerms.repaymentSchedule[i].dueTimestamp +
+        Number(CONVERSION_GRACE_PERIOD.toString()) +
+        Number(REPAYMENT_GRACE_PERIOD.toString()) +
+        1
       // move forward in time
-      await ethers.provider.send('evm_mine', [repaymentStartTime])
+      await ethers.provider.send('evm_mine', [repaymentCutoffTime])
+
       const preProposalBal1 = await daoToken.balanceOf(loanProposal.address)
       const preProposalBal2 = await usdc.balanceOf(loanProposal.address)
-      await loanProposal.connect(daoTreasury).repay(0)
+
+      // check revert if trying to mark as defaulted when all lenders converted
+      await expect(loanProposal.connect(anyUser).markAsDefaulted()).to.be.revertedWithCustomError(
+        loanProposal,
+        i < finalLoanTerms.repaymentSchedule.length - 1 ? 'NoDefault' : 'LoanIsFullyRepaid'
+      )
+
       const postProposalBal1 = await daoToken.balanceOf(loanProposal.address)
       const postProposalBal2 = await usdc.balanceOf(loanProposal.address)
-      // check that balances don't change if all lenders converted, i.e., shouldn't
-      // cause any costs for borrower
+
+      // check that reverted markAsDefaulted didn't change any balances
       expect(preProposalBal1).to.be.equal(postProposalBal1)
       expect(preProposalBal2).to.be.equal(postProposalBal2)
     }
 
     // check total total received coll matches with repayment schedule
     expect(actualConvertedAmountsTotal).to.be.equal(finalCollAmountReservedForConversions)
-
-    // check revert if trying to mark as defaulted when all lenders converted (and borrower repaid)
-    await expect(loanProposal.connect(anyUser).markAsDefaulted()).to.be.revertedWithCustomError(
-      loanProposal,
-      'LoanIsFullyRepaid'
-    )
   })
 
   it('Should handle default claims correctly (3/3)', async function () {

@@ -13,17 +13,22 @@ interface ILoanProposalImpl {
         uint256 _arrangerFee,
         uint256 _protocolFee
     );
-    event Rolledback();
+    event Rolledback(address sender);
     event LoanDeployed();
     event ConversionExercised(
         address indexed sender,
-        uint256 repaymentIdx,
-        uint256 amount
+        uint256 amount,
+        uint256 repaymentIdx
     );
-    event RepaymentClaimed(address indexed sender, uint256 amount);
+    event RepaymentClaimed(
+        address indexed sender,
+        uint256 amount,
+        uint256 repaymentIdx
+    );
     event Repaid(
         uint256 remainingLoanTokenDue,
-        uint256 collTokenLeftUnconverted
+        uint256 collTokenLeftUnconverted,
+        uint256 repaymentIdx
     );
     event LoanDefaulted();
     event DefaultProceedsClaimed(address indexed sender);
