@@ -21,5 +21,6 @@ library Constants {
     uint256 internal constant MIN_TIME_BETWEEN_DUE_DATES = 7 days;
     uint256 internal constant MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE = 60 seconds;
     uint256 internal constant MAX_ARRANGER_FEE = 0.5e18; // 50% max in base
-    uint256 internal constant LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 1 hours;
+    uint256 internal constant LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 15 minutes;
+    uint256 internal constant MAX_REPAYMENT_SCHEDULE_LENGTH = 20;
 }

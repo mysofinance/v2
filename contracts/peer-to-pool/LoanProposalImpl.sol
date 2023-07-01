@@ -58,6 +58,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidGracePeriod();
         }
+        // @dev: staticData struct fields don't change after initialization
         staticData.factory = _factory;
         staticData.fundingPool = _fundingPool;
         staticData.collToken = _collToken;
@@ -68,6 +69,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         staticData.unsubscribeGracePeriod = _unsubscribeGracePeriod;
         staticData.conversionGracePeriod = _conversionGracePeriod;
         staticData.repaymentGracePeriod = _repaymentGracePeriod;
+        // @dev: dynamicData struct fields are overwritten later when converting from
+        // relative to absolute amounts
         dynamicData.arrangerFee = _arrangerFee;
         dynamicData.protocolFee = IFactory(_factory).protocolFee();
     }
@@ -85,6 +88,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
+        // @dev: enforce loan-terms-update-cool-off-period to prevent borrower from being spammed by frequent
+        // loan proposal updates, which otherwise could create friction for borrower when trying to lock in terms
         if (
             block.timestamp <
             lastLoanTermsUpdateTime +
@@ -129,16 +134,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
-        uint256 currLastLoanTermsUpdateTime = lastLoanTermsUpdateTime;
-        if (
-            block.timestamp <
-            currLastLoanTermsUpdateTime +
-                Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD
-        ) {
-            revert Errors.WaitForLoanTermsCoolOffPeriod();
-        }
-        // once cool off period has passed, check if "remaining" time until
-        // first due date is "sufficiently" far enough in the future
+        // @dev: check if "remaining" time until first due date is "sufficiently"
+        // far enough in the future
         if (
             _loanTerms.repaymentSchedule[0].dueTimestamp <
             block.timestamp +
@@ -148,7 +145,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.FirstDueDateTooCloseOrPassed();
         }
-        if (_loanTermsUpdateTime != currLastLoanTermsUpdateTime) {
+        if (_loanTermsUpdateTime != lastLoanTermsUpdateTime) {
             revert Errors.InconsistentLastLoanTermsUpdateTime();
         }
         dynamicData.loanTermsLockedTime = block.timestamp;
@@ -268,7 +265,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function rollback() external {
-        // cannot be called anymore once lockInFinalAmountsAndProvideCollateral() called
+        // @dev: cannot be called anymore once finalizeLoanTermsAndTransferColl() called
         if (
             dynamicData.status !=
             DataTypesPeerToPool.LoanStatus.LOAN_TERMS_LOCKED
@@ -316,13 +313,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (lenderContribution == 0) {
             revert Errors.InvalidSender();
         }
-        if (
-            dynamicData.status != DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED
-        ) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
-        uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
-        _checkCurrRepaymentIdx(repaymentIdx);
+        _checkIsDeployed();
+        uint256 repaymentIdx = _checkAndGetCurrRepaymentIdx();
         mapping(uint256 => bool)
             storage lenderExercisedConversionPerRepaymentIdx = _lenderExercisedConversion[
                 msg.sender
@@ -347,7 +339,6 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ];
         uint256 conversionAmount;
         address collToken = staticData.collToken;
-
         if (
             dynamicData.grossLoanAmount ==
             totalConvertedSubscriptions + lenderContribution
@@ -359,11 +350,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 collTokenConverted[repaymentIdx];
             ++dynamicData.currentRepaymentIdx;
             // @dev: increment repayment idx (no need to do repay with 0 amount)
-            if (
-                _loanTerms.repaymentSchedule.length - 1 ==
-                // @dev: if "last lender" converts in last period then send remaining collateral back to borrower and
-                repaymentIdx
-            ) {
+            if (_loanTerms.repaymentSchedule.length == repaymentIdx + 1) {
+                // @dev: if "last lender" converts in last period then send remaining collateral back to borrower
                 IERC20Metadata(collToken).safeTransfer(
                     _loanTerms.borrower,
                     IERC20Metadata(collToken).balanceOf(address(this)) -
@@ -383,10 +371,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         collTokenConverted[repaymentIdx] += conversionAmount;
         totalConvertedSubscriptionsPerIdx[repaymentIdx] += lenderContribution;
         lenderExercisedConversionPerRepaymentIdx[repaymentIdx] = true;
-        IERC20Metadata(staticData.collToken).safeTransfer(
-            msg.sender,
-            conversionAmount
-        );
+        IERC20Metadata(collToken).safeTransfer(msg.sender, conversionAmount);
 
         emit ConversionExercised(msg.sender, conversionAmount, repaymentIdx);
     }
@@ -395,13 +380,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (msg.sender != _loanTerms.borrower) {
             revert Errors.InvalidSender();
         }
-        if (
-            dynamicData.status != DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED
-        ) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
-        uint256 repaymentIdx = dynamicData.currentRepaymentIdx++;
-        _checkCurrRepaymentIdx(repaymentIdx);
+        _checkIsDeployed();
+        uint256 repaymentIdx = _checkAndGetCurrRepaymentIdx();
         // must be after when the period of this loan when lenders can convert,
         // but before default period for this period
         // note: repayment can be done in the half-open interval of:
@@ -425,26 +405,33 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         uint256 remainingLoanTokenDue = (_repayment.loanTokenDue *
             collTokenLeftUnconverted) / _repayment.collTokenDueIfConverted;
         _loanTokenRepaid[repaymentIdx] = remainingLoanTokenDue;
+        ++dynamicData.currentRepaymentIdx;
+
         uint256 preBal = IERC20Metadata(loanToken).balanceOf(address(this));
-        IERC20Metadata(loanToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            remainingLoanTokenDue + expectedTransferFee
-        );
-        if (
-            IERC20Metadata(loanToken).balanceOf(address(this)) !=
-            remainingLoanTokenDue + preBal
-        ) {
-            revert Errors.InvalidSendAmount();
+        if (remainingLoanTokenDue + expectedTransferFee > 0) {
+            IERC20Metadata(loanToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                remainingLoanTokenDue + expectedTransferFee
+            );
+            if (
+                IERC20Metadata(loanToken).balanceOf(address(this)) !=
+                remainingLoanTokenDue + preBal
+            ) {
+                revert Errors.InvalidSendAmount();
+            }
         }
+
         // if final repayment, send all remaining coll token back to borrower
         // else send only unconverted coll token back to borrower
         address collToken = staticData.collToken;
-        uint256 collSendAmount = _loanTerms.repaymentSchedule.length - 1 ==
-            repaymentIdx
+        uint256 collSendAmount = _loanTerms.repaymentSchedule.length ==
+            repaymentIdx + 1
             ? IERC20Metadata(collToken).balanceOf(address(this))
             : collTokenLeftUnconverted;
-        IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
+        if (collSendAmount > 0) {
+            IERC20Metadata(collToken).safeTransfer(msg.sender, collSendAmount);
+        }
 
         emit Repaid(remainingLoanTokenDue, collSendAmount, repaymentIdx);
     }
@@ -497,11 +484,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
-        uint256 repaymentIdx = dynamicData.currentRepaymentIdx;
         // this will check if loan has been fully repaid yet in this instance
         // note: loan can be marked as defaulted if no repayment and blocktime is in half-open interval of:
         // [dueTimestamp + conversionGracePeriod + repaymentGracePeriod, infty)
-        _checkCurrRepaymentIdx(repaymentIdx);
+        uint256 repaymentIdx = _checkAndGetCurrRepaymentIdx();
         if (block.timestamp < _getRepaymentCutoffTime(repaymentIdx)) {
             revert Errors.NoDefault();
         }
@@ -638,10 +624,15 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         );
     }
 
-    function _checkCurrRepaymentIdx(uint256 repaymentIdx) internal view {
-        // currentRepaymentIdx increments on every repay;
+    function _checkAndGetCurrRepaymentIdx()
+        internal
+        view
+        returns (uint256 currRepaymentIdx)
+    {
+        // @dev: currentRepaymentIdx increments on every repay or if all lenders converted in a given period;
         // if and only if loan was fully repaid, then currentRepaymentIdx == _loanTerms.repaymentSchedule.length
-        if (repaymentIdx == _loanTerms.repaymentSchedule.length) {
+        currRepaymentIdx = dynamicData.currentRepaymentIdx;
+        if (currRepaymentIdx == _loanTerms.repaymentSchedule.length) {
             revert Errors.LoanIsFullyRepaid();
         }
     }
@@ -655,23 +646,23 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         uint256 minTotalSubscriptions,
         DataTypesPeerToPool.Repayment[] memory repaymentSchedule
     ) internal view {
-        if (repaymentSchedule.length == 0) {
-            revert Errors.EmptyRepaymentSchedule();
+        if (
+            repaymentSchedule.length == 0 ||
+            repaymentSchedule.length > Constants.MAX_REPAYMENT_SCHEDULE_LENGTH
+        ) {
+            revert Errors.InvalidRepaymentScheduleLength();
         }
-        // assuming loan terms are directly locked, then loan can get executed earliest after:
-        // block.timestamp + Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD + Constants.LOAN_EXECUTION_GRACE_PERIOD
+        // @dev: assuming loan terms are directly locked, then loan can get executed earliest after:
+        // block.timestamp + unsubscribeGracePeriod + Constants.LOAN_EXECUTION_GRACE_PERIOD
         if (
             repaymentSchedule[0].dueTimestamp <
             block.timestamp +
-                Constants.LOAN_TERMS_UPDATE_COOL_OFF_PERIOD +
                 staticData.unsubscribeGracePeriod +
                 Constants.LOAN_EXECUTION_GRACE_PERIOD +
                 Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
         ) {
             revert Errors.FirstDueDateTooCloseOrPassed();
         }
-        uint256 prevDueDate;
-        uint256 currDueDate;
         for (uint256 i; i < repaymentSchedule.length; ) {
             if (
                 SafeCast.toUint128(
@@ -681,13 +672,14 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             ) {
                 revert Errors.LoanTokenDueIsZero();
             }
-            currDueDate = repaymentSchedule[i].dueTimestamp;
             if (
-                currDueDate < prevDueDate + Constants.MIN_TIME_BETWEEN_DUE_DATES
+                i > 0 &&
+                repaymentSchedule[i].dueTimestamp <
+                repaymentSchedule[i - 1].dueTimestamp +
+                    Constants.MIN_TIME_BETWEEN_DUE_DATES
             ) {
                 revert Errors.InvalidDueDates();
             }
-            prevDueDate = currDueDate;
             unchecked {
                 ++i;
             }
@@ -701,5 +693,13 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
             staticData.conversionGracePeriod +
             staticData.repaymentGracePeriod;
+    }
+
+    function _checkIsDeployed() internal view {
+        if (
+            dynamicData.status != DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED
+        ) {
+            revert Errors.InvalidActionForCurrentStatus();
+        }
     }
 }
