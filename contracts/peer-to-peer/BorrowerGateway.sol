@@ -60,26 +60,19 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         (
             DataTypesPeerToPeer.Loan memory loan,
             uint256 loanId,
-            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
-        ) = ILenderVaultImpl(lenderVault).processQuote(
-                msg.sender,
+            uint256 upfrontFee
+        ) = _processBorrowTransaction(
                 borrowInstructions,
                 offChainQuote.generalQuoteInfo,
-                quoteTuple
+                quoteTuple,
+                lenderVault
             );
-
-        _processTransfers(
-            lenderVault,
-            borrowInstructions,
-            loan,
-            transferInstructions
-        );
 
         emit Borrowed(
             lenderVault,
             loan.borrower,
             loan,
-            transferInstructions.upfrontFee,
+            upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData
@@ -116,31 +109,25 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 onChainQuote
             );
         }
-        DataTypesPeerToPeer.QuoteTuple memory quoteTuple = onChainQuote
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple = onChainQuote
             .quoteTuples[quoteTupleIdx];
+
         (
             DataTypesPeerToPeer.Loan memory loan,
             uint256 loanId,
-            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
-        ) = ILenderVaultImpl(lenderVault).processQuote(
-                msg.sender,
+            uint256 upfrontFee
+        ) = _processBorrowTransaction(
                 borrowInstructions,
                 onChainQuote.generalQuoteInfo,
-                quoteTuple
+                quoteTuple,
+                lenderVault
             );
-
-        _processTransfers(
-            lenderVault,
-            borrowInstructions,
-            loan,
-            transferInstructions
-        );
 
         emit Borrowed(
             lenderVault,
             loan.borrower,
             loan,
-            transferInstructions.upfrontFee,
+            upfrontFee,
             loanId,
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData
@@ -259,6 +246,33 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     function getProtocolFeeParams() external view returns (uint128[2] memory) {
         return protocolFeeParams;
+    }
+
+    function _processBorrowTransaction(
+        DataTypesPeerToPeer.BorrowTransferInstructions
+            calldata borrowInstructions,
+        DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
+        address lenderVault
+    ) internal returns (DataTypesPeerToPeer.Loan memory, uint256, uint256) {
+        (
+            DataTypesPeerToPeer.Loan memory loan,
+            uint256 loanId,
+            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
+        ) = ILenderVaultImpl(lenderVault).processQuote(
+                msg.sender,
+                borrowInstructions,
+                generalQuoteInfo,
+                quoteTuple
+            );
+
+        _processTransfers(
+            lenderVault,
+            borrowInstructions,
+            loan,
+            transferInstructions
+        );
+        return (loan, loanId, transferInstructions.upfrontFee);
     }
 
     function _processTransfers(

@@ -318,6 +318,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         if (
             onChainQuote.generalQuoteInfo.maxLoan == 0 ||
+            onChainQuote.generalQuoteInfo.minLoan == 0 ||
             onChainQuote.generalQuoteInfo.minLoan >
             onChainQuote.generalQuoteInfo.maxLoan
         ) {
@@ -333,9 +334,6 @@ contract QuoteHandler is IQuoteHandler {
                 return false;
             }
             if (isSwapCurr && onChainQuote.quoteTuples.length > 1) {
-                return false;
-            }
-            if (k > 0 && isSwap != isSwapCurr) {
                 return false;
             }
             isSwap = isSwapCurr;
