@@ -213,15 +213,16 @@ contract QuoteHandler is IQuoteHandler {
         bytes32 offChainQuoteHash,
         bytes[] calldata compactSigs
     ) internal view returns (bool) {
+        uint256 compactSigsLength = compactSigs.length;
         if (
-            compactSigs.length < ILenderVaultImpl(lenderVault).minNumOfSigners()
+            compactSigsLength < ILenderVaultImpl(lenderVault).minNumOfSigners()
         ) {
             return false;
         }
         bytes32 messageHash = ECDSA.toEthSignedMessageHash(offChainQuoteHash);
         address recoveredSigner;
         address prevSigner;
-        for (uint256 i; i < compactSigs.length; ) {
+        for (uint256 i; i < compactSigsLength; ) {
             (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSigs[i]);
             recoveredSigner = messageHash.recover(r, vs);
             if (!ILenderVaultImpl(lenderVault).isSigner(recoveredSigner)) {
@@ -311,9 +312,6 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             return false;
         }
-        if (onChainQuote.quoteTuples.length == 0) {
-            return false;
-        }
         if (onChainQuote.generalQuoteInfo.validUntil < block.timestamp) {
             return false;
         }
@@ -325,8 +323,12 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             return false;
         }
+        uint256 quoteTuplesLen = onChainQuote.quoteTuples.length;
+        if (quoteTuplesLen == 0) {
+            return false;
+        }
         bool isSwap;
-        for (uint256 k; k < onChainQuote.quoteTuples.length; ) {
+        for (uint256 k; k < quoteTuplesLen; ) {
             (bool isValid, bool isSwapCurr) = _isValidOnChainQuoteTuple(
                 onChainQuote.generalQuoteInfo,
                 onChainQuote.quoteTuples[k]
@@ -334,7 +336,7 @@ contract QuoteHandler is IQuoteHandler {
             if (!isValid) {
                 return false;
             }
-            if (isSwapCurr && onChainQuote.quoteTuples.length > 1) {
+            if (isSwapCurr && quoteTuplesLen > 1) {
                 return false;
             }
             isSwap = isSwapCurr;

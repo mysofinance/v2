@@ -69,11 +69,12 @@ contract LenderVaultImpl is
         // only owner can call this function
         _checkOwner();
         // if empty array is passed, revert
-        if (_loanIds.length == 0) {
+        uint256 loanIdsLen = _loanIds.length;
+        if (loanIdsLen == 0) {
             revert Errors.InvalidArrayLength();
         }
         uint256 totalUnlockableColl;
-        for (uint256 i; i < _loanIds.length; ) {
+        for (uint256 i; i < loanIdsLen; ) {
             DataTypesPeerToPeer.Loan storage _loan = _loans[_loanIds[i]];
 
             if (_loan.collToken != collToken) {
@@ -300,11 +301,12 @@ contract LenderVaultImpl is
 
     function addSigners(address[] calldata _signers) external {
         _checkOwner();
-        if (_signers.length == 0) {
+        uint256 signersLen = _signers.length;
+        if (signersLen == 0) {
             revert Errors.InvalidArrayLength();
         }
         address vaultOwner = owner();
-        for (uint256 i; i < _signers.length; ) {
+        for (uint256 i; i < signersLen; ) {
             if (_signers[i] == address(0) || _signers[i] == vaultOwner) {
                 revert Errors.InvalidAddress();
             }
@@ -381,8 +383,8 @@ contract LenderVaultImpl is
     function loan(
         uint256 loanId
     ) external view returns (DataTypesPeerToPeer.Loan memory _loan) {
-        uint256 loanLen = _loans.length;
-        if (loanId >= loanLen) {
+        uint256 loansLen = _loans.length;
+        if (loanId >= loansLen) {
             revert Errors.InvalidArrayIndex();
         }
         _loan = _loans[loanId];
@@ -399,13 +401,14 @@ contract LenderVaultImpl is
         view
         returns (uint256[] memory balances, uint256[] memory _lockedAmounts)
     {
-        if (tokens.length == 0) {
+        uint256 tokensLen = tokens.length;
+        if (tokensLen == 0) {
             revert Errors.InvalidArrayLength();
         }
-        balances = new uint256[](tokens.length);
-        _lockedAmounts = new uint256[](tokens.length);
+        balances = new uint256[](tokensLen);
+        _lockedAmounts = new uint256[](tokensLen);
         IAddressRegistry _addressRegistry = IAddressRegistry(addressRegistry);
-        for (uint256 i; i < tokens.length; ) {
+        for (uint256 i; i < tokensLen; ) {
             if (
                 tokens[i] == address(0) ||
                 !_addressRegistry.isWhitelistedERC20(tokens[i])

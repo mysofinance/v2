@@ -32,14 +32,15 @@ contract UniV2Chainlink is ChainlinkBasic {
             UNI_V2_BASE_CURRENCY_UNIT
         )
     {
-        if (_lpAddrs.length == 0) {
+        uint256 lpAddrsLen = _lpAddrs.length;
+        if (lpAddrsLen == 0) {
             revert Errors.InvalidArrayLength();
         }
         if (_toleranceAmount >= 10000 || _toleranceAmount == 0) {
             revert Errors.InvalidOracleTolerance();
         }
         _tolerance = _toleranceAmount;
-        for (uint256 i; i < _lpAddrs.length; ) {
+        for (uint256 i; i < lpAddrsLen; ) {
             if (_lpAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }
