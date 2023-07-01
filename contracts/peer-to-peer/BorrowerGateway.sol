@@ -489,14 +489,10 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 Constants.YEAR_IN_SECONDS) >
             Constants.MAX_TOTAL_PROTOCOL_FEE;
         protocolFeeAmount = useMaxProtocolFee
-            ? 0
-            : (_protocolFeeParams[0] * collSendAmount) / Constants.BASE;
-        uint256 additionalLoanProtocolFee = (
-            useMaxProtocolFee
-                ? collSendAmount * Constants.MAX_TOTAL_PROTOCOL_FEE
-                : (collSendAmount * _protocolFeeParams[1] * borrowDuration) /
-                    (Constants.YEAR_IN_SECONDS)
-        ) / Constants.BASE;
-        protocolFeeAmount += additionalLoanProtocolFee;
+            ? (collSendAmount * Constants.MAX_TOTAL_PROTOCOL_FEE) /
+                Constants.BASE
+            : ((_protocolFeeParams[0] * collSendAmount) / Constants.BASE) +
+                ((collSendAmount * _protocolFeeParams[1] * borrowDuration) /
+                    (Constants.YEAR_IN_SECONDS * Constants.BASE));
     }
 }
