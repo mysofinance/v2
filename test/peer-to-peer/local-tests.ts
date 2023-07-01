@@ -1141,6 +1141,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       // set max protocol fee p.a.
       await borrowerGateway.connect(team).setProtocolFeeParams([0, BASE.mul(5).div(100)])
 
+      await expect(
+        borrowerGateway.connect(team).setProtocolFeeParams([BASE, BASE.mul(5).div(100)])
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidFee')
+
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 

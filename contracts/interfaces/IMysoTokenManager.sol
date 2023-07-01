@@ -7,12 +7,12 @@ import {DataTypesPeerToPool} from "../peer-to-pool/DataTypesPeerToPool.sol";
 
 interface IMysoTokenManager {
     function processP2PBorrow(
-        uint256[2] memory currProtocolFeeParams,
+        uint128[2] memory currProtocolFeeParams,
         DataTypesPeerToPeer.BorrowTransferInstructions
             calldata borrowInstructions,
         DataTypesPeerToPeer.Loan calldata loan,
         address lenderVault
-    ) external returns (uint256[2] memory applicableProtocolFeeParams);
+    ) external returns (uint128[2] memory applicableProtocolFeeParams);
 
     function processP2PCreateVault(
         uint256 numRegisteredVaults,

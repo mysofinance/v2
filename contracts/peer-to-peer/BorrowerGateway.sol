@@ -24,7 +24,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     address public immutable addressRegistry;
     // index 0: base protocol fee is paid even for swap (no tenor)
     // index 1: protocol fee slope scales protocol fee with tenor
-    uint256[2] internal protocolFeeParams;
+    uint128[2] internal protocolFeeParams;
 
     constructor(address _addressRegistry) {
         if (_addressRegistry == address(0)) {
@@ -241,13 +241,15 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     /**
      * @notice Protocol fee is allowed to be zero, so no min fee checks, only max fee checks
      */
-    function setProtocolFeeParams(uint256[2] calldata _newFeeParams) external {
+    function setProtocolFeeParams(uint128[2] calldata _newFeeParams) external {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
             revert Errors.InvalidSender();
         }
         if (
             _newFeeParams[0] > Constants.MAX_SWAP_PROTOCOL_FEE ||
-            _newFeeParams[1] > Constants.MAX_FEE_PER_ANNUM
+            _newFeeParams[1] > Constants.MAX_FEE_PER_ANNUM ||
+            (_newFeeParams[0] == protocolFeeParams[0] &&
+                _newFeeParams[1] == protocolFeeParams[1])
         ) {
             revert Errors.InvalidFee();
         }
@@ -255,7 +257,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         emit ProtocolFeeSet(_newFeeParams);
     }
 
-    function getProtocolFeeParams() external view returns (uint256[2] memory) {
+    function getProtocolFeeParams() external view returns (uint128[2] memory) {
         return protocolFeeParams;
     }
 
@@ -289,8 +291,8 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
-        uint256[2] memory currProtocolFeeParams = protocolFeeParams;
-        uint256[2] memory applicableProtocolFeeParams = currProtocolFeeParams;
+        uint128[2] memory currProtocolFeeParams = protocolFeeParams;
+        uint128[2] memory applicableProtocolFeeParams = currProtocolFeeParams;
 
         address mysoTokenManager = IAddressRegistry(addressRegistry)
             .mysoTokenManager();
@@ -478,7 +480,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     }
 
     function _calculateProtocolFeeAmount(
-        uint256[2] memory _protocolFeeParams,
+        uint128[2] memory _protocolFeeParams,
         uint256 collSendAmount,
         uint256 borrowDuration
     ) internal pure returns (uint256 protocolFeeAmount) {

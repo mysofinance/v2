@@ -21,7 +21,7 @@ interface IBorrowerGateway {
         uint256 repayAmount
     );
 
-    event ProtocolFeeSet(uint256[2] newFeeParams);
+    event ProtocolFeeSet(uint128[2] newFeeParams);
 
     /**
      * @notice function which allows a borrower to use an offChain quote to borrow
@@ -71,7 +71,7 @@ interface IBorrowerGateway {
      * @dev protocolFee params are in units of BASE constant (10**18) and variable portion is annualized
      * @param _newFeeParams new base fee (constant) and fee slope (variable) in BASE
      */
-    function setProtocolFeeParams(uint256[2] calldata _newFeeParams) external;
+    function setProtocolFeeParams(uint128[2] calldata _newFeeParams) external;
 
     /**
      * @notice function returns address registry
@@ -86,5 +86,5 @@ interface IBorrowerGateway {
     function getProtocolFeeParams()
         external
         view
-        returns (uint256[2] memory protocolFeeParams);
+        returns (uint128[2] memory protocolFeeParams);
 }
