@@ -892,7 +892,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_WETH)
       const expectedReclaimableAmount = collSendAmount.sub(collSendAmount.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE))
@@ -1102,7 +1103,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -1196,7 +1198,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // should process even for very long tenors now that protocolFee max time is capped at 180 days
@@ -1240,7 +1243,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // borrower approves gateway and executes quote
@@ -1287,7 +1291,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // borrower approves gateway and executes quote
@@ -1370,7 +1375,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // reverts if trying to borrow with quote that would result in zero loan amount
@@ -1479,7 +1485,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // unregistered vault address reverts
@@ -1616,7 +1623,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // should revert when trying to set invalid circuit breaker address
@@ -1738,7 +1746,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // move forward past valid until timestamp
@@ -1811,7 +1820,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -1880,7 +1890,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const borrowWithOffChainQuoteTransaction = await borrowerGateway
@@ -1953,7 +1964,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // reverts if trying to borrow with offchain quote that would lead to a loan that cannot be repaid as earliest repay is after expiry
@@ -2023,7 +2035,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -2102,7 +2115,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -2204,7 +2218,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // check revert on redundant sigs
@@ -2426,7 +2441,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // check revert if negative interest rate factor
@@ -2554,7 +2570,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await borrowerGateway
         .connect(borrower)
@@ -2690,7 +2707,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -2846,7 +2864,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 0)
@@ -3313,7 +3332,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv
       const expectedReclaimableAmount = collSendAmount
@@ -3865,7 +3885,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       // mint coll tokens, approve gateway and execute quote
       await collToken.mint(borrower.address, collTokenSendAmount)
@@ -3976,7 +3997,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr: ZERO_ADDRESS,
-        callbackData: ZERO_BYTES32
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       // mint coll tokens, approve gateway and execute quote
       await collToken.mint(borrower.address, collTokenSendAmount)
@@ -4057,7 +4079,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
-          callbackData
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
         }
         await borrowerGateway
           .connect(borrower)
@@ -4264,7 +4287,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
-          callbackData
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
         }
 
         await expect(
@@ -4315,7 +4339,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
-          callbackData
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
         }
 
         // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0)
@@ -4393,7 +4418,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           deadline: MAX_UINT256,
           minLoanAmount: 0,
           callbackAddr,
-          callbackData
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
         }
         // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0 and earliestRepayTenor != 0)
         let quoteTupleIdx = 2
@@ -4486,7 +4512,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await borrowerGateway
         .connect(borrower)
@@ -4598,7 +4625,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr: ZERO_ADDRESS,
-        callbackData: ZERO_BYTES32
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await borrowerGateway
         .connect(borrower)
@@ -4670,7 +4698,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr: ZERO_ADDRESS,
-        callbackData: ZERO_BYTES32
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await expect(
         borrowerGateway

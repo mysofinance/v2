@@ -128,6 +128,8 @@ library DataTypesPeerToPeer {
         address callbackAddr;
         // any data needed by callback
         bytes callbackData;
+        // any data needed by myso token manager
+        bytes mysoTokenManagerData;
     }
 
     struct TransferInstructions {

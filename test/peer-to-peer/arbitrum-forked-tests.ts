@@ -219,7 +219,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
 
     const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -378,7 +379,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
 
     // Since there is a 15 min cooldown duration after minting GLP, needs to pass for the user before transfer
@@ -586,7 +588,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
     await borrowerGateway
       .connect(borrower)
@@ -736,7 +739,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
 
     await expect(
@@ -826,7 +830,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await borrowerGateway

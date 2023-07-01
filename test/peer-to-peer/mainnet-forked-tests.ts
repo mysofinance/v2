@@ -971,7 +971,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // get borrower whitelisted
@@ -1074,7 +1075,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // get borrower whitelisted
@@ -1260,7 +1262,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // get borrower whitelisted
@@ -1413,7 +1416,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // get borrower whitelisted
@@ -1560,7 +1564,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // get borrower whitelisted
@@ -1759,7 +1764,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // get borrower whitelisted
@@ -2042,7 +2048,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // pre callback allowances
@@ -2277,7 +2284,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 0)
@@ -2469,7 +2477,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -2881,7 +2890,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -3090,7 +3100,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       //borrow with bad compartment before token-compartment-pair is whitelisted should fail
@@ -3256,7 +3267,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -3485,7 +3497,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -3753,7 +3766,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const borrowInstructionsWithExtraVaultTransferFee = {
@@ -3817,7 +3831,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -3980,7 +3995,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const collateralUsedForLoan = collSendAmount
@@ -4116,7 +4132,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -4197,7 +4214,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await borrowerGateway
         .connect(borrower)
@@ -4336,7 +4354,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // send borrow instructions and get compartment
@@ -4433,7 +4452,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await borrowerGateway
@@ -4533,7 +4553,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await borrowerGateway
@@ -4624,7 +4645,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       const borrowTransaction = await borrowerGateway
         .connect(borrower)
@@ -4854,7 +4876,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const badBorrowInstructionsTransferFee = {
@@ -4864,7 +4887,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const badBorrowInstructionsBelowMinLoan = {
@@ -4874,7 +4898,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const badBorrowInstructionsTooSmallLoanAmount = {
@@ -4884,7 +4909,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: MAX_UINT128,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -5012,7 +5038,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -5146,7 +5173,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await borrowerGateway
         .connect(borrower)
@@ -5278,7 +5306,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // too large ltv reverts
@@ -5432,7 +5461,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -5556,7 +5586,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await borrowerGateway
@@ -5739,7 +5770,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -5887,7 +5919,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await borrowerGateway
         .connect(borrower)
