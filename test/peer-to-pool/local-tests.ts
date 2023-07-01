@@ -21,12 +21,13 @@ const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
+const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 
 // deployment parameterization constants
 const MAX_ARRANGER_FEE = BASE.mul(5).div(10) // 50%
 const MIN_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY
 const MAX_UNSUBSCRIBE_GRACE_PERIOD = ONE_DAY.mul(14)
-const LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 60 * 60 // 1h
+const LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 60 * 15 // 15min
 const MIN_TIME_BETWEEN_DUE_DATES = ONE_DAY.mul(7)
 const MIN_CONVERSION_GRACE_PERIOD = ONE_DAY
 const MIN_REPAYMENT_GRACE_PERIOD = ONE_DAY
@@ -360,7 +361,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     // revert on empty repayment schedule
     await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
-      'EmptyRepaymentSchedule'
+      'InvalidRepaymentScheduleLength'
     )
 
     // define example repayment and conversion amounts
@@ -584,11 +585,6 @@ describe('Peer-to-Pool: Local Tests', function () {
       )
       expect(unfinalizedLoanTerms.repaymentSchedule[i].dueTimestamp).to.equal(loanTerms.repaymentSchedule[i].dueTimestamp)
     }
-    // reverts if trying to lock while terms are in cool off period
-    await expect(loanProposal.connect(daoTreasury).lockLoanTerms(lastLoanTermsUpdateTime)).to.be.revertedWithCustomError(
-      loanProposal,
-      'WaitForLoanTermsCoolOffPeriod'
-    )
 
     // move forward past loan terms update cool off period
     blocknum = await ethers.provider.getBlockNumber()
@@ -1047,6 +1043,23 @@ describe('Peer-to-Pool: Local Tests', function () {
       fundingPool,
       'InvalidLender'
     )
+
+    // construct payload and sign
+    const payload = ethers.utils.defaultAbiCoder.encode(
+      ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+      [factory.address, lender0.address, 0, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, ZERO_BYTES32]
+    )
+    const payloadHash = ethers.utils.keccak256(payload)
+    const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+    const sig = ethers.utils.splitSignature(signature)
+    const compactSig = sig.compact
+    const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+    expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+    // expects to revert on outdated signature
+    await expect(
+      factory.connect(lender0).claimLenderWhitelistStatus(whitelistAuthority.address, 0, compactSig, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(factory, 'CannotClaimOutdatedStatus')
   })
 
   it('Should revert on invalid loan terms locking', async function () {

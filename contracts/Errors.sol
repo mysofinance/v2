@@ -53,7 +53,7 @@ library Errors {
     error OnChainQuoteAlreadyAdded();
     error OffChainQuoteHasBeenInvalidated();
     error Uninitialized();
-    error EmptyRepaymentSchedule();
+    error InvalidRepaymentScheduleLength();
     error FirstDueDateTooCloseOrPassed();
     error InvalidGracePeriod();
     error UnregisteredLoanProposal();

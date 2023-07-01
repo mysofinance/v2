@@ -263,6 +263,12 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
+        if (
+            block.timestamp + Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE >
+            loanTerms.repaymentSchedule[0].dueTimestamp
+        ) {
+            revert Errors.FirstDueDateTooCloseOrPassed();
+        }
         ILoanProposalImpl(loanProposal).checkAndUpdateStatus();
         if (grossLoanAmount != totalSubscriptions[loanProposal]) {
             revert Errors.IncorrectLoanAmount();
@@ -273,7 +279,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         );
         (, , , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
-        
+
         address _depositToken = depositToken;
         if (arrangerFee > 0) {
             IERC20Metadata(_depositToken).safeTransfer(arranger, arrangerFee);
