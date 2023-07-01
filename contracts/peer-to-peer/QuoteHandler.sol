@@ -274,6 +274,7 @@ contract QuoteHandler is IQuoteHandler {
         if (
             generalQuoteInfo.collToken == generalQuoteInfo.loanToken ||
             generalQuoteInfo.maxLoan == 0 ||
+            generalQuoteInfo.minLoan == 0 ||
             generalQuoteInfo.minLoan > generalQuoteInfo.maxLoan
         ) {
             revert Errors.InvalidQuote();

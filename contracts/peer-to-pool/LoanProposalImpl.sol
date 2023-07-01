@@ -646,9 +646,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         uint256 minTotalSubscriptions,
         DataTypesPeerToPool.Repayment[] memory repaymentSchedule
     ) internal view {
+        uint256 repaymentsScheduleLen = repaymentSchedule.length;
         if (
-            repaymentSchedule.length == 0 ||
-            repaymentSchedule.length > Constants.MAX_REPAYMENT_SCHEDULE_LENGTH
+            repaymentsScheduleLen == 0 ||
+            repaymentsScheduleLen > Constants.MAX_REPAYMENT_SCHEDULE_LENGTH
         ) {
             revert Errors.InvalidRepaymentScheduleLength();
         }
@@ -663,7 +664,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.FirstDueDateTooCloseOrPassed();
         }
-        for (uint256 i; i < repaymentSchedule.length; ) {
+        for (uint256 i; i < repaymentsScheduleLen; ) {
             if (
                 SafeCast.toUint128(
                     (repaymentSchedule[i].loanTokenDue *

@@ -211,6 +211,12 @@ interface ILenderVaultImpl {
     function owner() external view returns (address);
 
     /**
+     * @notice function to return number of signers
+     * @return number of signers
+     */
+    function numSigners() external view returns (uint256);
+
+    /**
      * @notice function to return unlocked token balances
      * @param tokens array of token addresses
      * @return balances the vault balances of the token addresses

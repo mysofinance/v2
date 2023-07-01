@@ -54,7 +54,7 @@ contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
         }
         address newLoanProposal = Clones.clone(loanProposalImpl);
         loanProposals.push(newLoanProposal);
-        uint256 numLoanProposals = loanProposals.length;
+        uint256 _numLoanProposals = loanProposals.length;
         isLoanProposal[newLoanProposal] = true;
         address _mysoTokenManager = mysoTokenManager;
         if (_mysoTokenManager != address(0)) {
@@ -64,7 +64,7 @@ contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
                     msg.sender,
                     _collToken,
                     _arrangerFee,
-                    numLoanProposals
+                    _numLoanProposals
                 );
         }
         ILoanProposalImpl(newLoanProposal).initialize(
@@ -86,7 +86,7 @@ contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
             _collToken,
             _arrangerFee,
             _unsubscribeGracePeriod,
-            numLoanProposals
+            _numLoanProposals
         );
     }
 
@@ -173,10 +173,11 @@ contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
         address[] calldata lenders,
         uint256 whitelistedUntil
     ) external {
-        if (lenders.length == 0) {
+        uint256 lendersLen = lenders.length;
+        if (lendersLen == 0) {
             revert Errors.InvalidArrayLength();
         }
-        for (uint256 i; i < lenders.length; ) {
+        for (uint256 i; i < lendersLen; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerLender = _lenderWhitelistedUntil[
                     msg.sender
@@ -212,6 +213,10 @@ contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
         return
             _lenderWhitelistedUntil[whitelistAuthority][lender] >=
             block.timestamp;
+    }
+
+    function numLoanProposals() external view returns (uint256) {
+        return loanProposals.length;
     }
 
     function transferOwnership(address _newOwnerProposal) public override {

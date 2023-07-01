@@ -1378,7 +1378,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(lenderVault, 'TooSmallLoanAmount')
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
   })
 

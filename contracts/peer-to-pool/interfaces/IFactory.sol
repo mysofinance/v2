@@ -166,4 +166,10 @@ interface IFactory {
         address whitelistAuthority,
         address lender
     ) external view returns (bool);
+
+    /**
+     * @notice Returns the number of loan proposals created
+     * @return Number of loan proposals created
+     */
+    function numLoanProposals() external view returns (uint256);
 }
