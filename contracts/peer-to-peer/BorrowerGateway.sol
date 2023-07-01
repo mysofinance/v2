@@ -22,7 +22,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
 
     // putting fee info in borrow gateway since borrower always pays this upfront
     address public immutable addressRegistry;
-    uint256 public protocolFee; // in BASE
+    // index 0: base protocol fee is paid even for swap (no tenor)
+    // index 1: protocol fee slope scales protocol fee with tenor
+    uint128[2] internal protocolFeeParams;
 
     constructor(address _addressRegistry) {
         if (_addressRegistry == address(0)) {
@@ -207,9 +209,9 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                     uint256(loanRepayInstructions.targetRepayAmount)) /
                     uint256(leftRepaymentAmount)
             );
-            if (noCompartment && reclaimCollAmount == 0) {
-                revert Errors.ReclaimAmountIsZero();
-            }
+        }
+        if (reclaimCollAmount == 0) {
+            revert Errors.ReclaimAmountIsZero();
         }
 
         lenderVault.updateLoanInfo(
@@ -237,17 +239,26 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
     }
 
     /**
-     * @notice Protocol fee is allowed to be zero, so no min fee check, only a max fee check
+     * @notice Protocol fee is allowed to be zero, so no min fee checks, only max fee checks
      */
-    function setProtocolFee(uint256 _newFee) external {
+    function setProtocolFeeParams(uint128[2] calldata _newFeeParams) external {
         if (msg.sender != IAddressRegistry(addressRegistry).owner()) {
             revert Errors.InvalidSender();
         }
-        if (_newFee > Constants.MAX_FEE_PER_ANNUM) {
+        if (
+            _newFeeParams[0] > Constants.MAX_SWAP_PROTOCOL_FEE ||
+            _newFeeParams[1] > Constants.MAX_FEE_PER_ANNUM ||
+            (_newFeeParams[0] == protocolFeeParams[0] &&
+                _newFeeParams[1] == protocolFeeParams[1])
+        ) {
             revert Errors.InvalidFee();
         }
-        protocolFee = _newFee;
-        emit ProtocolFeeSet(_newFee);
+        protocolFeeParams = _newFeeParams;
+        emit ProtocolFeeSet(_newFeeParams);
+    }
+
+    function getProtocolFeeParams() external view returns (uint128[2] memory) {
+        return protocolFeeParams;
     }
 
     function _processTransfers(
@@ -257,10 +268,11 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.Loan memory loan,
         DataTypesPeerToPeer.TransferInstructions memory transferInstructions
     ) internal {
-        IAddressRegistry registry = IAddressRegistry(addressRegistry);
         if (
             borrowInstructions.callbackAddr != address(0) &&
-            registry.whitelistState(borrowInstructions.callbackAddr) !=
+            IAddressRegistry(addressRegistry).whitelistState(
+                borrowInstructions.callbackAddr
+            ) !=
             DataTypesPeerToPeer.WhitelistState.CALLBACK
         ) {
             revert Errors.NonWhitelistedCallback();
@@ -279,83 +291,129 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             );
         }
 
-        uint256 currProtocolFee = protocolFee;
-        uint256 applicableProtocolFee = currProtocolFee;
+        uint128[2] memory currProtocolFeeParams = protocolFeeParams;
+        uint128[2] memory applicableProtocolFeeParams = currProtocolFeeParams;
 
-        address mysoTokenManager = registry.mysoTokenManager();
+        address mysoTokenManager = IAddressRegistry(addressRegistry)
+            .mysoTokenManager();
         if (mysoTokenManager != address(0)) {
-            applicableProtocolFee = IMysoTokenManager(mysoTokenManager)
+            applicableProtocolFeeParams = IMysoTokenManager(mysoTokenManager)
                 .processP2PBorrow(
-                    currProtocolFee,
+                    applicableProtocolFeeParams,
                     borrowInstructions,
                     loan,
                     lenderVault
                 );
-            if (applicableProtocolFee > currProtocolFee) {
-                revert Errors.InvalidFee();
+            for (uint256 i; i < 2; ) {
+                if (applicableProtocolFeeParams[i] > currProtocolFeeParams[i]) {
+                    revert Errors.InvalidFee();
+                }
+                unchecked {
+                    ++i;
+                }
             }
         }
 
-        // protocol fees on whole sendAmount
-        // this will make calculation of expected transfer fee be protocolFeeAmount + (collSendAmount - protocolFeeAmount)*(tokenFee/collUnit)
-        uint256 protocolFeeAmount = ((borrowInstructions.collSendAmount *
-            applicableProtocolFee *
-            (loan.initCollAmount == 0 ? 1 : (loan.expiry - block.timestamp))) /
-            (Constants.BASE * Constants.YEAR_IN_SECONDS));
+        // Note: Collateral and fees flow and breakdown is as follows:
+        //
+        // collSendAmount ("collSendAmount")
+        // |
+        // |-- protocolFeeAmount ("protocolFeeAmount")
+        // |
+        // |-- gross pledge amount
+        //     |
+        //     |-- gross upfront fee
+        //     |   |
+        //     |   |-- net upfront fee ("upfrontFee")
+        //     |   |
+        //     |   |-- transfer fee 1
+        //     |
+        //     |-- gross reclaimable collateral
+        //         |
+        //         |-- net reclaimable collateral ("initCollAmount")
+        //         |
+        //         |-- transfer fee 2 ("expectedCompartmentTransferFee")
+        //
+        // where expectedProtocolAndVaultTransferFee = protocolFeeAmount + transfer fee 1
 
-        // should only happen when tenor >> 1 year or very large upfront fees with more reasonable protocol fees
-        // e.g. at 5% MAX_FEE_PER_ANNUM, tenor still needs to be 20 years with no upfront fee
-        // but a high upfrontFee could also make this fail for smaller protocolFee amounts
+        uint256 protocolFeeAmount = _calculateProtocolFeeAmount(
+            applicableProtocolFeeParams,
+            borrowInstructions.collSendAmount,
+            loan.initCollAmount == 0 ? 0 : loan.expiry - block.timestamp
+        );
+
+        // check protocolFeeAmount <= expectedProtocolAndVaultTransferFee
         if (
-            borrowInstructions.collSendAmount <
-            protocolFeeAmount + transferInstructions.upfrontFee
+            protocolFeeAmount >
+            borrowInstructions.expectedProtocolAndVaultTransferFee
         ) {
             revert Errors.InsufficientSendAmount();
         }
 
         if (protocolFeeAmount != 0) {
+            // note: if coll token has a transfer fee, then protocolFeeAmount received by the protocol will be less than
+            // protocolFeeAmount; this is by design to not tax borrowers or lenders for transfer fees on protocol fees
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
-                registry.owner(),
+                IAddressRegistry(addressRegistry).owner(),
                 protocolFeeAmount
             );
         }
-
-        uint256 collReceiverPreBal = IERC20Metadata(loan.collToken).balanceOf(
-            transferInstructions.collReceiver
-        );
-
-        uint256 collReceiverTransferAmount = borrowInstructions.collSendAmount -
-            protocolFeeAmount;
-        uint256 collReceiverExpBalDiff = loan.initCollAmount +
+        // determine any transfer fee for sending collateral to vault
+        uint256 collTransferFeeForSendingToVault = borrowInstructions
+            .expectedProtocolAndVaultTransferFee - protocolFeeAmount;
+        // Note: initialize the coll amount that is sent to vault in case there's no compartment
+        uint256 grossCollTransferAmountToVault = loan.initCollAmount +
+            transferInstructions.upfrontFee +
+            collTransferFeeForSendingToVault;
+        // Note: initialize the vault's expected coll balance increase in case there's no compartment
+        uint256 expVaultCollBalIncrease = loan.initCollAmount +
             transferInstructions.upfrontFee;
-        if (
-            transferInstructions.collReceiver != lenderVault &&
-            transferInstructions.upfrontFee != 0
-        ) {
-            collReceiverTransferAmount -= transferInstructions.upfrontFee;
-            collReceiverExpBalDiff -= transferInstructions.upfrontFee;
-            // Note: if a compartment is used then we need to transfer the upfront fee to the vault separately;
-            // in the special case where the coll also has a token transfer fee then the vault will receive slightly
-            // less collToken than upfrontFee due to coll token transferFee, which, however can be counteracted with
-            // a slightly higher upfrontFee to compensate for this effect.
+        if (transferInstructions.collReceiver != lenderVault) {
+            // Note: if there's a compartment then adjust the coll amount that is sent to vault by deducting the amount
+            // that goes to the compartment, i.e., the borrower's reclaimable coll amount and any associated transfer fees
+            grossCollTransferAmountToVault -= loan.initCollAmount;
+            // Note: similarly, adjust the vault's expected coll balance diff by deducting the reclaimable coll amount that
+            // goes to the compartment
+            expVaultCollBalIncrease -= loan.initCollAmount;
+
+            uint256 collReceiverPreBal = IERC20Metadata(loan.collToken)
+                .balanceOf(transferInstructions.collReceiver);
+            IERC20Metadata(loan.collToken).safeTransferFrom(
+                loan.borrower,
+                transferInstructions.collReceiver,
+                loan.initCollAmount +
+                    borrowInstructions.expectedCompartmentTransferFee
+            );
+            // check that compartment balance increase matches the intended reclaimable collateral amount
+            if (
+                IERC20Metadata(loan.collToken).balanceOf(
+                    transferInstructions.collReceiver
+                ) != loan.initCollAmount + collReceiverPreBal
+            ) {
+                revert Errors.InvalidSendAmount();
+            }
+        }
+
+        if (grossCollTransferAmountToVault > 0) {
+            // @dev: grossCollTransferAmountToVault can be zero in case no upfront fee and compartment is used
+            if (expVaultCollBalIncrease == 0) {
+                revert Errors.InconsistentExpVaultBalIncrease();
+            }
+            uint256 vaultPreBal = IERC20Metadata(loan.collToken).balanceOf(
+                lenderVault
+            );
             IERC20Metadata(loan.collToken).safeTransferFrom(
                 loan.borrower,
                 lenderVault,
-                transferInstructions.upfrontFee
+                grossCollTransferAmountToVault
             );
-        }
-        IERC20Metadata(loan.collToken).safeTransferFrom(
-            loan.borrower,
-            transferInstructions.collReceiver,
-            collReceiverTransferAmount
-        );
-        if (
-            IERC20Metadata(loan.collToken).balanceOf(
-                transferInstructions.collReceiver
-            ) != collReceiverExpBalDiff + collReceiverPreBal
-        ) {
-            revert Errors.InvalidSendAmount();
+            if (
+                IERC20Metadata(loan.collToken).balanceOf(lenderVault) !=
+                vaultPreBal + expVaultCollBalIncrease
+            ) {
+                revert Errors.InvalidSendAmount();
+            }
         }
     }
 
@@ -419,5 +477,22 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert Errors.UnregisteredVault();
         }
+    }
+
+    function _calculateProtocolFeeAmount(
+        uint128[2] memory _protocolFeeParams,
+        uint256 collSendAmount,
+        uint256 borrowDuration
+    ) internal pure returns (uint256 protocolFeeAmount) {
+        bool useMaxProtocolFee = _protocolFeeParams[0] +
+            ((_protocolFeeParams[1] * borrowDuration) /
+                Constants.YEAR_IN_SECONDS) >
+            Constants.MAX_TOTAL_PROTOCOL_FEE;
+        protocolFeeAmount = useMaxProtocolFee
+            ? (collSendAmount * Constants.MAX_TOTAL_PROTOCOL_FEE) /
+                Constants.BASE
+            : ((_protocolFeeParams[0] * collSendAmount) / Constants.BASE) +
+                ((collSendAmount * _protocolFeeParams[1] * borrowDuration) /
+                    (Constants.YEAR_IN_SECONDS * Constants.BASE));
     }
 }

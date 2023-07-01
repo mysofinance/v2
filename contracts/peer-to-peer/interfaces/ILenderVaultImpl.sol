@@ -23,6 +23,7 @@ interface ILenderVaultImpl {
     );
 
     event QuoteProcessed(
+        uint256 netPledgeAmount,
         DataTypesPeerToPeer.TransferInstructions transferInstructions
     );
 

@@ -115,8 +115,10 @@ library DataTypesPeerToPeer {
     struct BorrowTransferInstructions {
         // amount of collateral sent
         uint256 collSendAmount;
-        // includes protocol fee and native token transfer fee
-        uint256 expectedTransferFee;
+        // sum of (i) protocol fee and (ii) transfer fees (if any) associated with sending any collateral to vault
+        uint256 expectedProtocolAndVaultTransferFee;
+        // transfer fees associated with sending any collateral to compartment (if used)
+        uint256 expectedCompartmentTransferFee;
         // deadline to prevent stale transactions
         uint256 deadline;
         // slippage protection if oracle price is too loose

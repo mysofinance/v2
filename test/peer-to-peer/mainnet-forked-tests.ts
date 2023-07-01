@@ -24,7 +24,8 @@ import {
   getExactLpTokenPriceInEth,
   getFairReservesPriceAndEthValue,
   getDeltaBNComparison,
-  setupBorrowerWhitelist
+  setupBorrowerWhitelist,
+  getTwoFeesIfPossible
 } from './helpers/misc'
 
 // test config constants & vars
@@ -957,14 +958,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
 
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1058,14 +1061,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
 
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1242,14 +1247,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
 
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1393,14 +1400,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
 
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1538,14 +1547,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
 
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -1735,14 +1746,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_WETH.div(1000000)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
 
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2013,7 +2026,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const slippage = 0.01
       const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
       const quoteTupleIdx = 0
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const deadline = MAX_UINT128
       const callbackAddr = uniV3Looping.address
 
@@ -2023,7 +2037,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       const borrowInstructions = {
         collSendAmount: collSendAmountBn,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2243,7 +2258,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const slippageTolerance = BASE.mul(30).div(10000)
       const minSwapReceive = collSendAmount.sub(initCollFromBorrower).mul(BASE.sub(slippageTolerance)).div(BASE)
@@ -2256,7 +2272,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2278,7 +2295,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           .connect(borrower)
           .borrowWithOnChainQuote(
             lenderVault.address,
-            { ...borrowInstructions, expectedTransferFee: BigNumber.from(0).add(1) },
+            { ...borrowInstructions, expectedProtocolAndVaultTransferFee: BigNumber.from(0).add(1) },
             onChainQuote,
             quoteTupleIdx
           )
@@ -2439,14 +2456,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_CRV
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const compartmentData = crvGaugeIndex
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -2850,13 +2869,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = BigNumber.from(10).pow(18)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3057,13 +3078,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = BigNumber.from(10).pow(18)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3221,13 +3244,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_UNI
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3436,7 +3461,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrow with on chain quote
       const collSendAmount = ONE_UNI
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
 
       const PRECISION = 10000
@@ -3454,7 +3480,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3664,8 +3691,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await weth.connect(borrower).approve(poolAddress, MAX_UINT256)
       await poolInstance.connect(borrower).supply(weth.address, locallyCollBalance, borrower.address, '0')
 
-      //supply paxg pool
-
       // lender deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
@@ -3691,7 +3716,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
       // set protocol fee 10 bps
-      await borrowerGateway.connect(team).setProtocolFee(BASE.div(1000))
+      await borrowerGateway.connect(team).setProtocolFeeParams([0, BASE.div(1000)])
 
       const onChainQuote = await createOnChainRequest({
         lender,
@@ -3713,21 +3738,39 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         loanPerCollUnit: ONE_USDC.mul(1000)
       })
 
-      // borrow with on chain quote no transfer fee
+      // borrow with on chain quote no token transfer fee
       const collSendAmount = BigNumber.from(10).pow(18)
       // 90 day tenor with 10 bps protocol fee
-      const expectedTransferFee = collSendAmount.mul(90).div(365 * 1000)
+      const expectedProtocolAndVaultTransferFee = collSendAmount.mul(90).div(365 * 1000)
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
+
+      const borrowInstructionsWithExtraVaultTransferFee = {
+        ...borrowInstructions,
+        expectedProtocolAndVaultTransferFee: expectedProtocolAndVaultTransferFee.add(1)
+      }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            borrowInstructionsWithExtraVaultTransferFee,
+            onChainQuote,
+            quoteTupleIdx
+          )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
 
       const borrowWithOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -3752,27 +3795,57 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // checks that loan amount = (sendAmount - transfer fee) * loanPerColl
       // note: expected transfer fee is just protocol fee since no coll token transfer fee
       expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(
-        collSendAmount.sub(expectedTransferFee).mul(ONE_USDC.mul(1000)).div(BASE)
+        collSendAmount.sub(expectedProtocolAndVaultTransferFee).mul(ONE_USDC.mul(1000)).div(BASE)
       )
       // compartment coll balance = sendAmount - transfer fee - upfront fee
-      expect(aTokenCompartmentCollBal).to.equal(collSendAmount.sub(expectedTransferFee).sub(upfrontFee))
+      expect(aTokenCompartmentCollBal).to.equal(collSendAmount.sub(expectedProtocolAndVaultTransferFee).sub(upfrontFee))
       // vault coll balance = upfrontFee
       expect(vaultCollBalPost).to.equal(upfrontFee)
 
       // 90 day tenor with 10 bps protocol fee
-      const protocolFeeAmount = expectedTransferFee
+      const protocolFeeAmount = expectedProtocolAndVaultTransferFee
       const compartmentTransferAmount = collSendAmount.sub(protocolFeeAmount).sub(upfrontFee)
       // paxg transfer fee is 2 bps
       const paxgFeeOnCompartmentTransferAmount = compartmentTransferAmount.mul(2).div(10000)
-      const paxgExpectedTransferFee = protocolFeeAmount.add(paxgFeeOnCompartmentTransferAmount)
+      let paxgExpectedProtocolAndVaultTransferFee = protocolFeeAmount.add(paxgFeeOnCompartmentTransferAmount)
+
+      // initially no extra upfront fee to vault transfer fee will revert
       const paxgBorrowInstructions = {
         collSendAmount,
-        expectedTransferFee: paxgExpectedTransferFee,
+        expectedProtocolAndVaultTransferFee: paxgExpectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee: BigNumber.from(0),
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
         callbackData
       }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            paxgBorrowInstructions,
+            paxgWithCompartmentOnChainQuote,
+            quoteTupleIdx
+          )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+
+      const upfrontFeeFromQuote = paxgWithCompartmentOnChainQuote.quoteTuples[quoteTupleIdx].upfrontFeePctInBase
+      const commonFeeNumerator = collSendAmount.sub(protocolFeeAmount)
+      const commonFeeDenominator = BASE.mul(10000)
+
+      const paxgExpectedTransferFee1Numerator = commonFeeNumerator.mul(upfrontFeeFromQuote)
+      const paxgExpectedTransferFee2Numerator = commonFeeNumerator.mul(BASE.sub(upfrontFeeFromQuote))
+      const paxgExpectedTransferFee1 = paxgExpectedTransferFee1Numerator.mul(2).div(commonFeeDenominator)
+      const paxgExpectedTransferFee2 = paxgExpectedTransferFee2Numerator.mul(2).div(commonFeeDenominator)
+      paxgExpectedProtocolAndVaultTransferFee = paxgExpectedTransferFee1.add(protocolFeeAmount)
+
+      // now add in transfer fee on the upfront fee portion
+      paxgBorrowInstructions.expectedCompartmentTransferFee = paxgExpectedTransferFee2
+      paxgBorrowInstructions.expectedProtocolAndVaultTransferFee = paxgExpectedProtocolAndVaultTransferFee
+
+      const collateralUsedForLoan = collSendAmount.sub(paxgExpectedProtocolAndVaultTransferFee).sub(paxgExpectedTransferFee2)
 
       const borrowWithPaxgOnChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
@@ -3786,7 +3859,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const paxgUpfrontFee = borrowPaxgEvent?.args?.['upfrontFee']
       const paxgCollTokenCompartmentAddr = borrowPaxgEvent?.args?.loan?.['collTokenCompartmentAddr']
 
-      expect(paxgUpfrontFee).to.equal(upfrontFee)
+      expect(paxgUpfrontFee).to.equal(collateralUsedForLoan.mul(upfrontFeeFromQuote).div(BASE))
 
       // check balance post borrow
       const borrowerUsdcBalPostPaxg = await usdc.balanceOf(borrower.address)
@@ -3796,22 +3869,393 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // checks that loan currency delta is equal magnitude, but opposite sign for borrower and vault
       expect(borrowerUsdcBalPostPaxg.sub(borrowerUsdcBalPost)).to.equal(vaultUsdcBalPost.sub(vaultUsdcBalPostPaxg))
-      // checks that loan amount = (sendAmount - transfer fee) * loanPerColl
+      // checks that loan amount = (sendAmount - transfer fee - transfer fee for upfront coll) * loanPerColl
       // note: expected transfer fee is just protocol fee since no coll token transfer fee
       expect(vaultUsdcBalPost.sub(vaultUsdcBalPostPaxg)).to.equal(
-        collSendAmount.sub(paxgExpectedTransferFee).mul(ONE_USDC.mul(1000)).div(BASE)
+        collSendAmount
+          .sub(paxgExpectedProtocolAndVaultTransferFee)
+          .sub(paxgExpectedTransferFee2)
+          .mul(ONE_USDC.mul(1000))
+          .div(BASE)
       )
-      // compartment coll (paxg) balance = sendAmount - transfer fee - upfront fee
+      // compartment coll (paxg) balance = sendAmount - transfer fee - transfer fee for upfront coll - upfront fee
       // note this still equals loan.initCollAmount
-      expect(compartmentPaxgBal).to.equal(collSendAmount.sub(paxgExpectedTransferFee).sub(paxgUpfrontFee))
-      // vault coll (paxg) balance = upfrontFee - paxg token transfer fee
-      // this case (compartment with a token transfer fee and upfront fee) is only case where
-      // lender is affected by transfer fees...so in this situation would need to either
-      // 1) not use upfront fee
-      // 2) set upfront fee slightly higher to accomodate for coll token transfer fee
-      // note: currently we do not plan to have compartments with any known coll tokens with transfer fees
-      // but this case covers a possible future token that might fall into that category
-      expect(vaultPaxgBalPost).to.equal(upfrontFee.mul(9998).div(10000))
+      expect(compartmentPaxgBal).to.equal(
+        collSendAmount.sub(paxgExpectedProtocolAndVaultTransferFee).sub(paxgExpectedTransferFee2).sub(paxgUpfrontFee)
+      )
+      // vault coll (paxg) balance = upfrontFee
+      expect(vaultPaxgBalPost).to.equal(paxgUpfrontFee)
+    })
+
+    it('Should process compartment with protocol fee and transfer fees correctly with high upfront fee', async () => {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, paxg, lenderVault, addressRegistry } =
+        await setupTest()
+
+      // create curve staking implementation
+      const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
+      await AaveStakingCompartmentImplementation.connect(team)
+      const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
+      await aaveStakingCompartmentImplementation.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
+
+      // lender deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).setWhitelistState([usdc.address, paxg.address], 1)
+
+      // whitelist compartment for tokens
+      await addressRegistry
+        .connect(team)
+        .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [paxg.address], true)
+
+      // borrower approves borrower gateway
+      await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // set protocol fee of 10 bps annulized and 2bp fixed protocol fee
+      await borrowerGateway.connect(team).setProtocolFeeParams([BASE.div(5000), BASE.div(1000)])
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const buyPricePerCollToken = ONE_USDC.mul(1200)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE.mul(999).div(1000),
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: paxg.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: aaveStakingCompartmentImplementation.address,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrow with on chain quote with token transfer fee
+      // fixed part has 2bp protocol fee
+      const fixedProtocolFeeAmount = ONE_PAXG.div(5000)
+      // 90 day tenor with 10 bps variable protocol fee
+      const variableProtocolFeeAmount = ONE_PAXG.mul(quoteTuples[0].tenor).div(BigNumber.from(YEAR_IN_SECONDS).mul(1000))
+      const protocolFeeAmount = fixedProtocolFeeAmount.add(variableProtocolFeeAmount)
+      const collSendAmount = ONE_PAXG
+      const sendAmountAfterProtcolFee = collSendAmount.sub(protocolFeeAmount)
+      const sendAmountForVault = sendAmountAfterProtcolFee.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE)
+      const sendAmountForCompartment = sendAmountAfterProtcolFee.mul(BASE.sub(quoteTuples[0].upfrontFeePctInBase)).div(BASE)
+
+      const expectedProtocolAndVaultTransferFee = protocolFeeAmount.add(sendAmountForVault.mul(2).div(10000))
+      const expectedCompartmentTransferFee = sendAmountForCompartment.mul(2).div(10000)
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      const collateralUsedForLoan = collSendAmount
+        .sub(expectedProtocolAndVaultTransferFee)
+        .sub(expectedCompartmentTransferFee)
+
+      const borrowWithPaxgOnChainQuoteTransaction = await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      const borrowWithPaxgOnChainQuoteReceipt = await borrowWithPaxgOnChainQuoteTransaction.wait()
+
+      const borrowPaxgEvent = borrowWithPaxgOnChainQuoteReceipt.events?.find(x => {
+        return x.event === 'Borrowed'
+      })
+
+      const paxgUpfrontFee = borrowPaxgEvent?.args?.['upfrontFee']
+      const paxgCollTokenCompartmentAddr = borrowPaxgEvent?.args?.loan?.['collTokenCompartmentAddr']
+
+      expect(paxgUpfrontFee).to.equal(collateralUsedForLoan.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE))
+
+      // check balance post borrow
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const compartmentPaxgBal = await paxg.balanceOf(paxgCollTokenCompartmentAddr)
+      const vaultPaxgBalPost = await paxg.balanceOf(lenderVault.address)
+
+      // checks that loan currency delta is equal magnitude, but opposite sign for borrower and vault
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+      // checks that loan amount = (sendAmount - transfer fee - transfer fee for upfront coll) * loanPerColl
+      expect(vaultUsdcBalPre.sub(vaultUsdcBalPost)).to.equal(
+        collSendAmount
+          .sub(expectedProtocolAndVaultTransferFee)
+          .sub(expectedCompartmentTransferFee)
+          .mul(ONE_USDC.mul(1200))
+          .div(ONE_PAXG)
+      )
+      // compartment coll (paxg) balance = sendAmount - transfer fee - transfer fee for upfront coll - upfront fee
+      // note this still equals loan.initCollAmount
+      expect(compartmentPaxgBal).to.equal(
+        collSendAmount.sub(expectedProtocolAndVaultTransferFee).sub(expectedCompartmentTransferFee).sub(paxgUpfrontFee)
+      )
+      // vault coll (paxg) balance = upfrontFee
+      expect(vaultPaxgBalPost).to.equal(paxgUpfrontFee)
+    })
+
+    it('Should process correctly excess vault fee when no vault transfer (compartment, no upfront fee)', async () => {
+      const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault, addressRegistry } =
+        await setupTest()
+
+      // create curve staking implementation
+      const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
+      await AaveStakingCompartmentImplementation.connect(team)
+      const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
+      await aaveStakingCompartmentImplementation.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
+
+      // lender deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+
+      expect(vaultUsdcBalPre).to.equal(ONE_USDC.mul(100000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).setWhitelistState([usdc.address, weth.address], 1)
+
+      // whitelist compartment for tokens
+      await addressRegistry
+        .connect(team)
+        .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
+
+      // borrower approves borrower gateway
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // set protocol fee of 10 bps annulized and 2bp fixed protocol fee
+      await borrowerGateway.connect(team).setProtocolFeeParams([BASE.div(5000), BASE.div(1000)])
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const buyPricePerCollToken = ONE_USDC.mul(1200)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: aaveStakingCompartmentImplementation.address,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // borrow with on chain quote with token transfer fee
+      // fixed part has 2bp protocol fee
+      const fixedProtocolFeeAmount = ONE_PAXG.div(5000)
+      // 90 day tenor with 10 bps variable protocol fee
+      const variableProtocolFeeAmount = ONE_PAXG.mul(quoteTuples[0].tenor).div(BigNumber.from(YEAR_IN_SECONDS).mul(1000))
+      const protocolFeeAmount = fixedProtocolFeeAmount.add(variableProtocolFeeAmount)
+      const collSendAmount = ONE_WETH
+
+      const expectedProtocolAndVaultTransferFee = protocolFeeAmount.add(1)
+      const expectedCompartmentTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InconsistentExpVaultBalIncrease')
+    })
+
+    it('Should handle swap with protocol fee and transfer fee correctly', async function () {
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, team, borrower, usdc, paxg, lenderVault } =
+        await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // whitelist token pair
+      await addressRegistry.connect(team).setWhitelistState([usdc.address, paxg.address], 1)
+
+      await borrowerGateway.connect(team).setProtocolFeeParams([BASE.div(500), BASE.div(100)])
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const buyPricePerCollToken = ONE_USDC.mul(1890)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE,
+          tenor: 0
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: paxg.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDR,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDR,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDR,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerPaxgBalPre = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPre = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+      const numLoansPre = await lenderVault.totalNumLoans()
+      const lockedAmountsWethPre = await lenderVault.lockedAmounts(paxg.address)
+      const lockedAmountsUsdcPre = await lenderVault.lockedAmounts(usdc.address)
+
+      // borrower approves gateway and executes quote
+      await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const sellAmountOfCollToken = ONE_PAXG.mul(499).div(500).mul(4999).div(5000)
+      const expectedProtocolAndVaultTransferFee = ONE_PAXG.div(500).add(ONE_PAXG.mul(499).mul(2).div(10000).div(500))
+      const expectedCompartmentTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDR
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount: ONE_PAXG,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData
+      }
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      const borrowerPaxgBalPost = await paxg.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultPaxgBalPost = await paxg.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const numLoansPost = await lenderVault.totalNumLoans()
+      const lockedAmountsPaxgPost = await lenderVault.lockedAmounts(paxg.address)
+      const lockedAmountsUsdcPost = await lenderVault.lockedAmounts(usdc.address)
+
+      // check balance post borrow
+      expect(borrowerPaxgBalPre.sub(borrowerPaxgBalPost)).to.equal(
+        vaultPaxgBalPost.sub(vaultPaxgBalPre).add(expectedProtocolAndVaultTransferFee)
+      )
+      expect(vaultPaxgBalPost.sub(vaultPaxgBalPre)).to.equal(sellAmountOfCollToken)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(
+        buyPricePerCollToken.mul(sellAmountOfCollToken).div(ONE_PAXG)
+      )
+
+      // check no change in locked amounts
+      expect(lockedAmountsPaxgPost).to.equal(lockedAmountsWethPre)
+      expect(lockedAmountsPaxgPost).to.equal(0)
+      expect(lockedAmountsUsdcPost).to.equal(lockedAmountsUsdcPre)
+      expect(lockedAmountsUsdcPost).to.equal(0)
+
+      // check no loan was pushed
+      expect(numLoansPost).to.equal(numLoansPre)
+      expect(numLoansPost).to.equal(0)
+
+      // check no repay possible
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: 0,
+            targetRepayAmount: buyPricePerCollToken,
+            expectedTransferFee: 0,
+            deadline: MAX_UINT256,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
+
+      // check lender can unlock swapped amount (=upfront fee) immediately
+      const userPaxgBalPreWithdraw = await paxg.balanceOf(lender.address)
+      const vaultPaxgBalPreWithdraw = await paxg.balanceOf(lenderVault.address)
+      await lenderVault.connect(lender).withdraw(paxg.address, sellAmountOfCollToken)
+      const userPaxgBalPostWithdraw = await paxg.balanceOf(lender.address)
+      const vaultPaxgBalPostWithdraw = await paxg.balanceOf(lenderVault.address)
+      // must account for paxg transfer fees on withdrawal
+      expect(userPaxgBalPostWithdraw.sub(userPaxgBalPreWithdraw)).to.be.equal(
+        vaultPaxgBalPreWithdraw.sub(vaultPaxgBalPostWithdraw).mul(4999).div(5000)
+      )
+      expect(userPaxgBalPostWithdraw.sub(userPaxgBalPreWithdraw)).to.be.equal(sellAmountOfCollToken.mul(4999).div(5000))
     })
 
     it('Should not allow callbacks into transferCollFromCompartment(...)', async function () {
@@ -3880,13 +4324,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves and prepares borrow instructions
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -3974,14 +4420,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = ONE_PAXG.mul(2).div(9998)
+      const expectedProtocolAndVaultTransferFee = ONE_PAXG.mul(2).div(9998)
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4024,7 +4472,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       //team sets protocolFee
       const protocolFee = BigNumber.from(10).pow(16)
-      await borrowerGateway.connect(team).setProtocolFee(protocolFee) // 1% or 100 bp protocolFee
+      await borrowerGateway.connect(team).setProtocolFeeParams([0, protocolFee]) // 1% or 100 bp protocolFee
 
       // lenderVault owner gives quote
       const blocknum = await ethers.provider.getBlockNumber()
@@ -4080,7 +4528,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee: totalExpectedFees,
+        expectedProtocolAndVaultTransferFee: totalExpectedFees,
+        expectedCompartmentTransferFee: 0,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4162,14 +4611,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4390,14 +4841,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await paxg.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = ONE_PAXG.mul(2).div(9998)
+      const expectedProtocolAndVaultTransferFee = ONE_PAXG.mul(2).div(9998)
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_PAXG.mul(10000).div(9998)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4406,7 +4859,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const badBorrowInstructionsTransferFee = {
         collSendAmount,
-        expectedTransferFee: collSendAmount.mul(2),
+        expectedProtocolAndVaultTransferFee: collSendAmount.mul(2),
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4415,7 +4869,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const badBorrowInstructionsBelowMinLoan = {
         collSendAmount: collSendAmount.div(1000),
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4424,7 +4879,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       const badBorrowInstructionsTooSmallLoanAmount = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: MAX_UINT128,
         callbackAddr,
@@ -4543,14 +4999,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_WETH
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4675,14 +5133,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT128)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4807,12 +5267,14 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -4957,14 +5419,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await gohm.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_GOHM
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -5079,14 +5543,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -5260,14 +5726,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await uniV2WethUsdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_WETH.div(1000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
@@ -5406,14 +5874,16 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // borrower approves and executes quote
       await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_USDC.mul(10000)
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
