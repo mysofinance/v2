@@ -1404,6 +1404,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       // test add, remove, set min signer functionality
       await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await expect(lenderVault.addSigners([ZERO_ADDRESS])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+      await expect(lenderVault.addSigners([])).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayLength')
       await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       await lenderVault.connect(lender).setMinNumOfSigners(4)
       await expect(lenderVault.setMinNumOfSigners(4)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
@@ -2881,6 +2882,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = aaveStakingCompartmentImplementation.address
 
       await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
+      await expect(
+        addressRegistry.connect(team).setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [], true)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+
       await addressRegistry
         .connect(team)
         .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)

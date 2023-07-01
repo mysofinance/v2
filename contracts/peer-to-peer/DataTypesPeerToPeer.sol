@@ -35,8 +35,9 @@ library DataTypesPeerToPeer {
         // loan amount per one unit of collateral if no oracle
         // LTV in terms of the constant BASE (10 ** 18) if using oracle
         uint256 loanPerCollUnitOrLtv;
-        // interest rate percentage in BASE (can be negative but not smaller than -BASE (=-100%))
-        // also interestRatePCTInBase is not annualized
+        // interest rate percentage in BASE (can be negative but greater than -BASE)
+        // i.e. -100% < interestRatePct since repay amount of 0 is not allowed
+        // also interestRatePctInBase is not annualized
         int256 interestRatePctInBase;
         // fee percentage,in BASE, which will be paid in upfront in collateral
         uint256 upfrontFeePctInBase;

@@ -293,6 +293,9 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         address[] calldata borrowers,
         uint256 whitelistedUntil
     ) external {
+        if (borrowers.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
         for (uint256 i; i < borrowers.length; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerBorrower = _borrowerWhitelistedUntil[
