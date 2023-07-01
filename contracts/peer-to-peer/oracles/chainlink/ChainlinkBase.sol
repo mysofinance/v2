@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {AggregatorV3Interface} from "../../interfaces/oracles/chainlink/AggregatorV3Interface.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Constants} from "../../../Constants.sol";
 import {Errors} from "../../../Errors.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
@@ -55,9 +56,11 @@ abstract contract ChainlinkBase is IOracle {
         uint256 priceOfCollToken = _getPriceOfToken(collToken);
         uint256 priceOfLoanToken = _getPriceOfToken(loanToken);
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        collTokenPriceInLoanToken =
-            (priceOfCollToken * 10 ** loanTokenDecimals) /
-            priceOfLoanToken;
+        collTokenPriceInLoanToken = Math.mulDiv(
+            priceOfCollToken,
+            10 ** loanTokenDecimals,
+            priceOfLoanToken
+        );
     }
 
     function _getPriceOfToken(

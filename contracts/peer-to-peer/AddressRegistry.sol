@@ -151,6 +151,12 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             if (allowTokensForCompartment && !isWhitelistedERC20(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
+            if (
+                _isTokenWhitelistedForCompartment[compartmentImpl][tokens[i]] ==
+                allowTokensForCompartment
+            ) {
+                revert Errors.InvalidUpdate();
+            }
             _isTokenWhitelistedForCompartment[compartmentImpl][
                 tokens[i]
             ] = allowTokensForCompartment;

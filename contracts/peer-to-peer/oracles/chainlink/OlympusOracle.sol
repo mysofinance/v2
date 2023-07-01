@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IOlympus} from "../../interfaces/oracles/IOlympus.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ChainlinkBasic} from "./ChainlinkBasic.sol";
 import {Errors} from "../../../Errors.sol";
 
@@ -40,10 +41,15 @@ contract OlympusOracle is ChainlinkBasic {
         uint256 index = IOlympus(GOHM_ADDR).index();
 
         collTokenPriceInLoanToken = collToken == GOHM_ADDR
-            ? (priceOfCollToken * (10 ** loanTokenDecimals) * index) /
-                (priceOfLoanToken * (10 ** SOHM_DECIMALS))
-            : (priceOfCollToken *
-                (10 ** loanTokenDecimals) *
-                (10 ** SOHM_DECIMALS)) / (priceOfLoanToken * index);
+            ? Math.mulDiv(
+                priceOfCollToken,
+                (10 ** loanTokenDecimals) * index,
+                priceOfLoanToken * (10 ** SOHM_DECIMALS)
+            )
+            : Math.mulDiv(
+                priceOfCollToken,
+                (10 ** loanTokenDecimals) * (10 ** SOHM_DECIMALS),
+                priceOfLoanToken * index
+            );
     }
 }

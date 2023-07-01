@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata, IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
@@ -462,13 +463,14 @@ contract LenderVaultImpl is
             ) {
                 revert Errors.LtvHigherThanMax();
             }
-            loanPerCollUnit =
-                (quoteTuple.loanPerCollUnitOrLtv *
-                    IOracle(generalQuoteInfo.oracleAddr).getPrice(
-                        generalQuoteInfo.collToken,
-                        generalQuoteInfo.loanToken
-                    )) /
-                Constants.BASE;
+            loanPerCollUnit = Math.mulDiv(
+                quoteTuple.loanPerCollUnitOrLtv,
+                IOracle(generalQuoteInfo.oracleAddr).getPrice(
+                    generalQuoteInfo.collToken,
+                    generalQuoteInfo.loanToken
+                ),
+                Constants.BASE
+            );
         }
         uint256 unscaledLoanAmount = loanPerCollUnit *
             (collSendAmount - expectedTransferFee);
@@ -489,8 +491,11 @@ contract LenderVaultImpl is
 
         // calculate repay amount
         repayAmount =
-            (unscaledLoanAmount * interestRateFactor) /
-            Constants.BASE /
+            Math.mulDiv(
+                unscaledLoanAmount,
+                interestRateFactor,
+                Constants.BASE
+            ) /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
     }
 

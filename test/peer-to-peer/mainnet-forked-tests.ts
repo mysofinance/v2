@@ -4042,7 +4042,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           collToken: paxg.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDR,
-          minLoan: 0,
+          minLoan: 1,
           maxLoan: MAX_UINT256,
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,

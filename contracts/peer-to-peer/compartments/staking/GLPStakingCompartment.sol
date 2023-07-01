@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IGLPStakingHelper} from "../../interfaces/compartments/staking/IGLPStakingHelper.sol";
 import {BaseCompartment} from "../BaseCompartment.sol";
@@ -84,7 +85,7 @@ contract GLPStakingCompartment is BaseCompartment {
         // transfer proportion of weth token balance
         uint256 wethTokenAmount = isUnlock
             ? currentWethBal
-            : (repayAmount * currentWethBal) / repayAmountLeft;
+            : Math.mulDiv(repayAmount, currentWethBal, repayAmountLeft);
         IERC20(WETH).safeTransfer(recipient, wethTokenAmount);
     }
 }

@@ -49,7 +49,7 @@ export const createOnChainRequest = async ({
       collToken: collToken,
       loanToken: loanToken,
       oracleAddr: ZERO_ADDR,
-      minLoan: 0,
+      minLoan: 1,
       maxLoan: MAX_UINT256,
       validUntil: _validUntil,
       earliestRepayTenor: 0,

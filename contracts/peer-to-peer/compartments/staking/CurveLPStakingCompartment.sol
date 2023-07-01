@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ICurveStakingHelper} from "../../interfaces/compartments/staking/ICurveStakingHelper.sol";
@@ -134,8 +135,11 @@ contract CurveLPStakingCompartment is BaseCompartment {
             address(this)
         );
         // withdraw proportion of gauge amount
-        uint256 withdrawAmount = (repayAmount * currentStakedBal) /
-            repayAmountLeft;
+        uint256 withdrawAmount = Math.mulDiv(
+            repayAmount,
+            currentStakedBal,
+            repayAmountLeft
+        );
         ICurveStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
         try ICurveStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
             address rewardTokenAddrZeroIndex
@@ -208,7 +212,11 @@ contract CurveLPStakingCompartment is BaseCompartment {
         lpTokenAmount = SafeCast.toUint128(
             isUnlock || _liqGaugeAddr != address(0)
                 ? currentCompartmentBal
-                : (repayAmount * currentCompartmentBal) / repayAmountLeft
+                : Math.mulDiv(
+                    repayAmount,
+                    currentCompartmentBal,
+                    repayAmountLeft
+                )
         );
 
         // if unlock, send to vault (msg.sender), else if callback send directly there, else to borrower
@@ -246,7 +254,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         // transfer proportion of crv token balance
         uint256 tokenAmount = isUnlock
             ? currentCrvBal
-            : (repayAmount * currentCrvBal) / repayAmountLeft;
+            : Math.mulDiv(repayAmount, currentCrvBal, repayAmountLeft);
 
         // only perform crv transfer if
         // 1) crv token amount > 0 and coll token is not CRV else skip
@@ -270,8 +278,11 @@ contract CurveLPStakingCompartment is BaseCompartment {
                 if (currentRewardTokenBal > 0) {
                     tokenAmount = isUnlock
                         ? currentRewardTokenBal
-                        : (repayAmount * currentRewardTokenBal) /
-                            repayAmountLeft;
+                        : Math.mulDiv(
+                            repayAmount,
+                            currentRewardTokenBal,
+                            repayAmountLeft
+                        );
 
                     IERC20(_rewardTokenAddr[i]).safeTransfer(
                         rewardReceiver,

@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -71,8 +72,11 @@ contract WrappedERC20Impl is
             address tokenAddr = _wrappedTokens[i].tokenAddr;
             IERC20(tokenAddr).safeTransfer(
                 recipient,
-                (IERC20(tokenAddr).balanceOf(address(this)) * amount) /
+                Math.mulDiv(
+                    IERC20(tokenAddr).balanceOf(address(this)),
+                    amount,
                     currTotalSupply
+                )
             );
             unchecked {
                 ++i;
