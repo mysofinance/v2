@@ -162,7 +162,8 @@ contract LenderVaultImpl is
         (uint256 loanAmount, uint256 repayAmount) = _getLoanAndRepayAmount(
             netPledgeAmount,
             generalQuoteInfo,
-            quoteTuple
+            quoteTuple,
+            quoteTuple.upfrontFeePctInBase
         );
         // checks to prevent griefing attacks (e.g. small unlocks that aren't worth it)
         if (
@@ -184,21 +185,21 @@ contract LenderVaultImpl is
         );
         if (quoteTuple.upfrontFeePctInBase < Constants.BASE) {
             // note: if upfrontFee<100% this corresponds to a loan; check that tenor and earliest repay are consistent
+            if (
+                quoteTuple.tenor <
+                SafeCast.toUint40(
+                    generalQuoteInfo.earliestRepayTenor +
+                        Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
+                )
+            ) {
+                revert Errors.InvalidEarliestRepay();
+            }
             _loan.expiry = SafeCast.toUint40(
                 block.timestamp + quoteTuple.tenor
             );
             _loan.earliestRepay = SafeCast.toUint40(
                 block.timestamp + generalQuoteInfo.earliestRepayTenor
             );
-            if (
-                _loan.expiry <
-                SafeCast.toUint40(
-                    _loan.earliestRepay +
-                        Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY
-                )
-            ) {
-                revert Errors.InvalidEarliestRepay();
-            }
             if (_loan.initCollAmount == 0) {
                 revert Errors.ReclaimableCollateralAmountZero();
             }
@@ -299,6 +300,9 @@ contract LenderVaultImpl is
 
     function addSigners(address[] calldata _signers) external {
         _checkOwner();
+        if (_signers.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
         address vaultOwner = owner();
         for (uint256 i; i < _signers.length; ) {
             if (_signers[i] == address(0) || _signers[i] == vaultOwner) {
@@ -456,7 +460,8 @@ contract LenderVaultImpl is
     function _getLoanAndRepayAmount(
         uint256 netPledgeAmount,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
-        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
+        uint256 upfrontFeePctInBase
     ) internal view returns (uint256 loanAmount, uint256 repayAmount) {
         uint256 loanPerCollUnit;
         if (generalQuoteInfo.oracleAddr == address(0)) {
@@ -485,23 +490,26 @@ contract LenderVaultImpl is
             unscaledLoanAmount /
             (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
 
-        // calculate interest rate factor
-        // @dev: custom typecasting rather than safecasting to catch when interest rate factor = 0
-        int256 _interestRateFactor = int256(Constants.BASE) +
-            quoteTuple.interestRatePctInBase;
-        if (_interestRateFactor <= 0) {
-            revert Errors.InvalidInterestRateFactor();
-        }
-        uint256 interestRateFactor = uint256(_interestRateFactor);
+        // calculate repay amount and interest rate factor only for loans
+        if (upfrontFeePctInBase < Constants.BASE) {
+            // calculate interest rate factor
+            // @dev: custom typecasting rather than safecasting to catch when interest rate factor = 0
+            int256 _interestRateFactor = int256(Constants.BASE) +
+                quoteTuple.interestRatePctInBase;
+            if (_interestRateFactor <= 0) {
+                revert Errors.InvalidInterestRateFactor();
+            }
+            uint256 interestRateFactor = uint256(_interestRateFactor);
 
-        // calculate repay amount
-        repayAmount =
-            Math.mulDiv(
-                unscaledLoanAmount,
-                interestRateFactor,
-                Constants.BASE
-            ) /
-            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+            // calculate repay amount
+            repayAmount =
+                Math.mulDiv(
+                    unscaledLoanAmount,
+                    interestRateFactor,
+                    Constants.BASE
+                ) /
+                (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        }
     }
 
     function _checkCircuitBreaker(
