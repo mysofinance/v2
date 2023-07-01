@@ -53,17 +53,16 @@ library Errors {
     error OnChainQuoteAlreadyAdded();
     error OffChainQuoteHasBeenInvalidated();
     error Uninitialized();
-    error EmptyRepaymentSchedule();
+    error InvalidRepaymentScheduleLength();
     error FirstDueDateTooCloseOrPassed();
     error InvalidGracePeriod();
     error UnregisteredLoanProposal();
     error NotInSubscriptionPhase();
     error NotInUnsubscriptionPhase();
     error InsufficientBalance();
-    error SubscriptionAmountTooHigh();
+    error InsufficientFreeSubscriptionSpace();
     error BeforeEarliestUnsubscribe();
     error InconsistentLastLoanTermsUpdateTime();
-    error NotEnoughSubscriptions();
     error InvalidActionForCurrentStatus();
     error FellShortOfTotalSubscriptionTarget();
     error InvalidRollBackRequest();
@@ -108,4 +107,7 @@ library Errors {
     error TokenNotStuck();
     error InconsistentExpTransferFee();
     error InconsistentExpVaultBalIncrease();
+    error DepositLockActive();
+    error DisallowedSubscriptionLockup();
+    error IncorrectLoanAmount();
 }

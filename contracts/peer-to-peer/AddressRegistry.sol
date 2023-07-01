@@ -29,7 +29,6 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     address public mysoTokenManager;
     address public erc721Wrapper;
     address public erc20Wrapper;
-    uint256 public numRegisteredVaults;
     mapping(address => bool) public isRegisteredVault;
     mapping(bytes => bool) internal _signatureIsInvalidated;
     mapping(address => mapping(address => uint256))
@@ -173,7 +172,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         }
         isRegisteredVault[addr] = true;
         _registeredVaults.push(addr);
-        return ++numRegisteredVaults;
+        return _registeredVaults.length;
     }
 
     function claimBorrowerWhitelistStatus(
@@ -328,6 +327,10 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
 
     function registeredVaults() external view returns (address[] memory) {
         return _registeredVaults;
+    }
+
+    function numRegisteredVaults() external view returns (uint256) {
+        return _registeredVaults.length;
     }
 
     function transferOwnership(address _newOwnerProposal) public override {

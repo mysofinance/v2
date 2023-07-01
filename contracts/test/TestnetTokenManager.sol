@@ -64,6 +64,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         address /*fundingPool*/,
         address /*depositor*/,
         uint256 /*depositAmount*/,
+        uint256 /*depositLockupDuration*/,
         uint256 /*transferFee*/
     ) external {}
 
@@ -72,6 +73,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         address /*subscriber*/,
         address /*loanProposal*/,
         uint256 /*subscriptionAmount*/,
+        uint256 /*subscriptionLockupDuration*/,
         uint256 /*totalSubscriptions*/,
         DataTypesPeerToPool.LoanTerms calldata /*loanTerms*/
     ) external {}

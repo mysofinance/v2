@@ -19,10 +19,12 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     address public factory;
     address public depositToken;
     mapping(address => uint256) public balanceOf;
+    mapping(address => uint256) public depositUnlockTime;
+    mapping(address => uint256) public subscriptionUnlockTime;
     mapping(address => uint256) public totalSubscriptions;
     mapping(address => mapping(address => uint256)) public subscriptionAmountOf;
-    // note: earliest unsubscribe time is to prevent griefing accept loans through atomic flashborrow,
-    // deposit, subscribe, unsubscribe, and withdraw
+    // note: earliest unsubscribe time is to prevent griefing loans through atomic flashborrow,
+    // deposit, subscribe, lock, unsubscribe, and withdraw
     mapping(address => mapping(address => uint256))
         internal _earliestUnsubscribe;
 
@@ -43,10 +45,19 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
 
     function deposit(
         uint256 amount,
-        uint256 transferFee
+        uint256 transferFee,
+        uint256 depositLockupDuration
     ) external nonReentrant {
         if (amount == 0) {
             revert Errors.InvalidSendAmount();
+        }
+        if (depositLockupDuration > 0) {
+            uint256 _depositUnlockTime = depositUnlockTime[msg.sender];
+            if (_depositUnlockTime < block.timestamp + depositLockupDuration) {
+                depositUnlockTime[msg.sender] =
+                    block.timestamp +
+                    depositLockupDuration;
+            }
         }
         address mysoTokenManager = IFactory(factory).mysoTokenManager();
         if (mysoTokenManager != address(0)) {
@@ -54,27 +65,34 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
                 address(this),
                 msg.sender,
                 amount,
+                depositLockupDuration,
                 transferFee
             );
         }
-        uint256 preBal = IERC20Metadata(depositToken).balanceOf(address(this));
-        IERC20Metadata(depositToken).safeTransferFrom(
+        address _depositToken = depositToken;
+        uint256 preBal = IERC20Metadata(_depositToken).balanceOf(address(this));
+        IERC20Metadata(_depositToken).safeTransferFrom(
             msg.sender,
             address(this),
             amount + transferFee
         );
-        uint256 postBal = IERC20Metadata(depositToken).balanceOf(address(this));
+        uint256 postBal = IERC20Metadata(_depositToken).balanceOf(
+            address(this)
+        );
         if (postBal != preBal + amount) {
             revert Errors.InvalidSendAmount();
         }
         balanceOf[msg.sender] += amount;
-        emit Deposited(msg.sender, amount);
+        emit Deposited(msg.sender, amount, depositLockupDuration);
     }
 
     function withdraw(uint256 amount) external {
         uint256 _balanceOf = balanceOf[msg.sender];
         if (amount == 0 || amount > _balanceOf) {
             revert Errors.InvalidWithdrawAmount();
+        }
+        if (block.timestamp < depositUnlockTime[msg.sender]) {
+            revert Errors.DepositLockActive();
         }
         unchecked {
             balanceOf[msg.sender] = _balanceOf - amount;
@@ -85,12 +103,18 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
 
     function subscribe(
         address loanProposal,
-        uint256 amount
+        uint256 minSubscriptionAmount,
+        uint256 maxSubscriptionAmount,
+        uint256 subscriptionLockupDuration
     ) external nonReentrant {
-        if (amount == 0) {
+        if (
+            maxSubscriptionAmount == 0 ||
+            minSubscriptionAmount > maxSubscriptionAmount
+        ) {
             revert Errors.InvalidAmount();
         }
-        if (!IFactory(factory).isLoanProposal(loanProposal)) {
+        address _factory = factory;
+        if (!IFactory(_factory).isLoanProposal(loanProposal)) {
             revert Errors.UnregisteredLoanProposal();
         }
         if (!ILoanProposalImpl(loanProposal).canSubscribe()) {
@@ -101,7 +125,7 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         ).staticData();
         if (
             whitelistAuthority != address(0) &&
-            !IFactory(factory).isWhitelistedLender(
+            !IFactory(_factory).isWhitelistedLender(
                 whitelistAuthority,
                 msg.sender
             )
@@ -109,35 +133,70 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             revert Errors.InvalidLender();
         }
         uint256 _balanceOf = balanceOf[msg.sender];
-        if (amount > _balanceOf) {
+        if (maxSubscriptionAmount > _balanceOf) {
             revert Errors.InsufficientBalance();
         }
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
-        uint256 _totalSubscriptions = totalSubscriptions[loanProposal];
-        if (amount + _totalSubscriptions > loanTerms.maxTotalSubscriptions) {
-            revert Errors.SubscriptionAmountTooHigh();
+        if (subscriptionLockupDuration > 0) {
+            (
+                ,
+                ,
+                ,
+                ,
+                ,
+                ,
+                DataTypesPeerToPool.LoanStatus status,
+
+            ) = ILoanProposalImpl(loanProposal).dynamicData();
+            if (status != DataTypesPeerToPool.LoanStatus.LOAN_TERMS_LOCKED) {
+                revert Errors.DisallowedSubscriptionLockup();
+            }
         }
+        uint256 _totalSubscriptions = totalSubscriptions[loanProposal];
+        uint256 _freeSubscriptionSpace = loanTerms.maxTotalSubscriptions -
+            _totalSubscriptions;
+        if (_freeSubscriptionSpace < minSubscriptionAmount) {
+            revert Errors.InsufficientFreeSubscriptionSpace();
+        }
+        uint256 effectiveSubscriptionAmount = maxSubscriptionAmount <
+            _freeSubscriptionSpace
+            ? maxSubscriptionAmount
+            : _freeSubscriptionSpace;
         address mysoTokenManager = IFactory(factory).mysoTokenManager();
         if (mysoTokenManager != address(0)) {
             IMysoTokenManager(mysoTokenManager).processP2PoolSubscribe(
                 address(this),
                 msg.sender,
                 loanProposal,
-                amount,
+                effectiveSubscriptionAmount,
+                subscriptionLockupDuration,
                 _totalSubscriptions,
                 loanTerms
             );
         }
-        balanceOf[msg.sender] = _balanceOf - amount;
-        totalSubscriptions[loanProposal] = _totalSubscriptions + amount;
-        subscriptionAmountOf[loanProposal][msg.sender] += amount;
+        balanceOf[msg.sender] = _balanceOf - effectiveSubscriptionAmount;
+        totalSubscriptions[loanProposal] =
+            _totalSubscriptions +
+            effectiveSubscriptionAmount;
+        subscriptionAmountOf[loanProposal][
+            msg.sender
+        ] += effectiveSubscriptionAmount;
         _earliestUnsubscribe[loanProposal][msg.sender] =
             block.timestamp +
-            Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE;
-
-        emit Subscribed(msg.sender, loanProposal, amount);
+            (
+                subscriptionLockupDuration <
+                    Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE
+                    ? Constants.MIN_WAIT_UNTIL_EARLIEST_UNSUBSCRIBE
+                    : subscriptionLockupDuration
+            );
+        emit Subscribed(
+            msg.sender,
+            loanProposal,
+            effectiveSubscriptionAmount,
+            subscriptionLockupDuration
+        );
     }
 
     function unsubscribe(address loanProposal, uint256 amount) external {
@@ -161,7 +220,20 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
             storage earliestUnsubscribePerLender = _earliestUnsubscribe[
                 loanProposal
             ];
-        if (block.timestamp < earliestUnsubscribePerLender[msg.sender]) {
+        (
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            DataTypesPeerToPool.LoanStatus status,
+
+        ) = ILoanProposalImpl(loanProposal).dynamicData();
+        if (
+            status != DataTypesPeerToPool.LoanStatus.ROLLBACK &&
+            block.timestamp < earliestUnsubscribePerLender[msg.sender]
+        ) {
             revert Errors.BeforeEarliestUnsubscribe();
         }
         balanceOf[msg.sender] += amount;
@@ -173,7 +245,8 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     }
 
     function executeLoanProposal(address loanProposal) external {
-        if (!IFactory(factory).isLoanProposal(loanProposal)) {
+        address _factory = factory;
+        if (!IFactory(_factory).isLoanProposal(loanProposal)) {
             revert Errors.UnregisteredLoanProposal();
         }
 
@@ -190,18 +263,33 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
         DataTypesPeerToPool.LoanTerms memory loanTerms = ILoanProposalImpl(
             loanProposal
         ).loanTerms();
+        if (
+            block.timestamp + Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE >
+            loanTerms.repaymentSchedule[0].dueTimestamp
+        ) {
+            revert Errors.FirstDueDateTooCloseOrPassed();
+        }
         ILoanProposalImpl(loanProposal).checkAndUpdateStatus();
+        if (grossLoanAmount != totalSubscriptions[loanProposal]) {
+            revert Errors.IncorrectLoanAmount();
+        }
         IERC20Metadata(depositToken).safeTransfer(
             loanTerms.borrower,
             grossLoanAmount - arrangerFee - protocolFee
         );
         (, , , address arranger, , , , ) = ILoanProposalImpl(loanProposal)
             .staticData();
-        IERC20Metadata(depositToken).safeTransfer(arranger, arrangerFee);
-        IERC20Metadata(depositToken).safeTransfer(
-            IFactory(factory).owner(),
-            protocolFee
-        );
+
+        address _depositToken = depositToken;
+        if (arrangerFee > 0) {
+            IERC20Metadata(_depositToken).safeTransfer(arranger, arrangerFee);
+        }
+        if (protocolFee > 0) {
+            IERC20Metadata(_depositToken).safeTransfer(
+                IFactory(factory).owner(),
+                protocolFee
+            );
+        }
 
         emit LoanProposalExecuted(
             loanProposal,

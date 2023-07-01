@@ -5,7 +5,7 @@ import {DataTypesPeerToPool} from "../DataTypesPeerToPool.sol";
 
 interface ILoanProposalImpl {
     event LoanTermsProposed(DataTypesPeerToPool.LoanTerms loanTerms);
-    event LoanTermsAccepted();
+    event LoanTermsLocked();
     event LoanTermsAndTransferCollFinalized(
         uint256 grossLoanAmount,
         uint256 _finalCollAmountReservedForDefault,
@@ -13,17 +13,22 @@ interface ILoanProposalImpl {
         uint256 _arrangerFee,
         uint256 _protocolFee
     );
-    event Rolledback();
+    event Rolledback(address sender);
     event LoanDeployed();
     event ConversionExercised(
         address indexed sender,
-        uint256 repaymentIdx,
-        uint256 amount
+        uint256 amount,
+        uint256 repaymentIdx
     );
-    event RepaymentClaimed(address indexed sender, uint256 amount);
+    event RepaymentClaimed(
+        address indexed sender,
+        uint256 amount,
+        uint256 repaymentIdx
+    );
     event Repaid(
         uint256 remainingLoanTokenDue,
-        uint256 collTokenLeftUnconverted
+        uint256 collTokenLeftUnconverted,
+        uint256 repaymentIdx
     );
     event LoanDefaulted();
     event DefaultProceedsClaimed(address indexed sender);
@@ -63,11 +68,11 @@ interface ILoanProposalImpl {
     ) external;
 
     /**
-     * @notice Accept loan terms
-     * @param loanTermsUpdateTime The timestamp of the loan terms that are to be accepted
-     * @dev Can only be called by the borrower
+     * @notice Lock loan terms
+     * @param loanTermsUpdateTime The timestamp at which loan terms are locked
+     * @dev Can only be called by the arranger or borrower
      */
-    function acceptLoanTerms(uint256 loanTermsUpdateTime) external;
+    function lockLoanTerms(uint256 loanTermsUpdateTime) external;
 
     /**
      * @notice Finalize the loan terms and transfer final collateral amount
