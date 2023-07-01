@@ -275,15 +275,15 @@ contract CurveLPStakingCompartment is BaseCompartment {
                     address(this)
                 );
 
-                if (currentRewardTokenBal > 0) {
-                    tokenAmount = isUnlock
-                        ? currentRewardTokenBal
-                        : Math.mulDiv(
-                            repayAmount,
-                            currentRewardTokenBal,
-                            repayAmountLeft
-                        );
+                tokenAmount = isUnlock
+                    ? currentRewardTokenBal
+                    : Math.mulDiv(
+                        repayAmount,
+                        currentRewardTokenBal,
+                        repayAmountLeft
+                    );
 
+                if (tokenAmount > 0) {
                     IERC20(_rewardTokenAddr[i]).safeTransfer(
                         rewardReceiver,
                         tokenAmount
