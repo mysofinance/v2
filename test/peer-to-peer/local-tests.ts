@@ -1180,11 +1180,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
       const collSendAmount = ONE_WETH.mul(2)
-      const expectedProtocolAndVaultTransferFee = ONE_WETH.mul(2)
-        .mul(ONE_DAY)
-        .mul(180)
-        .mul(BASE.mul(5).div(100))
-        .div(BASE.mul(YEAR_IN_SECONDS))
+      const expectedProtocolAndVaultTransferFee = ONE_WETH.mul(2).mul(5).div(100)
       const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS

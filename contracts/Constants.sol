@@ -6,7 +6,7 @@ library Constants {
     uint256 internal constant BASE = 1e18;
     uint256 internal constant MAX_FEE_PER_ANNUM = 0.05e18; // 5% max in base
     uint256 internal constant MAX_SWAP_PROTOCOL_FEE = 0.01e18; // 1% max in base
-    uint256 internal constant MAX_TIME_BEFORE_PROTOCOL_FEE_CAP = 180 days;
+    uint256 internal constant MAX_TOTAL_PROTOCOL_FEE = 0.05e18; // 5% max in base
     uint256 internal constant MAX_P2POOL_PROTOCOL_FEE = 0.05e18; // 5% max in base
     uint256 internal constant MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY =
         1 days;
