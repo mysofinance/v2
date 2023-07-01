@@ -420,6 +420,10 @@ contract LenderVaultImpl is
         }
     }
 
+    function numSigners() external view returns (uint256) {
+        return signers.length;
+    }
+
     function transferOwnership(address _newOwnerProposal) public override {
         _checkOwner();
         if (
