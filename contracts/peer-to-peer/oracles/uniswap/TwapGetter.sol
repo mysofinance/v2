@@ -3,13 +3,13 @@
 pragma solidity 0.8.19;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {FullMath} from "./FullMath.sol";
-import {FixedPoint96} from "./FixedPoint96.sol";
-import {TickMath} from "./TickMath.sol";
+import {FixedPoint96} from "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
+import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {FullMath} from "./FullMath.sol"; // cannot import from @uniswap due to incompatible versions
+import {TickMath} from "./TickMath.sol"; // cannot import from @uniswap due to incompatible versions
 import {Errors} from "../../../Errors.sol";
-import {IUniswapV3Factory} from "../../interfaces/oracles/uniswap/IUniswapV3Factory.sol";
-import {IUniswapV3Pool} from "../../interfaces/oracles/uniswap/IUniswapV3Pool.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {ITwapGetter} from "../../interfaces/oracles/uniswap/ITwapGetter.sol";
 
 abstract contract TwapGetter is ITwapGetter {
@@ -60,13 +60,16 @@ abstract contract TwapGetter is ITwapGetter {
             (int56[] memory tickCumulatives, ) = IUniswapV3Pool(uniswapV3Pool)
                 .observe(secondsAgo);
 
-            int56 tickCumulativesDelta = int56(
-                tickCumulatives[1] - tickCumulatives[0]
+            int56 tickCumulativesDelta = tickCumulatives[1] -
+                tickCumulatives[0];
+            if (uint32(int32(twapInterval)) != twapInterval) {
+                revert Errors.TooLongTwapInterval();
+            }
+            int24 averageTick = SafeCast.toInt24(
+                tickCumulativesDelta / int32(twapInterval)
             );
-            int56 averageTick = tickCumulativesDelta /
-                int24(int32(twapInterval));
 
-            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(int24(averageTick));
+            sqrtPriceX96 = TickMath.getSqrtRatioAtTick(averageTick);
         }
     }
 

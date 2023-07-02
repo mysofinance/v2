@@ -103,9 +103,10 @@ library Errors {
     error SequencerDown();
     error GracePeriodNotOver();
     error LoanExpired();
-    error NO_DSETH();
+    error NoDsEth();
     error TooShortTwapInterval();
-    error SpotPriceDeviatesFromTWAPPrice();
+    error TooLongTwapInterval();
+    error SpotPriceDeviatesFromTwapPrice();
     error Reentrancy();
     error TokenNotStuck();
     error InconsistentExpTransferFee();

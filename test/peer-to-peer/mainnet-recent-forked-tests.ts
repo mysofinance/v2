@@ -283,7 +283,7 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
 
       await expect(indexCoopOracle.getPrice(usdc.address, weth.address)).to.be.revertedWithCustomError(
         IndexCoopOracle,
-        'NO_DSETH'
+        'NoDsEth'
       )
 
       // toggle to show logs

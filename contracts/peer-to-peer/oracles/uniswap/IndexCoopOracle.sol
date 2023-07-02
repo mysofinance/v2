@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.19;
 
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {ChainlinkBase} from "../chainlink/ChainlinkBase.sol";
 import {Errors} from "../../../Errors.sol";
 import {TwapGetter} from "./TwapGetter.sol";
 import {IDSETH} from "../../interfaces/oracles/IDSETH.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {IUniswapV3Pool} from "../../interfaces/oracles/uniswap/IUniswapV3Pool.sol";
 
 /**
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
@@ -79,10 +79,12 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
     ) external view override returns (uint256 collTokenPriceInLoanToken) {
         // must have at least one token is DS_ETH to use this oracle
         if (collToken != DS_ETH && loanToken != DS_ETH) {
-            revert Errors.NO_DSETH();
+            revert Errors.NoDsEth();
         }
-        uint256 priceOfCollToken = _getPriceOfToken(collToken);
-        uint256 priceOfLoanToken = _getPriceOfToken(loanToken);
+        (uint256 priceOfCollToken, uint256 priceOfLoanToken) = (
+            _getPriceOfToken(collToken),
+            _getPriceOfToken(loanToken)
+        );
         uint256 loanTokenDecimals = (loanToken == WETH || loanToken == DS_ETH)
             ? 18
             : IERC20Metadata(loanToken).decimals();
@@ -100,11 +102,11 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
         // i.e. if stakewise eth has uni v3 address but no chainlink address, and lender
         // tries to use stakewise eth as loan and ds eth as collateral, then revert
         tokenPriceRaw = token == WETH ? BASE_CURRENCY_UNIT : token == DS_ETH
-            ? _getDSETHPrice()
+            ? _getDsEthPrice()
             : super._getPriceOfToken(token);
     }
 
-    function _getDSETHPrice() internal view returns (uint256 dsEthPriceRaw) {
+    function _getDsEthPrice() internal view returns (uint256 dsEthPriceRaw) {
         address[] memory components = IDSETH(DS_ETH).getComponents();
         uint256 componentsLength = components.length;
         address currComponent;
@@ -122,7 +124,7 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
             }
             // always try to use chainlink oracle if available even if also had uni v3 pair passed in by mistake too
             currComponentPrice = oracleAddrs[currComponent] == address(0)
-                ? _getTWAPPrice(uniV3PairAddrs[currComponent])
+                ? _getTwapPrice(uniV3PairAddrs[currComponent])
                 : _getPriceOfToken(currComponent);
             currComponentUnit = IDSETH(DS_ETH).getTotalComponentRealUnits(
                 currComponent
@@ -135,7 +137,7 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
         dsEthPriceRaw = totalPriceUniCumSum / INDEX_COOP_BASE_CURRENCY_UNIT;
     }
 
-    function _getTWAPPrice(
+    function _getTwapPrice(
         address uniV3PairAddr
     ) internal view returns (uint256 twapPriceRaw) {
         address token0 = IUniswapV3Pool(uniV3PairAddr).token0();
@@ -157,7 +159,7 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
             twapPriceRaw > ((10000 + _tolerance) * currSpotPrice) / 10000 ||
             twapPriceRaw < ((10000 - _tolerance) * currSpotPrice) / 10000
         ) {
-            revert Errors.SpotPriceDeviatesFromTWAPPrice();
+            revert Errors.SpotPriceDeviatesFromTwapPrice();
         }
     }
 }
