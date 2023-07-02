@@ -221,14 +221,13 @@ contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
 
     function transferOwnership(address _newOwnerProposal) public override {
         if (
-            _newOwnerProposal == address(0) ||
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
             _newOwnerProposal == owner()
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        super.transferOwnership(_newOwnerProposal);
+        Ownable2Step.transferOwnership(_newOwnerProposal);
     }
 
     function owner() public view override(Ownable, IFactory) returns (address) {

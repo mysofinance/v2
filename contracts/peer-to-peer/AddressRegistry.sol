@@ -41,7 +41,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     address[] internal _registeredVaults;
 
     constructor() {
-        _transferOwnership(msg.sender);
+        // @dev: for initial ownership assignment use internal method from Ownable2Step
+        Ownable2Step._transferOwnership(msg.sender);
     }
 
     function initialize(
@@ -73,7 +74,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         address[] calldata addrs,
         DataTypesPeerToPeer.WhitelistState state
     ) external {
-        _checkSenderAndIsInitialized();
+        _checkIsInitialized();
+        _checkOwner();
         uint256 addrsLen = addrs.length;
         if (addrsLen < 1) {
             revert Errors.InvalidArrayLength();
@@ -135,7 +137,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         address[] calldata tokens,
         bool allowTokensForCompartment
     ) external {
-        _checkSenderAndIsInitialized();
+        _checkIsInitialized();
+        _checkOwner();
         // check that tokens can only be whitelisted for valid compartment (whereas de-whitelisting is always possible)
         if (
             allowTokensForCompartment &&
@@ -173,6 +176,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     }
 
     function addLenderVault(address addr) external returns (uint256) {
+        _checkIsInitialized();
         // catches case where address registry is uninitialized (lenderVaultFactory == address(0))
         if (msg.sender != lenderVaultFactory) {
             revert Errors.InvalidSender();
@@ -349,15 +353,17 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     }
 
     function transferOwnership(address _newOwnerProposal) public override {
+        _checkIsInitialized();
+        _checkOwner();
         if (
-            _newOwnerProposal == address(0) ||
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
             _newOwnerProposal == owner()
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        super.transferOwnership(_newOwnerProposal);
+        // @dev: Ownable2Step checks against address(0)
+        Ownable2Step.transferOwnership(_newOwnerProposal);
     }
 
     function owner()
@@ -430,8 +436,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         }
     }
 
-    function _checkSenderAndIsInitialized() internal view {
-        _checkOwner();
+    function _checkIsInitialized() internal view {
         if (_getInitializedVersion() == 0) {
             revert Errors.Uninitialized();
         }

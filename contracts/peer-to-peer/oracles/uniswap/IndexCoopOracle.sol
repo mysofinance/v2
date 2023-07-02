@@ -101,9 +101,15 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
         // except only when calculating ds eth price to minimize risk
         // i.e. if stakewise eth has uni v3 address but no chainlink address, and lender
         // tries to use stakewise eth as loan and ds eth as collateral, then revert
-        tokenPriceRaw = token == WETH ? BASE_CURRENCY_UNIT : token == DS_ETH
-            ? _getDsEthPrice()
-            : super._getPriceOfToken(token);
+
+        // @dev: no use of nested ternary operator for npx hardhat compatibility reasons
+        if (token == WETH) {
+            tokenPriceRaw = BASE_CURRENCY_UNIT;
+        } else {
+            tokenPriceRaw = token == DS_ETH
+                ? _getDsEthPrice()
+                : super._getPriceOfToken(token);
+        }
     }
 
     function _getDsEthPrice() internal view returns (uint256 dsEthPriceRaw) {

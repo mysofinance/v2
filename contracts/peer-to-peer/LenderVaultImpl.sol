@@ -59,7 +59,11 @@ contract LenderVaultImpl is
     ) external initializer {
         addressRegistry = _addressRegistry;
         minNumOfSigners = 1;
-        _transferOwnership(_vaultOwner);
+        if (_vaultOwner == address(0) || _addressRegistry == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        // @dev: for initial ownership assignment use internal helper function
+        Ownable2Step._transferOwnership(_vaultOwner);
     }
 
     function unlockCollateral(
@@ -430,7 +434,6 @@ contract LenderVaultImpl is
     function transferOwnership(address _newOwnerProposal) public override {
         _checkOwner();
         if (
-            _newOwnerProposal == address(0) ||
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
             _newOwnerProposal == owner() ||
@@ -438,7 +441,8 @@ contract LenderVaultImpl is
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        super.transferOwnership(_newOwnerProposal);
+        // @dev: Ownable2Step checks against address(0)
+        Ownable2Step.transferOwnership(_newOwnerProposal);
     }
 
     function owner()

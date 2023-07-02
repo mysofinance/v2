@@ -244,11 +244,14 @@ library TickMath {
                 (log_sqrt10001 + 291339464771989622907027621153398088495) >> 128
             );
 
-            tick = tickLow == tickHi
-                ? tickLow
-                : getSqrtRatioAtTick(tickHi) <= sqrtPriceX96
-                ? tickHi
-                : tickLow;
+            // @dev: no use of nested ternary operator for npx hardhat compatibility reasons
+            if (tickLow == tickHi) {
+                tick = tickLow;
+            } else {
+                tick = getSqrtRatioAtTick(tickHi) <= sqrtPriceX96
+                    ? tickHi
+                    : tickLow;
+            }
         }
     }
 }

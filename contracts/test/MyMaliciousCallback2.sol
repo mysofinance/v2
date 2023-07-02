@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 contract MyMaliciousCallback2 {
+    // solhint-disable avoid-low-level-calls no-inline-assembly no-empty-blocks
     address internal _vaultVictim;
     address internal _withdrawToken;
     uint256 internal _withdrawAmount;
@@ -36,6 +37,7 @@ contract MyMaliciousCallback2 {
                 revert(add(result, 32), mload(result))
             }
         }
+        return 0;
     }
 
     function transfer(address, uint256) external returns (bool) {}
