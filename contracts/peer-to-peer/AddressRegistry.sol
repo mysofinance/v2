@@ -2,10 +2,12 @@
 pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {DataTypesPeerToPeer} from "./DataTypesPeerToPeer.sol";
 import {Errors} from "../Errors.sol";
 import {Helpers} from "../Helpers.sol";
-import {Ownable} from "../Ownable.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {IERC721Wrapper} from "./interfaces/wrappers/ERC721/IERC721Wrapper.sol";
 import {IERC20Wrapper} from "./interfaces/wrappers/ERC20/IERC20Wrapper.sol";
@@ -18,17 +20,15 @@ import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
  * with that token (repays and withdrawals would still be allowed). In the limit of a total de-whitelisting of all
  * tokens, all borrowing in the protocol would be paused. This feature can also be utilized if a fork with the same chainId is found.
  */
-contract AddressRegistry is Ownable, IAddressRegistry {
+contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     using ECDSA for bytes32;
 
-    bool internal _isInitialized;
     address public lenderVaultFactory;
     address public borrowerGateway;
     address public quoteHandler;
     address public mysoTokenManager;
     address public erc721Wrapper;
     address public erc20Wrapper;
-    uint256 public numRegisteredVaults;
     mapping(address => bool) public isRegisteredVault;
     mapping(bytes => bool) internal _signatureIsInvalidated;
     mapping(address => mapping(address => uint256))
@@ -40,15 +40,16 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         internal _isTokenWhitelistedForCompartment;
     address[] internal _registeredVaults;
 
+    constructor() {
+        _transferOwnership(msg.sender);
+    }
+
     function initialize(
         address _lenderVaultFactory,
         address _borrowerGateway,
         address _quoteHandler
-    ) external {
-        _senderCheckOwner();
-        if (_isInitialized) {
-            revert Errors.AlreadyInitialized();
-        }
+    ) external initializer {
+        _checkOwner();
         if (
             _lenderVaultFactory == address(0) ||
             _borrowerGateway == address(0) ||
@@ -66,7 +67,6 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         lenderVaultFactory = _lenderVaultFactory;
         borrowerGateway = _borrowerGateway;
         quoteHandler = _quoteHandler;
-        _isInitialized = true;
     }
 
     function setWhitelistState(
@@ -74,8 +74,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState state
     ) external {
         _checkSenderAndIsInitialized();
-
-        if (addrs.length < 1) {
+        uint256 addrsLen = addrs.length;
+        if (addrsLen < 1) {
             revert Errors.InvalidArrayLength();
         }
 
@@ -91,7 +91,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER ||
             state == DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
         ) {
-            if (addrs.length != 1) {
+            if (addrsLen != 1) {
                 revert Errors.InvalidArrayLength();
             }
             if (addrs[0] == address(0)) {
@@ -107,7 +107,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             whitelistState[addrs[0]] = state;
         } else {
             // note (2/2): all other states can be "occupied" by multiple addresses
-            for (uint i = 0; i < addrs.length; ) {
+            for (uint256 i; i < addrsLen; ) {
                 if (addrs[i] == address(0)) {
                     revert Errors.InvalidAddress();
                 }
@@ -144,12 +144,19 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         ) {
             revert Errors.NonWhitelistedCompartment();
         }
-        if (tokens.length == 0) {
+        uint256 tokensLen = tokens.length;
+        if (tokensLen == 0) {
             revert Errors.InvalidArrayLength();
         }
-        for (uint i = 0; i < tokens.length; ) {
+        for (uint256 i; i < tokensLen; ) {
             if (allowTokensForCompartment && !isWhitelistedERC20(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
+            }
+            if (
+                _isTokenWhitelistedForCompartment[compartmentImpl][tokens[i]] ==
+                allowTokensForCompartment
+            ) {
+                revert Errors.InvalidUpdate();
             }
             _isTokenWhitelistedForCompartment[compartmentImpl][
                 tokens[i]
@@ -165,14 +172,14 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         );
     }
 
-    function addLenderVault(address addr) external {
+    function addLenderVault(address addr) external returns (uint256) {
         // catches case where address registry is uninitialized (lenderVaultFactory == address(0))
         if (msg.sender != lenderVaultFactory) {
             revert Errors.InvalidSender();
         }
         isRegisteredVault[addr] = true;
         _registeredVaults.push(addr);
-        ++numRegisteredVaults;
+        return _registeredVaults.length;
     }
 
     function claimBorrowerWhitelistStatus(
@@ -193,9 +200,7 @@ contract AddressRegistry is Ownable, IAddressRegistry {
                 salt
             )
         );
-        bytes32 messageHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
-        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(payloadHash);
         (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSig);
         address recoveredSigner = messageHash.recover(r, vs);
         if (
@@ -226,7 +231,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     function createWrappedTokenForERC721s(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external {
         address _erc721Wrapper = erc721Wrapper;
         if (_erc721Wrapper == address(0)) {
@@ -236,7 +242,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             IMysoTokenManager(mysoTokenManager)
                 .processP2PCreateWrappedTokenForERC721s(
                     msg.sender,
-                    tokensToBeWrapped
+                    tokensToBeWrapped,
+                    mysoTokenManagerData
                 );
         }
         address newERC20Addr = IERC721Wrapper(_erc721Wrapper)
@@ -255,7 +262,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     function createWrappedTokenForERC20s(
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external {
         address _erc20Wrapper = erc20Wrapper;
         if (_erc20Wrapper == address(0)) {
@@ -265,7 +273,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
             IMysoTokenManager(mysoTokenManager)
                 .processP2PCreateWrappedTokenForERC20s(
                     msg.sender,
-                    tokensToBeWrapped
+                    tokensToBeWrapped,
+                    mysoTokenManagerData
                 );
         }
         address newERC20Addr = IERC20Wrapper(_erc20Wrapper).createWrappedToken(
@@ -289,7 +298,11 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         address[] calldata borrowers,
         uint256 whitelistedUntil
     ) external {
-        for (uint i = 0; i < borrowers.length; ) {
+        uint256 borrowersLen = borrowers.length;
+        if (borrowersLen == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        for (uint256 i; i < borrowersLen; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerBorrower = _borrowerWhitelistedUntil[
                     msg.sender
@@ -331,13 +344,29 @@ contract AddressRegistry is Ownable, IAddressRegistry {
         return _registeredVaults;
     }
 
+    function numRegisteredVaults() external view returns (uint256) {
+        return _registeredVaults.length;
+    }
+
+    function transferOwnership(address _newOwnerProposal) public override {
+        if (
+            _newOwnerProposal == address(0) ||
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == pendingOwner() ||
+            _newOwnerProposal == owner()
+        ) {
+            revert Errors.InvalidNewOwnerProposal();
+        }
+        super.transferOwnership(_newOwnerProposal);
+    }
+
     function owner()
-        external
+        public
         view
         override(Ownable, IAddressRegistry)
         returns (address)
     {
-        return _owner;
+        return super.owner();
     }
 
     function isWhitelistedERC20(address token) public view returns (bool) {
@@ -402,8 +431,8 @@ contract AddressRegistry is Ownable, IAddressRegistry {
     }
 
     function _checkSenderAndIsInitialized() internal view {
-        _senderCheckOwner();
-        if (!_isInitialized) {
+        _checkOwner();
+        if (_getInitializedVersion() == 0) {
             revert Errors.Uninitialized();
         }
     }

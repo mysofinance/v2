@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ICurveStakingHelper} from "../../interfaces/compartments/staking/ICurveStakingHelper.sol";
@@ -63,7 +64,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
             _liqGaugeAddr,
             IERC20(loan.collToken).allowance(address(this), _liqGaugeAddr)
         );
-        emit Staked(gaugeIndex, liqGaugeAddr, amount);
+        emit Staked(gaugeIndex, _liqGaugeAddr, amount);
     }
 
     function toggleApprovedStaker(address _staker) external {
@@ -134,8 +135,11 @@ contract CurveLPStakingCompartment is BaseCompartment {
             address(this)
         );
         // withdraw proportion of gauge amount
-        uint256 withdrawAmount = (repayAmount * currentStakedBal) /
-            repayAmountLeft;
+        uint256 withdrawAmount = Math.mulDiv(
+            repayAmount,
+            currentStakedBal,
+            repayAmountLeft
+        );
         ICurveStakingHelper(CRV_MINTER_ADDR).mint(_liqGaugeAddr);
         try ICurveStakingHelper(_liqGaugeAddr).reward_tokens(0) returns (
             address rewardTokenAddrZeroIndex
@@ -143,7 +147,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
             // versions 2, 3, 4, or 5
             _rewardTokenAddr[0] = rewardTokenAddrZeroIndex;
             address rewardTokenAddr;
-            for (uint256 i = 0; i < 7; ) {
+            for (uint256 i; i < 7; ) {
                 rewardTokenAddr = ICurveStakingHelper(_liqGaugeAddr)
                     .reward_tokens(i + 1);
                 if (rewardTokenAddr != address(0)) {
@@ -208,12 +212,16 @@ contract CurveLPStakingCompartment is BaseCompartment {
         lpTokenAmount = SafeCast.toUint128(
             isUnlock || _liqGaugeAddr != address(0)
                 ? currentCompartmentBal
-                : (repayAmount * currentCompartmentBal) / repayAmountLeft
+                : Math.mulDiv(
+                    repayAmount,
+                    currentCompartmentBal,
+                    repayAmountLeft
+                )
         );
 
-        // if unlock, send to vault, else if callback send directly there, else to borrower
+        // if unlock, send to vault (msg.sender), else if callback send directly there, else to borrower
         address lpTokenReceiver = isUnlock
-            ? vaultAddr
+            ? msg.sender
             : (callbackAddr == address(0) ? borrowerAddr : callbackAddr);
 
         IERC20(collTokenAddr).safeTransfer(lpTokenReceiver, lpTokenAmount);
@@ -239,14 +247,14 @@ contract CurveLPStakingCompartment is BaseCompartment {
         address[8] memory _rewardTokenAddr
     ) internal {
         // rest of rewards are always sent to borrower, not for callback
-        // if unlock then sent to vaultAddr
-        address rewardReceiver = isUnlock ? vaultAddr : borrowerAddr;
+        // if unlock then sent to vaultAddr (msg.sender)
+        address rewardReceiver = isUnlock ? msg.sender : borrowerAddr;
         // check crv token balance
         uint256 currentCrvBal = IERC20(CRV_ADDR).balanceOf(address(this));
         // transfer proportion of crv token balance
         uint256 tokenAmount = isUnlock
             ? currentCrvBal
-            : (repayAmount * currentCrvBal) / repayAmountLeft;
+            : Math.mulDiv(repayAmount, currentCrvBal, repayAmountLeft);
 
         // only perform crv transfer if
         // 1) crv token amount > 0 and coll token is not CRV else skip
@@ -267,12 +275,15 @@ contract CurveLPStakingCompartment is BaseCompartment {
                     address(this)
                 );
 
-                if (currentRewardTokenBal > 0) {
-                    tokenAmount = isUnlock
-                        ? currentRewardTokenBal
-                        : (repayAmount * currentRewardTokenBal) /
-                            repayAmountLeft;
+                tokenAmount = isUnlock
+                    ? currentRewardTokenBal
+                    : Math.mulDiv(
+                        repayAmount,
+                        currentRewardTokenBal,
+                        repayAmountLeft
+                    );
 
+                if (tokenAmount > 0) {
                     IERC20(_rewardTokenAddr[i]).safeTransfer(
                         rewardReceiver,
                         tokenAmount
@@ -299,7 +310,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
         }
         // check if reward token is a duplicate in previous entries
         if (index > 0) {
-            for (uint256 i = 0; i < index; ) {
+            for (uint256 i; i < index; ) {
                 if (rewardTokens[i] == rewardTokens[index]) {
                     return false;
                 }

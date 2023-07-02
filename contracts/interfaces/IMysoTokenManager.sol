@@ -7,12 +7,12 @@ import {DataTypesPeerToPool} from "../peer-to-pool/DataTypesPeerToPool.sol";
 
 interface IMysoTokenManager {
     function processP2PBorrow(
-        uint256 currProtocolFee,
+        uint128[2] memory currProtocolFeeParams,
         DataTypesPeerToPeer.BorrowTransferInstructions
             calldata borrowInstructions,
         DataTypesPeerToPeer.Loan calldata loan,
         address lenderVault
-    ) external returns (uint256 applicableProtocolFee);
+    ) external returns (uint128[2] memory applicableProtocolFeeParams);
 
     function processP2PCreateVault(
         uint256 numRegisteredVaults,
@@ -22,18 +22,21 @@ interface IMysoTokenManager {
 
     function processP2PCreateWrappedTokenForERC721s(
         address tokenCreator,
-        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     function processP2PCreateWrappedTokenForERC20s(
         address tokenCreator,
-        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     function processP2PoolDeposit(
         address fundingPool,
         address depositor,
         uint256 depositAmount,
+        uint256 depositLockupDuration,
         uint256 transferFee
     ) external;
 
@@ -42,6 +45,7 @@ interface IMysoTokenManager {
         address subscriber,
         address loanProposal,
         uint256 subscriptionAmount,
+        uint256 subscriptionLockupDuration,
         uint256 totalSubscriptions,
         DataTypesPeerToPool.LoanTerms calldata loanTerms
     ) external;
@@ -52,7 +56,7 @@ interface IMysoTokenManager {
         address collToken,
         address arranger,
         address borrower,
-        uint256 finalLoanAmount,
+        uint256 grossLoanAmount,
         uint256 finalCollAmountReservedForDefault,
         uint256 finalCollAmountReservedForConversions
     ) external;

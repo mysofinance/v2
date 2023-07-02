@@ -5,6 +5,15 @@ pragma solidity 0.8.19;
 import {DataTypesPeerToPeer} from "../../../DataTypesPeerToPeer.sol";
 
 interface IWrappedERC721Impl {
+    event Redeemed(address indexed redeemer, address recipient);
+
+    event TransferFromWrappedTokenFailed(
+        address indexed tokenAddr,
+        uint256 indexed tokenId
+    );
+
+    event TokenSweepAttempted(address indexed tokenAddr, uint256[] tokenIds);
+
     /**
      * @notice Initializes the ERC20 wrapper
      * @param minter Address of the minter
@@ -17,6 +26,16 @@ interface IWrappedERC721Impl {
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
         string calldata symbol
+    ) external;
+
+    /**
+     * @notice Transfers any stuck wrapped tokens to the redeemer
+     * @param tokenAddr Address of the token to be swept
+     * @param tokenIds Array of token ids to be swept
+     */
+    function sweepTokensLeftAfterRedeem(
+        address tokenAddr,
+        uint256[] calldata tokenIds
     ) external;
 
     /**

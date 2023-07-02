@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -36,7 +37,7 @@ contract WrappedERC20Impl is
         string calldata _symbol,
         bool _isIOU
     ) external initializer {
-        for (uint256 i = 0; i < wrappedTokens.length; ) {
+        for (uint256 i; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
                 ++i;
@@ -67,17 +68,22 @@ contract WrappedERC20Impl is
             _spendAllowance(account, msg.sender, amount);
         }
         _burn(account, amount);
-        for (uint256 i = 0; i < _wrappedTokens.length; ) {
+        uint256 wrappedTokensLen = _wrappedTokens.length;
+        for (uint256 i; i < wrappedTokensLen; ) {
             address tokenAddr = _wrappedTokens[i].tokenAddr;
             IERC20(tokenAddr).safeTransfer(
                 recipient,
-                (IERC20(tokenAddr).balanceOf(address(this)) * amount) /
+                Math.mulDiv(
+                    IERC20(tokenAddr).balanceOf(address(this)),
+                    amount,
                     currTotalSupply
+                )
             );
             unchecked {
                 ++i;
             }
         }
+        emit Redeemed(account, recipient, amount);
     }
 
     function getWrappedTokensInfo()

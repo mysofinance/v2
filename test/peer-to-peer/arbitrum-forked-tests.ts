@@ -137,9 +137,9 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     await weth.connect(borrower).deposit({ value: ONE_WETH.mul(100000) })
 
     // whitelist addrs
-    await expect(
-      addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    await expect(addressRegistry.connect(lender).setWhitelistState([balancerV2Looping.address], 4)).to.be.revertedWith(
+      'Ownable: caller is not the owner'
+    )
     await addressRegistry.connect(team).setWhitelistState([balancerV2Looping.address], 4)
     await addressRegistry.connect(team).setWhitelistState([uniV3Looping.address], 4)
 
@@ -207,17 +207,20 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     // borrow with on chain quote
     const collSendAmount = ONE_WETH
-    const expectedTransferFee = 0
+    const expectedProtocolAndVaultTransferFee = 0
+    const expectedCompartmentTransferFee = 0
     const quoteTupleIdx = 0
     const callbackAddr = ZERO_ADDR
     const callbackData = ZERO_BYTES32
     const borrowInstructions = {
       collSendAmount,
-      expectedTransferFee,
+      expectedProtocolAndVaultTransferFee,
+      expectedCompartmentTransferFee,
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
 
     const borrowWithOnChainQuoteTransaction = await borrowerGateway
@@ -264,6 +267,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: partialRepayAmount,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -363,17 +367,20 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
     // borrow with on chain quote
     const collSendAmount = borrowerCollBalPre
-    const expectedTransferFee = 0
+    const expectedProtocolAndVaultTransferFee = 0
+    const expectedCompartmentTransferFee = 0
     const quoteTupleIdx = 0
     const callbackAddr = ZERO_ADDR
     const callbackData = ZERO_BYTES32
     const borrowInstructions = {
       collSendAmount,
-      expectedTransferFee,
+      expectedProtocolAndVaultTransferFee,
+      expectedCompartmentTransferFee,
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
 
     // Since there is a 15 min cooldown duration after minting GLP, needs to pass for the user before transfer
@@ -424,6 +431,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
           targetLoanId: loanId,
           targetRepayAmount: partialRepayAmount,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -564,7 +572,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
     const quoteTupleIdx = 0
     await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-    const expectedTransferFee = 0
+    const expectedProtocolAndVaultTransferFee = 0
+    const expectedCompartmentTransferFee = 0
     const deadline = MAX_UINT128
     const callbackAddr = uniV3Looping.address
 
@@ -574,11 +583,13 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     )
     const borrowInstructions = {
       collSendAmount: collSendAmountBn,
-      expectedTransferFee,
+      expectedProtocolAndVaultTransferFee,
+      expectedCompartmentTransferFee,
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
     await borrowerGateway
       .connect(borrower)
@@ -623,6 +634,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
           targetLoanId: 0,
           targetRepayAmount: loan.initRepayAmount,
           expectedTransferFee: 0,
+          deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
           callbackData: callbackData
         },
@@ -711,7 +723,8 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     const minSwapReceiveBn = fromReadableAmount(minSwapReceive * (1 - slippage), dexSwapTokenOut.decimals)
     const quoteTupleIdx = 0
     await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-    const expectedTransferFee = 0
+    const expectedProtocolAndVaultTransferFee = 0
+    const expectedCompartmentTransferFee = 0
     const deadline = MAX_UINT128
     const callbackAddr = uniV3Looping.address
 
@@ -721,11 +734,13 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     )
     const borrowInstructions = {
       collSendAmount: collSendAmountBn,
-      expectedTransferFee,
+      expectedProtocolAndVaultTransferFee,
+      expectedCompartmentTransferFee,
       deadline: MAX_UINT256,
       minLoanAmount: 0,
       callbackAddr,
-      callbackData
+      callbackData,
+      mysoTokenManagerData: ZERO_BYTES32
     }
 
     await expect(
@@ -802,18 +817,21 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
 
       // borrower approves and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const collSendAmount = ONE_WETH
       const callbackAddr = ZERO_ADDR
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await borrowerGateway

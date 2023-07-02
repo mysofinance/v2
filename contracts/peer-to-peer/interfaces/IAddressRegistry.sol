@@ -10,7 +10,7 @@ interface IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState indexed whitelistState
     );
     event AllowedTokensForCompartmentUpdated(
-        address compartmentImpl,
+        address indexed compartmentImpl,
         address[] tokens,
         bool isWhitelisted
     );
@@ -20,8 +20,8 @@ interface IAddressRegistry {
         uint256 whitelistedUntil
     );
     event BorrowerWhitelistUpdated(
-        address whitelistAuthority,
-        address[] indexed borrower,
+        address indexed whitelistAuthority,
+        address[] borrowers,
         uint256 whitelistedUntil
     );
     event CreatedWrappedTokenForERC721s(
@@ -53,8 +53,11 @@ interface IAddressRegistry {
      * @notice adds new lender vault to registry
      * @dev can only be called lender vault factory
      * @param addr address of new lender vault
+     * @return numRegisteredVaults number of registered vaults
      */
-    function addLenderVault(address addr) external;
+    function addLenderVault(
+        address addr
+    ) external returns (uint256 numRegisteredVaults);
 
     /**
      * @notice Allows user to claim whitelisted status
@@ -75,11 +78,13 @@ interface IAddressRegistry {
      * @param tokensToBeWrapped Array of WrappedERC721TokenInfo
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
+     * @param mysoTokenManagerData Data to be passed to MysoTokenManager
      */
     function createWrappedTokenForERC721s(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     /**
@@ -87,11 +92,13 @@ interface IAddressRegistry {
      * @param tokensToBeWrapped Array of WrappedERC20TokenInfo
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
+     * @param mysoTokenManagerData Data to be passed to MysoTokenManager
      */
     function createWrappedTokenForERC20s(
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     /**

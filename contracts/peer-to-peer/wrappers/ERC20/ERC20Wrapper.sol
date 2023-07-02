@@ -20,7 +20,6 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
     address public immutable addressRegistry;
     address public immutable wrappedErc20Impl;
     address[] internal _tokensCreated;
-    uint256 public numTokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc20Impl) {
         if (_addressRegistry == address(0) || _wrappedErc20Impl == address(0)) {
@@ -45,19 +44,15 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         if (minter == address(0) || minter == address(this)) {
             revert Errors.InvalidAddress();
         }
-        newErc20Addr = Clones.cloneDeterministic(
-            wrappedErc20Impl,
-            keccak256(abi.encodePacked(_tokensCreated.length))
-        );
+        newErc20Addr = Clones.clone(wrappedErc20Impl);
         _tokensCreated.push(newErc20Addr);
-        ++numTokensCreated;
 
+        // @dev: external call happens before state update due to minTokenAmount determination
         (bool isIOU, uint256 minTokenAmount) = _transferTokens(
             minter,
             tokensToBeWrapped,
             newErc20Addr
         );
-        // @dev: state update happens after external call due to minTokenAmount determination
         IWrappedERC20Impl(newErc20Addr).initialize(
             minter,
             tokensToBeWrapped,
@@ -66,10 +61,20 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             symbol,
             isIOU
         );
+        emit ERC20WrapperCreated(
+            newErc20Addr,
+            minter,
+            _tokensCreated.length,
+            tokensToBeWrapped
+        );
     }
 
     function tokensCreated() external view returns (address[] memory) {
         return _tokensCreated;
+    }
+
+    function numTokensCreated() external view returns (uint256) {
+        return _tokensCreated.length;
     }
 
     function _transferTokens(
@@ -83,7 +88,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         uint256 numTokensToBeWrapped = tokensToBeWrapped.length;
         isIOU = numTokensToBeWrapped == 0;
         if (!isIOU) {
-            for (uint256 i = 0; i < numTokensToBeWrapped; ) {
+            for (uint256 i; i < numTokensToBeWrapped; ) {
                 if (
                     addressRegistry != address(0) &&
                     !IAddressRegistry(addressRegistry).isWhitelistedERC20(

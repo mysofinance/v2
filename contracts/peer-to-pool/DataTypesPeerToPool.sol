@@ -18,10 +18,9 @@ library DataTypesPeerToPool {
         uint128 minTotalSubscriptions;
         // Max subscription amount (in loan token) that the borrower deems acceptable
         uint128 maxTotalSubscriptions;
-        // The number of collateral tokens the borrower pledges per loan token borrowed as collateral for default
-        // case
+        // The number of collateral tokens the borrower pledges per loan token borrowed as collateral for default case
         uint128 collPerLoanToken;
-        // Borrower who can accept given loan proposal
+        // Borrower who can finalize given loan proposal
         address borrower;
         // Array of scheduled repayments
         Repayment[] repaymentSchedule;
@@ -54,8 +53,9 @@ library DataTypesPeerToPool {
         // Arranger fee charged on final loan amount, initially in relative terms (100%=BASE), and after finalization
         // in absolute terms (in loan token)
         uint256 arrangerFee;
-        // Final loan amount; initially this is zero and gets set once loan proposal got accepted and finalized
-        uint256 finalLoanAmount;
+        // The gross loan amount; initially this is zero and gets set once loan proposal gets accepted and finalized;
+        // note that the borrower receives the gross loan amount minus any arranger and protocol fees
+        uint256 grossLoanAmount;
         // Final collateral amount reserved for defaults; initially this is zero and gets set once loan proposal got
         // accepted and finalized
         uint256 finalCollAmountReservedForDefault;
@@ -69,12 +69,15 @@ library DataTypesPeerToPool {
         uint256 currentRepaymentIdx;
         // Status of current loan proposal
         DataTypesPeerToPool.LoanStatus status;
+        // Protocol fee, initially in relative terms (100%=BASE), and after finalization in absolute terms (in loan token);
+        // note that the relative protocol fee is locked in at the time when the loan proposal is created
+        uint256 protocolFee;
     }
 
     enum LoanStatus {
         WITHOUT_LOAN_TERMS,
         IN_NEGOTIATION,
-        BORROWER_ACCEPTED,
+        LOAN_TERMS_LOCKED,
         READY_TO_EXECUTE,
         ROLLBACK,
         LOAN_DEPLOYED,

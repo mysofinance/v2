@@ -19,6 +19,9 @@ contract WrappedERC721Impl is
     string internal _tokenName;
     string internal _tokenSymbol;
     DataTypesPeerToPeer.WrappedERC721TokenInfo[] internal _wrappedTokens;
+    address public redeemer;
+    mapping(address => mapping(uint256 => bool)) public stuckTokens;
+    bool internal _mutex;
 
     constructor() ERC20("Wrapped ERC721 Impl", "Wrapped ERC721 Impl") {
         _disableInitializers();
@@ -42,30 +45,84 @@ contract WrappedERC721Impl is
     }
 
     function redeem(address account, address recipient) external nonReentrant {
+        // mutex is used to prevent entrancy into the sweepTokensLeftAfterRedeem function
+        // in case the redeemer/recipient is one of the NFTs being transferred
+        _mutex = true;
         if (msg.sender != account) {
             _spendAllowance(account, msg.sender, 1);
         }
         _burn(account, 1);
-        for (uint256 i = 0; i < _wrappedTokens.length; ) {
-            for (uint256 j = 0; j < _wrappedTokens[i].tokenIds.length; ) {
+        redeemer = account;
+        uint256 tokensLength = _wrappedTokens.length;
+        address tokenAddr;
+        uint256 tokenId;
+        uint256 idsLength;
+        for (uint256 i; i < tokensLength; ) {
+            idsLength = _wrappedTokens[i].tokenIds.length;
+            tokenAddr = _wrappedTokens[i].tokenAddr;
+            for (uint256 j; j < idsLength; ) {
+                tokenId = _wrappedTokens[i].tokenIds[j];
                 try
-                    IERC721(_wrappedTokens[i].tokenAddr).transferFrom(
+                    IERC721(tokenAddr).safeTransferFrom(
                         address(this),
                         recipient,
-                        _wrappedTokens[i].tokenIds[j]
+                        tokenId
                     )
+                // solhint-disable-next-line no-empty-blocks
                 {
-                    unchecked {
-                        ++j;
-                    }
+
                 } catch {
-                    revert Errors.TransferFromWrappedTokenFailed();
+                    stuckTokens[tokenAddr][tokenId] = true;
+                    emit TransferFromWrappedTokenFailed(tokenAddr, tokenId);
+                }
+                unchecked {
+                    ++j;
                 }
             }
             unchecked {
                 ++i;
             }
         }
+        _mutex = false;
+        emit Redeemed(account, recipient);
+    }
+
+    function sweepTokensLeftAfterRedeem(
+        address tokenAddr,
+        uint256[] calldata tokenIds
+    ) external nonReentrant {
+        if (_mutex) {
+            revert Errors.Reentrancy();
+        }
+        if (msg.sender != redeemer) {
+            revert Errors.InvalidSender();
+        }
+        if (tokenIds.length == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        mapping(uint256 => bool) storage stuckTokenAddr = stuckTokens[
+            tokenAddr
+        ];
+        for (uint256 i; i < tokenIds.length; ) {
+            if (!stuckTokenAddr[tokenIds[i]]) {
+                revert Errors.TokenNotStuck();
+            }
+            try
+                IERC721(tokenAddr).transferFrom(
+                    address(this),
+                    msg.sender,
+                    tokenIds[i]
+                )
+            {
+                delete stuckTokenAddr[tokenIds[i]];
+            } catch {
+                emit TransferFromWrappedTokenFailed(tokenAddr, tokenIds[i]);
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        emit TokenSweepAttempted(tokenAddr, tokenIds);
     }
 
     function getWrappedTokensInfo()

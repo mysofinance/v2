@@ -32,14 +32,15 @@ contract UniV2Chainlink is ChainlinkBasic {
             UNI_V2_BASE_CURRENCY_UNIT
         )
     {
-        if (_lpAddrs.length == 0) {
+        uint256 lpAddrsLen = _lpAddrs.length;
+        if (lpAddrsLen == 0) {
             revert Errors.InvalidArrayLength();
         }
         if (_toleranceAmount >= 10000 || _toleranceAmount == 0) {
             revert Errors.InvalidOracleTolerance();
         }
         _tolerance = _toleranceAmount;
-        for (uint i = 0; i < _lpAddrs.length; ) {
+        for (uint256 i; i < lpAddrsLen; ) {
             if (_lpAddrs[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }
@@ -67,9 +68,11 @@ contract UniV2Chainlink is ChainlinkBasic {
             ? getLpTokenPrice(loanToken)
             : _getPriceOfToken(loanToken);
 
-        collTokenPriceInLoanToken =
-            (collTokenPriceRaw * (10 ** loanTokenDecimals)) /
-            loanTokenPriceRaw;
+        collTokenPriceInLoanToken = Math.mulDiv(
+            collTokenPriceRaw,
+            10 ** loanTokenDecimals,
+            loanTokenPriceRaw
+        );
     }
 
     /**
@@ -115,13 +118,12 @@ contract UniV2Chainlink is ChainlinkBasic {
         // need to divide by sqrt reserve decimals to cancel out units of invariant k
         // IMPORTANT: while formula is robust against typical flashloan skews, lenders should use this
         // oracle with caution and take into account skew scenarios when setting their LTVs
-        lpTokenPriceInEth =
-            (2 *
-                Math.sqrt(reserve0 * reserve1) *
-                Math.sqrt(priceToken0 * priceToken1) *
-                10 ** IERC20Metadata(lpToken).decimals()) /
-            totalLpSupply /
-            Math.sqrt(10 ** token0Decimals * 10 ** token1Decimals);
+        lpTokenPriceInEth = Math.mulDiv(
+            2 * Math.sqrt(reserve0 * reserve1),
+            Math.sqrt(priceToken0 * priceToken1) * UNI_V2_BASE_CURRENCY_UNIT,
+            totalLpSupply *
+                Math.sqrt(10 ** token0Decimals * 10 ** token1Decimals)
+        );
     }
 
     /**
