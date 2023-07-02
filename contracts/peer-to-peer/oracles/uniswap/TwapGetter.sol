@@ -10,28 +10,20 @@ import {Errors} from "../../../Errors.sol";
 import {IUniswapV3Factory} from "../../interfaces/oracles/uniswap/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "../../interfaces/oracles/uniswap/IUniswapV3Pool.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
+import {ITwapGetter} from "../../interfaces/oracles/uniswap/ITwapGetter.sol";
 
-abstract contract TwapGetter {
-    // uint256 internal constant BASE_CURRENCY_UNIT = 10 ** 18;
-
+abstract contract TwapGetter is ITwapGetter {
     // inToken: `1 unit of inToken`
     // outToken: resulting units of outToken (in "base unit" of outTokens, e.g. if 427518869723400 and outToken is eth, then this corresponds to 427518869723400/10^18)
     function getTwap(
         address inToken,
         address outToken,
-        //uint24 fee,
         uint32 twapInterval,
         address uniswapV3Pool
     ) public view returns (uint256 twap) {
         (address token0, address token1) = inToken < outToken
             ? (inToken, outToken)
             : (outToken, inToken);
-        // address uniswapV3Pool = IUniswapV3Factory(
-        //     0x1F98431c8aD98523631AE4a59f267346ea31F984
-        // ).getPool(token0, token1, fee);
-        // if (uniswapV3Pool == address(0)) {
-        //     revert Errors.NoOracle();
-        // }
 
         // note: this returns the sqrt price
         uint160 sqrtPriceX96 = getSqrtTwapX96(uniswapV3Pool, twapInterval);

@@ -149,8 +149,9 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
         (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(uniV3PairAddr)
             .slot0();
         uint256 currSpotPrice = token0 == WETH
-            ? getPriceFromSqrtPriceX96(sqrtPriceX96, 18)
-            : (10 ** 36) / getPriceFromSqrtPriceX96(sqrtPriceX96, 18);
+            ? (10 ** 36) / getPriceFromSqrtPriceX96(sqrtPriceX96, 18)
+            : getPriceFromSqrtPriceX96(sqrtPriceX96, 18);
+
         // if twap price is exceeds threshold from spot price, then revert
         if (
             twapPriceRaw > ((10000 + _tolerance) * currSpotPrice) / 10000 ||
