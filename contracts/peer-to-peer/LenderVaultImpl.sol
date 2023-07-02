@@ -432,7 +432,6 @@ contract LenderVaultImpl is
     }
 
     function transferOwnership(address _newOwnerProposal) public override {
-        _checkOwner();
         if (
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
@@ -441,7 +440,8 @@ contract LenderVaultImpl is
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        // @dev: Ownable2Step checks against address(0)
+        // @dev: Ownable2Step checks against address(0);
+        // also access control covered through onlyOwner modifier from Ownable2Step.transferOwnership
         Ownable2Step.transferOwnership(_newOwnerProposal);
     }
 

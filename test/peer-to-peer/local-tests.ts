@@ -741,7 +741,11 @@ describe('Peer-to-Peer: Local Tests', function () {
 
   describe('Lender Vault', function () {
     it('Should handle ownership transfer correctly', async function () {
-      const { lender, team, borrower, lenderVault } = await setupTest()
+      const { lender, team, lenderVault, signer } = await setupTest()
+
+      const currOwner = await lenderVault.owner()
+      expect(currOwner).to.be.equal(lender.address)
+      expect(await lenderVault.pendingOwner()).to.be.equal(ZERO_ADDRESS)
 
       // check that only owner can propose new owner
       await expect(lenderVault.connect(team).transferOwnership(team.address)).to.be.revertedWith(
@@ -761,10 +765,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
 
       // add signer
-      await lenderVault.connect(lender).addSigners([borrower.address])
+      await lenderVault.connect(lender).addSigners([signer.address])
 
       // check that new owner can't be a signer
-      await expect(lenderVault.connect(lender).transferOwnership(borrower.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(signer.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
@@ -783,9 +787,11 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // claim ownership
       await expect(lenderVault.connect(team).acceptOwnership()).to.emit(lenderVault, 'OwnershipTransferred')
+      const newOwner = await lenderVault.owner()
+      expect(newOwner).to.be.equal(team.address)
 
       // check that old owner can't propose new owner anymore
-      await expect(lenderVault.connect(lender).transferOwnership(borrower.address)).to.be.revertedWith(
+      await expect(lenderVault.connect(lender).transferOwnership(lender.address)).to.be.revertedWith(
         'Ownable: caller is not the owner'
       )
     })

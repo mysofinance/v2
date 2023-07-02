@@ -228,7 +228,7 @@ contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
             revert Errors.InvalidNewOwnerProposal();
         }
         // @dev: Ownable2Step checks against address(0);
-        // also access control covered through onlyOwner modifier
+        // also access control covered through onlyOwner modifier from Ownable2Step.transferOwnership
         Ownable2Step.transferOwnership(_newOwnerProposal);
     }
 
