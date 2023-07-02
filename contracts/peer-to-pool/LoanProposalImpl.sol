@@ -78,9 +78,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     function proposeLoanTerms(
         DataTypesPeerToPool.LoanTerms calldata newLoanTerms
     ) external {
-        if (msg.sender != staticData.arranger) {
-            revert Errors.InvalidSender();
-        }
+        _checkIsAuthorizedSender(staticData.arranger);
         DataTypesPeerToPool.LoanStatus status = dynamicData.status;
         if (
             status != DataTypesPeerToPool.LoanStatus.WITHOUT_LOAN_TERMS &&
@@ -129,11 +127,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.InvalidSender();
         }
-        if (
-            dynamicData.status != DataTypesPeerToPool.LoanStatus.IN_NEGOTIATION
-        ) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
+        _checkStatus(DataTypesPeerToPool.LoanStatus.IN_NEGOTIATION);
         // @dev: check if "remaining" time until first due date is "sufficiently"
         // far enough in the future
         if (
@@ -155,12 +149,10 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function finalizeLoanTermsAndTransferColl(
-        uint256 expectedTransferFee
+        uint256 expectedTransferFee,
+        bytes calldata mysoTokenManagerData
     ) external {
-        DataTypesPeerToPool.LoanTerms memory _unfinalizedLoanTerms = _loanTerms;
-        if (msg.sender != _unfinalizedLoanTerms.borrower) {
-            revert Errors.InvalidSender();
-        }
+        _checkIsAuthorizedSender(_loanTerms.borrower);
         // revert if loan terms are locked or lender cutoff time hasn't passed yet
         if (
             dynamicData.status !=
@@ -172,6 +164,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         address fundingPool = staticData.fundingPool;
         uint256 totalSubscriptions = IFundingPoolImpl(fundingPool)
             .totalSubscriptions(address(this));
+        DataTypesPeerToPool.LoanTerms memory _unfinalizedLoanTerms = _loanTerms;
         if (totalSubscriptions < _unfinalizedLoanTerms.minTotalSubscriptions) {
             revert Errors.FellShortOfTotalSubscriptionTarget();
         }
@@ -189,10 +182,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         // 1 loanToken for 8 collToken) to absolute (e.g., 200 collToken)
         (
             DataTypesPeerToPool.LoanTerms memory _finalizedLoanTerms,
-            uint256 _arrangerFee,
-            uint256 _finalCollAmountReservedForDefault,
-            uint256 _finalCollAmountReservedForConversions,
-            uint256 _protocolFee
+            uint256[2] memory collAmounts,
+            uint256[2] memory fees
         ) = getAbsoluteLoanTerms(
                 _unfinalizedLoanTerms,
                 totalSubscriptions,
@@ -212,25 +203,21 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
                 ++i;
             }
         }
-        dynamicData.arrangerFee = _arrangerFee;
-        dynamicData.protocolFee = _protocolFee;
+        dynamicData.arrangerFee = fees[0];
+        dynamicData.protocolFee = fees[1];
         dynamicData.grossLoanAmount = totalSubscriptions;
-        dynamicData
-            .finalCollAmountReservedForDefault = _finalCollAmountReservedForDefault;
-        dynamicData
-            .finalCollAmountReservedForConversions = _finalCollAmountReservedForConversions;
+        dynamicData.finalCollAmountReservedForDefault = collAmounts[0];
+        dynamicData.finalCollAmountReservedForConversions = collAmounts[1];
         address mysoTokenManager = IFactory(staticData.factory)
             .mysoTokenManager();
         if (mysoTokenManager != address(0)) {
             IMysoTokenManager(mysoTokenManager).processP2PoolLoanFinalization(
                 address(this),
                 fundingPool,
-                staticData.collToken,
                 staticData.arranger,
                 msg.sender,
                 totalSubscriptions,
-                _finalCollAmountReservedForDefault,
-                _finalCollAmountReservedForConversions
+                mysoTokenManagerData
             );
         }
 
@@ -242,36 +229,25 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         IERC20Metadata(collToken).safeTransferFrom(
             msg.sender,
             address(this),
-            _finalCollAmountReservedForDefault +
-                _finalCollAmountReservedForConversions +
-                expectedTransferFee
+            collAmounts[0] + collAmounts[1] + expectedTransferFee
         );
         if (
             IERC20Metadata(collToken).balanceOf(address(this)) !=
-            preBal +
-                _finalCollAmountReservedForDefault +
-                _finalCollAmountReservedForConversions
+            preBal + collAmounts[0] + collAmounts[1]
         ) {
             revert Errors.InvalidSendAmount();
         }
 
         emit LoanTermsAndTransferCollFinalized(
             totalSubscriptions,
-            _finalCollAmountReservedForDefault,
-            _finalCollAmountReservedForConversions,
-            _arrangerFee,
-            _protocolFee
+            collAmounts,
+            fees
         );
     }
 
     function rollback() external {
         // @dev: cannot be called anymore once finalizeLoanTermsAndTransferColl() called
-        if (
-            dynamicData.status !=
-            DataTypesPeerToPool.LoanStatus.LOAN_TERMS_LOCKED
-        ) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
+        _checkStatus(DataTypesPeerToPool.LoanStatus.LOAN_TERMS_LOCKED);
         uint256 totalSubscriptions = IFundingPoolImpl(staticData.fundingPool)
             .totalSubscriptions(address(this));
         uint256 lenderInOrOutCutoffTime = _lenderInOrOutCutoffTime();
@@ -292,28 +268,16 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function checkAndUpdateStatus() external {
-        if (msg.sender != staticData.fundingPool) {
-            revert Errors.InvalidSender();
-        }
-        if (
-            dynamicData.status !=
-            DataTypesPeerToPool.LoanStatus.READY_TO_EXECUTE
-        ) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
+        _checkIsAuthorizedSender(staticData.fundingPool);
+        _checkStatus(DataTypesPeerToPool.LoanStatus.READY_TO_EXECUTE);
         dynamicData.status = DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED;
 
         emit LoanDeployed();
     }
 
     function exerciseConversion() external {
-        address fundingPool = staticData.fundingPool;
-        uint256 lenderContribution = IFundingPoolImpl(fundingPool)
-            .subscriptionAmountOf(address(this), msg.sender);
-        if (lenderContribution == 0) {
-            revert Errors.InvalidSender();
-        }
-        _checkIsDeployed();
+        (, uint256 lenderContribution) = _checkIsLender();
+        _checkStatus(DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED);
         uint256 repaymentIdx = _checkAndGetCurrRepaymentIdx();
         mapping(uint256 => bool)
             storage lenderExercisedConversionPerRepaymentIdx = _lenderExercisedConversion[
@@ -377,10 +341,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function repay(uint256 expectedTransferFee) external {
-        if (msg.sender != _loanTerms.borrower) {
-            revert Errors.InvalidSender();
-        }
-        _checkIsDeployed();
+        _checkIsAuthorizedSender(_loanTerms.borrower);
+        _checkStatus(DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED);
         uint256 repaymentIdx = _checkAndGetCurrRepaymentIdx();
         // must be after when the period of this loan when lenders can convert,
         // but before default period for this period
@@ -437,12 +399,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function claimRepayment(uint256 repaymentIdx) external {
-        address fundingPool = staticData.fundingPool;
-        uint256 lenderContribution = IFundingPoolImpl(fundingPool)
-            .subscriptionAmountOf(address(this), msg.sender);
-        if (lenderContribution == 0) {
-            revert Errors.InvalidSender();
-        }
+        (address fundingPool, uint256 lenderContribution) = _checkIsLender();
         // the currentRepaymentIdx (initially 0) gets incremented on repay or if all lenders converted for given period;
         // hence any `repaymentIdx` smaller than `currentRepaymentIdx` will always map to a valid repayment claim
         if (repaymentIdx >= dynamicData.currentRepaymentIdx) {
@@ -479,11 +436,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function markAsDefaulted() external {
-        if (
-            dynamicData.status != DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED
-        ) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
+        _checkStatus(DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED);
         // this will check if loan has been fully repaid yet in this instance
         // note: loan can be marked as defaulted if no repayment and blocktime is in half-open interval of:
         // [dueTimestamp + conversionGracePeriod + repaymentGracePeriod, infty)
@@ -496,15 +449,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     }
 
     function claimDefaultProceeds() external {
-        if (dynamicData.status != DataTypesPeerToPool.LoanStatus.DEFAULTED) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
-        address fundingPool = staticData.fundingPool;
-        uint256 lenderContribution = IFundingPoolImpl(fundingPool)
-            .subscriptionAmountOf(address(this), msg.sender);
-        if (lenderContribution == 0) {
-            revert Errors.InvalidSender();
-        }
+        _checkStatus(DataTypesPeerToPool.LoanStatus.DEFAULTED);
+        (, uint256 lenderContribution) = _checkIsLender();
         if (_lenderClaimedCollateralOnDefault[msg.sender]) {
             revert Errors.AlreadyClaimed();
         }
@@ -576,10 +522,8 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         view
         returns (
             DataTypesPeerToPool.LoanTerms memory,
-            uint256,
-            uint256,
-            uint256,
-            uint256
+            uint256[2] memory collAmounts,
+            uint256[2] memory fees
         )
     {
         uint256 _arrangerFee = (dynamicData.arrangerFee * totalSubscriptions) /
@@ -617,10 +561,11 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         }
         return (
             _tmpLoanTerms,
-            _arrangerFee,
-            _finalCollAmountReservedForDefault,
-            _finalCollAmountReservedForConversions,
-            _protocolFee
+            [
+                _finalCollAmountReservedForDefault,
+                _finalCollAmountReservedForConversions
+            ],
+            [_arrangerFee, _protocolFee]
         );
     }
 
@@ -696,10 +641,29 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             staticData.repaymentGracePeriod;
     }
 
-    function _checkIsDeployed() internal view {
-        if (
-            dynamicData.status != DataTypesPeerToPool.LoanStatus.LOAN_DEPLOYED
-        ) {
+    function _checkIsAuthorizedSender(address authorizedSender) internal view {
+        if (msg.sender != authorizedSender) {
+            revert Errors.InvalidSender();
+        }
+    }
+
+    function _checkIsLender()
+        internal
+        view
+        returns (address fundingPool, uint256 lenderContribution)
+    {
+        fundingPool = staticData.fundingPool;
+        lenderContribution = IFundingPoolImpl(fundingPool).subscriptionAmountOf(
+            address(this),
+            msg.sender
+        );
+        if (lenderContribution == 0) {
+            revert Errors.InvalidSender();
+        }
+    }
+
+    function _checkStatus(DataTypesPeerToPool.LoanStatus status) internal view {
+        if (dynamicData.status != status) {
             revert Errors.InvalidActionForCurrentStatus();
         }
     }
