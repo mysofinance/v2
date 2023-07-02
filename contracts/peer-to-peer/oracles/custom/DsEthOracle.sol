@@ -5,14 +5,14 @@ pragma solidity 0.8.19;
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {ChainlinkBase} from "../chainlink/ChainlinkBase.sol";
 import {Errors} from "../../../Errors.sol";
-import {TwapGetter} from "./TwapGetter.sol";
+import {TwapGetter} from "../uniswap/TwapGetter.sol";
 import {IDSETH} from "../../interfaces/oracles/IDSETH.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
- * @dev supports oracles which are compatible with v2v3 or v3 interfaces
+ * @dev custom oracle for ds-eth
  */
-contract IndexCoopOracle is ChainlinkBase, TwapGetter {
+contract DsEthOracle is ChainlinkBase, TwapGetter {
     // must be paired with WETH and only allow components within ds eth to use TWAP
     mapping(address => address) public uniV3PairAddrs;
     uint256 internal immutable _tolerance; // tolerance must be an integer less than 10000 and greater than 0
@@ -114,12 +114,10 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
 
     function _getDsEthPrice() internal view returns (uint256 dsEthPriceRaw) {
         address[] memory components = IDSETH(DS_ETH).getComponents();
-        uint256 componentsLength = components.length;
         address currComponent;
         uint256 currComponentPrice;
-        uint256 currComponentUnit;
         uint256 totalPriceUniCumSum;
-        for (uint256 i; i < componentsLength; ) {
+        for (uint256 i; i < components.length; ) {
             currComponent = components[i];
             if (
                 oracleAddrs[currComponent] == address(0) &&
@@ -132,10 +130,8 @@ contract IndexCoopOracle is ChainlinkBase, TwapGetter {
             currComponentPrice = oracleAddrs[currComponent] == address(0)
                 ? _getTwapPrice(uniV3PairAddrs[currComponent])
                 : _getPriceOfToken(currComponent);
-            currComponentUnit = IDSETH(DS_ETH).getTotalComponentRealUnits(
-                currComponent
-            );
-            totalPriceUniCumSum += (currComponentPrice * currComponentUnit);
+            totalPriceUniCumSum += (currComponentPrice *
+                IDSETH(DS_ETH).getTotalComponentRealUnits(currComponent));
             unchecked {
                 ++i;
             }

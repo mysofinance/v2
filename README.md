@@ -18,6 +18,7 @@ npx hardhat test
 ## Contract Files
 ```
 contracts/
+contracts/
 ┣ interfaces/
 ┃ ┗ IMysoTokenManager.sol
 ┣ peer-to-peer/
@@ -74,9 +75,10 @@ contracts/
 ┃ ┃ ┃ ┣ ChainlinkBasicWithWbtc.sol
 ┃ ┃ ┃ ┣ OlympusOracle.sol
 ┃ ┃ ┃ ┗ UniV2Chainlink.sol
+┃ ┃ ┣ custom/
+┃ ┃ ┃ ┗ DsEthOracle.sol
 ┃ ┃ ┗ uniswap/
 ┃ ┃   ┣ FullMath.sol
-┃ ┃   ┣ IndexCoopOracle.sol
 ┃ ┃   ┣ TickMath.sol
 ┃ ┃   ┗ TwapGetter.sol
 ┃ ┣ wrappers/
@@ -153,19 +155,21 @@ test/
 ### Test Coverage
 ```
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
+File                                                     |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
+---------------------------------------------------------|----------|----------|----------|----------|----------------|
  contracts\                                              |      100 |       50 |      100 |      100 |                |
   Constants.sol                                          |      100 |      100 |      100 |      100 |                |
   Errors.sol                                             |      100 |      100 |      100 |      100 |                |
   Helpers.sol                                            |      100 |       50 |      100 |      100 |                |
  contracts\interfaces\                                   |      100 |      100 |      100 |      100 |                |
   IMysoTokenManager.sol                                  |      100 |      100 |      100 |      100 |                |
- contracts\peer-to-peer\                                 |    99.44 |    91.41 |     97.3 |    97.67 |                |
-  AddressRegistry.sol                                    |      100 |    90.22 |      100 |    97.48 |     81,117,162 |
+ contracts\peer-to-peer\                                 |    99.72 |    94.27 |    98.72 |    98.75 |                |
+  AddressRegistry.sol                                    |      100 |    94.57 |      100 |    99.17 |            116 |
   BorrowerGateway.sol                                    |    98.55 |    91.18 |    90.91 |       97 |    248,323,364 |
   DataTypesPeerToPeer.sol                                |      100 |      100 |      100 |      100 |                |
   LenderVaultFactory.sol                                 |      100 |     87.5 |      100 |      100 |                |
-  LenderVaultImpl.sol                                    |    98.97 |     88.6 |       96 |    96.59 |... 341,342,431 |
-  QuoteHandler.sol                                       |      100 |    96.08 |      100 |    99.34 |            371 |
+  LenderVaultImpl.sol                                    |      100 |    92.98 |      100 |    98.88 |         63,208 |
+  QuoteHandler.sol                                       |      100 |    98.04 |      100 |    99.34 |            371 |
  contracts\peer-to-peer\callbacks\                       |      100 |       75 |    88.89 |    96.88 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
   UniV3Looping.sol                                       |      100 |      100 |      100 |      100 |                |
@@ -217,9 +221,10 @@ test/
   ChainlinkBasicWithWbtc.sol                             |      100 |      100 |      100 |      100 |                |
   OlympusOracle.sol                                      |      100 |      100 |      100 |      100 |                |
   UniV2Chainlink.sol                                     |      100 |       95 |      100 |    97.14 |             92 |
- contracts\peer-to-peer\oracles\uniswap\                 |    79.52 |    52.94 |    84.62 |    56.11 |                |
+ contracts\peer-to-peer\oracles\custom\                  |      100 |    83.33 |      100 |    93.48 |                |
+  DsEthOracle.sol                                        |      100 |    83.33 |      100 |    93.48 |     68,127,165 |
+ contracts\peer-to-peer\oracles\uniswap\                 |    71.19 |    40.28 |       75 |    41.98 |                |
   FullMath.sol                                           |    41.67 |       20 |       50 |    25.81 |... 123,124,125 |
-  IndexCoopOracle.sol                                    |      100 |    83.33 |      100 |    93.88 |     68,129,168 |
   TickMath.sol                                           |     69.7 |    42.59 |       50 |    35.44 |... 248,249,251 |
   TwapGetter.sol                                         |      100 |       50 |      100 |    90.48 |          52,66 |
  contracts\peer-to-peer\wrappers\ERC20\                  |      100 |       75 |      100 |    96.77 |                |
@@ -228,16 +233,16 @@ test/
  contracts\peer-to-peer\wrappers\ERC721\                 |      100 |    81.58 |      100 |    96.74 |                |
   ERC721Wrapper.sol                                      |      100 |    81.82 |      100 |    95.12 |         47,128 |
   WrappedERC721Impl.sol                                  |      100 |    81.25 |      100 |    98.04 |             95 |
- contracts\peer-to-pool\                                 |    98.34 |    90.24 |      100 |    97.46 |                |
+ contracts\peer-to-pool\                                 |    98.35 |    90.65 |      100 |    97.47 |                |
   DataTypesPeerToPool.sol                                |      100 |      100 |      100 |      100 |                |
-  Factory.sol                                            |    97.73 |    92.86 |      100 |    98.51 |             61 |
-  FundingPoolImpl.sol                                    |    96.88 |    83.82 |      100 |    95.92 | 64,169,270,274 |
+  Factory.sol                                            |    97.78 |    92.86 |      100 |    98.55 |             61 |
+  FundingPoolImpl.sol                                    |    96.88 |    85.29 |      100 |    95.92 | 64,169,270,274 |
   LoanProposalImpl.sol                                   |    99.25 |    92.65 |      100 |    97.82 |... 255,421,456 |
  contracts\peer-to-pool\interfaces\                      |      100 |      100 |      100 |      100 |                |
   IFactory.sol                                           |      100 |      100 |      100 |      100 |                |
   IFundingPoolImpl.sol                                   |      100 |      100 |      100 |      100 |                |
   ILoanProposalImpl.sol                                  |      100 |      100 |      100 |      100 |                |
- contracts\test\                                         |    70.59 |       40 |    65.71 |    76.67 |                |
+ contracts\test\                                         |    68.57 |    36.36 |    65.71 |    75.41 |                |
   IPAXG.sol                                              |      100 |      100 |      100 |      100 |                |
   IUSDC.sol                                              |      100 |      100 |      100 |      100 |                |
   IWETH.sol                                              |      100 |      100 |      100 |      100 |                |
@@ -248,8 +253,8 @@ test/
   MyMaliciousCallback1.sol                               |    66.67 |       50 |    66.67 |    85.71 |             52 |
   MyMaliciousCallback2.sol                               |    66.67 |       50 |    66.67 |    85.71 |             40 |
   MyMaliciousERC20.sol                                   |     62.5 |       50 |       50 |       75 |       28,46,50 |
-  TestnetTokenManager.sol                                |    55.56 |     12.5 |    41.67 |    55.56 |... 121,124,128 |
+  TestnetTokenManager.sol                                |       50 |       10 |    41.67 |    52.63 |... 123,125,129 |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    96.25 |     83.3 |    92.86 |    91.39 |                |
+All files                                                |    96.26 |    84.38 |    93.44 |    91.72 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```

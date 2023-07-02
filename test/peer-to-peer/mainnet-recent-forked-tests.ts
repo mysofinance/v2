@@ -189,102 +189,99 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
       const wbtcUsdcUniV3PoolAddr = '0x9a772018FbD77fcD2d25657e5C547BAfF3Fd7D16'
 
       // deploy uni v3 twap
-      const IndexCoopOracle = await ethers.getContractFactory('IndexCoopOracle')
+      const DsEthOracle = await ethers.getContractFactory('DsEthOracle')
       // revert if tolerance is not between 0 and 10000 exclusive
       await expect(
-        IndexCoopOracle.connect(team).deploy(
+        DsEthOracle.connect(team).deploy(
           [usdc.address, reth, steth],
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stakewiseEthEthUniV3PoolAddr],
           3600,
           0
         )
-      ).to.be.revertedWithCustomError(IndexCoopOracle, 'InvalidOracleTolerance')
+      ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidOracleTolerance')
       // revert if tolerance is not between 0 and 10000 exclusive
       await expect(
-        IndexCoopOracle.connect(team).deploy(
+        DsEthOracle.connect(team).deploy(
           [usdc.address, reth, steth],
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stakewiseEthEthUniV3PoolAddr],
           3600,
           10000
         )
-      ).to.be.revertedWithCustomError(IndexCoopOracle, 'InvalidOracleTolerance')
+      ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidOracleTolerance')
       // revert if twap interval is less than 30 minutes (1800 seconds)
       await expect(
-        IndexCoopOracle.connect(team).deploy(
+        DsEthOracle.connect(team).deploy(
           [usdc.address, reth, steth],
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stakewiseEthEthUniV3PoolAddr],
           300,
           500
         )
-      ).to.be.revertedWithCustomError(IndexCoopOracle, 'TooShortTwapInterval')
+      ).to.be.revertedWithCustomError(DsEthOracle, 'TooShortTwapInterval')
 
       // revert if zero address in uni v3 array
       await expect(
-        IndexCoopOracle.connect(team).deploy(
+        DsEthOracle.connect(team).deploy(
           [usdc.address, reth, steth],
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [ZERO_ADDR],
           3600,
           500
         )
-      ).to.be.revertedWithCustomError(IndexCoopOracle, 'InvalidAddress')
+      ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
 
       // revert if address without weth as one of tokens is in uni v3 array
       await expect(
-        IndexCoopOracle.connect(team).deploy(
+        DsEthOracle.connect(team).deploy(
           [usdc.address, reth, steth],
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stethCbethUniV3PoolAddr],
           3600,
           500
         )
-      ).to.be.revertedWithCustomError(IndexCoopOracle, 'InvalidAddress')
+      ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
 
       // revert if address without a component token as one of tokens is in uni v3 array
       await expect(
-        IndexCoopOracle.connect(team).deploy(
+        DsEthOracle.connect(team).deploy(
           [usdc.address, reth, steth],
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [usdcWethUniV3PoolAddr],
           3600,
           500
         )
-      ).to.be.revertedWithCustomError(IndexCoopOracle, 'InvalidAddress')
+      ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
 
       // revert if address without a component token and without weth as one of tokens is in uni v3 array
       await expect(
-        IndexCoopOracle.connect(team).deploy(
+        DsEthOracle.connect(team).deploy(
           [usdc.address, reth, steth],
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [wbtcUsdcUniV3PoolAddr],
           3600,
           500
         )
-      ).to.be.revertedWithCustomError(IndexCoopOracle, 'InvalidAddress')
+      ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
 
-      await IndexCoopOracle.connect(team)
-      const indexCoopOracle = await IndexCoopOracle.deploy(
+      await DsEthOracle.connect(team)
+      const dsEthOracle = await DsEthOracle.deploy(
         [usdc.address, reth, steth],
         [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
         [stakewiseEthEthUniV3PoolAddr],
         3600,
         500
       )
-      await indexCoopOracle.deployed()
+      await dsEthOracle.deployed()
 
-      const dsEthCollUsdcLoanPrice = await indexCoopOracle.getPrice(dseth.address, usdc.address)
-      const dsEthCollWethLoanPrice = await indexCoopOracle.getPrice(dseth.address, weth.address)
+      const dsEthCollUsdcLoanPrice = await dsEthOracle.getPrice(dseth.address, usdc.address)
+      const dsEthCollWethLoanPrice = await dsEthOracle.getPrice(dseth.address, weth.address)
 
-      const usdcColldsEthLoanPrice = await indexCoopOracle.getPrice(usdc.address, dseth.address)
-      const wethColldsEthLoanPrice = await indexCoopOracle.getPrice(weth.address, dseth.address)
+      const usdcColldsEthLoanPrice = await dsEthOracle.getPrice(usdc.address, dseth.address)
+      const wethColldsEthLoanPrice = await dsEthOracle.getPrice(weth.address, dseth.address)
 
-      await expect(indexCoopOracle.getPrice(usdc.address, weth.address)).to.be.revertedWithCustomError(
-        IndexCoopOracle,
-        'NoDsEth'
-      )
+      await expect(dsEthOracle.getPrice(usdc.address, weth.address)).to.be.revertedWithCustomError(DsEthOracle, 'NoDsEth')
 
       // toggle to show logs
       const showLogs = false
@@ -308,7 +305,7 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
         )
       }
 
-      await addressRegistry.connect(team).setWhitelistState([indexCoopOracle.address], 2)
+      await addressRegistry.connect(team).setWhitelistState([dsEthOracle.address], 2)
 
       await addressRegistry.connect(team).setWhitelistState([usdc.address, dseth.address, weth.address], 1)
 
@@ -334,7 +331,7 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
         generalQuoteInfo: {
           collToken: dseth.address,
           loanToken: usdc.address,
-          oracleAddr: indexCoopOracle.address,
+          oracleAddr: dsEthOracle.address,
           minLoan: ONE_USDC.mul(1000),
           maxLoan: MAX_UINT256,
           validUntil: timestamp + 60,
@@ -392,7 +389,7 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
 
       const loanTokenPriceRaw = loanTokenRoundData.answer
 
-      const collTokenPriceInEth = await indexCoopOracle.getPrice(dseth.address, weth.address)
+      const collTokenPriceInEth = await dsEthOracle.getPrice(dseth.address, weth.address)
 
       const collTokenPriceInLoanToken = collTokenPriceInEth.mul(ONE_USDC).div(loanTokenPriceRaw)
       const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)

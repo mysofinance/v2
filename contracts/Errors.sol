@@ -114,4 +114,5 @@ library Errors {
     error DepositLockActive();
     error DisallowedSubscriptionLockup();
     error IncorrectLoanAmount();
+    error Disabled();
 }

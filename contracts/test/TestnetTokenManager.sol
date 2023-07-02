@@ -113,15 +113,16 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
     }
 
     function transferOwnership(address _newOwnerProposal) public override {
+        _checkOwner();
         if (
+            _newOwnerProposal == address(0) ||
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
             _newOwnerProposal == owner()
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        // @dev: Ownable2Step checks against address(0)
-        Ownable2Step.transferOwnership(_newOwnerProposal);
+        super._transferOwnership(_newOwnerProposal);
     }
 
     function decimals() public view override returns (uint8) {

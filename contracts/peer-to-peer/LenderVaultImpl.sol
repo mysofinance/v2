@@ -62,8 +62,7 @@ contract LenderVaultImpl is
         if (_vaultOwner == address(0) || _addressRegistry == address(0)) {
             revert Errors.InvalidAddress();
         }
-        // @dev: for initial ownership assignment use internal helper function
-        Ownable2Step._transferOwnership(_vaultOwner);
+        super._transferOwnership(_vaultOwner);
     }
 
     function unlockCollateral(
@@ -431,7 +430,9 @@ contract LenderVaultImpl is
         return signers.length;
     }
 
-    function transferOwnership(address _newOwnerProposal) public override {
+    function transferOwnership(
+        address _newOwnerProposal
+    ) public override(Ownable2Step, ILenderVaultImpl) {
         if (
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
@@ -440,9 +441,9 @@ contract LenderVaultImpl is
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        // @dev: Ownable2Step checks against address(0);
-        // also access control covered through onlyOwner modifier from Ownable2Step.transferOwnership
-        Ownable2Step.transferOwnership(_newOwnerProposal);
+        // @dev: access control via super.transferOwnership()
+        // as well as _newOwnerProposal check against address(0)
+        super.transferOwnership(_newOwnerProposal);
     }
 
     function owner()
@@ -452,6 +453,19 @@ contract LenderVaultImpl is
         returns (address)
     {
         return super.owner();
+    }
+
+    function pendingOwner()
+        public
+        view
+        override(Ownable2Step, ILenderVaultImpl)
+        returns (address)
+    {
+        return super.pendingOwner();
+    }
+
+    function renounceOwnership() public pure override {
+        revert Errors.Disabled();
     }
 
     function _createCollCompartment(

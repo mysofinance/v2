@@ -99,6 +99,13 @@ interface IFactory {
     function setMysoTokenManager(address newTokenManager) external;
 
     /**
+     * @dev Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
+     * Can only be called by the current owner.
+     * @param newOwner the proposed new owner address
+     */
+    function transferOwnership(address newOwner) external;
+
+    /**
      * @notice Returns the address of the funding pool implementation
      * @return The address of the funding pool implementation
      */
@@ -149,6 +156,12 @@ interface IFactory {
      * @return The address of the owner of this contract
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns address of the pending owner
+     * @return Address of the pending owner
+     */
+    function pendingOwner() external view returns (address);
 
     /**
      * @notice Returns the address of the MYSO token manager

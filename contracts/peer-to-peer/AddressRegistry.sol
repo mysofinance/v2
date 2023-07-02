@@ -41,8 +41,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     address[] internal _registeredVaults;
 
     constructor() {
-        // @dev: for initial ownership assignment use internal method from Ownable2Step
-        Ownable2Step._transferOwnership(msg.sender);
+        super._transferOwnership(msg.sender);
     }
 
     function initialize(
@@ -352,7 +351,9 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         return _registeredVaults.length;
     }
 
-    function transferOwnership(address _newOwnerProposal) public override {
+    function transferOwnership(
+        address _newOwnerProposal
+    ) public override(Ownable2Step, IAddressRegistry) {
         _checkIsInitialized();
         if (
             _newOwnerProposal == address(this) ||
@@ -361,9 +362,9 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        // @dev: Ownable2Step checks against address(0);
-        // also access control covered through onlyOwner modifier from Ownable2Step.transferOwnership
-        Ownable2Step.transferOwnership(_newOwnerProposal);
+        // @dev: access control via super.transferOwnership()
+        // as well as _newOwnerProposal check against address(0)
+        super.transferOwnership(_newOwnerProposal);
     }
 
     function owner()
@@ -373,6 +374,15 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         returns (address)
     {
         return super.owner();
+    }
+
+    function pendingOwner()
+        public
+        view
+        override(Ownable2Step, IAddressRegistry)
+        returns (address)
+    {
+        return super.pendingOwner();
     }
 
     function isWhitelistedERC20(address token) public view returns (bool) {
@@ -386,6 +396,10 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             DataTypesPeerToPeer
                 .WhitelistState
                 .ERC20_TOKEN_REQUIRING_COMPARTMENT;
+    }
+
+    function renounceOwnership() public pure override {
+        revert Errors.Disabled();
     }
 
     function _updateSingletonAddr(

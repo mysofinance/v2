@@ -121,6 +121,11 @@ describe('Peer-to-Pool: Local Tests', function () {
     const fundingPoolAddr = await factory.fundingPools(0)
     const fundingPool = await FundingPoolImpl.attach(fundingPoolAddr)
 
+    // reverts if trying to initialize base contract
+    await expect(fundingPool.initialize(ADDRESS_ZERO, ADDRESS_ZERO)).to.be.revertedWith(
+      'Initializable: contract is already initialized'
+    )
+
     // reverts if trying to create deposit pool for zero address
     await expect(factory.createFundingPool(ADDRESS_ZERO)).to.be.revertedWithCustomError(factory, 'InvalidAddress')
 
@@ -222,6 +227,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     await factory.connect(anyUser).acceptOwnership()
     const newOwner = await factory.owner()
     expect(newOwner).to.be.equal(anyUser.address)
+
+    // check renouncing ownership is disabled
+    await expect(factory.connect(anyUser).renounceOwnership()).to.be.revertedWithCustomError(factory, 'Disabled')
   })
 
   it('Should handle lender whitelist correctly', async function () {
@@ -798,6 +806,10 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     // check can't subscribe when min subscription amount > max subscription amount
     await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 1, 0, 0)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidAmount'
+    )
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 2, 1, 0)).to.be.revertedWithCustomError(
       fundingPool,
       'InvalidAmount'
     )
