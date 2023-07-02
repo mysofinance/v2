@@ -8,10 +8,8 @@ interface ILoanProposalImpl {
     event LoanTermsLocked();
     event LoanTermsAndTransferCollFinalized(
         uint256 grossLoanAmount,
-        uint256 _finalCollAmountReservedForDefault,
-        uint256 _finalCollAmountReservedForConversions,
-        uint256 _arrangerFee,
-        uint256 _protocolFee
+        uint256[2] collAmounts,
+        uint256[2] fees
     );
     event Rolledback(address sender);
     event LoanDeployed();
@@ -77,10 +75,12 @@ interface ILoanProposalImpl {
     /**
      * @notice Finalize the loan terms and transfer final collateral amount
      * @param expectedTransferFee The expected transfer fee (if any) of the collateral token
+     * @param mysoTokenManagerData The expected transfer fee (if any) of the collateral token
      * @dev Can only be called by the borrower
      */
     function finalizeLoanTermsAndTransferColl(
-        uint256 expectedTransferFee
+        uint256 expectedTransferFee,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     /**
@@ -236,10 +236,8 @@ interface ILoanProposalImpl {
      * @param totalSubscriptions The current (or assumed) total subscription amount
      * @param loanTokenDecimals The loan token decimals
      * @return loanTerms The loan terms in absolute terms
-     * @return absArrangerFee The arranger fee in absolute terms
-     * @return absCollAmountReservedForDefault The collateral token amount reserved for default claims in absolute terms
-     * @return absCollAmountReservedForConversions The collateral token amount reserved for lender conversions
-     * @return absProtocolFee The protocol fee in absolute terms
+     * @return collAmounts Array containing collateral amount reserved for default and for conversions
+     * @return fees Array containing arranger fee and protocol fee
      */
     function getAbsoluteLoanTerms(
         DataTypesPeerToPool.LoanTerms memory _tmpLoanTerms,
@@ -250,9 +248,7 @@ interface ILoanProposalImpl {
         view
         returns (
             DataTypesPeerToPool.LoanTerms memory loanTerms,
-            uint256 absArrangerFee,
-            uint256 absCollAmountReservedForDefault,
-            uint256 absCollAmountReservedForConversions,
-            uint256 absProtocolFee
+            uint256[2] memory collAmounts,
+            uint256[2] memory fees
         );
 }

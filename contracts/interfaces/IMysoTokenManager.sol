@@ -53,12 +53,10 @@ interface IMysoTokenManager {
     function processP2PoolLoanFinalization(
         address loanProposal,
         address fundingPool,
-        address collToken,
         address arranger,
         address borrower,
         uint256 grossLoanAmount,
-        uint256 finalCollAmountReservedForDefault,
-        uint256 finalCollAmountReservedForConversions
+        bytes calldata mysoTokenManagerData
     ) external;
 
     function processP2PoolCreateLoanProposal(

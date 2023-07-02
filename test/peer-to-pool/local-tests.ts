@@ -746,10 +746,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     expect(lenderSubscriptionPost.sub(lenderSubscriptionPre)).to.be.equal(lenderBalancePre.sub(lenderBalancePost))
 
     // reverts if trying to finalize loan terms prior to loan terms lock
-    await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidActionForCurrentStatus'
-    )
+    await expect(
+      loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(loanProposal, 'InvalidActionForCurrentStatus')
 
     // reverts if users tries to rollback prior to loan terms lock
     await expect(loanProposal.connect(daoTreasury).rollback()).to.be.revertedWithCustomError(
@@ -824,10 +823,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     )
 
     // reverts if trying to finalize loan terms during lender unsubscribe grace period
-    await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidActionForCurrentStatus'
-    )
+    await expect(
+      loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(loanProposal, 'InvalidActionForCurrentStatus')
 
     // move forward post lender unsubscribe grace period
     blocknum = await ethers.provider.getBlockNumber()
@@ -841,15 +839,14 @@ describe('Peer-to-Pool: Local Tests', function () {
     ).to.be.revertedWithCustomError(fundingPool, 'NotInUnsubscriptionPhase')
 
     // reverts if unauthorized sender tries to finalize loan terms and convert relative to absolute terms
-    await expect(loanProposal.connect(lender1).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
-      loanProposal,
-      'InvalidSender'
-    )
+    await expect(
+      loanProposal.connect(lender1).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(loanProposal, 'InvalidSender')
 
     // get final amounts
     totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let lockedInLoanTerms = await loanProposal.loanTerms()
-    let [, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
 
@@ -863,7 +860,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
     let daoTreasuryBalPre = await daoToken.balanceOf(daoTreasury.address)
     let loanProposalBalPre = await daoToken.balanceOf(loanProposal.address)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
     let daoTreasuryBalPost = await daoToken.balanceOf(daoTreasury.address)
     let loanProposalBalPost = await daoToken.balanceOf(loanProposal.address)
     expect(loanProposalBalPost.sub(loanProposalBalPre)).to.be.equal(daoTreasuryBalPre.sub(daoTreasuryBalPost))
@@ -1459,10 +1456,8 @@ describe('Peer-to-Pool: Local Tests', function () {
     let loanTokenDecimals = await usdc.decimals()
     let [
       finalLoanTerms,
-      arrangerFee,
-      finalCollAmountReservedForDefault,
-      finalCollAmountReservedForConversions,
-      protocolFee
+      [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions],
+      [arrangerFee, protocolFee]
     ] = await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao treasury executes loan proposal
@@ -1470,7 +1465,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     let preDaoTreasuryBal = await daoToken.balanceOf(daoTreasury.address)
     let preLoanProposalBal = await daoToken.balanceOf(loanProposal.address)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
     let postDaoTreasuryBal = await daoToken.balanceOf(daoTreasury.address)
     let postLoanProposalBal = await daoToken.balanceOf(loanProposal.address)
     expect(preDaoTreasuryBal.sub(postDaoTreasuryBal)).to.be.equal(postLoanProposalBal.sub(preLoanProposalBal))
@@ -1575,10 +1570,9 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [timestamp + Number(UNSUBSCRIBE_GRACE_PERIOD.toString())])
 
     // reverts if trying to finalize and subscriptions below min loan
-    await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
-      loanProposal,
-      'FellShortOfTotalSubscriptionTarget'
-    )
+    await expect(
+      loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(loanProposal, 'FellShortOfTotalSubscriptionTarget')
   })
 
   it('Should handle loan execution correctly (3/3)', async function () {
@@ -1625,19 +1619,17 @@ describe('Peer-to-Pool: Local Tests', function () {
     await ethers.provider.send('evm_mine', [Number(firstDueDate.sub(MIN_TIME_UNTIL_FIRST_DUE_DATE).toString())])
 
     // reverts if trying to finalize if "too close" to first due date
-    await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
-      loanProposal,
-      'FirstDueDateTooCloseOrPassed'
-    )
+    await expect(
+      loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(loanProposal, 'FirstDueDateTooCloseOrPassed')
 
     // move forward past first due date
     await ethers.provider.send('evm_mine', [Number(firstDueDate.toString()) + 1])
 
     // reverts if trying to finalize loan terms where first due already passed
-    await expect(loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)).to.be.revertedWithCustomError(
-      loanProposal,
-      'FirstDueDateTooCloseOrPassed'
-    )
+    await expect(
+      loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(loanProposal, 'FirstDueDateTooCloseOrPassed')
   })
 
   it('Should handle conversions correctly (1/3)', async function () {
@@ -1688,13 +1680,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // revert if lender tries to convert before loan is deployed
     await expect(loanProposal.connect(lender1).exerciseConversion()).to.be.revertedWithCustomError(
@@ -1806,13 +1798,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // execute loan
     await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
@@ -1891,13 +1883,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // execute loan
     await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
@@ -1965,13 +1957,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // check current repayment idx is zero
     let dynamicData = await loanProposal.dynamicData()
@@ -2139,13 +2131,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // execute loan
     await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
@@ -2234,13 +2226,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // execute loan
     await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
@@ -2320,13 +2312,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // execute loan
     await fundingPool.connect(daoTreasury).executeLoanProposal(loanProposal.address)
@@ -2431,13 +2423,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // revert if any user tries to mark as defaulted before loan is deployed
     await expect(loanProposal.connect(anyUser).markAsDefaulted()).to.be.revertedWithCustomError(
@@ -2554,13 +2546,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // check that final collateral amount reserved for default is 0, due to collPerLoanToken=0
     expect(finalCollAmountReservedForDefault).to.be.equal(0)
@@ -2701,13 +2693,13 @@ describe('Peer-to-Pool: Local Tests', function () {
     let lockedInLoanTerms = await loanProposal.loanTerms()
     let totalSubscriptions = await fundingPool.totalSubscriptions(loanProposal.address)
     let loanTokenDecimals = await usdc.decimals()
-    let [finalLoanTerms, , finalCollAmountReservedForDefault, finalCollAmountReservedForConversions] =
+    let [finalLoanTerms, [finalCollAmountReservedForDefault, finalCollAmountReservedForConversions]] =
       await loanProposal.getAbsoluteLoanTerms(lockedInLoanTerms, totalSubscriptions, loanTokenDecimals)
 
     // dao finalizes loan terms and sends collateral
     let finalCollTransferAmount = finalCollAmountReservedForDefault.add(finalCollAmountReservedForConversions)
     await daoToken.connect(daoTreasury).approve(loanProposal.address, finalCollTransferAmount)
-    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0)
+    await loanProposal.connect(daoTreasury).finalizeLoanTermsAndTransferColl(0, ZERO_BYTES32)
 
     // check that final collateral amount reserved for default is 0, due to collPerLoanToken=0
     expect(finalCollAmountReservedForDefault).to.be.equal(0)
