@@ -354,7 +354,6 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
 
     function transferOwnership(address _newOwnerProposal) public override {
         _checkIsInitialized();
-        _checkOwner();
         if (
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
@@ -362,7 +361,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        // @dev: Ownable2Step checks against address(0)
+        // @dev: Ownable2Step checks against address(0);
+        // also access control covered through onlyOwner modifier
         Ownable2Step.transferOwnership(_newOwnerProposal);
     }
 
