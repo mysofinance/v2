@@ -75,7 +75,7 @@ interface ILoanProposalImpl {
     /**
      * @notice Finalize the loan terms and transfer final collateral amount
      * @param expectedTransferFee The expected transfer fee (if any) of the collateral token
-     * @param mysoTokenManagerData The expected transfer fee (if any) of the collateral token
+     * @param mysoTokenManagerData Data to be passed to MysoTokenManager
      * @dev Can only be called by the borrower
      */
     function finalizeLoanTermsAndTransferColl(
