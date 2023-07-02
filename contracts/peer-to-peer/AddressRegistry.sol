@@ -74,8 +74,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState state
     ) external {
         _checkSenderAndIsInitialized();
-
-        if (addrs.length < 1) {
+        uint256 addrsLen = addrs.length;
+        if (addrsLen < 1) {
             revert Errors.InvalidArrayLength();
         }
 
@@ -91,7 +91,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER ||
             state == DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
         ) {
-            if (addrs.length != 1) {
+            if (addrsLen != 1) {
                 revert Errors.InvalidArrayLength();
             }
             if (addrs[0] == address(0)) {
@@ -107,7 +107,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             whitelistState[addrs[0]] = state;
         } else {
             // note (2/2): all other states can be "occupied" by multiple addresses
-            for (uint256 i; i < addrs.length; ) {
+            for (uint256 i; i < addrsLen; ) {
                 if (addrs[i] == address(0)) {
                     revert Errors.InvalidAddress();
                 }
@@ -144,10 +144,11 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         ) {
             revert Errors.NonWhitelistedCompartment();
         }
-        if (tokens.length == 0) {
+        uint256 tokensLen = tokens.length;
+        if (tokensLen == 0) {
             revert Errors.InvalidArrayLength();
         }
-        for (uint256 i; i < tokens.length; ) {
+        for (uint256 i; i < tokensLen; ) {
             if (allowTokensForCompartment && !isWhitelistedERC20(tokens[i])) {
                 revert Errors.NonWhitelistedToken();
             }
@@ -230,7 +231,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     function createWrappedTokenForERC721s(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external {
         address _erc721Wrapper = erc721Wrapper;
         if (_erc721Wrapper == address(0)) {
@@ -240,7 +242,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             IMysoTokenManager(mysoTokenManager)
                 .processP2PCreateWrappedTokenForERC721s(
                     msg.sender,
-                    tokensToBeWrapped
+                    tokensToBeWrapped,
+                    mysoTokenManagerData
                 );
         }
         address newERC20Addr = IERC721Wrapper(_erc721Wrapper)
@@ -259,7 +262,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     function createWrappedTokenForERC20s(
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external {
         address _erc20Wrapper = erc20Wrapper;
         if (_erc20Wrapper == address(0)) {
@@ -269,7 +273,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             IMysoTokenManager(mysoTokenManager)
                 .processP2PCreateWrappedTokenForERC20s(
                     msg.sender,
-                    tokensToBeWrapped
+                    tokensToBeWrapped,
+                    mysoTokenManagerData
                 );
         }
         address newERC20Addr = IERC20Wrapper(_erc20Wrapper).createWrappedToken(
@@ -293,10 +298,11 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         address[] calldata borrowers,
         uint256 whitelistedUntil
     ) external {
-        if (borrowers.length == 0) {
+        uint256 borrowersLen = borrowers.length;
+        if (borrowersLen == 0) {
             revert Errors.InvalidArrayLength();
         }
-        for (uint256 i; i < borrowers.length; ) {
+        for (uint256 i; i < borrowersLen; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerBorrower = _borrowerWhitelistedUntil[
                     msg.sender

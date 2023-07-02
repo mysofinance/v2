@@ -68,7 +68,8 @@ contract WrappedERC20Impl is
             _spendAllowance(account, msg.sender, amount);
         }
         _burn(account, amount);
-        for (uint256 i; i < _wrappedTokens.length; ) {
+        uint256 wrappedTokensLen = _wrappedTokens.length;
+        for (uint256 i; i < wrappedTokensLen; ) {
             address tokenAddr = _wrappedTokens[i].tokenAddr;
             IERC20(tokenAddr).safeTransfer(
                 recipient,

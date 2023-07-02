@@ -78,11 +78,13 @@ interface IAddressRegistry {
      * @param tokensToBeWrapped Array of WrappedERC721TokenInfo
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
+     * @param mysoTokenManagerData Data to be passed to MysoTokenManager
      */
     function createWrappedTokenForERC721s(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     /**
@@ -90,11 +92,13 @@ interface IAddressRegistry {
      * @param tokensToBeWrapped Array of WrappedERC20TokenInfo
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
+     * @param mysoTokenManagerData Data to be passed to MysoTokenManager
      */
     function createWrappedTokenForERC20s(
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     /**

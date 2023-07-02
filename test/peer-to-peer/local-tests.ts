@@ -421,12 +421,16 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // reverts if nft wrapper contract address is zero
     await expect(
-      addressRegistry.connect(team).createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '')
+      addressRegistry
+        .connect(team)
+        .createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '', ZERO_BYTES32)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
 
     // reverts if token basket wrapper contract address is zero
     await expect(
-      addressRegistry.connect(team).createWrappedTokenForERC20s([{ tokenAddr: ZERO_ADDRESS, tokenAmount: 1000 }], '', '')
+      addressRegistry
+        .connect(team)
+        .createWrappedTokenForERC20s([{ tokenAddr: ZERO_ADDRESS, tokenAmount: 1000 }], '', '', ZERO_BYTES32)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
 
     await addressRegistry.connect(team).setWhitelistState([borrower.address], 4)
@@ -2995,7 +2999,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         addressRegistry
           .connect(borrower)
-          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
+          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '', ZERO_BYTES32)
       ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidAddress')
 
       // set token wrapper contract in address registry
@@ -3005,20 +3009,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         addressRegistry
           .connect(team)
-          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
+          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '', ZERO_BYTES32)
       ).to.be.revertedWithCustomError(erc721Wrapper, 'NonWhitelistedToken')
 
       // should revert if tokenInfo array has length 0
-      await expect(addressRegistry.connect(team).createWrappedTokenForERC721s([], '', '')).to.be.revertedWithCustomError(
-        erc721Wrapper,
-        'InvalidArrayLength'
-      )
+      await expect(
+        addressRegistry.connect(team).createWrappedTokenForERC721s([], '', '', ZERO_BYTES32)
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidArrayLength')
 
       // should revert if tokenIds array has length 0
       await expect(
         addressRegistry
           .connect(team)
-          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [] }], '', '')
+          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [] }], '', '', ZERO_BYTES32)
       ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidArrayLength')
 
       // whitelist tokens
@@ -3061,7 +3064,8 @@ describe('Peer-to-Peer: Local Tests', function () {
             { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingTokenAddrs')
 
@@ -3073,7 +3077,8 @@ describe('Peer-to-Peer: Local Tests', function () {
             { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingNonFungibleTokenIds')
 
@@ -3085,7 +3090,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
         ],
         'testName',
-        'testSymbol'
+        'testSymbol',
+        ZERO_BYTES32
       )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
 
@@ -3169,7 +3175,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(await myFirstNFT.ownerOf(6)).to.be.equal(borrower.address)
       await addressRegistry
         .connect(borrower)
-        .createWrappedTokenForERC721s([{ tokenAddr: myFirstNFT.address, tokenIds: [3, 4, 5, 6] }], 'testName', 'testSymbol')
+        .createWrappedTokenForERC721s(
+          [{ tokenAddr: myFirstNFT.address, tokenIds: [3, 4, 5, 6] }],
+          'testName',
+          'testSymbol',
+          ZERO_BYTES32
+        )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(2)
       const tokensCreated2 = await erc721Wrapper.tokensCreated()
       const newWrappedTokenAddr2 = tokensCreated2[1]
@@ -3239,7 +3250,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
         ],
         'testName',
-        'testSymbol'
+        'testSymbol',
+        ZERO_BYTES32
       )
 
       const tokensCreated = await erc721Wrapper.tokensCreated()
@@ -3476,7 +3488,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
         ],
         'testName',
-        'testSymbol'
+        'testSymbol',
+        ZERO_BYTES32
       )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
 
@@ -3615,7 +3628,8 @@ describe('Peer-to-Peer: Local Tests', function () {
             { tokenAddr: usdc.address, tokenAmount: ONE_USDC }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidAddress')
 
@@ -3630,7 +3644,8 @@ describe('Peer-to-Peer: Local Tests', function () {
             { tokenAddr: addressRegistry.address, tokenAmount: ONE_USDC }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'NonWhitelistedToken')
 
@@ -3638,7 +3653,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         addressRegistry
           .connect(team)
-          .createWrappedTokenForERC20s([{ tokenAddr: weth.address, tokenAmount: ONE_WETH }], '', '')
+          .createWrappedTokenForERC20s([{ tokenAddr: weth.address, tokenAmount: ONE_WETH }], '', '', ZERO_BYTES32)
       ).to.be.revertedWith('ERC20: insufficient allowance')
 
       // mint and approve test tokens
@@ -3663,7 +3678,8 @@ describe('Peer-to-Peer: Local Tests', function () {
             { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'NonIncreasingTokenAddrs')
 
@@ -3675,7 +3691,8 @@ describe('Peer-to-Peer: Local Tests', function () {
             { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidSendAmount')
       await expect(
@@ -3685,7 +3702,8 @@ describe('Peer-to-Peer: Local Tests', function () {
             { tokenAddr: sortedTokenInfo[1].tokenAddr, tokenAmount: 0 }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidSendAmount')
 
@@ -3705,7 +3723,8 @@ describe('Peer-to-Peer: Local Tests', function () {
           }
         ],
         'testName',
-        'testSymbol'
+        'testSymbol',
+        ZERO_BYTES32
       )
 
       // check new token has been created
@@ -3800,7 +3819,9 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(postFullRedeemBorrowerBalance).to.equal(0)
 
       // create wrapped placeholder token basket
-      await addressRegistry.connect(borrower).createWrappedTokenForERC20s([], 'testPlaceholderName', 'testPlaceholderSymbol')
+      await addressRegistry
+        .connect(borrower)
+        .createWrappedTokenForERC20s([], 'testPlaceholderName', 'testPlaceholderSymbol', ZERO_BYTES32)
 
       // check new token has been created
       expect(await erc20Wrapper.numTokensCreated()).to.be.equal(2)

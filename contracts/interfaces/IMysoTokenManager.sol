@@ -22,12 +22,14 @@ interface IMysoTokenManager {
 
     function processP2PCreateWrappedTokenForERC721s(
         address tokenCreator,
-        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     function processP2PCreateWrappedTokenForERC20s(
         address tokenCreator,
-        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped
+        DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     function processP2PoolDeposit(
