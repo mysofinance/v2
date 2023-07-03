@@ -121,6 +121,11 @@ describe('Peer-to-Pool: Local Tests', function () {
     const fundingPoolAddr = await factory.fundingPools(0)
     const fundingPool = await FundingPoolImpl.attach(fundingPoolAddr)
 
+    // reverts if trying to initialize base contract
+    await expect(fundingPool.initialize(ADDRESS_ZERO, ADDRESS_ZERO)).to.be.revertedWith(
+      'Initializable: contract is already initialized'
+    )
+
     // reverts if trying to create deposit pool for zero address
     await expect(factory.createFundingPool(ADDRESS_ZERO)).to.be.revertedWithCustomError(factory, 'InvalidAddress')
 
@@ -153,6 +158,12 @@ describe('Peer-to-Pool: Local Tests', function () {
       'InvalidAddress'
     )
 
+    // check that myso token manager can be set to some address
+    await factory.connect(team).setMysoTokenManager(team.address)
+
+    // reset to zero address
+    await factory.connect(team).setMysoTokenManager(ADDRESS_ZERO)
+
     return {
       fundingPool,
       factory,
@@ -170,10 +181,126 @@ describe('Peer-to-Pool: Local Tests', function () {
     }
   }
 
+  it('Should handle factory ownership transferrals correctly', async function () {
+    const { factory, team, anyUser, arranger } = await setupTest()
+    const currOwner = await factory.owner()
+    expect(currOwner).to.be.equal(team.address)
+    expect(await factory.pendingOwner()).to.be.equal(ADDRESS_ZERO)
+
+    // revert if unauthorized party tries to claim ownership
+    await expect(factory.connect(anyUser).transferOwnership(anyUser.address)).to.be.revertedWith(
+      'Ownable: caller is not the owner'
+    )
+    await expect(factory.connect(arranger).transferOwnership(arranger.address)).to.be.revertedWith(
+      'Ownable: caller is not the owner'
+    )
+
+    // check revert on invalid new owner proposals
+    await expect(factory.connect(team).transferOwnership(ADDRESS_ZERO)).to.be.revertedWithCustomError(
+      factory,
+      'InvalidNewOwnerProposal'
+    )
+    await expect(factory.connect(team).transferOwnership(factory.address)).to.be.revertedWithCustomError(
+      factory,
+      'InvalidNewOwnerProposal'
+    )
+    await expect(factory.connect(team).transferOwnership(team.address)).to.be.revertedWithCustomError(
+      factory,
+      'InvalidNewOwnerProposal'
+    )
+
+    // propose valid new owner
+    await factory.connect(team).transferOwnership(anyUser.address)
+    const newOwnerProposal = await factory.pendingOwner()
+    expect(newOwnerProposal).to.be.equal(anyUser.address)
+
+    // check revert when trying to propose already currently pending new owner
+    await expect(factory.connect(team).transferOwnership(anyUser.address)).to.be.revertedWithCustomError(
+      factory,
+      'InvalidNewOwnerProposal'
+    )
+
+    // revert if unauthorized party tries to claim ownership
+    await expect(factory.connect(arranger).acceptOwnership()).to.be.revertedWith('Ownable2Step: caller is not the new owner')
+
+    // claim ownership
+    await factory.connect(anyUser).acceptOwnership()
+    const newOwner = await factory.owner()
+    expect(newOwner).to.be.equal(anyUser.address)
+
+    // check renouncing ownership is disabled
+    await expect(factory.connect(anyUser).renounceOwnership()).to.be.revertedWithCustomError(factory, 'Disabled')
+  })
+
+  it('Should handle lender whitelist correctly', async function () {
+    const { factory, whitelistAuthority, lender0 } = await setupTest()
+    // should revert when trying to update lender whitelist with empty array
+    await expect(factory.connect(whitelistAuthority).updateLenderWhitelist([], 1)).to.be.revertedWithCustomError(
+      factory,
+      'InvalidArrayLength'
+    )
+
+    // valid whitelisting
+    await factory.connect(whitelistAuthority).updateLenderWhitelist([lender0.address], 1)
+
+    const blocknum = await ethers.provider.getBlockNumber()
+    const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+    const whitelistedUntil = timestamp + 10
+
+    // construct payload and signature
+    const payload = ethers.utils.defaultAbiCoder.encode(
+      ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+      [factory.address, lender0.address, whitelistedUntil, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, ZERO_BYTES32]
+    )
+    const payloadHash = ethers.utils.keccak256(payload)
+    const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+    const sig = ethers.utils.splitSignature(signature)
+    const compactSig = sig.compact
+    const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+    expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+    // claim whitelist status
+    await factory
+      .connect(lender0)
+      .claimLenderWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, ZERO_BYTES32)
+
+    // should revert when trying to update lender whitelist with same value
+    await expect(
+      factory.connect(whitelistAuthority).updateLenderWhitelist([lender0.address], whitelistedUntil)
+    ).to.be.revertedWithCustomError(factory, 'InvalidUpdate')
+
+    // should revert when trying to update lender whitelist with zero address
+    await expect(
+      factory.connect(whitelistAuthority).updateLenderWhitelist([ADDRESS_ZERO], whitelistedUntil)
+    ).to.be.revertedWithCustomError(factory, 'InvalidUpdate')
+
+    // construct 2nd payload with outdated "whitelisted until" and sign
+    const outdatedWhitelistedUntil = whitelistedUntil - 1
+    const payload2 = ethers.utils.defaultAbiCoder.encode(
+      ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+      [factory.address, lender0.address, outdatedWhitelistedUntil, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, ZERO_BYTES32]
+    )
+    const payloadHash2 = ethers.utils.keccak256(payload2)
+    const signature2 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash2))
+    const sig2 = ethers.utils.splitSignature(signature2)
+    const compactSig2 = sig2.compact
+    const recoveredAddr2 = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash2), sig2)
+    expect(recoveredAddr2).to.equal(whitelistAuthority.address)
+
+    // should revert when trying to update lender whitelist with same value
+    await expect(
+      factory
+        .connect(lender0)
+        .claimLenderWhitelistStatus(whitelistAuthority.address, outdatedWhitelistedUntil, compactSig2, ZERO_BYTES32)
+    ).to.be.revertedWithCustomError(factory, 'CannotClaimOutdatedStatus')
+  })
+
   it('Should handle creating a new loan proposal contract correctly', async function () {
     const { fundingPool, factory, daoToken, arranger } = await setupTest()
 
     // arranger creates loan proposal
+    const preNumLoanProposals = await factory.numLoanProposals()
+    expect(preNumLoanProposals).to.be.equal(0)
     const loanProposal = await createLoanProposal(
       factory,
       arranger,
@@ -185,8 +312,25 @@ describe('Peer-to-Pool: Local Tests', function () {
       CONVERSION_GRACE_PERIOD,
       REPAYMENT_GRACE_PERIOD
     )
+    const postNumLoanProposals = await factory.numLoanProposals()
+    expect(postNumLoanProposals).to.be.equal(1)
 
-    // revert on too small arranger fee
+    // revert on invalid collateral token
+    await expect(
+      factory
+        .connect(arranger)
+        .createLoanProposal(
+          fundingPool.address,
+          ADDRESS_ZERO,
+          ADDRESS_ZERO,
+          MAX_ARRANGER_FEE,
+          MIN_UNSUBSCRIBE_GRACE_PERIOD,
+          MIN_CONVERSION_GRACE_PERIOD,
+          MIN_REPAYMENT_GRACE_PERIOD
+        )
+    ).to.be.revertedWithCustomError(factory, 'InvalidAddress')
+
+    // revert on too large arranger fee
     await expect(
       factory
         .connect(arranger)
@@ -665,6 +809,10 @@ describe('Peer-to-Pool: Local Tests', function () {
       fundingPool,
       'InvalidAmount'
     )
+    await expect(fundingPool.connect(lender1).subscribe(loanProposal.address, 2, 1, 0)).to.be.revertedWithCustomError(
+      fundingPool,
+      'InvalidAmount'
+    )
 
     // check valid subscribe works
     await fundingPool.connect(lender2).subscribe(loanProposal.address, subscriptionAmount, subscriptionAmount, 0)
@@ -1041,7 +1189,7 @@ describe('Peer-to-Pool: Local Tests', function () {
       'InvalidLender'
     )
 
-    // construct payload and sign
+    // construct payload with outdated "whitelisted until" and sign
     const payload = ethers.utils.defaultAbiCoder.encode(
       ['address', 'address', 'uint256', 'uint256', 'bytes32'],
       [factory.address, lender0.address, 0, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, ZERO_BYTES32]
@@ -1053,7 +1201,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
     expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
-    // expects to revert on outdated signature
+    // expects to revert when trying to claim whitelist status with outdated "whitelisted until" field
     await expect(
       factory.connect(lender0).claimLenderWhitelistStatus(whitelistAuthority.address, 0, compactSig, ZERO_BYTES32)
     ).to.be.revertedWithCustomError(factory, 'CannotClaimOutdatedStatus')

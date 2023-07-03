@@ -103,6 +103,10 @@ library Errors {
     error SequencerDown();
     error GracePeriodNotOver();
     error LoanExpired();
+    error NoDsEth();
+    error TooShortTwapInterval();
+    error TooLongTwapInterval();
+    error SpotPriceDeviatesFromTwapPrice();
     error Reentrancy();
     error TokenNotStuck();
     error InconsistentExpTransferFee();
@@ -110,4 +114,5 @@ library Errors {
     error DepositLockActive();
     error DisallowedSubscriptionLockup();
     error IncorrectLoanAmount();
+    error Disabled();
 }

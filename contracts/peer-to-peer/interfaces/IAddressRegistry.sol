@@ -138,6 +138,13 @@ interface IAddressRegistry {
     ) external;
 
     /**
+     * @dev Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
+     * Can only be called by the current owner.
+     * @param newOwner the proposed new owner address
+     */
+    function transferOwnership(address newOwner) external;
+
+    /**
      * @notice Returns boolean flag indicating whether the borrower has been whitelisted by whitelistAuthority
      * @param whitelistAuthority Addresses of the whitelist authority
      * @param borrower Addresses of the borrower
@@ -209,6 +216,12 @@ interface IAddressRegistry {
      * @return Address of the owner
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns address of the pending owner
+     * @return Address of the pending owner
+     */
+    function pendingOwner() external view returns (address);
 
     /**
      * @notice Returns boolean flag indicating whether given compartment implementation and token combination is whitelisted
