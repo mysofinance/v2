@@ -282,6 +282,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.Loan memory loan,
         DataTypesPeerToPeer.TransferInstructions memory transferInstructions
     ) internal {
+        /* solhint-disable code-complexity */
         if (
             borrowInstructions.callbackAddr != address(0) &&
             IAddressRegistry(addressRegistry).whitelistState(
@@ -429,6 +430,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
                 revert Errors.InvalidSendAmount();
             }
         }
+        /* solhint-enable code-complexity */
     }
 
     function _processRepayTransfers(

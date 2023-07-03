@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
+/* solhint-disable avoid-low-level-calls no-inline-assembly no-empty-blocks */
 
 pragma solidity 0.8.19;
 
 contract MyMaliciousCallback1 {
-    // solhint-disable avoid-low-level-calls no-inline-assembly no-empty-blocks
-
     uint256 internal _vaultVictim;
     address internal _collToken;
     address internal _compartmentVictim;

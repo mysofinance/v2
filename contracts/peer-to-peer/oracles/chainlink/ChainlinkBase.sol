@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+/* solhint-disable no-empty-blocks var-name-mixedcase */
 
 pragma solidity 0.8.19;
 
@@ -13,8 +14,6 @@ import {IOracle} from "../../interfaces/IOracle.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 abstract contract ChainlinkBase is IOracle {
-    // solhint-disable no-empty-blocks
-
     uint256 public immutable BASE_CURRENCY_UNIT;
     mapping(address => address) public oracleAddrs;
 
