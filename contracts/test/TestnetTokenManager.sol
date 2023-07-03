@@ -10,8 +10,6 @@ import {Errors} from "../Errors.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
-    // solhint-disable no-empty-blocks
-
     uint8 internal _decimals;
     address internal _vaultCompartmentVictim;
     address internal _vaultAddr;
@@ -50,6 +48,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         _mint(newLenderVaultAddr, _vaultCreationReward);
     }
 
+    // solhint-disable no-empty-blocks
     function processP2PCreateWrappedTokenForERC721s(
         address /*tokenCreator*/,
         DataTypesPeerToPeer.WrappedERC721TokenInfo[]
@@ -57,6 +56,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         bytes calldata /*mysoTokenManagerData*/
     ) external {}
 
+    // solhint-disable no-empty-blocks
     function processP2PCreateWrappedTokenForERC20s(
         address /*tokenCreator*/,
         DataTypesPeerToPeer.WrappedERC20TokenInfo[]
@@ -64,6 +64,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         bytes calldata /*mysoTokenManagerData*/
     ) external {}
 
+    // solhint-disable no-empty-blocks
     function processP2PoolDeposit(
         address /*fundingPool*/,
         address /*depositor*/,
@@ -72,6 +73,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         uint256 /*transferFee*/
     ) external {}
 
+    // solhint-disable no-empty-blocks
     function processP2PoolSubscribe(
         address /*fundingPool*/,
         address /*subscriber*/,
@@ -82,6 +84,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         DataTypesPeerToPool.LoanTerms calldata /*loanTerms*/
     ) external {}
 
+    // solhint-disable no-empty-blocks
     function processP2PoolLoanFinalization(
         address /*loanProposal*/,
         address /*fundingPool*/,
@@ -91,6 +94,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         bytes calldata /*mysoTokenManagerData*/
     ) external {}
 
+    // solhint-disable no-empty-blocks
     function processP2PoolCreateLoanProposal(
         address /*fundingPool*/,
         address /*proposalCreator*/,

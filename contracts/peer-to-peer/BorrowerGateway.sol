@@ -275,6 +275,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         return (loan, loanId, transferInstructions.upfrontFee);
     }
 
+    // solhint-disable code-complexity
     function _processTransfers(
         address lenderVault,
         DataTypesPeerToPeer.BorrowTransferInstructions

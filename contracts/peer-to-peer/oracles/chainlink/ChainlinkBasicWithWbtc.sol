@@ -9,7 +9,6 @@ import {Errors} from "../../../Errors.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 contract ChainlinkBasicWithWbtc is ChainlinkBasic {
-    // solhint-disable no-empty-blocks
     address internal constant WBTC_BTC_ORACLE =
         0xfdFD9C85aD200c506Cf9e21F1FD8dd01932FBB23;
     address internal constant BTC_USD_ORACLE =
@@ -22,7 +21,7 @@ contract ChainlinkBasicWithWbtc is ChainlinkBasic {
         address[] memory _oracleAddrs
     )
         ChainlinkBasic(_tokenAddrs, _oracleAddrs, WBTC, WBTC_BASE_CURRENCY_UNIT)
-    {}
+    {} // solhint-disable no-empty-blocks
 
     function _getPriceOfToken(
         address token

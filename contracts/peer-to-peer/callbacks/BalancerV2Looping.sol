@@ -17,7 +17,7 @@ contract BalancerV2Looping is VaultCallback {
     address private constant BALANCER_V2_VAULT =
         0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
-    constructor(address _borrowerGateway) VaultCallback(_borrowerGateway) {}
+    constructor(address _borrowerGateway) VaultCallback(_borrowerGateway) {} // solhint-disable no-empty-blocks
 
     function borrowCallback(
         DataTypesPeerToPeer.Loan calldata loan,

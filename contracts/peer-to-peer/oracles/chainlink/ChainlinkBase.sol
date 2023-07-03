@@ -13,8 +13,7 @@ import {IOracle} from "../../interfaces/IOracle.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 abstract contract ChainlinkBase is IOracle {
-    // solhint-disable no-empty-blocks
-
+    // solhint-disable var-name-mixedcase
     uint256 public immutable BASE_CURRENCY_UNIT;
     mapping(address => address) public oracleAddrs;
 

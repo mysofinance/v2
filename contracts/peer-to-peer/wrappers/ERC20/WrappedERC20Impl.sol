@@ -57,9 +57,6 @@ contract WrappedERC20Impl is
         address recipient,
         uint256 amount
     ) external nonReentrant {
-        if (isIOU) {
-            revert Errors.IOUCannotBeRedeemedOnChain();
-        }
         if (amount == 0) {
             revert Errors.InvalidAmount();
         }
@@ -68,19 +65,21 @@ contract WrappedERC20Impl is
             _spendAllowance(account, msg.sender, amount);
         }
         _burn(account, amount);
-        uint256 wrappedTokensLen = _wrappedTokens.length;
-        for (uint256 i; i < wrappedTokensLen; ) {
-            address tokenAddr = _wrappedTokens[i].tokenAddr;
-            IERC20(tokenAddr).safeTransfer(
-                recipient,
-                Math.mulDiv(
-                    IERC20(tokenAddr).balanceOf(address(this)),
-                    amount,
-                    currTotalSupply
-                )
-            );
-            unchecked {
-                ++i;
+        if (!isIOU) {
+            uint256 wrappedTokensLen = _wrappedTokens.length;
+            for (uint256 i; i < wrappedTokensLen; ) {
+                address tokenAddr = _wrappedTokens[i].tokenAddr;
+                IERC20(tokenAddr).safeTransfer(
+                    recipient,
+                    Math.mulDiv(
+                        IERC20(tokenAddr).balanceOf(address(this)),
+                        amount,
+                        currTotalSupply
+                    )
+                );
+                unchecked {
+                    ++i;
+                }
             }
         }
         emit Redeemed(account, recipient, amount);
