@@ -23,13 +23,20 @@ interface ILenderVaultImpl {
     );
 
     event QuoteProcessed(
-        address borrower,
-        DataTypesPeerToPeer.Loan loan,
-        uint256 loanId,
-        address collReceiver
+        uint256 netPledgeAmount,
+        DataTypesPeerToPeer.TransferInstructions transferInstructions
     );
 
     event Withdrew(address indexed tokenAddr, uint256 withdrawAmount);
+
+    event CircuitBreakerUpdated(
+        address indexed newCircuitBreaker,
+        address indexed oldCircuitBreaker
+    );
+    event ReverseCircuitBreakerUpdated(
+        address indexed newReverseCircuitBreaker,
+        address indexed oldReverseCircuitBreaker
+    );
 
     /**
      * @notice function to initialize lender vault
@@ -58,14 +65,14 @@ interface ILenderVaultImpl {
      * @param repayAmount amount of loan repaid
      * @param loanId index of loan in loans array
      * @param collAmount amount of collateral to unlock
-     * @param collTokenCompartmentAddr address of the compartment to unlock collateral
+     * @param noCompartment boolean flag indicating whether loan has no compartment
      * @param collToken address of the collateral token
      */
     function updateLoanInfo(
         uint128 repayAmount,
         uint256 loanId,
-        uint256 collAmount,
-        address collTokenCompartmentAddr,
+        uint128 collAmount,
+        bool noCompartment,
         address collToken
     ) external;
 
@@ -78,8 +85,7 @@ interface ILenderVaultImpl {
      * @param quoteTuple struct containing specific quote tuple info (see DataTypesPeerToPeer.sol notes)
      * @return loan loan information after processing the quote
      * @return loanId index of loans in the loans array
-     * @return upfrontFee upfront fee in coll token
-     * @return collReceiver receiver of the collateral (e.g., vault or compartment)
+     * @return transferInstructions struct containing transfer instruction info (see DataTypesPeerToPeer.sol notes)
      */
     function processQuote(
         address borrower,
@@ -92,8 +98,7 @@ interface ILenderVaultImpl {
         returns (
             DataTypesPeerToPeer.Loan calldata loan,
             uint256 loanId,
-            uint256 upfrontFee,
-            address collReceiver
+            DataTypesPeerToPeer.TransferInstructions memory transferInstructions
         );
 
     /**
@@ -121,8 +126,9 @@ interface ILenderVaultImpl {
      * @notice function to transfer token from a compartment
      * @dev only borrow gateway can call this function, if callbackAddr, then
      * the collateral will be transferred to the callback address
-     * @param repayAmount amount of loan token that was repaid
-     * @param repayAmountLeft amount of loan still outstanding
+     * @param repayAmount amount of loan token to be repaid
+     * @param repayAmountLeft amount of loan token still outstanding
+     * @param reclaimCollAmount amount of collateral to be reclaimed
      * @param borrowerAddr address of the borrower
      * @param collTokenAddr address of the coll token to transfer to compartment
      * @param callbackAddr address of callback
@@ -131,6 +137,7 @@ interface ILenderVaultImpl {
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr,
@@ -160,6 +167,41 @@ interface ILenderVaultImpl {
     function removeSigner(address signer, uint256 signerIdx) external;
 
     /**
+     * @notice function to set a circuit breaker
+     * @dev the circuit breaker (and vault owner) can pause all loan offers;
+     * note: circuit breaker and reverse circuit breaker can be the same account
+     * @param circuitBreaker address of the circuit breaker
+     */
+    function setCircuitBreaker(address circuitBreaker) external;
+
+    /**
+     * @notice function to set a reverse circuit breaker
+     * @dev the reverse circuit breaker (and vault owner) can unpause all loan offers;
+     * note: circuit breaker and reverse circuit breaker can be the same account
+     * @param reverseCircuitBreaker address of the reverse circuit breaker
+     */
+    function setReverseCircuitBreaker(address reverseCircuitBreaker) external;
+
+    /**
+     * @notice function to pause all quotes from lendervault
+     * @dev only vault owner and circuit breaker can pause quotes
+     */
+    function pauseQuotes() external;
+
+    /**
+     * @notice function to unpause all quotes from lendervault
+     * @dev only vault owner and reverse circuit breaker can unpause quotes again
+     */
+    function unpauseQuotes() external;
+
+    /**
+     * @dev Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
+     * Can only be called by the current owner.
+     * @param newOwner the proposed new owner address
+     */
+    function transferOwnership(address newOwner) external;
+
+    /**
      * @notice function to retrieve loan from loans array in vault
      * @dev this function reverts on invalid index
      * @param index index of loan
@@ -170,22 +212,22 @@ interface ILenderVaultImpl {
     ) external view returns (DataTypesPeerToPeer.Loan memory loan);
 
     /**
-     * @notice function validates repay info
-     * @param borrower address of the borrower
-     * @param loan loan that is being repaid
-     * @param loanRepayInstructions struct containing repayment info (see DataTypesPeerToPeer.sol notes)
-     */
-    function validateRepayInfo(
-        address borrower,
-        DataTypesPeerToPeer.Loan calldata loan,
-        DataTypesPeerToPeer.LoanRepayInstructions calldata loanRepayInstructions
-    ) external view;
-
-    /**
      * @notice function to return owner address
      * @return owner address
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns address of the pending owner
+     * @return Address of the pending owner
+     */
+    function pendingOwner() external view returns (address);
+
+    /**
+     * @notice function to return number of signers
+     * @return number of signers
+     */
+    function numSigners() external view returns (uint256);
 
     /**
      * @notice function to return unlocked token balances
@@ -205,6 +247,18 @@ interface ILenderVaultImpl {
      * @return registry address
      */
     function addressRegistry() external view returns (address);
+
+    /**
+     * @notice function to return address of the circuit breaker
+     * @return circuit breaker address
+     */
+    function circuitBreaker() external view returns (address);
+
+    /**
+     * @notice function to return address of the reverse circuit breaker
+     * @return reverse circuit breaker address
+     */
+    function reverseCircuitBreaker() external view returns (address);
 
     /**
      * @notice function returns signer at given index

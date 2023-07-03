@@ -69,6 +69,16 @@ const collTokenAbi = [
     type: 'function'
   },
   {
+    name: 'allowance',
+    outputs: [{ type: 'uint256', name: '' }],
+    inputs: [
+      { type: 'address', name: 'owner' },
+      { type: 'address', name: 'spender' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     name: 'approve',
     outputs: [{ type: 'bool', name: '' }],
     inputs: [
@@ -283,6 +293,15 @@ const gohmAbi = [
 
 const uniV2Abi = [
   {
+    constant: false,
+    inputs: [],
+    name: 'sync',
+    outputs: [],
+    payable: false,
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
+  {
     constant: true,
     inputs: [],
     name: 'getReserves',
@@ -372,11 +391,6 @@ const payloadScheme = [
     components: [
       {
         internalType: 'address',
-        name: 'whitelistAuthority',
-        type: 'address'
-      },
-      {
-        internalType: 'address',
         name: 'collToken',
         type: 'address'
       },
@@ -418,6 +432,16 @@ const payloadScheme = [
       {
         internalType: 'bool',
         name: 'isSingleUse',
+        type: 'bool'
+      },
+      {
+        internalType: 'address',
+        name: 'whitelistAddr',
+        type: 'address'
+      },
+      {
+        internalType: 'bool',
+        name: 'isWhitelistAddrSingleBorrower',
         type: 'bool'
       }
     ],

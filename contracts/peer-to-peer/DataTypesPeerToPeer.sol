@@ -19,9 +19,12 @@ library DataTypesPeerToPeer {
         uint128 initLoanAmount;
         // full repay amount at start of loan
         uint128 initRepayAmount;
-        // amount repaid up until current time
+        // amount repaid (loan token) up until current time
         // note: partial repayments are allowed
         uint128 amountRepaidSoFar;
+        // amount reclaimed (coll token) up until current time
+        // note: partial repayments are allowed
+        uint128 amountReclaimedSoFar;
         // flag tracking if collateral has been unlocked by vault
         bool collUnlocked;
         // address of the compartment housing the collateral
@@ -32,8 +35,9 @@ library DataTypesPeerToPeer {
         // loan amount per one unit of collateral if no oracle
         // LTV in terms of the constant BASE (10 ** 18) if using oracle
         uint256 loanPerCollUnitOrLtv;
-        // interest rate percentage in BASE (can be negative but not smaller than -BASE (=-100%))
-        // also interestRatePCTInBase is not annualized
+        // interest rate percentage in BASE (can be negative but greater than -BASE)
+        // i.e. -100% < interestRatePct since repay amount of 0 is not allowed
+        // also interestRatePctInBase is not annualized
         int256 interestRatePctInBase;
         // fee percentage,in BASE, which will be paid in upfront in collateral
         uint256 upfrontFeePctInBase;
@@ -42,8 +46,6 @@ library DataTypesPeerToPeer {
     }
 
     struct GeneralQuoteInfo {
-        // address of a borrower whitelist authority (optional)
-        address whitelistAuthority;
         // address of collateral token
         address collToken;
         // address of loan token
@@ -64,6 +66,11 @@ library DataTypesPeerToPeer {
         // will invalidate quote after one use
         // if false, will be a standing quote
         bool isSingleUse;
+        // whitelist address (optional)
+        address whitelistAddr;
+        // flag indicating whether whitelistAddr refers to a single whitelisted
+        // borrower or to a whitelist authority that can whitelist multiple addresses
+        bool isWhitelistAddrSingleBorrower;
     }
 
     struct OnChainQuote {
@@ -86,10 +93,8 @@ library DataTypesPeerToPeer {
         bytes32 salt;
         // for invalidating multiple parallel quotes in one click
         uint256 nonce;
-        // arrays of necessary parameters for recovering signatures
-        uint8[] v;
-        bytes32[] r;
-        bytes32[] s;
+        // array of compact signatures from vault signers
+        bytes[] compactSigs;
     }
 
     struct LoanRepayInstructions {
@@ -100,13 +105,21 @@ library DataTypesPeerToPeer {
         // expected transfer fees in loan token (=0 for tokens without transfer fee)
         // note: amount that borrower sends is targetRepayAmount + expectedTransferFee
         uint128 expectedTransferFee;
+        // deadline to prevent stale transactions
+        uint256 deadline;
+        // e.g., for using collateral to payoff debt via DEX
+        address callbackAddr;
+        // any data needed by callback
+        bytes callbackData;
     }
 
     struct BorrowTransferInstructions {
         // amount of collateral sent
         uint256 collSendAmount;
-        // includes protocol fee and native token transfer fee
-        uint256 expectedTransferFee;
+        // sum of (i) protocol fee and (ii) transfer fees (if any) associated with sending any collateral to vault
+        uint256 expectedProtocolAndVaultTransferFee;
+        // transfer fees associated with sending any collateral to compartment (if used)
+        uint256 expectedCompartmentTransferFee;
         // deadline to prevent stale transactions
         uint256 deadline;
         // slippage protection if oracle price is too loose
@@ -115,6 +128,17 @@ library DataTypesPeerToPeer {
         address callbackAddr;
         // any data needed by callback
         bytes callbackData;
+        // any data needed by myso token manager
+        bytes mysoTokenManagerData;
+    }
+
+    struct TransferInstructions {
+        // collateral token receiver
+        address collReceiver;
+        // effective upfront fee in collateral tokens (vault or compartment)
+        uint256 upfrontFee;
+        // boolean flag indicating whether transfers relate to loan (or swap)
+        bool isLoan;
     }
 
     struct WrappedERC721TokenInfo {

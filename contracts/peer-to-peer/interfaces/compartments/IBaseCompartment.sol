@@ -24,8 +24,9 @@ interface IBaseCompartment {
      * @dev this function can only be called by vault and tranfers proportional amount
      * of compartment collTokenBalance to borrower address. This needs use a proportion
      * and not the amount to account for possible changes due to rewards accruing
-     * @param repayAmount amount of loan token being sent to vault
+     * @param repayAmount amount of loan token to be repaid
      * @param repayAmountLeft amount of loan token still outstanding
+     * @param reclaimCollAmount amount of collateral token to be reclaimed
      * @param borrowerAddr address of borrower receiving transfer
      * @param collTokenAddr address of collateral token being transferred
      * @param callbackAddr address to send collateral to instead of borrower if using callback
@@ -33,6 +34,7 @@ interface IBaseCompartment {
     function transferCollFromCompartment(
         uint256 repayAmount,
         uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
@@ -44,4 +46,17 @@ interface IBaseCompartment {
      * @param collTokenAddr pass in collToken addr to avoid callback reads gas cost
      */
     function unlockCollToVault(address collTokenAddr) external;
+
+    /**
+     * @notice function returns the potentially reclaimable collateral token balance
+     * @param initCollAmount initially reclaimable collateral amount
+     * @param amountReclaimedSoFar amount of collateral reclaimed so far
+     * @param collTokenAddr address of collateral token for which reclaimable balance is being retrieved
+     * @dev depending on compartment implementation this could be simple balanceOf or eg staked balance call
+     */
+    function getReclaimableBalance(
+        uint256 initCollAmount,
+        uint256 amountReclaimedSoFar,
+        address collTokenAddr
+    ) external view returns (uint256 reclaimableBalance);
 }

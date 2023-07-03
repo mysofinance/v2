@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 library Errors {
-    error AlreadyInitialized();
     error UnregisteredVault();
     error InvalidDelegatee();
     error InvalidSender();
@@ -54,17 +53,16 @@ library Errors {
     error OnChainQuoteAlreadyAdded();
     error OffChainQuoteHasBeenInvalidated();
     error Uninitialized();
-    error EmptyRepaymentSchedule();
+    error InvalidRepaymentScheduleLength();
     error FirstDueDateTooCloseOrPassed();
     error InvalidGracePeriod();
     error UnregisteredLoanProposal();
     error NotInSubscriptionPhase();
     error NotInUnsubscriptionPhase();
     error InsufficientBalance();
-    error SubscriptionAmountTooHigh();
+    error InsufficientFreeSubscriptionSpace();
     error BeforeEarliestUnsubscribe();
     error InconsistentLastLoanTermsUpdateTime();
-    error NotEnoughSubscriptions();
     error InvalidActionForCurrentStatus();
     error FellShortOfTotalSubscriptionTarget();
     error InvalidRollBackRequest();
@@ -96,4 +94,25 @@ library Errors {
     error TransferToWrappedTokenFailed();
     error TransferFromWrappedTokenFailed();
     error StateAlreadySet();
+    error IOUCannotBeRedeemedOnChain();
+    error ReclaimableCollateralAmountZero();
+    error InvalidSwap();
+    error InvalidUpfrontFee();
+    error InvalidOracleTolerance();
+    error ReserveRatiosSkewedFromOraclePrice();
+    error SequencerDown();
+    error GracePeriodNotOver();
+    error LoanExpired();
+    error NoDsEth();
+    error TooShortTwapInterval();
+    error TooLongTwapInterval();
+    error SpotPriceDeviatesFromTwapPrice();
+    error Reentrancy();
+    error TokenNotStuck();
+    error InconsistentExpTransferFee();
+    error InconsistentExpVaultBalIncrease();
+    error DepositLockActive();
+    error DisallowedSubscriptionLockup();
+    error IncorrectLoanAmount();
+    error Disabled();
 }

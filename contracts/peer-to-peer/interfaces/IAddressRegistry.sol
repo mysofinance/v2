@@ -10,7 +10,7 @@ interface IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState indexed whitelistState
     );
     event AllowedTokensForCompartmentUpdated(
-        address compartmentImpl,
+        address indexed compartmentImpl,
         address[] tokens,
         bool isWhitelisted
     );
@@ -20,8 +20,8 @@ interface IAddressRegistry {
         uint256 whitelistedUntil
     );
     event BorrowerWhitelistUpdated(
-        address whitelistAuthority,
-        address[] indexed borrower,
+        address indexed whitelistAuthority,
+        address[] borrowers,
         uint256 whitelistedUntil
     );
     event CreatedWrappedTokenForERC721s(
@@ -53,20 +53,23 @@ interface IAddressRegistry {
      * @notice adds new lender vault to registry
      * @dev can only be called lender vault factory
      * @param addr address of new lender vault
+     * @return numRegisteredVaults number of registered vaults
      */
-    function addLenderVault(address addr) external;
+    function addLenderVault(
+        address addr
+    ) external returns (uint256 numRegisteredVaults);
 
     /**
      * @notice Allows user to claim whitelisted status
      * @param whitelistAuthority Address of whitelist authorithy
      * @param whitelistedUntil Timestamp until when user is whitelisted
-     * @param signature Signature from whitelist authority
+     * @param compactSig Compact signature from whitelist authority
      * @param salt Salt to make signature unique
      */
     function claimBorrowerWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes calldata signature,
+        bytes calldata compactSig,
         bytes32 salt
     ) external;
 
@@ -75,11 +78,13 @@ interface IAddressRegistry {
      * @param tokensToBeWrapped Array of WrappedERC721TokenInfo
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
+     * @param mysoTokenManagerData Data to be passed to MysoTokenManager
      */
     function createWrappedTokenForERC721s(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     /**
@@ -87,11 +92,13 @@ interface IAddressRegistry {
      * @param tokensToBeWrapped Array of WrappedERC20TokenInfo
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
+     * @param mysoTokenManagerData Data to be passed to MysoTokenManager
      */
     function createWrappedTokenForERC20s(
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata tokensToBeWrapped,
         string calldata name,
-        string calldata symbol
+        string calldata symbol,
+        bytes calldata mysoTokenManagerData
     ) external;
 
     /**
@@ -129,6 +136,13 @@ interface IAddressRegistry {
         address[] calldata tokens,
         bool allowTokensForCompartment
     ) external;
+
+    /**
+     * @dev Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
+     * Can only be called by the current owner.
+     * @param newOwner the proposed new owner address
+     */
+    function transferOwnership(address newOwner) external;
 
     /**
      * @notice Returns boolean flag indicating whether the borrower has been whitelisted by whitelistAuthority
@@ -204,6 +218,12 @@ interface IAddressRegistry {
     function owner() external view returns (address);
 
     /**
+     * @notice Returns address of the pending owner
+     * @return Address of the pending owner
+     */
+    function pendingOwner() external view returns (address);
+
+    /**
      * @notice Returns boolean flag indicating whether given compartment implementation and token combination is whitelisted
      * @param compartmentImpl Address of compartment implementation to check if it is allowed for token
      * @param token Address of token to check if compartment implementation is allowed
@@ -213,4 +233,10 @@ interface IAddressRegistry {
         address compartmentImpl,
         address token
     ) external view returns (bool isWhitelisted);
+
+    /**
+     * @notice Returns current number of vaults registered
+     * @return numVaults Current number of vaults registered
+     */
+    function numRegisteredVaults() external view returns (uint256 numVaults);
 }

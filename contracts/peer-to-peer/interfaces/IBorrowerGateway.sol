@@ -10,7 +10,7 @@ interface IBorrowerGateway {
         address indexed borrower,
         DataTypesPeerToPeer.Loan loan,
         uint256 upfrontFee,
-        uint256 loanId,
+        uint256 indexed loanId,
         address callbackAddr,
         bytes callbackData
     );
@@ -21,7 +21,7 @@ interface IBorrowerGateway {
         uint256 repayAmount
     );
 
-    event ProtocolFeeSet(uint256 newFee);
+    event ProtocolFeeSet(uint128[2] newFeeParams);
 
     /**
      * @notice function which allows a borrower to use an offChain quote to borrow
@@ -59,23 +59,19 @@ interface IBorrowerGateway {
      * @notice function which allows a borrower to repay a loan
      * @param loanRepayInstructions data needed for loan repay (see DataTypesPeerToPeer comments)
      * @param vaultAddr address of the vault in which loan was taken out
-     * @param callbackAddr address for callback (if any, e.g. 1-click repay)
-     * @param callbackData data needed by the callback address
      */
     function repay(
         DataTypesPeerToPeer.LoanRepayInstructions
             calldata loanRepayInstructions,
-        address vaultAddr,
-        address callbackAddr,
-        bytes calldata callbackData
+        address vaultAddr
     ) external;
 
     /**
-     * @notice function which allows owner to set new protocol fee
-     * @dev protocolFee is in units of BASE constant (10**18) and annualized
-     * @param _newFee new fee in BASE
+     * @notice function which allows owner to set new protocol fee params
+     * @dev protocolFee params are in units of BASE constant (10**18) and variable portion is annualized
+     * @param _newFeeParams new base fee (constant) and fee slope (variable) in BASE
      */
-    function setProtocolFee(uint256 _newFee) external;
+    function setProtocolFeeParams(uint128[2] calldata _newFeeParams) external;
 
     /**
      * @notice function returns address registry
@@ -85,7 +81,10 @@ interface IBorrowerGateway {
 
     /**
      * @notice function returns protocol fee
-     * @return protocol fee in BASE
+     * @return protocolFeeParams protocol fee Params in Base
      */
-    function protocolFee() external view returns (uint256);
+    function getProtocolFeeParams()
+        external
+        view
+        returns (uint128[2] memory protocolFeeParams);
 }

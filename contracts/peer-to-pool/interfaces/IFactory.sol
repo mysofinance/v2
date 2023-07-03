@@ -9,23 +9,22 @@ interface IFactory {
         address indexed sender,
         address collToken,
         uint256 arrangerFee,
-        uint256 unsubscribeGracePeriod
+        uint256 unsubscribeGracePeriod,
+        uint256 numLoanProposals
     );
     event FundingPoolCreated(
         address indexed newFundingPool,
-        address indexed depositToken
+        address indexed depositToken,
+        uint256 numFundingPools
     );
-    event ArrangerFeeSplitUpdated(
-        uint256 oldArrangerFeeSplit,
-        uint256 newArrangerFeeSplit
-    );
+    event ProtocolFeeUpdated(uint256 oldProtocolFee, uint256 newProtocolFee);
     event LenderWhitelistStatusClaimed(
         address indexed whitelistAuthority,
         address indexed lender,
         uint256 whitelistedUntil
     );
     event LenderWhitelistUpdated(
-        address whitelistAuthority,
+        address indexed whitelistAuthority,
         address[] indexed lender,
         uint256 whitelistedUntil
     );
@@ -61,23 +60,23 @@ interface IFactory {
     function createFundingPool(address _depositToken) external;
 
     /**
-     * @notice Sets the arranger fee split between the arranger and the protocol
+     * @notice Sets the protocol fee
      * @dev Can only be called by the loan proposal factory owner
-     * @param _newArrangerFeeSplit The given arranger fee split (e.g. 10% = BASE/10, meaning 10% of absolute arranger fee goes to protocol and rest to arranger); note that this amount must be smaller than Constants.MAX_ARRANGER_SPLIT (<50%)
+     * @param _newProtocolFee The given protocol fee; note that this amount must be smaller than Constants.MAX_P2POOL_PROTOCOL_FEE (<5%)
      */
-    function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external;
+    function setProtocolFee(uint256 _newProtocolFee) external;
 
     /**
      * @notice Allows user to claim whitelisted status
      * @param whitelistAuthority Address of whitelist authorithy
      * @param whitelistedUntil Timestamp until when user is whitelisted
-     * @param signature Signature from whitelist authority
+     * @param compactSig Compact signature from whitelist authority
      * @param salt Salt to make signature unique
      */
     function claimLenderWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes calldata signature,
+        bytes calldata compactSig,
         bytes32 salt
     ) external;
 
@@ -98,6 +97,13 @@ interface IFactory {
      * @param newTokenManager Address of the new MYSO token manager contract
      */
     function setMysoTokenManager(address newTokenManager) external;
+
+    /**
+     * @dev Starts the ownership transfer of the contract to a new account. Replaces the pending transfer if there is one.
+     * Can only be called by the current owner.
+     * @param newOwner the proposed new owner address
+     */
+    function transferOwnership(address newOwner) external;
 
     /**
      * @notice Returns the address of the funding pool implementation
@@ -140,16 +146,22 @@ interface IFactory {
     function isFundingPool(address addr) external view returns (bool);
 
     /**
-     * @notice Returns the arranger fee split between the arranger and the protocol (e.g. 10% = BASE/10, meaning 10% of absolute arranger fee goes to protocol and rest to arranger)
-     * @return The arranger fee split between the arranger and the protocol
+     * @notice Returns the protocol fee
+     * @return The protocol fee
      */
-    function arrangerFeeSplit() external view returns (uint256);
+    function protocolFee() external view returns (uint256);
 
     /**
      * @notice Returns the address of the owner of this contract
      * @return The address of the owner of this contract
      */
     function owner() external view returns (address);
+
+    /**
+     * @notice Returns address of the pending owner
+     * @return Address of the pending owner
+     */
+    function pendingOwner() external view returns (address);
 
     /**
      * @notice Returns the address of the MYSO token manager
@@ -167,4 +179,10 @@ interface IFactory {
         address whitelistAuthority,
         address lender
     ) external view returns (bool);
+
+    /**
+     * @notice Returns the number of loan proposals created
+     * @return Number of loan proposals created
+     */
+    function numLoanProposals() external view returns (uint256);
 }

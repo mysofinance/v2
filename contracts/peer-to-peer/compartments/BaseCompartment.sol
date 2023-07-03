@@ -32,23 +32,17 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
 
     // transfer coll on repays
     function _transferCollFromCompartment(
-        uint256 repayAmount,
-        uint256 repayAmountLeft,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
     ) internal {
         _withdrawCheck();
         if (msg.sender != vaultAddr) revert Errors.InvalidSender();
-        uint256 currentCompartmentBal = IERC20(collTokenAddr).balanceOf(
-            address(this)
-        );
-        uint256 amount = (repayAmount * currentCompartmentBal) /
-            repayAmountLeft;
         address collReceiver = callbackAddr == address(0)
             ? borrowerAddr
             : callbackAddr;
-        IERC20(collTokenAddr).safeTransfer(collReceiver, amount);
+        IERC20(collTokenAddr).safeTransfer(collReceiver, reclaimCollAmount);
     }
 
     function _unlockCollToVault(address collTokenAddr) internal {
@@ -57,7 +51,7 @@ abstract contract BaseCompartment is Initializable, IBaseCompartment {
         uint256 currentCollBalance = IERC20(collTokenAddr).balanceOf(
             address(this)
         );
-        IERC20(collTokenAddr).safeTransfer(vaultAddr, currentCollBalance);
+        IERC20(collTokenAddr).safeTransfer(msg.sender, currentCollBalance);
     }
 
     function _withdrawCheck() internal view {

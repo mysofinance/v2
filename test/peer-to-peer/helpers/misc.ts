@@ -46,16 +46,17 @@ export const createOnChainRequest = async ({
   ]
   let onChainQuote = {
     generalQuoteInfo: {
-      whitelistAuthority: ZERO_ADDR,
       collToken: collToken,
       loanToken: loanToken,
       oracleAddr: ZERO_ADDR,
-      minLoan: 0,
+      minLoan: 1,
       maxLoan: MAX_UINT256,
       validUntil: _validUntil,
       earliestRepayTenor: 0,
       borrowerCompartmentImplementation: borrowerCompartmentImplementation,
-      isSingleUse: false
+      isSingleUse: false,
+      whitelistAddr: ZERO_ADDR,
+      isWhitelistAddrSingleBorrower: false
     },
     quoteTuples: quoteTuples,
     salt: ZERO_BYTES32
@@ -279,17 +280,18 @@ export const setupBorrowerWhitelist = async ({
 
   // construct payload and sign
   const payload = ethers.utils.defaultAbiCoder.encode(
-    ['address', 'uint256', 'uint256', 'bytes32'],
-    [borrower.address, whitelistedUntil, chainId, salt]
+    ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+    [addressRegistry.address, borrower.address, whitelistedUntil, chainId, salt]
   )
   const payloadHash = ethers.utils.keccak256(payload)
   const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
   const sig = ethers.utils.splitSignature(signature)
+  const compactSig = sig.compact
   const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
   expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
   // have borrower claim whitelist status
   await addressRegistry
     .connect(borrower)
-    .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, signature, salt)
+    .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, salt)
 }

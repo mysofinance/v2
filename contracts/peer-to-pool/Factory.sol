@@ -4,19 +4,21 @@ pragma solidity 0.8.19;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Constants} from "../Constants.sol";
 import {Errors} from "../Errors.sol";
-import {Ownable} from "../Ownable.sol";
+import {Helpers} from "../Helpers.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
-contract Factory is Ownable, ReentrancyGuard, IFactory {
+contract Factory is Ownable2Step, ReentrancyGuard, IFactory {
     using ECDSA for bytes32;
 
-    uint256 public arrangerFeeSplit;
+    uint256 public protocolFee;
     address public immutable loanProposalImpl;
     address public immutable fundingPoolImpl;
     address public mysoTokenManager;
@@ -24,16 +26,18 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
     address[] public fundingPools;
     mapping(address => bool) public isLoanProposal;
     mapping(address => bool) public isFundingPool;
+    mapping(bytes => bool) internal _signatureIsInvalidated;
     mapping(address => bool) internal _depositTokenHasFundingPool;
     mapping(address => mapping(address => uint256))
         internal _lenderWhitelistedUntil;
 
-    constructor(address _loanProposalImpl, address _fundingPoolImpl) Ownable() {
+    constructor(address _loanProposalImpl, address _fundingPoolImpl) {
         if (_loanProposalImpl == address(0) || _fundingPoolImpl == address(0)) {
             revert Errors.InvalidAddress();
         }
         loanProposalImpl = _loanProposalImpl;
         fundingPoolImpl = _fundingPoolImpl;
+        _transferOwnership(msg.sender);
     }
 
     function createLoanProposal(
@@ -48,15 +52,9 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         if (!isFundingPool[_fundingPool] || _collToken == address(0)) {
             revert Errors.InvalidAddress();
         }
-        uint256 numLoanProposals = loanProposals.length;
-        bytes32 salt = keccak256(
-            abi.encodePacked(loanProposalImpl, msg.sender, numLoanProposals)
-        );
-        address newLoanProposal = Clones.cloneDeterministic(
-            loanProposalImpl,
-            salt
-        );
+        address newLoanProposal = Clones.clone(loanProposalImpl);
         loanProposals.push(newLoanProposal);
+        uint256 _numLoanProposals = loanProposals.length;
         isLoanProposal[newLoanProposal] = true;
         address _mysoTokenManager = mysoTokenManager;
         if (_mysoTokenManager != address(0)) {
@@ -66,7 +64,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
                     msg.sender,
                     _collToken,
                     _arrangerFee,
-                    numLoanProposals
+                    _numLoanProposals
                 );
         }
         ILoanProposalImpl(newLoanProposal).initialize(
@@ -87,7 +85,8 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             msg.sender,
             _collToken,
             _arrangerFee,
-            _unsubscribeGracePeriod
+            _unsubscribeGracePeriod,
+            _numLoanProposals
         );
     }
 
@@ -95,13 +94,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         if (_depositTokenHasFundingPool[_depositToken]) {
             revert Errors.FundingPoolAlreadyExists();
         }
-        bytes32 salt = keccak256(
-            abi.encodePacked(_depositToken, fundingPools.length)
-        );
-        address newFundingPool = Clones.cloneDeterministic(
-            fundingPoolImpl,
-            salt
-        );
+        address newFundingPool = Clones.clone(fundingPoolImpl);
         fundingPools.push(newFundingPool);
         isFundingPool[newFundingPool] = true;
         _depositTokenHasFundingPool[_depositToken] = true;
@@ -110,35 +103,47 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             _depositToken
         );
 
-        emit FundingPoolCreated(newFundingPool, _depositToken);
+        emit FundingPoolCreated(
+            newFundingPool,
+            _depositToken,
+            fundingPools.length
+        );
     }
 
-    function setArrangerFeeSplit(uint256 _newArrangerFeeSplit) external {
-        _senderCheckOwner();
-        uint256 oldArrangerFeeSplit = arrangerFeeSplit;
+    function setProtocolFee(uint256 _newprotocolFee) external {
+        _checkOwner();
+        uint256 oldprotocolFee = protocolFee;
         if (
-            _newArrangerFeeSplit > Constants.MAX_ARRANGER_SPLIT ||
-            _newArrangerFeeSplit == oldArrangerFeeSplit
+            _newprotocolFee > Constants.MAX_P2POOL_PROTOCOL_FEE ||
+            _newprotocolFee == oldprotocolFee
         ) {
             revert Errors.InvalidFee();
         }
-        arrangerFeeSplit = _newArrangerFeeSplit;
-        emit ArrangerFeeSplitUpdated(oldArrangerFeeSplit, _newArrangerFeeSplit);
+        protocolFee = _newprotocolFee;
+        emit ProtocolFeeUpdated(oldprotocolFee, _newprotocolFee);
     }
 
     function claimLenderWhitelistStatus(
         address whitelistAuthority,
         uint256 whitelistedUntil,
-        bytes calldata signature,
+        bytes calldata compactSig,
         bytes32 salt
     ) external {
+        if (_signatureIsInvalidated[compactSig]) {
+            revert Errors.InvalidSignature();
+        }
         bytes32 payloadHash = keccak256(
-            abi.encode(msg.sender, whitelistedUntil, block.chainid, salt)
+            abi.encode(
+                address(this),
+                msg.sender,
+                whitelistedUntil,
+                block.chainid,
+                salt
+            )
         );
-        bytes32 messageHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
-        );
-        address recoveredSigner = messageHash.recover(signature);
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(payloadHash);
+        (bytes32 r, bytes32 vs) = Helpers.splitSignature(compactSig);
+        address recoveredSigner = messageHash.recover(r, vs);
         if (
             whitelistAuthority == address(0) ||
             recoveredSigner != whitelistAuthority
@@ -156,6 +161,7 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             revert Errors.CannotClaimOutdatedStatus();
         }
         whitelistedUntilPerLender[msg.sender] = whitelistedUntil;
+        _signatureIsInvalidated[compactSig] = true;
         emit LenderWhitelistStatusClaimed(
             whitelistAuthority,
             msg.sender,
@@ -167,7 +173,11 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         address[] calldata lenders,
         uint256 whitelistedUntil
     ) external {
-        for (uint i = 0; i < lenders.length; ) {
+        uint256 lendersLen = lenders.length;
+        if (lendersLen == 0) {
+            revert Errors.InvalidArrayLength();
+        }
+        for (uint256 i; i < lendersLen; ) {
             mapping(address => uint256)
                 storage whitelistedUntilPerLender = _lenderWhitelistedUntil[
                     msg.sender
@@ -180,14 +190,14 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
             }
             whitelistedUntilPerLender[lenders[i]] = whitelistedUntil;
             unchecked {
-                i++;
+                ++i;
             }
         }
         emit LenderWhitelistUpdated(msg.sender, lenders, whitelistedUntil);
     }
 
     function setMysoTokenManager(address newTokenManager) external {
-        _senderCheckOwner();
+        _checkOwner();
         address oldTokenManager = mysoTokenManager;
         if (oldTokenManager == newTokenManager) {
             revert Errors.InvalidAddress();
@@ -196,21 +206,48 @@ contract Factory is Ownable, ReentrancyGuard, IFactory {
         emit MysoTokenManagerUpdated(oldTokenManager, newTokenManager);
     }
 
-    function owner()
-        external
-        view
-        override(Ownable, IFactory)
-        returns (address)
-    {
-        return _owner;
-    }
-
     function isWhitelistedLender(
         address whitelistAuthority,
         address lender
     ) external view returns (bool) {
         return
-            _lenderWhitelistedUntil[whitelistAuthority][lender] >
+            _lenderWhitelistedUntil[whitelistAuthority][lender] >=
             block.timestamp;
+    }
+
+    function numLoanProposals() external view returns (uint256) {
+        return loanProposals.length;
+    }
+
+    function transferOwnership(
+        address _newOwnerProposal
+    ) public override(Ownable2Step, IFactory) {
+        if (
+            _newOwnerProposal == address(this) ||
+            _newOwnerProposal == pendingOwner() ||
+            _newOwnerProposal == owner()
+        ) {
+            revert Errors.InvalidNewOwnerProposal();
+        }
+        // @dev: access control via super.transferOwnership()
+        // as well as _newOwnerProposal check against address(0)
+        super.transferOwnership(_newOwnerProposal);
+    }
+
+    function owner() public view override(Ownable, IFactory) returns (address) {
+        return super.owner();
+    }
+
+    function pendingOwner()
+        public
+        view
+        override(Ownable2Step, IFactory)
+        returns (address)
+    {
+        return super.pendingOwner();
+    }
+
+    function renounceOwnership() public pure override {
+        revert Errors.Disabled();
     }
 }

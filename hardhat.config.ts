@@ -17,6 +17,17 @@ export const getMainnetForkingConfig = () => {
   return { chainId: chainId, url: url, blockNumber: blockNumber }
 }
 
+export const getRecentMainnetForkingConfig = () => {
+  const INFURA_API_KEY = process.env.INFURA_API_KEY
+  if (INFURA_API_KEY === undefined) {
+    throw new Error('Invalid hardhat.config.ts! Need to set `INFURA_API_KEY`!')
+  }
+  const chainId = 1
+  const url = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`
+  const blockNumber = 17487097 // 2023-06-15
+  return { chainId: chainId, url: url, blockNumber: blockNumber }
+}
+
 export const getArbitrumForkingConfig = () => {
   const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
   if (ALCHEMY_API_KEY === undefined) {
@@ -64,6 +75,12 @@ const getForkingConfig = () => {
       url = arbitrumForkingConfig.url
       blockNumber = arbitrumForkingConfig.blockNumber
       break
+    case 'recent-mainnet':
+      const recentMainnetForkingConfig = getRecentMainnetForkingConfig()
+      chainId = recentMainnetForkingConfig.chainId
+      url = recentMainnetForkingConfig.url
+      blockNumber = recentMainnetForkingConfig.blockNumber
+      break
     default:
       throw new Error(`Invalid hardhat.config.ts! Unknown HARDHAT_CONFIG_NAME '${HARDHAT_CONFIG_NAME}'!`)
   }
@@ -76,7 +93,15 @@ const getForkingConfig = () => {
 export const HARDHAT_CHAIN_ID_AND_FORKING_CONFIG = getForkingConfig()
 
 const config: HardhatUserConfig = {
-  solidity: '0.8.19',
+  solidity: {
+    version: '0.8.19',
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000
+      }
+    }
+  },
   networks: {
     hardhat: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG
   },

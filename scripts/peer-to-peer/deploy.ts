@@ -79,16 +79,16 @@ async function main() {
   console.log(`glpStakingCompartmentImplmentation deployed to ${glpStakingCompartmentImplementation.address}`)
   */
 
-  //callbacks
+  // callbacks
   // deploy balancer v2 callbacks
   const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
-  const balancerV2Looping = await BalancerV2Looping.connect(deployer).deploy()
+  const balancerV2Looping = await BalancerV2Looping.connect(deployer).deploy(borrowerGateway.address)
   await balancerV2Looping.deployed()
   console.log(`BalancerV2Looping deployed to ${balancerV2Looping.address}`)
 
   // deploy uni v3 callback
   const UniV3Looping = await ethers.getContractFactory('UniV3Looping')
-  const uniV3Looping = await UniV3Looping.connect(deployer).deploy()
+  const uniV3Looping = await UniV3Looping.connect(deployer).deploy(borrowerGateway.address)
   await uniV3Looping.deployed()
   console.log(`UniV3Looping deployed to ${uniV3Looping.address}`)
 
@@ -98,7 +98,16 @@ async function main() {
 
   // whitelist callbacks and compartments
   await addressRegistry.connect(deployer).setWhitelistState([balancerV2Looping.address, uniV3Looping.address], 4)
-  await addressRegistry.connect(deployer).setWhitelistState([aaveStakingCompartmentImplementation.address, curveLPStakingCompartmentImplementation.address, votingCompartmentImplementation.address], 3)
+  await addressRegistry
+    .connect(deployer)
+    .setWhitelistState(
+      [
+        aaveStakingCompartmentImplementation.address,
+        curveLPStakingCompartmentImplementation.address,
+        votingCompartmentImplementation.address
+      ],
+      3
+    )
 
   // only on arbitrum
   //await addressRegistry.connect(deployer).setWhitelistState([glpStakingCompartmentImplementation.address], 3)

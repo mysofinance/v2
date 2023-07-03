@@ -23,6 +23,9 @@ contract VoteCompartment is BaseCompartment {
         if (msg.sender != loan.borrower && !approvedDelegator[msg.sender]) {
             revert Errors.InvalidSender();
         }
+        if (block.timestamp >= loan.expiry) {
+            revert Errors.LoanExpired();
+        }
         if (_delegatee == address(0)) {
             revert Errors.InvalidDelegatee();
         }
@@ -53,15 +56,15 @@ contract VoteCompartment is BaseCompartment {
 
     // transfer coll on repays
     function transferCollFromCompartment(
-        uint256 repayAmount,
-        uint256 repayAmountLeft,
+        uint256 /*repayAmount*/,
+        uint256 /*repayAmountLeft*/,
+        uint128 reclaimCollAmount,
         address borrowerAddr,
         address collTokenAddr,
         address callbackAddr
     ) external {
         _transferCollFromCompartment(
-            repayAmount,
-            repayAmountLeft,
+            reclaimCollAmount,
             borrowerAddr,
             collTokenAddr,
             callbackAddr
@@ -71,5 +74,13 @@ contract VoteCompartment is BaseCompartment {
     // unlockColl this would be called on defaults
     function unlockCollToVault(address collTokenAddr) external {
         _unlockCollToVault(collTokenAddr);
+    }
+
+    function getReclaimableBalance(
+        uint256 /*initCollAmount*/,
+        uint256 /*amountReclaimedSoFar*/,
+        address collToken
+    ) external view override returns (uint256) {
+        return IERC20(collToken).balanceOf(address(this));
     }
 }

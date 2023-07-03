@@ -3,6 +3,7 @@
 pragma solidity 0.8.19;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -22,6 +23,7 @@ contract WrappedERC20Impl is
     string internal _tokenName;
     string internal _tokenSymbol;
     DataTypesPeerToPeer.WrappedERC20TokenInfo[] internal _wrappedTokens;
+    bool public isIOU;
 
     constructor() ERC20("Wrapped ERC20 Impl", "Wrapped ERC20 Impl") {
         _disableInitializers();
@@ -32,40 +34,56 @@ contract WrappedERC20Impl is
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata _name,
-        string calldata _symbol
+        string calldata _symbol,
+        bool _isIOU
     ) external initializer {
-        for (uint256 i = 0; i < wrappedTokens.length; ) {
+        for (uint256 i; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
             unchecked {
-                i++;
+                ++i;
             }
         }
         _tokenName = _name;
         _tokenSymbol = _symbol;
+        isIOU = _isIOU;
         _mint(
             minter,
             totalInitialSupply < 10 ** 6 ? totalInitialSupply : 10 ** 6
         );
     }
 
-    function redeem(uint256 amount) external nonReentrant {
-        // faster fail here than in burn
-        if (amount == 0 || balanceOf(msg.sender) < amount) {
-            revert Errors.InvalidSendAmount();
+    function redeem(
+        address account,
+        address recipient,
+        uint256 amount
+    ) external nonReentrant {
+        if (isIOU) {
+            revert Errors.IOUCannotBeRedeemedOnChain();
+        }
+        if (amount == 0) {
+            revert Errors.InvalidAmount();
         }
         uint256 currTotalSupply = totalSupply();
-        for (uint256 i = 0; i < _wrappedTokens.length; ) {
+        if (msg.sender != account) {
+            _spendAllowance(account, msg.sender, amount);
+        }
+        _burn(account, amount);
+        uint256 wrappedTokensLen = _wrappedTokens.length;
+        for (uint256 i; i < wrappedTokensLen; ) {
             address tokenAddr = _wrappedTokens[i].tokenAddr;
             IERC20(tokenAddr).safeTransfer(
-                msg.sender,
-                (IERC20(tokenAddr).balanceOf(address(this)) * amount) /
+                recipient,
+                Math.mulDiv(
+                    IERC20(tokenAddr).balanceOf(address(this)),
+                    amount,
                     currTotalSupply
+                )
             );
             unchecked {
-                i++;
+                ++i;
             }
         }
-        _burn(msg.sender, amount);
+        emit Redeemed(account, recipient, amount);
     }
 
     function getWrappedTokensInfo()

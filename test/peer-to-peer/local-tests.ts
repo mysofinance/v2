@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
-import { LenderVaultImpl, MyERC20 } from '../typechain-types'
+import { LenderVaultImpl, MyERC20 } from '../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist } from './helpers/misc'
@@ -19,27 +19,34 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
+const YEAR_IN_SECONDS = 31_536_000
 
 async function generateOffChainQuote({
   lenderVault,
   lender,
-  whitelistAuthority,
+  signer,
+  whitelistAuthority = ZERO_ADDRESS,
   weth,
   usdc,
   offChainQuoteBodyInfo = {},
   generalQuoteInfo = {},
-  customSignature = {},
-  earliestRepayTenor = 0
+  customSignatures = [],
+  earliestRepayTenor = 0,
+  minLoan = ONE_USDC.mul(1000),
+  maxLoan = MAX_UINT256
 }: {
   lenderVault: LenderVaultImpl
   lender: SignerWithAddress
-  whitelistAuthority: SignerWithAddress
+  signer: SignerWithAddress
+  whitelistAuthority?: any
   weth: MyERC20
   usdc: MyERC20
   offChainQuoteBodyInfo?: any
   generalQuoteInfo?: any
-  customSignature?: any
+  customSignatures?: any[]
   earliestRepayTenor?: any
+  minLoan?: any
+  maxLoan?: any
 }) {
   // lenderVault owner gives quote
   const blocknum = await ethers.provider.getBlockNumber()
@@ -57,6 +64,36 @@ async function generateOffChainQuote({
       interestRatePctInBase: BASE.mul(20).div(100),
       upfrontFeePctInBase: 0,
       tenor: ONE_DAY.mul(180)
+    },
+    {
+      loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+      interestRatePctInBase: 0,
+      upfrontFeePctInBase: BASE,
+      tenor: 1 // invalid for upfront fee = 100%
+    },
+    {
+      loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+      interestRatePctInBase: 0,
+      upfrontFeePctInBase: BASE.div(10),
+      tenor: 0 // invalid for upfront fee < 100%
+    },
+    {
+      loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+      interestRatePctInBase: 0,
+      upfrontFeePctInBase: BASE,
+      tenor: 0 // valid swap quote
+    },
+    {
+      loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+      interestRatePctInBase: 0,
+      upfrontFeePctInBase: BASE.add(1), // invalid swap quote
+      tenor: 0
+    },
+    {
+      loanPerCollUnitOrLtv: 0, // invalid quote with zero loan amount
+      interestRatePctInBase: 0,
+      upfrontFeePctInBase: 0,
+      tenor: ONE_DAY.mul(90)
     }
   ]
   const quoteTuplesTree = StandardMerkleTree.of(
@@ -66,24 +103,23 @@ async function generateOffChainQuote({
   const quoteTuplesRoot = quoteTuplesTree.root
   let offChainQuote = {
     generalQuoteInfo: {
-      whitelistAuthority: whitelistAuthority.address,
       collToken: weth.address,
       loanToken: usdc.address,
       oracleAddr: ZERO_ADDRESS,
-      minLoan: ONE_USDC.mul(1000),
-      maxLoan: MAX_UINT256,
+      minLoan: minLoan,
+      maxLoan: maxLoan,
       validUntil: timestamp + 60,
       earliestRepayTenor: earliestRepayTenor,
       borrowerCompartmentImplementation: ZERO_ADDRESS,
       isSingleUse: false,
+      whitelistAddr: whitelistAuthority == ZERO_ADDRESS ? ZERO_ADDRESS : whitelistAuthority.address,
+      isWhitelistAddrSingleBorrower: false,
       ...generalQuoteInfo
     },
     quoteTuplesRoot: quoteTuplesRoot,
     salt: ZERO_BYTES32,
     nonce: 0,
-    v: [0],
-    r: [ZERO_BYTES32],
-    s: [ZERO_BYTES32],
+    compactSigs: [],
     ...offChainQuoteBodyInfo
   }
 
@@ -97,19 +133,18 @@ async function generateOffChainQuote({
   ])
 
   const payloadHash = ethers.utils.keccak256(payload)
-  const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+  const signature = await signer.signMessage(ethers.utils.arrayify(payloadHash))
   const sig = ethers.utils.splitSignature(signature)
+  const compactSig = sig.compact
+
   const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
-  expect(recoveredAddr).to.equal(lender.address)
+  expect(recoveredAddr).to.equal(signer.address)
 
   // add signer
-  await lenderVault.connect(lender).addSigners([lender.address])
+  await lenderVault.connect(lender).addSigners([signer.address])
 
   // lender add sig to quote and pass to borrower
-  offChainQuote.v = customSignature.v || [sig.v]
-  offChainQuote.r = customSignature.r || [sig.r]
-  offChainQuote.s = customSignature.s || [sig.s]
-
+  offChainQuote.compactSigs = customSignatures.length != 0 ? customSignatures : [compactSig]
   return { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash }
 }
 
@@ -133,7 +168,8 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, borrower, team, whitelistAuthority, addr1, addr2, addr3] = await ethers.getSigners()
+    const [lender, signer, borrower, team, circuitBreaker, whitelistAuthority, addr1, addr2, addr3] =
+      await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -185,32 +221,27 @@ describe('Peer-to-Peer: Local Tests', function () {
     await lenderVaultFactory.deployed()
 
     // deploy wrapped ERC721 Implementation
-    const WrappedERC721Implementation = await ethers.getContractFactory('WrappedERC721Impl')
-    const wrappedERC721Implementation = await WrappedERC721Implementation.connect(team).deploy()
-    await wrappedERC721Implementation.deployed()
+    const WrappedERC721Impl = await ethers.getContractFactory('WrappedERC721Impl')
+    const wrappedERC721Impl = await WrappedERC721Impl.connect(team).deploy()
+    await wrappedERC721Impl.deployed()
     await expect(
-      wrappedERC721Implementation.initialize(team.address, [{ tokenAddr: ZERO_ADDRESS, tokenIds: [0] }], '', '')
+      wrappedERC721Impl.initialize(team.address, [{ tokenAddr: ZERO_ADDRESS, tokenIds: [0] }], '', '')
     ).to.be.revertedWith('Initializable: contract is already initialized')
 
     // deploy ERC721 wrapper
     const ERC721Wrapper = await ethers.getContractFactory('ERC721Wrapper')
-    const erc721Wrapper = await ERC721Wrapper.connect(team).deploy(
-      addressRegistry.address,
-      wrappedERC721Implementation.address
-    )
-    await erc721Wrapper.deployed()
-
-    const erc721WrapperWithoutRegistry = await ERC721Wrapper.connect(team).deploy(
-      ZERO_ADDRESS,
-      wrappedERC721Implementation.address
-    )
-    await erc721WrapperWithoutRegistry.deployed()
-
-    // should revert on zero address in implementation
-    await expect(ERC721Wrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
-      erc721Wrapper,
+    // should revert if registry is address 0
+    await expect(ERC721Wrapper.connect(team).deploy(ZERO_ADDRESS, wrappedERC721Impl.address)).to.be.revertedWithCustomError(
+      ERC721Wrapper,
       'InvalidAddress'
     )
+    await expect(ERC721Wrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      ERC721Wrapper,
+      'InvalidAddress'
+    )
+    // deploy with valid constructor args
+    const erc721Wrapper = await ERC721Wrapper.connect(team).deploy(addressRegistry.address, wrappedERC721Impl.address)
+    await erc721Wrapper.deployed()
 
     // deploy token basket wrapper implementation
     const WrappedERC20Impl = await ethers.getContractFactory('WrappedERC20Impl')
@@ -219,35 +250,29 @@ describe('Peer-to-Peer: Local Tests', function () {
 
     // deploy token basket wrapper
     const ERC20Wrapper = await ethers.getContractFactory('ERC20Wrapper')
+    // should revert if registry is address 0
+    await expect(ERC20Wrapper.connect(team).deploy(ZERO_ADDRESS, wrappedERC20Impl.address)).to.be.revertedWithCustomError(
+      ERC20Wrapper,
+      'InvalidAddress'
+    )
+    await expect(ERC20Wrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      ERC20Wrapper,
+      'InvalidAddress'
+    )
+    // deploy with valid constructor args
     const erc20Wrapper = await ERC20Wrapper.connect(team).deploy(addressRegistry.address, wrappedERC20Impl.address)
     await erc20Wrapper.deployed()
 
-    // deploy token basket wrapper without registry
-    const tokenBasketWrapperWithoutRegistry = await ERC20Wrapper.connect(team).deploy(ZERO_ADDRESS, wrappedERC20Impl.address)
-    await tokenBasketWrapperWithoutRegistry.deployed()
-
-    // should revert on zero address in implementation
-    await expect(ERC20Wrapper.connect(team).deploy(addressRegistry.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
-      erc20Wrapper,
-      'InvalidAddress'
-    )
-
-    // reverts if user tries to create vault before initialized because address registry doesn't have lender vault factory set yet
+    // reverts if user tries to create vault before address registry has been initialized (otherwise couldn't keep track of registered vaults)
     await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(
-      addressRegistry,
-      'InvalidSender'
-    )
-
-    // reverts if trying to set whitelist state to tokens (=1) before address registry is initialized
-    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 1)).to.be.revertedWithCustomError(
       addressRegistry,
       'Uninitialized'
     )
 
-    // initialize address registry
+    // check reverts on invalid initialization
     await expect(
       addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    ).to.be.revertedWith('Ownable: caller is not the owner')
     await expect(
       addressRegistry.connect(team).initialize(ZERO_ADDRESS, borrowerGateway.address, quoteHandler.address)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
@@ -268,13 +293,40 @@ describe('Peer-to-Peer: Local Tests', function () {
     await expect(
       addressRegistry.connect(team).initialize(lenderVaultFactory.address, quoteHandler.address, quoteHandler.address)
     ).to.be.revertedWithCustomError(addressRegistry, 'DuplicateAddresses')
+
+    // reverts if trying to set whitelist state to tokens (=1) before address registry is initialized
+    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 1)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'Uninitialized'
+    )
+
+    // valid initialization
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
+
+    // check revert when trying to initialize again
     await expect(
       addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'AlreadyInitialized')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
     await expect(
       addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)
-    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSender')
+    ).to.be.revertedWith('Initializable: contract is already initialized')
+
+    // reverts if trying to set whitelist state while uninitialized
+    await expect(addressRegistry.connect(team).setWhitelistState([], 1)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidArrayLength'
+    )
+
+    // check revert when trying to set singleton address (wrappers and myso token manager) with array length > 1
+    await expect(
+      addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address, team.address], 7)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+    await expect(
+      addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address, team.address], 8)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+    await expect(
+      addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address, team.address], 9)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
 
     // test erc721 wrapper whitelisting
     let whitelistState
@@ -379,25 +431,48 @@ describe('Peer-to-Peer: Local Tests', function () {
     // reset address whitelist state
     await addressRegistry.connect(team).setWhitelistState([team.address], 0)
 
+    // check that 2 addresses cannot have the same singleton state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 9)
+    await expect(addressRegistry.connect(team).setWhitelistState([lender.address], 9)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'StateAlreadySet'
+    )
+    // reset address whitelist state
+    await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+
     // reverts if nft wrapper contract address is zero
     await expect(
-      addressRegistry.connect(team).createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '')
+      addressRegistry
+        .connect(team)
+        .createWrappedTokenForERC721s([{ tokenAddr: ZERO_ADDRESS, tokenIds: [1] }], '', '', ZERO_BYTES32)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
 
     // reverts if token basket wrapper contract address is zero
     await expect(
-      addressRegistry.connect(team).createWrappedTokenForERC20s([{ tokenAddr: ZERO_ADDRESS, tokenAmount: 1000 }], '', '')
+      addressRegistry
+        .connect(team)
+        .createWrappedTokenForERC20s([{ tokenAddr: ZERO_ADDRESS, tokenAmount: 1000 }], '', '', ZERO_BYTES32)
     ).to.be.revertedWithCustomError(addressRegistry, 'InvalidAddress')
 
     await addressRegistry.connect(team).setWhitelistState([borrower.address], 4)
     await addressRegistry.connect(team).setWhitelistState([borrower.address], 0)
+
+    // add testnet token manager
+    const TestnetTokenManager = await ethers.getContractFactory('TestnetTokenManager')
+    const testnetTokenManager = await TestnetTokenManager.deploy()
+    await testnetTokenManager.deployed()
+    await addressRegistry.connect(team).setWhitelistState([testnetTokenManager.address], 9)
 
     /* ********************************** */
     /* DEPLOYMENT OF SYSTEM CONTRACTS END */
     /* ********************************** */
 
     // create a vault
+    const numVaultsPre = await addressRegistry.numRegisteredVaults()
+    expect(numVaultsPre).to.be.equal(0)
     await lenderVaultFactory.connect(lender).createVault()
+    const numVaultsPost = await addressRegistry.numRegisteredVaults()
+    expect(numVaultsPost).to.be.equal(1)
     const lenderVaultAddrs = await addressRegistry.registeredVaults()
     const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
@@ -432,9 +507,8 @@ describe('Peer-to-Peer: Local Tests', function () {
     await weth.mint(borrower.address, ONE_WETH.mul(10))
 
     // whitelist addrs
-    await expect(addressRegistry.connect(lender).setWhitelistState([weth.address], 1)).to.be.revertedWithCustomError(
-      addressRegistry,
-      'InvalidSender'
+    await expect(addressRegistry.connect(lender).setWhitelistState([weth.address], 1)).to.be.revertedWith(
+      'Ownable: caller is not the owner'
     )
     await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
     await expect(addressRegistry.connect(team).setWhitelistState([ZERO_ADDRESS], 1)).to.be.revertedWithCustomError(
@@ -452,35 +526,35 @@ describe('Peer-to-Peer: Local Tests', function () {
     )
 
     const sortedAddrs = [addr1, addr2, addr3].sort((a, b) => (ethers.BigNumber.from(a.address).lt(b.address) ? -1 : 1))
-
     return {
       addressRegistry,
       borrowerGateway,
       quoteHandler,
       lender,
+      signer,
       borrower,
       team,
       whitelistAuthority,
       signer1: sortedAddrs[0],
       signer2: sortedAddrs[1],
       signer3: sortedAddrs[2],
+      circuitBreaker,
       usdc,
       weth,
       lenderVault,
-      wrappedERC721Implementation,
+      wrappedERC721Impl,
       erc721Wrapper,
-      erc721WrapperWithoutRegistry,
       wrappedERC20Impl,
       erc20Wrapper,
-      tokenBasketWrapperWithoutRegistry,
       myFirstNFT,
-      mySecondNFT
+      mySecondNFT,
+      testnetTokenManager
     }
   }
 
   describe('Address Registry', function () {
-    it('Should handle borrower whitelist correctly', async function () {
-      const { addressRegistry, team, lender, borrower, whitelistAuthority } = await setupTest()
+    it('Should handle borrower whitelist correctly (1/2)', async function () {
+      const { addressRegistry, team, borrower, whitelistAuthority } = await setupTest()
 
       // define whitelistedUntil
       let blocknum = await ethers.provider.getBlockNumber()
@@ -492,12 +566,13 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // construct payload and sign
       let payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256', 'uint256', 'bytes32'],
-        [borrower.address, whitelistedUntil1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [addressRegistry.address, borrower.address, whitelistedUntil1, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
       )
       let payloadHash = ethers.utils.keccak256(payload)
       const signature1 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
       const sig1 = ethers.utils.splitSignature(signature1)
+      const compactSig1 = sig1.compact
       let recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig1)
       expect(recoveredAddr).to.equal(whitelistAuthority.address)
 
@@ -506,13 +581,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         addressRegistry
           .connect(team)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
 
       // revert if trying to claim whitelist with whitelist authority being zero address
       await expect(
-        addressRegistry.connect(team).claimBorrowerWhitelistStatus(ZERO_ADDRESS, whitelistedUntil1, signature1, salt)
+        addressRegistry.connect(team).claimBorrowerWhitelistStatus(ZERO_ADDRESS, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
 
       // move forward past valid until timestamp
@@ -523,7 +598,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         addressRegistry
           .connect(borrower)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, team.address)).to.be.false
 
@@ -532,33 +607,34 @@ describe('Peer-to-Peer: Local Tests', function () {
       timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       const whitelistedUntil2 = Number(timestamp.toString()) + 60 * 60 * 365
       payload = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256', 'uint256', 'bytes32'],
-        [borrower.address, whitelistedUntil2, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [addressRegistry.address, borrower.address, whitelistedUntil2, HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId, salt]
       )
       payloadHash = ethers.utils.keccak256(payload)
       const signature2 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
       const sig2 = ethers.utils.splitSignature(signature2)
+      const compactSig2 = sig2.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig2)
 
       // have borrower claim whitelist status
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
       await addressRegistry
         .connect(borrower)
-        .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)
+        .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, compactSig2, salt)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
 
       // revert if trying to claim again
       await expect(
         addressRegistry
           .connect(borrower)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, signature2, salt)
-      ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil2, compactSig2, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
 
       // revert if trying to claim previous sig with outdated whitelistedUntil timestamp
       await expect(
         addressRegistry
           .connect(borrower)
-          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, signature1, salt)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig1, salt)
       ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
 
       // revert if whitelist authority tries to set same whitelistedUntil on borrower
@@ -574,58 +650,270 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check that whitelist authority can overwrite whitelistedUntil
       await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], 0)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.false
+
+      // check that user can't backrun dewhitelisting
+      await expect(
+        addressRegistry
+          .connect(borrower)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil1, compactSig2, salt)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidSignature')
+
+      // whitelist user again
       await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], MAX_UINT256)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
+    })
+
+    it('Should handle borrower whitelist correctly (2/2', async function () {
+      const { addressRegistry, whitelistAuthority, lender } = await setupTest()
+      // should revert when trying to update lender whitelist with empty array
+      await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([], 1)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidArrayLength'
+      )
+
+      // valid whitelisting
+      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([lender.address], 1)
+
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const whitelistedUntil = timestamp + 10
+
+      // construct payload and signature
+      const payload = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [
+          addressRegistry.address,
+          lender.address,
+          whitelistedUntil,
+          HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+          ZERO_BYTES32
+        ]
+      )
+      const payloadHash = ethers.utils.keccak256(payload)
+      const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig = ethers.utils.splitSignature(signature)
+      const compactSig = sig.compact
+      const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+      expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+      // claim whitelist status
+      await addressRegistry
+        .connect(lender)
+        .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, ZERO_BYTES32)
+
+      // should revert when trying to update lender whitelist with same value
+      await expect(
+        addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([lender.address], whitelistedUntil)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+
+      // should revert when trying to update lender whitelist with zero address
+      await expect(
+        addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([ZERO_ADDRESS], whitelistedUntil)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+
+      // construct 2nd payload with outdated "whitelisted until" and sign
+      const outdatedWhitelistedUntil = whitelistedUntil - 1
+      const payload2 = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [
+          addressRegistry.address,
+          lender.address,
+          outdatedWhitelistedUntil,
+          HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+          ZERO_BYTES32
+        ]
+      )
+      const payloadHash2 = ethers.utils.keccak256(payload2)
+      const signature2 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash2))
+      const sig2 = ethers.utils.splitSignature(signature2)
+      const compactSig2 = sig2.compact
+      const recoveredAddr2 = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash2), sig2)
+      expect(recoveredAddr2).to.equal(whitelistAuthority.address)
+
+      // should revert when trying to update lender whitelist with same value
+      await expect(
+        addressRegistry
+          .connect(lender)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, outdatedWhitelistedUntil, compactSig2, ZERO_BYTES32)
+      ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+    })
+
+    it('Should handle ownership transfers correctly', async function () {
+      const { addressRegistry, team, lender, borrower } = await setupTest()
+      const currOwner = await addressRegistry.owner()
+      expect(currOwner).to.be.equal(team.address)
+      expect(await addressRegistry.pendingOwner()).to.be.equal(ZERO_ADDRESS)
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+      await expect(addressRegistry.connect(lender).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+
+      // check revert on invalid new owner proposals
+      await expect(addressRegistry.connect(team).transferOwnership(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(addressRegistry.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(team.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // propose valid new owner
+      await addressRegistry.connect(team).transferOwnership(lender.address)
+      const newOwnerProposal = await addressRegistry.pendingOwner()
+      expect(newOwnerProposal).to.be.equal(lender.address)
+
+      // check revert when trying to propose already currently pending new owner
+      await expect(addressRegistry.connect(team).transferOwnership(lender.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).acceptOwnership()).to.be.revertedWith(
+        'Ownable2Step: caller is not the new owner'
+      )
+
+      // claim ownership
+      await addressRegistry.connect(lender).acceptOwnership()
+      const newOwner = await addressRegistry.owner()
+      expect(newOwner).to.be.equal(lender.address)
+
+      // check renouncing ownership is disabled
+      await expect(addressRegistry.connect(newOwner).renounceOwnership()).to.be.revertedWithCustomError(
+        addressRegistry,
+        'Disabled'
+      )
     })
   })
 
   describe('Lender Vault', function () {
-    it('Should handle ownership transfer correctly', async function () {
-      const { lender, team, borrower, lenderVault } = await setupTest()
+    it('Should handle ownership transfers correctly', async function () {
+      const { lender, team, lenderVault, signer } = await setupTest()
+
+      const currOwner = await lenderVault.owner()
+      expect(currOwner).to.be.equal(lender.address)
+      expect(await lenderVault.pendingOwner()).to.be.equal(ZERO_ADDRESS)
 
       // check that only owner can propose new owner
-      await expect(lenderVault.connect(team).proposeNewOwner(team.address)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(team).transferOwnership(team.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // check that new owner can't be zero address
-      await expect(lenderVault.connect(lender).proposeNewOwner(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(ZERO_ADDRESS)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
 
       // check that new owner can't be lender vault address itself
-      await expect(lenderVault.connect(lender).proposeNewOwner(lenderVault.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(lenderVault.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidNewOwnerProposal'
+      )
+
+      // check that new owner can't be current owner
+      await expect(lenderVault.connect(lender).transferOwnership(currOwner)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
 
       // add signer
-      await lenderVault.connect(lender).addSigners([borrower.address])
+      await lenderVault.connect(lender).addSigners([signer.address])
 
       // check that new owner can't be a signer
-      await expect(lenderVault.connect(lender).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(signer.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
 
       // make valid owner proposal
-      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.emit(lenderVault, 'NewOwnerProposed')
+      await expect(lenderVault.connect(lender).transferOwnership(team.address)).to.emit(
+        lenderVault,
+        'OwnershipTransferStarted'
+      )
 
       // check that you can't re-submit same new owner proposal
-      await expect(lenderVault.connect(lender).proposeNewOwner(team.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(team.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
 
       // claim ownership
-      await expect(lenderVault.connect(team).claimOwnership()).to.emit(lenderVault, 'ClaimedOwnership')
+      await expect(lenderVault.connect(team).acceptOwnership()).to.emit(lenderVault, 'OwnershipTransferred')
+      const newOwner = await lenderVault.owner()
+      expect(newOwner).to.be.equal(team.address)
 
       // check that old owner can't propose new owner anymore
-      await expect(lenderVault.connect(lender).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(lender).transferOwnership(lender.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+
+      // check renouncing ownership is disabled
+      await expect(lenderVault.connect(lender).renounceOwnership()).to.be.revertedWithCustomError(lenderVault, 'Disabled')
+    })
+
+    it('Should handle address registry ownership transferrals correctly', async function () {
+      const { addressRegistry, team, lender, borrower } = await setupTest()
+      const currOwner = await addressRegistry.owner()
+      expect(currOwner).to.be.equal(team.address)
+      expect(await addressRegistry.pendingOwner()).to.be.equal(ZERO_ADDRESS)
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+      await expect(addressRegistry.connect(lender).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+
+      // check revert on invalid new owner proposals
+      await expect(addressRegistry.connect(team).transferOwnership(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(addressRegistry.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(team.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // propose valid new owner
+      await addressRegistry.connect(team).transferOwnership(lender.address)
+      const newOwnerProposal = await addressRegistry.pendingOwner()
+      expect(newOwnerProposal).to.be.equal(lender.address)
+
+      // check revert when trying to propose already currently pending new owner
+      await expect(addressRegistry.connect(team).transferOwnership(lender.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).acceptOwnership()).to.be.revertedWith(
+        'Ownable2Step: caller is not the new owner'
+      )
+
+      // claim ownership
+      await addressRegistry.connect(lender).acceptOwnership()
+      const newOwner = await addressRegistry.owner()
+      expect(newOwner).to.be.equal(lender.address)
+
+      // check renouncing ownership is disabled
+      await expect(addressRegistry.connect(newOwner).renounceOwnership()).to.be.revertedWithCustomError(
+        addressRegistry,
+        'Disabled'
       )
     })
 
@@ -650,21 +938,18 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // reverts if non-owner tries to withdraw
       withdrawAmount = depositAmount.div(3)
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // reverts if non-owner tries to withdraw invalid amount
       withdrawAmount = 0
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
       withdrawAmount = depositAmount.add(1)
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // reverts if owner tries to withdraw invalid token
@@ -699,13 +984,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
 
       // transfer ownership to new vault owner
-      await lenderVault.connect(lender).proposeNewOwner(team.address)
-      await lenderVault.connect(team).claimOwnership()
+      await lenderVault.connect(lender).transferOwnership(team.address)
+      await lenderVault.connect(team).acceptOwnership()
 
       // reverts if old owner tries to withdraw
-      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(lender).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // new owner can withdraw
@@ -727,9 +1011,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         lender,
         borrower,
         whitelistAuthority,
+        circuitBreaker,
         usdc,
         weth,
-        lenderVault
+        lenderVault,
+        signer
       } = await setupTest()
 
       let depositAmount
@@ -760,14 +1046,12 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // reverts if non-owner tries to withdraw
       withdrawAmount = usdc.balanceOf(lenderVault.address)
-      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(usdc.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
       withdrawAmount = weth.balanceOf(lenderVault.address)
-      await expect(lenderVault.connect(borrower).withdraw(weth.address, withdrawAmount)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).withdraw(weth.address, withdrawAmount)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // reverts if owner tries to withdraw invalid amount
@@ -795,7 +1079,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -804,7 +1087,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -827,20 +1112,30 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv.mul(collSendAmount).div(ONE_WETH)
       const expectedReclaimableAmount = collSendAmount.sub(collSendAmount.mul(quoteTuples[0].upfrontFeePctInBase).div(BASE))
+
+      // reverts when trying to borrow with out-of-bounds quote tuple idx
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx + 1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidArrayIndex')
 
       // check pre/post amounts on borrow
       let preLockedWethAmounts = await lenderVault.lockedAmounts(weth.address)
@@ -849,6 +1144,84 @@ describe('Peer-to-Peer: Local Tests', function () {
       let preBorrowerWethBal = await weth.balanceOf(borrower.address)
       let preVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
       let preBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+
+      // if no compartment, then a compartment transfer fee should revert
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(
+            lenderVault.address,
+            { ...borrowInstructions, collSendAmount: ONE_WETH.add(1), expectedCompartmentTransferFee: 1 },
+            onChainQuote,
+            quoteTupleIdx
+          )
+      ).to.be.revertedWithCustomError(lenderVault, 'InconsistentExpTransferFee')
+
+      // should revert when trying to set invalid circuit breaker address
+      await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // should revert when trying to set invalid reverse circuit breaker address
+      await expect(lenderVault.connect(lender).setReverseCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // should revert when trying to set invalid reverse circuit breaker address
+      await lenderVault.addSigners([signer.address])
+      await expect(lenderVault.connect(lender).setReverseCircuitBreaker(signer.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // set valid circuit breaker
+      await lenderVault.connect(lender).setCircuitBreaker(circuitBreaker.address)
+
+      // check revert on unauthorized pause calls
+      await expect(lenderVault.connect(team).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+      await expect(lenderVault.connect(borrower).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // check that circuit breaker can pause
+      await lenderVault.connect(circuitBreaker).pauseQuotes()
+
+      // check revert that circuit breaker cannot unpause if not explicitly set as reverse circuit breaker
+      await expect(lenderVault.connect(circuitBreaker).unpauseQuotes()).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidSender'
+      )
+
+      // check that vault owner can unpause
+      await lenderVault.connect(lender).unpauseQuotes()
+
+      // check that vault owner can pause
+      await lenderVault.connect(lender).pauseQuotes()
+
+      // trying to execute borrow should revert
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      ).to.be.revertedWith('Pausable: paused')
+
+      // authorize circuit breaker also for reverse circuit breaker role
+      await lenderVault.connect(lender).setReverseCircuitBreaker(circuitBreaker.address)
+
+      // should revert when trying to set same address again
+      await expect(
+        lenderVault.connect(lender).setReverseCircuitBreaker(circuitBreaker.address)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+
+      // should allow setting circuit breaker to zero address
+      await lenderVault.connect(lender).setCircuitBreaker(ZERO_ADDRESS)
+
+      // check revert when circuit breaker or any other unauthorized party tries to unpause
+      await expect(lenderVault.connect(borrower).unpauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // circuit breaker can now unpause because it is also authorized as reverse circuit breaker
+      await lenderVault.connect(circuitBreaker).unpauseQuotes()
+
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
@@ -906,13 +1279,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(postLenderBal.sub(preLenderBal)).to.be.equal(preVaultBal.sub(postVaultBal))
     })
 
-    it('Should not proccess with insufficient vault funds', async function () {
+    it('Should not process with insufficient vault funds', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
 
       // check that only owner can propose new owner
-      await expect(lenderVault.connect(borrower).proposeNewOwner(borrower.address)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidSender'
+      await expect(lenderVault.connect(borrower).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
       )
 
       // lenderVault owner gives quote
@@ -934,7 +1306,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -943,7 +1314,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -957,17 +1330,20 @@ describe('Peer-to-Peer: Local Tests', function () {
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -977,28 +1353,38 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(lenderVault, 'InsufficientVaultFunds')
 
       // allow for transfer of vault ownership
-      await lenderVault.connect(lender).proposeNewOwner(borrower.address)
+      await lenderVault.connect(lender).transferOwnership(borrower.address)
       // only new proposed owner can claim vault
-      await expect(lenderVault.connect(lender).claimOwnership()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
-      await lenderVault.connect(borrower).claimOwnership()
+      await expect(lenderVault.connect(lender).acceptOwnership()).to.be.revertedWith(
+        'Ownable2Step: caller is not the new owner'
+      )
+      await lenderVault.connect(borrower).acceptOwnership()
     })
   })
 
   describe('Borrow Gateway', function () {
-    it('Should not proccess with bigger fee than max fee', async function () {
+    it('Should not process with bigger fee than max fee', async function () {
       const { borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
 
-      await expect(borrowerGateway.connect(lender).setProtocolFee(0)).to.be.revertedWithCustomError(
+      await expect(borrowerGateway.connect(lender).setProtocolFeeParams([0, 0])).to.be.revertedWithCustomError(
         borrowerGateway,
         'InvalidSender'
       )
-      await expect(borrowerGateway.connect(team).setProtocolFee(BASE)).to.be.revertedWithCustomError(
+      await expect(borrowerGateway.connect(team).setProtocolFeeParams([0, BASE])).to.be.revertedWithCustomError(
+        borrowerGateway,
+        'InvalidFee'
+      )
+      await expect(borrowerGateway.connect(team).setProtocolFeeParams([BASE, 0])).to.be.revertedWithCustomError(
         borrowerGateway,
         'InvalidFee'
       )
 
       // set max protocol fee p.a.
-      await borrowerGateway.connect(team).setProtocolFee(BASE.mul(5).div(100))
+      await borrowerGateway.connect(team).setProtocolFeeParams([0, BASE.mul(5).div(100)])
+
+      await expect(
+        borrowerGateway.connect(team).setProtocolFeeParams([BASE, BASE.mul(5).div(100)])
+      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidFee')
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1008,7 +1394,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -1017,7 +1402,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: [
           {
@@ -1037,26 +1424,206 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
-      const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const collSendAmount = ONE_WETH.mul(2)
+      const expectedProtocolAndVaultTransferFee = ONE_WETH.mul(2).mul(5).div(100)
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
-      // reverts if trying to borrow with quote where protocol fee would exceed pledge amount
+      // should process even for very long tenors now that protocolFee max time is capped at 180 days
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
-      ).to.be.revertedWithCustomError(borrowerGateway, 'InvalidSendAmount')
+      ).to.emit(borrowerGateway, 'Borrowed')
+    })
+
+    it('Should not process off-chain quote with invalid min/max loan amount (1/2)', async function () {
+      const { borrowerGateway, quoteHandler, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender produces invalid quote off-chain
+      const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        signer,
+        weth,
+        usdc,
+        minLoan: 2,
+        maxLoan: 1
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 0
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      const collSendAmount = ONE_WETH
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // reverts if trying to borrow with quote that would result in zero loan amount
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+    })
+
+    it('Should not process off-chain quote with invalid min/max loan amount (2/2)', async function () {
+      const { borrowerGateway, quoteHandler, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender produces invalid quote off-chain
+      const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        signer,
+        weth,
+        usdc,
+        minLoan: 0,
+        maxLoan: 0
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 0
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      const collSendAmount = ONE_WETH
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // reverts if trying to borrow with quote that would result in zero loan amount
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+    })
+
+    it('Should not process zero loan amounts', async function () {
+      const { borrowerGateway, quoteHandler, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote that results in zero loan amount
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+
+      let onChainQuote = {
+        generalQuoteInfo: {
+          whitelistAuthority: ZERO_ADDRESS,
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: [
+          {
+            loanPerCollUnitOrLtv: 0, // invalid value
+            interestRatePctInBase: BASE.mul(20).div(100),
+            upfrontFeePctInBase: 0,
+            tenor: ONE_DAY.mul(365).mul(20)
+          }
+        ],
+        salt: ZERO_BYTES32
+      }
+
+      // check invalid on-chain quote cannot bet added
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // lender produces invalid quote off-chain
+      const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
+        lenderVault,
+        lender,
+        signer,
+        weth,
+        usdc,
+        minLoan: 0
+      })
+
+      // borrower obtains proof for chosen quote tuple
+      const quoteTupleIdx = 6
+      const selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      const proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      const collSendAmount = ONE_WETH
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+
+      // reverts if trying to borrow with quote that would result in zero loan amount
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
   })
 
@@ -1067,6 +1634,10 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
+        signer1,
+        signer2,
+        signer3,
         borrower,
         team,
         whitelistAuthority,
@@ -1079,37 +1650,54 @@ describe('Peer-to-Peer: Local Tests', function () {
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
       // test add, remove, set min signer functionality
-      await expect(lenderVault.addSigners([lender.address, lender.address])).to.be.revertedWithCustomError(
-        lenderVault,
-        'AlreadySigner'
-      )
+      await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
       await expect(lenderVault.addSigners([ZERO_ADDRESS])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+      await expect(lenderVault.addSigners([])).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayLength')
       await expect(lenderVault.setMinNumOfSigners(0)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       await lenderVault.connect(lender).setMinNumOfSigners(4)
       await expect(lenderVault.setMinNumOfSigners(4)).to.be.revertedWithCustomError(lenderVault, 'InvalidNewMinNumOfSigners')
       const minNumSigners = await lenderVault.minNumOfSigners()
       expect(minNumSigners).to.be.equal(4)
       await lenderVault.connect(lender).setMinNumOfSigners(1)
-      await lenderVault.connect(lender).addSigners([team.address, borrower.address])
+      await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
+      await lenderVault
+        .connect(lender)
+        .addSigners([signer.address, signer1.address, signer2.address, signer3.address, team.address, borrower.address])
       // errors in handling signers
-      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).addSigners([borrower.address])).to.be.revertedWithCustomError(
+        lenderVault,
+        'AlreadySigner'
+      )
+
+      // reverts when trying to remove with signer idx that is out-of-bounds
+      let numSigners = Number((await lenderVault.numSigners()).toString())
+      await expect(lenderVault.connect(lender).removeSigner(borrower.address, numSigners)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidArrayIndex'
       )
-      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidArrayIndex'
-      )
+
+      // reverts when trying to remove unknown signer address
       await expect(lenderVault.connect(lender).removeSigner(weth.address, 0)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidSignerRemoveInfo'
       )
-      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 0)).to.be.revertedWithCustomError(
+
+      // reverts when trying to remove signer but with non-matching idx
+      const signerAddr = await lenderVault.signers(0)
+      await expect(lenderVault.connect(lender).removeSigner(signerAddr, 1)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidSignerRemoveInfo'
       )
+
       // valid remove
-      await lenderVault.connect(lender).removeSigner(borrower.address, 1)
+      await lenderVault.connect(lender).removeSigner(signerAddr, 0)
+
+      // remove all signers (always remove last one to test edge case handling)
+      numSigners = Number((await lenderVault.numSigners()).toString())
+      for (let i = 0; i < numSigners; i++) {
+        const lastSignerAddr = await lenderVault.signers(numSigners - i - 1)
+        await lenderVault.connect(lender).removeSigner(lastSignerAddr, numSigners - i - 1)
+      }
 
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
@@ -1126,6 +1714,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc
@@ -1145,16 +1734,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // unregistered vault address reverts
@@ -1238,8 +1830,11 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
+        team,
         whitelistAuthority,
+        circuitBreaker,
         usdc,
         weth,
         lenderVault
@@ -1263,6 +1858,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree, payloadHash } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc
@@ -1276,17 +1872,64 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
+
+      // should revert when trying to set invalid circuit breaker address
+      await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // should revert when trying to set invalid reverse circuit breaker address
+      await expect(lenderVault.connect(lender).setCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // set valid circuit breaker
+      await lenderVault.connect(lender).setCircuitBreaker(circuitBreaker.address)
+
+      // check revert on unauthorized pause calls
+      await expect(lenderVault.connect(team).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+      await expect(lenderVault.connect(borrower).pauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // check that circuit breaker can pause
+      await lenderVault.connect(circuitBreaker).pauseQuotes()
+
+      // check that vault owner can unpause
+      await lenderVault.connect(lender).unpauseQuotes()
+
+      // check that vault owner can pause
+      await lenderVault.connect(lender).pauseQuotes()
+
+      // trying to execute borrow should revert
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWith('Pausable: paused')
+
+      // set valid reverse circuit breaker
+      await lenderVault.connect(lender).setReverseCircuitBreaker(team.address)
+
+      // check revert when circuit breaker or any other unauthorized party tries to unpause
+      await expect(lenderVault.connect(borrower).unpauseQuotes()).to.be.revertedWithCustomError(lenderVault, 'InvalidSender')
+
+      // check that reverse circuit breaker can unpause
+      await lenderVault.connect(team).unpauseQuotes()
 
       // borrower executes valid off chain quote
       await borrowerGateway
@@ -1310,6 +1953,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1334,6 +1978,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1350,16 +1995,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // move forward past valid until timestamp
@@ -1379,6 +2027,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1403,6 +2052,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1419,16 +2069,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -1444,6 +2097,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1468,6 +2122,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1484,16 +2139,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       const borrowWithOffChainQuoteTransaction = await borrowerGateway
@@ -1516,7 +2174,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should validate off-chain earliest repay correctly', async function () {
-      const { addressRegistry, borrowerGateway, lender, borrower, whitelistAuthority, usdc, weth, lenderVault } =
+      const { addressRegistry, borrowerGateway, lender, signer, borrower, whitelistAuthority, usdc, weth, lenderVault } =
         await setupTest()
 
       // lenderVault owner deposits usdc
@@ -1537,6 +2195,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1554,16 +2213,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // reverts if trying to borrow with offchain quote that would lead to a loan that cannot be repaid as earliest repay is after expiry
@@ -1580,6 +2242,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1604,6 +2267,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
@@ -1620,16 +2284,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -1651,7 +2318,9 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
+        team,
         whitelistAuthority,
         usdc,
         weth,
@@ -1672,15 +2341,19 @@ describe('Peer-to-Peer: Local Tests', function () {
         whitelistedUntil: whitelistedUntil
       })
 
+      // generate off chain quote with bad signature
+      const payloadHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('some payload'))
+      const someSignature = await team.signMessage(ethers.utils.arrayify(payloadHash))
+      const someSig = ethers.utils.splitSignature(someSignature)
+      const someCompactSig = someSig.compact
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc,
-        customSignature: {
-          v: [0, 1, 2, 3]
-        }
+        customSignatures: [someCompactSig]
       })
 
       // borrower obtains proof for chosen quote tuple
@@ -1691,16 +2364,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -1716,6 +2392,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrowerGateway,
         quoteHandler,
         lender,
+        signer,
         borrower,
         whitelistAuthority,
         usdc,
@@ -1743,13 +2420,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
         lenderVault,
         lender,
+        signer,
         whitelistAuthority,
         weth,
         usdc
       })
 
       // define signer setup without lender
-      await lenderVault.connect(lender).removeSigner(lender.address, 0)
+      await lenderVault.connect(lender).removeSigner(signer.address, 0)
       await lenderVault.connect(lender).addSigners([signer1.address, signer2.address, signer3.address])
       await lenderVault.connect(lender).setMinNumOfSigners(3)
 
@@ -1767,14 +2445,17 @@ describe('Peer-to-Peer: Local Tests', function () {
       // signer1, signer2, signer3
       const signature1 = await signer1.signMessage(ethers.utils.arrayify(payloadHash))
       const sig1 = ethers.utils.splitSignature(signature1)
+      const compactSig1 = sig1.compact
       let recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig1)
       expect(recoveredAddr).to.equal(signer1.address)
       const signature2 = await signer2.signMessage(ethers.utils.arrayify(payloadHash))
       const sig2 = ethers.utils.splitSignature(signature2)
+      const compactSig2 = sig2.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig2)
       expect(recoveredAddr).to.equal(signer2.address)
       const signature3 = await signer3.signMessage(ethers.utils.arrayify(payloadHash))
       const sig3 = ethers.utils.splitSignature(signature3)
+      const compactSig3 = sig3.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig3)
       expect(recoveredAddr).to.equal(signer3.address)
 
@@ -1786,22 +2467,23 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // check revert on redundant sigs
-      offChainQuote.v = [sig1.v, sig2.v, sig1.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig1.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig1.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig1]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1809,9 +2491,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on redundant sigs
-      offChainQuote.v = [sig1.v, sig2.v, sig2.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig2.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig2.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig2]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1819,9 +2499,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on redundant sigs
-      offChainQuote.v = [sig1.v, sig1.v, sig2.v]
-      offChainQuote.r = [sig1.r, sig1.r, sig2.r]
-      offChainQuote.s = [sig1.s, sig1.s, sig2.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig1, compactSig2]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1831,11 +2509,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check revert on unauthorized sigs
       const signature4 = await lender.signMessage(ethers.utils.arrayify(payloadHash))
       const sig4 = ethers.utils.splitSignature(signature4)
+      const compactSig4 = sig4.compact
       recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig4)
       expect(recoveredAddr).to.equal(lender.address)
-      offChainQuote.v = [sig1.v, sig2.v, sig4.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig4.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig4.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig4]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1843,10 +2520,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on too few sigs
-      offChainQuote.v = [sig1.v, sig2.v]
-      offChainQuote.r = [sig1.r, sig2.r]
-      offChainQuote.s = [sig1.s, sig2.s]
-
+      offChainQuote.compactSigs = [compactSig1, compactSig2]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1854,9 +2528,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on too few sigs
-      offChainQuote.v = [sig1.v, sig3.v]
-      offChainQuote.r = [sig1.r, sig3.r]
-      offChainQuote.s = [sig1.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig3]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1864,29 +2536,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert on too few sigs
-      offChainQuote.v = [sig2.v, sig3.v]
-      offChainQuote.r = [sig2.r, sig3.r]
-      offChainQuote.s = [sig2.s, sig3.s]
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
-
-      // check revert if signature arrays unequal length
-      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
-      offChainQuote.r = [sig2.r, sig3.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig3.s]
-      await expect(
-        borrowerGateway
-          .connect(borrower)
-          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
-
-      // check revert if signature arrays unequal length
-      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig3.r]
-      offChainQuote.s = [sig2.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig2, compactSig3]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1894,9 +2544,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check revert if correct number of valid sigs but wrong order
-      offChainQuote.v = [sig2.v, sig1.v, sig3.v]
-      offChainQuote.r = [sig2.r, sig1.r, sig3.r]
-      offChainQuote.s = [sig2.s, sig1.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig2, compactSig1, compactSig3]
       await expect(
         borrowerGateway
           .connect(borrower)
@@ -1904,9 +2552,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidOffChainSignature')
 
       // check borrow tx successful if correct number of valid sigs
-      offChainQuote.v = [sig1.v, sig2.v, sig3.v]
-      offChainQuote.r = [sig1.r, sig2.r, sig3.r]
-      offChainQuote.s = [sig1.s, sig2.s, sig3.s]
+      offChainQuote.compactSigs = [compactSig1, compactSig2, compactSig3]
       const borrowWithOffChainQuoteTransaction = await borrowerGateway
         .connect(borrower)
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
@@ -1941,8 +2587,18 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should process off-chain quote with zero or negative interest rate factor correctly', async function () {
-      const { addressRegistry, borrowerGateway, lender, borrower, team, whitelistAuthority, usdc, weth, lenderVault } =
-        await setupTest()
+      const {
+        addressRegistry,
+        borrowerGateway,
+        lender,
+        signer,
+        borrower,
+        team,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -1975,7 +2631,6 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       let offChainQuoteWithBadTuples = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -1984,7 +2639,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuplesRoot: badQuoteTuplesRoot,
         salt: ZERO_BYTES32,
@@ -2004,18 +2661,17 @@ describe('Peer-to-Peer: Local Tests', function () {
       ])
 
       const payloadHash = ethers.utils.keccak256(payload)
-      const signature = await lender.signMessage(ethers.utils.arrayify(payloadHash))
+      const signature = await signer.signMessage(ethers.utils.arrayify(payloadHash))
       const sig = ethers.utils.splitSignature(signature)
+      const compactSig = sig.compact
       const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
-      expect(recoveredAddr).to.equal(lender.address)
+      expect(recoveredAddr).to.equal(signer.address)
 
       // add signer
-      await lenderVault.connect(lender).addSigners([lender.address])
+      await lenderVault.connect(lender).addSigners([signer.address])
 
       // lender add sig to quote and pass to borrower
-      offChainQuoteWithBadTuples.v = [sig.v]
-      offChainQuoteWithBadTuples.r = [sig.r]
-      offChainQuoteWithBadTuples.s = [sig.s]
+      offChainQuoteWithBadTuples.compactSigs = [compactSig]
 
       // borrower obtains proof for quote tuple idx 0
       let quoteTupleIdx = 0
@@ -2034,16 +2690,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       // check revert if negative interest rate factor
@@ -2090,7 +2749,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         whitelistAuthority,
         usdc,
         weth,
-        lenderVault
+        lenderVault,
+        testnetTokenManager
       } = await setupTest()
 
       // lenderVault owner deposits usdc
@@ -2115,7 +2775,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2124,7 +2783,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2147,23 +2808,30 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const borrowerMysoTokenBalPre = await testnetTokenManager.balanceOf(borrower.address)
       const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+      const vaultMysoTokenBalPre = await testnetTokenManager.balanceOf(lenderVault.address)
+      expect(borrowerMysoTokenBalPre).to.be.equal(0)
+      expect(vaultMysoTokenBalPre).to.be.equal(ONE_WETH) // from initial vault creation
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
       await borrowerGateway
         .connect(borrower)
@@ -2171,9 +2839,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check balance post borrow
       const borrowerWethBalPost = await weth.balanceOf(borrower.address)
       const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const borrowerMysoTokenBalPost = await testnetTokenManager.balanceOf(borrower.address)
       const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const vaultMysoTokenBalPost = await testnetTokenManager.balanceOf(lenderVault.address)
 
+      expect(borrowerMysoTokenBalPost).to.be.equal(ONE_WETH)
+      expect(vaultMysoTokenBalPost).to.be.equal(ONE_WETH.add(ONE_WETH))
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
 
@@ -2185,13 +2857,14 @@ describe('Peer-to-Peer: Local Tests', function () {
           {
             targetLoanId: loanId,
             targetRepayAmount: loanInfo.initRepayAmount,
-            expectedTransferFee: 0
+            expectedTransferFee: 0,
+            deadline: MAX_UINT256,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
           },
-          lenderVault.address,
-          callbackAddr,
-          callbackData
+          lenderVault.address
         )
-      ).to.be.revertedWithCustomError(lenderVault, 'OutsideValidRepayWindow')
+      ).to.be.revertedWithCustomError(borrowerGateway, 'OutsideValidRepayWindow')
 
       // move forward past valid until timestamp
       await ethers.provider.send('evm_mine', [Number(onChainQuote.generalQuoteInfo.validUntil.toString()) + 1])
@@ -2240,7 +2913,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: whitelistAuthority.address,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2249,7 +2921,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY.mul(360),
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: true
+          isSingleUse: true,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2281,17 +2955,20 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await expect(
@@ -2396,7 +3073,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2405,7 +3081,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: ONE_DAY.mul(360),
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: true
+          isSingleUse: true,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2434,17 +3112,20 @@ describe('Peer-to-Peer: Local Tests', function () {
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
       const collSendAmount = ONE_WETH
-      const expectedTransferFee = 0
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
       const quoteTupleIdx = 0
       const callbackAddr = ZERO_ADDRESS
       const callbackData = ZERO_BYTES32
       const borrowInstructions = {
         collSendAmount,
-        expectedTransferFee,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
         deadline: MAX_UINT256,
         minLoanAmount: 0,
         callbackAddr,
-        callbackData
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
       }
 
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 0)
@@ -2480,9 +3161,20 @@ describe('Peer-to-Peer: Local Tests', function () {
       onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = aaveStakingCompartmentImplementation.address
 
       await addressRegistry.connect(team).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
+      await expect(
+        addressRegistry.connect(team).setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [], true)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+
       await addressRegistry
         .connect(team)
         .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
+
+      // should revert when trying to set same state again
+      await expect(
+        addressRegistry
+          .connect(team)
+          .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
 
       // add new valid onchain quote with compartment
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
@@ -2521,7 +3213,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       ]
       let onChainQuote = {
         generalQuoteInfo: {
-          whitelistAuthority: ZERO_ADDRESS,
           collToken: weth.address,
           loanToken: usdc.address,
           oracleAddr: ZERO_ADDRESS,
@@ -2530,7 +3221,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           validUntil: timestamp + 60,
           earliestRepayTenor: 0,
           borrowerCompartmentImplementation: ZERO_ADDRESS,
-          isSingleUse: false
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
         },
         quoteTuples: quoteTuples,
         salt: ZERO_BYTES32
@@ -2554,44 +3247,240 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
   })
 
-  describe('Wrapped ERC721 Testing', function () {
+  describe('ERC721 Wrapper Testing', function () {
     it('Should handle wrapping and redeeming of nfts correctly', async function () {
-      const { addressRegistry, borrower, team, erc721Wrapper, erc721WrapperWithoutRegistry, myFirstNFT, mySecondNFT } =
-        await setupTest()
+      const { addressRegistry, borrower, team, erc721Wrapper, myFirstNFT, mySecondNFT } = await setupTest()
 
-      // should revert if minter is zero address
+      // should revert if not called through address registry
       await expect(
         erc721Wrapper
           .connect(borrower)
           .createWrappedToken(ZERO_ADDRESS, [{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidSender')
+
+      // should revert if wrapper not whitelisted
+      await expect(
+        addressRegistry
+          .connect(borrower)
+          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '', ZERO_BYTES32)
       ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidAddress')
 
-      // should revert if tokenInfo array has length 0
-      await expect(erc721Wrapper.connect(team).createWrappedToken(team.address, [], '', '')).to.be.revertedWithCustomError(
-        erc721Wrapper,
-        'InvalidArrayLength'
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
+
+      // should revert when trying to set same state again
+      await expect(
+        addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
+      ).to.be.revertedWithCustomError(addressRegistry, 'StateAlreadySet')
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 7)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
       )
+
+      // should revert if token is not whitelisted
+      await expect(
+        addressRegistry
+          .connect(team)
+          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '', ZERO_BYTES32)
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonWhitelistedToken')
+
+      // should revert if tokenInfo array has length 0
+      await expect(
+        addressRegistry.connect(team).createWrappedTokenForERC721s([], '', '', ZERO_BYTES32)
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidArrayLength')
 
       // should revert if tokenIds array has length 0
       await expect(
-        erc721Wrapper
+        addressRegistry
           .connect(team)
-          .createWrappedToken(team.address, [{ tokenAddr: mySecondNFT.address, tokenIds: [] }], '', '')
+          .createWrappedTokenForERC721s([{ tokenAddr: mySecondNFT.address, tokenIds: [] }], '', '', ZERO_BYTES32)
       ).to.be.revertedWithCustomError(erc721Wrapper, 'InvalidArrayLength')
 
-      // should revert if address registry is non-zero and token is not whitelisted
-      await expect(
-        erc721Wrapper
-          .connect(team)
-          .createWrappedToken(team.address, [{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
-      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonWhitelistedToken')
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([myFirstNFT.address, mySecondNFT.address], 6)
 
-      // should pass through all the way until transfer, where it will revert
+      // mint tokens
+      await myFirstNFT.connect(team).safeMint(borrower.address, 1)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 2)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 1)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 2)
+      // check owner is borrower
+      const ownerOFMyFirstNFT = await myFirstNFT.ownerOf(1)
+      const ownerOFMySecondNFT = await mySecondNFT.ownerOf(1)
+      expect(ownerOFMyFirstNFT).to.equal(borrower.address)
+      expect(ownerOFMySecondNFT).to.equal(borrower.address)
+      const ownerSecondOfMyFirstNFT = await myFirstNFT.ownerOf(2)
+      const ownerSecondOfMySecondNFT = await mySecondNFT.ownerOf(2)
+      expect(ownerSecondOfMyFirstNFT).to.equal(borrower.address)
+      expect(ownerSecondOfMySecondNFT).to.equal(borrower.address)
+      // set approval for wrapper contract
+      await myFirstNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+      await mySecondNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+
+      // sort ERC721_TOKEN token addresses
+      const sortedNFTAddrs = [myFirstNFT.address, mySecondNFT.address].sort((a, b) =>
+        ethers.BigNumber.from(a).lte(b) ? -1 : 1
+      )
+
+      // check approvals
+      const isApprovedForAll = await myFirstNFT.isApprovedForAll(borrower.address, erc721Wrapper.address)
+      expect(isApprovedForAll).to.equal(true)
+      const isApprovedForAll2 = await mySecondNFT.isApprovedForAll(borrower.address, erc721Wrapper.address)
+      expect(isApprovedForAll2).to.equal(true)
+
+      // should revert with token address array out of order
       await expect(
-        erc721WrapperWithoutRegistry
-          .connect(team)
-          .createWrappedToken(team.address, [{ tokenAddr: mySecondNFT.address, tokenIds: [1, 2] }], '', '')
-      ).to.be.revertedWithCustomError(erc721WrapperWithoutRegistry, 'TransferToWrappedTokenFailed')
+        addressRegistry.connect(borrower).createWrappedTokenForERC721s(
+          [
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] },
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] }
+          ],
+          '',
+          '',
+          ZERO_BYTES32
+        )
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingTokenAddrs')
+
+      // should revert with token id array out of order
+      await expect(
+        addressRegistry.connect(borrower).createWrappedTokenForERC721s(
+          [
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [2, 1] },
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+          ],
+          '',
+          '',
+          ZERO_BYTES32
+        )
+      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingNonFungibleTokenIds')
+
+      // create wrapped token
+      expect(await erc721Wrapper.numTokensCreated()).to.be.equal(0)
+      await addressRegistry.connect(borrower).createWrappedTokenForERC721s(
+        [
+          { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+          { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+        ],
+        'testName',
+        'testSymbol',
+        ZERO_BYTES32
+      )
+      expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
+
+      const tokensCreated1 = await erc721Wrapper.tokensCreated()
+      const newWrappedTokenAddr1 = tokensCreated1[0]
+      const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr1)
+      const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr1)
+
+      // new token should be whitelisted as ERC20_TOKEN
+      expect(whitelistTokenState).to.equal(1)
+
+      // check borrower has balance of 1
+      const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
+
+      expect(borrowerWrappedTokenBalance).to.equal(1)
+
+      // check total supply is 1
+      const totalSupply = await wrappedToken.totalSupply()
+
+      expect(totalSupply).to.equal(1)
+
+      // check wrapped token name, symbol and decimal overrides
+      const wrappedTokenName = await wrappedToken.name()
+      const wrappedTokenSymbol = await wrappedToken.symbol()
+      const wrappedTokenDecimals = await wrappedToken.decimals()
+      expect(wrappedTokenName).to.equal('testName')
+      expect(wrappedTokenSymbol).to.equal('testSymbol')
+      expect(wrappedTokenDecimals).to.equal(0)
+
+      const wrappedTokensInfo = await wrappedToken.getWrappedTokensInfo()
+      expect(wrappedTokensInfo.length).to.equal(2)
+
+      // check ownership of all NFTs has shifted to new wrapped token
+      const currOwnerFirstNFTIdx1 = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2 = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1 = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2 = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1).to.equal(wrappedToken.address)
+      expect(currOwnerFirstNFTIdx2).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2).to.equal(wrappedToken.address)
+
+      // should revert if insufficient balance / not owner of wrapped token
+      await expect(wrappedToken.connect(team).redeem(team.address, team.address)).to.be.revertedWith(
+        'ERC20: burn amount exceeds balance'
+      )
+      await expect(wrappedToken.connect(team).redeem(borrower.address, team.address)).to.be.revertedWith(
+        'ERC20: insufficient allowance'
+      )
+
+      await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)
+
+      // check ownership of all NFTs has shifted back to borrower
+      const currOwnerFirstNFTIdx1PostRedeem = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostRedeem = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostRedeem = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostRedeem = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerFirstNFTIdx2PostRedeem).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx2PostRedeem).to.equal(borrower.address)
+
+      // check borrower has balance of 0
+      const borrowerWrappedTokenBalancePostRedeem = await wrappedToken.balanceOf(borrower.address)
+      expect(borrowerWrappedTokenBalancePostRedeem).to.equal(0)
+
+      // check total supply is 0
+      const totalSupplyPostRedeem = await wrappedToken.totalSupply()
+      expect(totalSupplyPostRedeem).to.equal(0)
+
+      // create another wrapped token
+      await myFirstNFT.connect(team).safeMint(borrower.address, 3)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 4)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 5)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 6)
+      expect(await myFirstNFT.ownerOf(3)).to.be.equal(borrower.address)
+      expect(await myFirstNFT.ownerOf(4)).to.be.equal(borrower.address)
+      expect(await myFirstNFT.ownerOf(5)).to.be.equal(borrower.address)
+      expect(await myFirstNFT.ownerOf(6)).to.be.equal(borrower.address)
+      await addressRegistry
+        .connect(borrower)
+        .createWrappedTokenForERC721s(
+          [{ tokenAddr: myFirstNFT.address, tokenIds: [3, 4, 5, 6] }],
+          'testName',
+          'testSymbol',
+          ZERO_BYTES32
+        )
+      expect(await erc721Wrapper.numTokensCreated()).to.be.equal(2)
+      const tokensCreated2 = await erc721Wrapper.tokensCreated()
+      const newWrappedTokenAddr2 = tokensCreated2[1]
+      const wrappedToken2 = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr2)
+
+      // approve 3rd party to redeem
+      await wrappedToken2.connect(borrower).approve(team.address, 1)
+      await wrappedToken2.connect(team).redeem(borrower.address, team.address)
+      expect(await myFirstNFT.ownerOf(3)).to.be.equal(team.address)
+      expect(await myFirstNFT.ownerOf(4)).to.be.equal(team.address)
+      expect(await myFirstNFT.ownerOf(5)).to.be.equal(team.address)
+      expect(await myFirstNFT.ownerOf(6)).to.be.equal(team.address)
+    })
+
+    it('Should handle wrapping and borrowing of nfts correctly', async function () {
+      const {
+        addressRegistry,
+        borrower,
+        team,
+        usdc,
+        lender,
+        erc721Wrapper,
+        myFirstNFT,
+        mySecondNFT,
+        lenderVault,
+        quoteHandler,
+        borrowerGateway
+      } = await setupTest()
 
       // set token wrapper contract in address registry
       await addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
@@ -2626,32 +3515,6 @@ describe('Peer-to-Peer: Local Tests', function () {
       const isApprovedForAll2 = await mySecondNFT.isApprovedForAll(borrower.address, erc721Wrapper.address)
       expect(isApprovedForAll2).to.equal(true)
 
-      // should revert with token address array out of order
-      await expect(
-        erc721Wrapper.connect(borrower).createWrappedToken(
-          borrower.address,
-          [
-            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] },
-            { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] }
-          ],
-          '',
-          ''
-        )
-      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingTokenAddrs')
-
-      // should revert with token id array out of order
-      await expect(
-        erc721Wrapper.connect(borrower).createWrappedToken(
-          borrower.address,
-          [
-            { tokenAddr: sortedNFTAddrs[0], tokenIds: [2, 1] },
-            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
-          ],
-          '',
-          ''
-        )
-      ).to.be.revertedWithCustomError(erc721Wrapper, 'NonIncreasingNonFungibleTokenIds')
-
       // create wrapped token
       await addressRegistry.connect(borrower).createWrappedTokenForERC721s(
         [
@@ -2659,13 +3522,13 @@ describe('Peer-to-Peer: Local Tests', function () {
           { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
         ],
         'testName',
-        'testSymbol'
+        'testSymbol',
+        ZERO_BYTES32
       )
 
-      const newWrappedTokenAddr = await erc721Wrapper.tokensCreated(0)
-
+      const tokensCreated = await erc721Wrapper.tokensCreated()
+      const newWrappedTokenAddr = tokensCreated[0]
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr)
-
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
 
       // new token should be whitelisted as ERC20_TOKEN
@@ -2703,10 +3566,147 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(currOwnerSecondNFTIdx1).to.equal(wrappedToken.address)
       expect(currOwnerSecondNFTIdx2).to.equal(wrappedToken.address)
 
-      // should revert if not owner of wrapped token
-      await expect(wrappedToken.connect(team).redeem()).to.be.revertedWithCustomError(wrappedToken, 'InvalidSender')
+      // prepare borrow, lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const depositAmount = ONE_USDC.mul(10000)
+      await usdc.connect(lender).transfer(lenderVault.address, depositAmount)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: BASE.mul(1).div(100),
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: wrappedToken.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
 
-      await wrappedToken.connect(borrower).redeem()
+      // borrower approves gateway and executes quote
+      await wrappedToken.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount = 1
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+      const expectedLoanAmount = quoteTuples[0].loanPerCollUnitOrLtv
+      const expectedReclaimableAmount = collSendAmount
+
+      // check pre/post amounts on borrow
+      let preLockedWrappedTokenAmounts = await lenderVault.lockedAmounts(wrappedToken.address)
+      let preLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
+      let preVaultWrappedTokenBal = await wrappedToken.balanceOf(lenderVault.address)
+      let preBorrowerWrappedTokenBal = await wrappedToken.balanceOf(borrower.address)
+      let preVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
+      let preBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      let postLockedWrappedTokenAmounts = await lenderVault.lockedAmounts(wrappedToken.address)
+      let postLockedUsdcAmounts = await lenderVault.lockedAmounts(usdc.address)
+      let postVaultWrappedTokenBal = await wrappedToken.balanceOf(lenderVault.address)
+      let postBorrowerWrappedTokenBal = await wrappedToken.balanceOf(borrower.address)
+      let postVaultUsdcBal = await usdc.balanceOf(lenderVault.address)
+      let postBorrowerUsdcBal = await usdc.balanceOf(borrower.address)
+
+      expect(postLockedWrappedTokenAmounts).to.equal(preLockedWrappedTokenAmounts.add(collSendAmount))
+      expect(postLockedUsdcAmounts).to.equal(preLockedUsdcAmounts)
+      expect(postVaultWrappedTokenBal).to.equal(preVaultWrappedTokenBal.add(collSendAmount))
+      expect(postBorrowerWrappedTokenBal).to.equal(preBorrowerWrappedTokenBal.sub(collSendAmount))
+      expect(postVaultUsdcBal).to.equal(preVaultUsdcBal.sub(expectedLoanAmount))
+      expect(postBorrowerUsdcBal).to.equal(preBorrowerUsdcBal.add(expectedLoanAmount))
+
+      // check ownership of all NFTs is still wrapped Token
+      const currOwnerFirstNFTIdx1PostBorrow = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostBorrow = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostBorrow = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostBorrow = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostBorrow).to.equal(wrappedToken.address)
+      expect(currOwnerFirstNFTIdx2PostBorrow).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1PostBorrow).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2PostBorrow).to.equal(wrappedToken.address)
+
+      await usdc.connect(lender).transfer(borrower.address, ONE_USDC.mul(1000))
+
+      const loanId = 0
+      const loanInfo = await lenderVault.loan(loanId)
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: loanInfo.initRepayAmount.div(2),
+            expectedTransferFee: 0,
+            deadline: MAX_UINT256,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'ReclaimAmountIsZero')
+
+      await usdc.connect(borrower).approve(borrowerGateway.address, ONE_USDC.mul(10000))
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: loanInfo.initRepayAmount,
+            expectedTransferFee: 0,
+            deadline: 0,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.be.revertedWithCustomError(borrowerGateway, 'DeadlinePassed')
+
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: loanId,
+            targetRepayAmount: loanInfo.initRepayAmount,
+            expectedTransferFee: 0,
+            deadline: MAX_UINT256,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.emit(borrowerGateway, 'Repaid')
+
+      await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)
 
       // check ownership of all NFTs has shifted back to borrower
       const currOwnerFirstNFTIdx1PostRedeem = await myFirstNFT.ownerOf(1)
@@ -2727,14 +3727,159 @@ describe('Peer-to-Peer: Local Tests', function () {
       const totalSupplyPostRedeem = await wrappedToken.totalSupply()
       expect(totalSupplyPostRedeem).to.equal(0)
     })
+
+    it('Should handle sweeping and redeeming of blocked nfts correctly', async function () {
+      const { addressRegistry, borrower, team, erc721Wrapper, myFirstNFT, mySecondNFT } = await setupTest()
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
+
+      // whitelist tokens
+      await addressRegistry.connect(team).setWhitelistState([myFirstNFT.address, mySecondNFT.address], 6)
+
+      // mint tokens
+      await myFirstNFT.connect(team).safeMint(borrower.address, 1)
+      await myFirstNFT.connect(team).safeMint(borrower.address, 2)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 1)
+      await mySecondNFT.connect(team).safeMint(borrower.address, 2)
+
+      // set approval for wrapper contract
+      await myFirstNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+      await mySecondNFT.connect(borrower).setApprovalForAll(erc721Wrapper.address, true)
+
+      // sort ERC721_TOKEN token addresses
+      const sortedNFTAddrs = [myFirstNFT.address, mySecondNFT.address].sort((a, b) =>
+        ethers.BigNumber.from(a).lte(b) ? -1 : 1
+      )
+
+      // create wrapped token
+      expect(await erc721Wrapper.numTokensCreated()).to.be.equal(0)
+      await addressRegistry.connect(borrower).createWrappedTokenForERC721s(
+        [
+          { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+          { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+        ],
+        'testName',
+        'testSymbol',
+        ZERO_BYTES32
+      )
+      expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
+
+      const tokensCreated1 = await erc721Wrapper.tokensCreated()
+      const newWrappedTokenAddr1 = tokensCreated1[0]
+      const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr1)
+      const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr1)
+
+      // new token should be whitelisted as ERC20_TOKEN
+      expect(whitelistTokenState).to.equal(1)
+
+      // check borrower has balance of 1
+      const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
+
+      expect(borrowerWrappedTokenBalance).to.equal(1)
+
+      // check total supply is 1
+      const totalSupply = await wrappedToken.totalSupply()
+
+      expect(totalSupply).to.equal(1)
+
+      // check wrapped token name, symbol and decimal overrides
+      const wrappedTokenName = await wrappedToken.name()
+      const wrappedTokenSymbol = await wrappedToken.symbol()
+      const wrappedTokenDecimals = await wrappedToken.decimals()
+      expect(wrappedTokenName).to.equal('testName')
+      expect(wrappedTokenSymbol).to.equal('testSymbol')
+      expect(wrappedTokenDecimals).to.equal(0)
+
+      const wrappedTokensInfo = await wrappedToken.getWrappedTokensInfo()
+      expect(wrappedTokensInfo.length).to.equal(2)
+
+      await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
+      await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
+
+      await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)
+
+      // check ownership of all unlocked NFTs have shifted back to borrower, but locked NFTs
+      const currOwnerFirstNFTIdx1PostRedeem = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostRedeem = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostRedeem = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostRedeem = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostRedeem).to.equal(borrower.address)
+      expect(currOwnerFirstNFTIdx2PostRedeem).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1PostRedeem).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2PostRedeem).to.equal(borrower.address)
+
+      // check borrower has balance of 0
+      const borrowerWrappedTokenBalancePostRedeem = await wrappedToken.balanceOf(borrower.address)
+      expect(borrowerWrappedTokenBalancePostRedeem).to.equal(0)
+
+      // check total supply is 0
+      const totalSupplyPostRedeem = await wrappedToken.totalSupply()
+      expect(totalSupplyPostRedeem).to.equal(0)
+
+      // check stuckToken status
+      const stuckTokenStatusFirstNFTIdx1 = await wrappedToken.stuckTokens(myFirstNFT.address, 1)
+      const stuckTokenStatusFirstNFTIdx2PreSweep = await wrappedToken.stuckTokens(myFirstNFT.address, 2)
+      const stuckTokenStatusSecondNFTIdx1PreSweep = await wrappedToken.stuckTokens(mySecondNFT.address, 1)
+      const stuckTokenStatusSecondNFTIdx2 = await wrappedToken.stuckTokens(mySecondNFT.address, 2)
+
+      expect(stuckTokenStatusFirstNFTIdx1).to.be.false
+      expect(stuckTokenStatusFirstNFTIdx2PreSweep).to.be.true
+      expect(stuckTokenStatusSecondNFTIdx1PreSweep).to.be.true
+      expect(stuckTokenStatusSecondNFTIdx2).to.be.false
+
+      // expect sweep to revert if not called by redeemer
+      await expect(
+        wrappedToken.connect(team).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidSender')
+
+      // expect sweep to revert if empty token array
+      await expect(
+        wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [])
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidArrayLength')
+
+      // toggle block transfer back for first blocked token
+      await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
+
+      // passing in token Ids that are not stuck should revert
+      await expect(
+        wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [1, 2])
+      ).to.be.revertedWithCustomError(wrappedToken, 'TokenNotStuck')
+
+      // sweep stuck token in first NFT contract
+      await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
+
+      // sweep stuck token should go into the catch statement since still stuck and emit event
+      await expect(wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1]))
+        .to.emit(wrappedToken, 'TransferFromWrappedTokenFailed')
+        .withArgs(mySecondNFT.address, 1)
+
+      // toggle block transfer back for second blocked token
+      await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
+      // sweep stuck token skipping a non-stuck token
+      await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1])
+
+      const currOwnerFirstNFTIdx2PostSweep = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostSweep = await mySecondNFT.ownerOf(1)
+
+      expect(currOwnerFirstNFTIdx2PostSweep).to.equal(borrower.address)
+      expect(currOwnerSecondNFTIdx1PostSweep).to.equal(borrower.address)
+
+      // check stuckToken status
+      const stuckTokenStatusFirstNFTIdx2PostSweep = await wrappedToken.stuckTokens(myFirstNFT.address, 2)
+      const stuckTokenStatusSecondNFTIdx1PostSweep = await wrappedToken.stuckTokens(mySecondNFT.address, 1)
+
+      expect(stuckTokenStatusFirstNFTIdx2PostSweep).to.be.false
+      expect(stuckTokenStatusSecondNFTIdx1PostSweep).to.be.false
+    })
   })
 
-  describe('Wrapped Token Basket Testing', function () {
+  describe('ERC20 Wrapper Testing', function () {
     it('Should handle wrapping and redeeming of token basket correctly', async function () {
-      const { addressRegistry, borrower, team, usdc, weth, erc20Wrapper, tokenBasketWrapperWithoutRegistry } =
-        await setupTest()
+      const { addressRegistry, borrower, team, usdc, weth, erc20Wrapper } = await setupTest()
 
-      // should revert if minter is zero address
+      // should revert if not called through address registry
       await expect(
         erc20Wrapper.connect(borrower).createWrappedToken(
           ZERO_ADDRESS,
@@ -2745,28 +3890,45 @@ describe('Peer-to-Peer: Local Tests', function () {
           '',
           ''
         )
-      ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidAddress')
+      ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidSender')
 
-      // should revert if address registry is non-zero and token is not whitelisted
+      // should revert if wrapper not whitelisted
       await expect(
-        erc20Wrapper.connect(team).createWrappedToken(
-          team.address,
+        addressRegistry.connect(team).createWrappedTokenForERC20s(
           [
-            { tokenAddr: team.address, tokenAmount: ONE_WETH },
+            { tokenAddr: weth.address, tokenAmount: ONE_WETH },
             { tokenAddr: usdc.address, tokenAmount: ONE_USDC }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
+        )
+      ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidAddress')
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address], 8)
+
+      // should revert for non-whitelisted tokens
+      await expect(
+        addressRegistry.connect(team).createWrappedTokenForERC20s(
+          [
+            { tokenAddr: team.address, tokenAmount: ONE_WETH },
+            { tokenAddr: addressRegistry.address, tokenAmount: ONE_USDC }
+          ],
+          '',
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'NonWhitelistedToken')
 
-      // should pass through all the way until transfer, where it will revert because of no approval
+      // should revert if insufficient allowance
       await expect(
-        tokenBasketWrapperWithoutRegistry
+        addressRegistry
           .connect(team)
-          .createWrappedToken(team.address, [{ tokenAddr: weth.address, tokenAmount: ONE_WETH }], '', '')
+          .createWrappedTokenForERC20s([{ tokenAddr: weth.address, tokenAmount: ONE_WETH }], '', '', ZERO_BYTES32)
       ).to.be.revertedWith('ERC20: insufficient allowance')
 
+      // mint and approve test tokens
       const wrappedUsdcAmount = ONE_USDC.mul(876)
       const wrappedEthAmount = ONE_WETH.mul(8)
       await usdc.mint(borrower.address, wrappedUsdcAmount)
@@ -2774,50 +3936,51 @@ describe('Peer-to-Peer: Local Tests', function () {
       await usdc.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
       await weth.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
 
+      // sort addresses
       const sortedTokenInfo = [
         { tokenAddr: weth.address, tokenAmount: wrappedEthAmount },
         { tokenAddr: usdc.address, tokenAmount: wrappedUsdcAmount }
       ].sort((a, b) => (ethers.BigNumber.from(a.tokenAddr).lte(b.tokenAddr) ? -1 : 1))
 
-      // set token wrapper contract in address registry
-      await addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address], 8)
-
-      // should revert if token addrs are out of order
+      // should revert with token address array out of order
       await expect(
-        erc20Wrapper.connect(borrower).createWrappedToken(
-          borrower.address,
+        addressRegistry.connect(borrower).createWrappedTokenForERC20s(
           [
             { tokenAddr: sortedTokenInfo[1].tokenAddr, tokenAmount: 1 },
             { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'NonIncreasingTokenAddrs')
 
       // should revert if any token amount is equal to 0
       await expect(
-        erc20Wrapper.connect(borrower).createWrappedToken(
-          borrower.address,
+        addressRegistry.connect(borrower).createWrappedTokenForERC20s(
           [
             { tokenAddr: sortedTokenInfo[1].tokenAddr, tokenAmount: 0 },
             { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidSendAmount')
       await expect(
-        erc20Wrapper.connect(borrower).createWrappedToken(
-          borrower.address,
+        addressRegistry.connect(borrower).createWrappedTokenForERC20s(
           [
             { tokenAddr: sortedTokenInfo[0].tokenAddr, tokenAmount: 1 },
             { tokenAddr: sortedTokenInfo[1].tokenAddr, tokenAmount: 0 }
           ],
           '',
-          ''
+          '',
+          ZERO_BYTES32
         )
       ).to.be.revertedWithCustomError(erc20Wrapper, 'InvalidSendAmount')
+
+      // check that initially no tokens have been created
+      expect(await erc20Wrapper.numTokensCreated()).to.be.equal(0)
 
       // create wrapped token basket
       await addressRegistry.connect(borrower).createWrappedTokenForERC20s(
@@ -2832,12 +3995,18 @@ describe('Peer-to-Peer: Local Tests', function () {
           }
         ],
         'testName',
-        'testSymbol'
+        'testSymbol',
+        ZERO_BYTES32
       )
 
-      const newWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
+      // check new token has been created
+      expect(await erc20Wrapper.numTokensCreated()).to.be.equal(1)
+
+      const tokensCreated = await erc20Wrapper.tokensCreated()
+      const newWrappedTokenAddr = tokensCreated[0]
       const wrappedToken = await ethers.getContractAt('WrappedERC20Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
+      const isIOU = await wrappedToken.isIOU()
 
       // check name, symbol, and decimal overrides
       const wrappedTokenName = await wrappedToken.name()
@@ -2846,6 +4015,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(wrappedTokenName).to.equal('testName')
       expect(wrappedTokenSymbol).to.equal('testSymbol')
       expect(wrappedTokenDecimals).to.equal(6)
+      expect(whitelistTokenState).to.equal(1)
+      expect(isIOU).to.equal(false)
 
       // check that tokens were stored in instance storage correctly
       const tokenAddrs = await wrappedToken.getWrappedTokensInfo()
@@ -2876,18 +4047,23 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(usdcBalanceOfWrappedToken).to.equal(wrappedUsdcAmount)
       expect(wethBalanceOfWrappedToken).to.equal(wrappedEthAmount)
 
-      const preRedeemUsdcBalance = await usdc.balanceOf(borrower.address)
-      const preRedeemWethBalance = await weth.balanceOf(borrower.address)
-
       // should revert if redeem more than balance
-      await expect(wrappedToken.connect(borrower).redeem(borrowerWrappedTokenBalance.add(1))).to.be.revertedWithCustomError(
+      await expect(
+        wrappedToken.connect(borrower).redeem(borrower.address, borrower.address, borrowerWrappedTokenBalance.add(1))
+      ).to.be.revertedWith('ERC20: burn amount exceeds balance')
+      await expect(wrappedToken.connect(team).redeem(team.address, team.address, 0)).to.be.revertedWithCustomError(
         wrappedToken,
-        'InvalidSendAmount'
+        'InvalidAmount'
       )
-      await expect(wrappedToken.connect(team).redeem(0)).to.be.revertedWithCustomError(wrappedToken, 'InvalidSendAmount')
+      await expect(
+        wrappedToken.connect(team).redeem(borrower.address, team.address, borrowerWrappedTokenBalance)
+      ).to.be.revertedWith('ERC20: insufficient allowance')
+
+      // approve 3rd party to redeem
+      await wrappedToken.connect(borrower).approve(team.address, totalSupply.div(2))
 
       // redeem half the balance
-      await wrappedToken.connect(borrower).redeem(totalSupply.div(2))
+      await wrappedToken.connect(team).redeem(borrower.address, team.address, totalSupply.div(2))
 
       // check half of supply is burned
       const postPartialRedeemTotalSupply = await wrappedToken.totalSupply()
@@ -2897,14 +4073,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       const postPartialRedeemBorrowerBalance = await wrappedToken.balanceOf(borrower.address)
       expect(postPartialRedeemBorrowerBalance).to.equal(borrowerWrappedTokenBalance.div(2))
 
-      const postRedeemUsdcBalance = await usdc.balanceOf(borrower.address)
-      const postRedeemWethBalance = await weth.balanceOf(borrower.address)
+      const postRedeemUsdcBalance = await usdc.balanceOf(team.address)
+      const postRedeemWethBalance = await weth.balanceOf(team.address)
 
-      expect(postRedeemUsdcBalance.sub(preRedeemUsdcBalance)).to.equal(usdcBalanceOfWrappedToken.div(2))
-      expect(postRedeemWethBalance.sub(preRedeemWethBalance)).to.equal(wethBalanceOfWrappedToken.div(2))
+      expect(postRedeemUsdcBalance).to.equal(usdcBalanceOfWrappedToken.div(2))
+      expect(postRedeemWethBalance).to.equal(wethBalanceOfWrappedToken.div(2))
 
       // redeem remaining balance
-      await wrappedToken.connect(borrower).redeem(totalSupply.div(2))
+      await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address, totalSupply.div(2))
 
       // check total supply is 0
       const postFullRedeemTotalSupply = await wrappedToken.totalSupply()
@@ -2913,6 +4089,943 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check balance of borrower is 0
       const postFullRedeemBorrowerBalance = await wrappedToken.balanceOf(borrower.address)
       expect(postFullRedeemBorrowerBalance).to.equal(0)
+
+      // create wrapped placeholder token basket
+      await addressRegistry
+        .connect(borrower)
+        .createWrappedTokenForERC20s([], 'testPlaceholderName', 'testPlaceholderSymbol', ZERO_BYTES32)
+
+      // check new token has been created
+      expect(await erc20Wrapper.numTokensCreated()).to.be.equal(2)
+      const tokensCreated2 = await erc20Wrapper.tokensCreated()
+      const newPlaceholderWrappedTokenAddr = tokensCreated2[1]
+      const wrappedPlaceholderToken = await ethers.getContractAt('WrappedERC20Impl', newPlaceholderWrappedTokenAddr)
+      const whitelistPlaceholderTokenState = await addressRegistry.whitelistState(newPlaceholderWrappedTokenAddr)
+
+      // check name, symbol, and decimal overrides
+      const wrappedPlaceholderTokenName = await wrappedPlaceholderToken.name()
+      const wrappedPlaceholderTokenSymbol = await wrappedPlaceholderToken.symbol()
+      const wrappedPlaceholderTokenDecimals = await wrappedPlaceholderToken.decimals()
+      expect(wrappedPlaceholderTokenName).to.equal('testPlaceholderName')
+      expect(wrappedPlaceholderTokenSymbol).to.equal('testPlaceholderSymbol')
+      expect(wrappedPlaceholderTokenDecimals).to.equal(6)
+      expect(whitelistPlaceholderTokenState).to.equal(1)
+      expect(await wrappedPlaceholderToken.isIOU()).to.equal(true)
+
+      const totalPlaceHolderSupply = await wrappedPlaceholderToken.totalSupply()
+      expect(totalPlaceHolderSupply).to.equal(10 ** 6)
+    })
+  })
+
+  describe('Edge Case Testing', function () {
+    it('Should handle case correctly where borrower partially repays "almost" full loan amount', async function () {
+      const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, lenderVault } = await setupTest()
+
+      // deploy & whitelist test token
+      const MyERC20 = await ethers.getContractFactory('MyERC20')
+      const collToken = await MyERC20.deploy('COLL', 'COLL', 6)
+      await collToken.deployed()
+      await addressRegistry.connect(team).setWhitelistState([collToken.address], 1)
+
+      // lenderVault owner deposits usdc
+      await usdc.mint(lenderVault.address, ONE_USDC.mul(1000000000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000000),
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: collToken.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // prepare borrow params
+      const collTokenSendAmount = ONE_USDC.mul(1000)
+      const expectedProtocolAndVaultTransferFee = 0
+      const expectedCompartmentTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount: collTokenSendAmount,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+      // mint coll tokens, approve gateway and execute quote
+      await collToken.mint(borrower.address, collTokenSendAmount)
+      await collToken.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // approve loan token
+      await usdc.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      // check amountReclaimedSoFar on loan pre repay
+      let loan = await lenderVault.loan(0)
+      expect(loan.amountReclaimedSoFar).to.be.equal(0)
+
+      // do partial repay of close to full loan amount
+      const repayAmount1 = ONE_USDC.mul(1000000000).sub(999999)
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: 0,
+          targetRepayAmount: repayAmount1,
+          expectedTransferFee: 0,
+          deadline: MAX_UINT256,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+
+      // check amountReclaimedSoFar on loan after 1st repay
+      loan = await lenderVault.loan(0)
+      expect(loan.amountReclaimedSoFar).to.be.equal(999999999)
+
+      // do partial repay of close to full loan amount
+      const repayAmount2 = 999999
+      await borrowerGateway.connect(borrower).repay(
+        {
+          targetLoanId: 0,
+          targetRepayAmount: repayAmount2,
+          expectedTransferFee: 0,
+          deadline: MAX_UINT256,
+          callbackAddr: callbackAddr,
+          callbackData: callbackData
+        },
+        lenderVault.address
+      )
+
+      // check amountReclaimedSoFar on loan after final repay
+      loan = await lenderVault.loan(0)
+      expect(loan.amountReclaimedSoFar).to.be.equal(1000000000)
+    })
+
+    it('Should handle repayment amount calculation with potential rounding error correctly', async function () {
+      const { addressRegistry, borrowerGateway, quoteHandler, team, lender, borrower, lenderVault } = await setupTest()
+
+      // test tokens
+      const MyERC20 = await ethers.getContractFactory('MyERC20')
+      const collToken = await MyERC20.deploy('COLL', 'COLL', 6)
+      await collToken.deployed()
+      const loanToken = await MyERC20.deploy('LOAN', 'LOAN', 0)
+      await loanToken.deployed()
+      await addressRegistry.connect(team).setWhitelistState([collToken.address, loanToken.address], 1)
+
+      // lenderVault owner deposits usdc
+      await loanToken.mint(lenderVault.address, MAX_UINT256)
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: 10,
+          interestRatePctInBase: BASE.mul(30).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: collToken.address,
+          loanToken: loanToken.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // prepare borrow params
+      const collTokenSendAmount = 692308
+      const quoteTupleIdx = 0
+      const borrowInstructions = {
+        collSendAmount: collTokenSendAmount,
+        expectedProtocolAndVaultTransferFee: 0,
+        expectedCompartmentTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+      // mint coll tokens, approve gateway and execute quote
+      await collToken.mint(borrower.address, collTokenSendAmount)
+      await collToken.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+
+      // get loan info
+      const loan = await lenderVault.loan(0)
+      expect(loan.initLoanAmount).to.be.equal(6)
+      expect(loan.initRepayAmount).to.be.equal(9)
+    })
+
+    describe('Swap Testing (Edge Case for Loans with upfrontfee=100% and tenor=0)', function () {
+      it('Should handle on-chain swap quotes correctly (1/2)', async function () {
+        const { borrowerGateway, quoteHandler, lender, borrower, usdc, weth, lenderVault } = await setupTest()
+
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+        // lenderVault owner gives quote
+        const blocknum = await ethers.provider.getBlockNumber()
+        const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+        const buyPricePerCollToken = ONE_USDC.mul(1869)
+        let quoteTuples = [
+          {
+            loanPerCollUnitOrLtv: buyPricePerCollToken,
+            interestRatePctInBase: 0,
+            upfrontFeePctInBase: BASE,
+            tenor: 0
+          }
+        ]
+        let onChainQuote = {
+          generalQuoteInfo: {
+            collToken: weth.address,
+            loanToken: usdc.address,
+            oracleAddr: ZERO_ADDRESS,
+            minLoan: ONE_USDC.mul(1000),
+            maxLoan: MAX_UINT256,
+            validUntil: timestamp + 60,
+            earliestRepayTenor: 0,
+            borrowerCompartmentImplementation: ZERO_ADDRESS,
+            isSingleUse: false,
+            whitelistAddr: ZERO_ADDRESS,
+            isWhitelistAddrSingleBorrower: false
+          },
+          quoteTuples: quoteTuples,
+          salt: ZERO_BYTES32
+        }
+
+        await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+          quoteHandler,
+          'OnChainQuoteAdded'
+        )
+
+        // check balance pre borrow
+        const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+        const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+        const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+        const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+        const numLoansPre = await lenderVault.totalNumLoans()
+        const lockedAmountsWethPre = await lenderVault.lockedAmounts(weth.address)
+        const lockedAmountsUsdcPre = await lenderVault.lockedAmounts(usdc.address)
+
+        // borrower approves gateway and executes quote
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const sellAmountOfCollToken = ONE_WETH
+        const expectedProtocolAndVaultTransferFee = 0
+        const expectedCompartmentTransferFee = 0
+        const quoteTupleIdx = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount: sellAmountOfCollToken,
+          expectedProtocolAndVaultTransferFee,
+          expectedCompartmentTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
+        }
+        await borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+        const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+        const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+        const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+        const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+        const numLoansPost = await lenderVault.totalNumLoans()
+        const lockedAmountsWethPost = await lenderVault.lockedAmounts(weth.address)
+        const lockedAmountsUsdcPost = await lenderVault.lockedAmounts(usdc.address)
+
+        // check balance post borrow
+        expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(vaultWethBalPost.sub(vaultWethBalPre))
+        expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(sellAmountOfCollToken)
+        expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+        expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(
+          buyPricePerCollToken.mul(sellAmountOfCollToken).div(ONE_WETH)
+        )
+
+        // check no change in locked amounts
+        expect(lockedAmountsWethPost).to.equal(lockedAmountsWethPre)
+        expect(lockedAmountsWethPost).to.equal(0)
+        expect(lockedAmountsUsdcPost).to.equal(lockedAmountsUsdcPre)
+        expect(lockedAmountsUsdcPost).to.equal(0)
+
+        // check no loan was pushed
+        expect(numLoansPost).to.equal(numLoansPre)
+        expect(numLoansPost).to.equal(0)
+
+        // check no repay possible
+        await expect(
+          borrowerGateway.connect(borrower).repay(
+            {
+              targetLoanId: 0,
+              targetRepayAmount: buyPricePerCollToken,
+              expectedTransferFee: 0,
+              deadline: MAX_UINT256,
+              callbackAddr: callbackAddr,
+              callbackData: callbackData
+            },
+            lenderVault.address
+          )
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
+
+        // check lender can unlock swapped amount (=upfront fee) immediately
+        const userWethBalPreWithdraw = await weth.balanceOf(lender.address)
+        const vaultWethBalPreWithdraw = await weth.balanceOf(lenderVault.address)
+        await lenderVault.connect(lender).withdraw(weth.address, sellAmountOfCollToken)
+        const userWethBalPostWithdraw = await weth.balanceOf(lender.address)
+        const vaultWethBalPostWithdraw = await weth.balanceOf(lenderVault.address)
+        expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(
+          vaultWethBalPreWithdraw.sub(vaultWethBalPostWithdraw)
+        )
+        expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(sellAmountOfCollToken)
+      })
+
+      it('Should handle on-chain swap quotes correctly (2/2)', async function () {
+        const { borrowerGateway, addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } =
+          await setupTest()
+
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+        // lenderVault owner gives quote
+        const blocknum = await ethers.provider.getBlockNumber()
+        const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+        const buyPricePerCollToken = ONE_USDC.mul(1869)
+        let quoteTuples = [
+          {
+            loanPerCollUnitOrLtv: buyPricePerCollToken,
+            interestRatePctInBase: 0,
+            upfrontFeePctInBase: BASE,
+            tenor: 0
+          }
+        ]
+        let onChainQuote = {
+          generalQuoteInfo: {
+            collToken: weth.address,
+            loanToken: usdc.address,
+            oracleAddr: ZERO_ADDRESS,
+            minLoan: ONE_USDC.mul(1000),
+            maxLoan: MAX_UINT256,
+            validUntil: timestamp + 60,
+            earliestRepayTenor: 0,
+            borrowerCompartmentImplementation: ZERO_ADDRESS,
+            isSingleUse: false,
+            whitelistAddr: ZERO_ADDRESS,
+            isWhitelistAddrSingleBorrower: false
+          },
+          quoteTuples: quoteTuples,
+          salt: ZERO_BYTES32
+        }
+
+        // should revert with bad swap on-chain quote (tenor != 0)
+        onChainQuote.quoteTuples[0].tenor = 1
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (earliest repay != 0)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 1
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (tenor and earliest repay != 0)
+        onChainQuote.quoteTuples[0].tenor = 1
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 1
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (upfrontfee < 100%)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.mul(0)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (upfrontfee < 100%)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.div(10)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (upfrontfee > 100%)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE.add(1)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert with bad swap on-chain quote (compartment address != 0x)
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = team.address
+        // set dummy compartment to test revert when trying to add swap-quote with compartment
+        await addressRegistry.connect(team).setWhitelistState([team.address], 3)
+        await addressRegistry.connect(team).setAllowedTokensForCompartment(team.address, [weth.address], true)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+        await addressRegistry.connect(team).setWhitelistState([team.address], 0)
+        await addressRegistry.connect(team).setAllowedTokensForCompartment(team.address, [weth.address], false)
+
+        // should revert if trying to add "mixed" quote tuples, where some correspond to loans and some to swaps
+        // with potentially incompatible compartment requirements
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+        onChainQuote.quoteTuples.push({
+          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE.sub(1),
+          tenor: Number(ONE_DAY.toString())
+        })
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should revert if trying to add multiple swap quotes (no need to have multiple
+        // swap quotes with different prices because takers would always take the cheaper one)
+        onChainQuote.quoteTuples.pop()
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+        onChainQuote.quoteTuples.push({
+          loanPerCollUnitOrLtv: buyPricePerCollToken.sub(1),
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE,
+          tenor: 0
+        })
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // should pass with valid swap on-chain quote
+        onChainQuote.quoteTuples.pop()
+        onChainQuote.quoteTuples[0].tenor = 0
+        onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
+        onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
+        onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+
+        // should revert with on chain quote that has min or max loan limit of zero
+        onChainQuote.generalQuoteInfo.minLoan = ethers.BigNumber.from(0)
+        onChainQuote.generalQuoteInfo.maxLoan = ethers.BigNumber.from(0)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+        onChainQuote.generalQuoteInfo.maxLoan = MAX_UINT256
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+        onChainQuote.generalQuoteInfo.minLoan = ONE_USDC.mul(1000)
+        onChainQuote.generalQuoteInfo.maxLoan = ethers.BigNumber.from(0)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // reset to be valid min loan (and max loan)
+        onChainQuote.generalQuoteInfo.minLoan = ONE_USDC.mul(1000)
+        onChainQuote.generalQuoteInfo.maxLoan = MAX_UINT256
+
+        // add valid on chain quote
+        await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const sellAmountOfCollToken = ONE_WETH
+        const expectedProtocolAndVaultTransferFee = 0
+        const expectedCompartmentTransferFee = 0
+        const quoteTupleIdx = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount: sellAmountOfCollToken,
+          expectedProtocolAndVaultTransferFee,
+          expectedCompartmentTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
+        }
+
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOnChainQuote(
+              lenderVault.address,
+              { ...borrowInstructions, expectedCompartmentTransferFee: 1 },
+              onChainQuote,
+              quoteTupleIdx
+            )
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
+
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+        ).to.emit(lenderVault, 'QuoteProcessed')
+      })
+
+      it('Should handle off-chain swap quotes correctly (1/2)', async function () {
+        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault, quoteHandler } = await setupTest()
+
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+        // lender produces template off-chain quote (incl swap quote tuples)
+        const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+          lenderVault,
+          lender,
+          signer,
+          whitelistAuthority: ZERO_ADDRESS,
+          weth,
+          usdc
+        })
+
+        // borrower approves gateway and executes quote
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const collSendAmount = ONE_WETH
+        const expectedProtocolAndVaultTransferFee = 0
+        const expectedCompartmentTransferFee = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount,
+          expectedProtocolAndVaultTransferFee,
+          expectedCompartmentTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
+        }
+
+        // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0)
+        let quoteTupleIdx = 2
+        let selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        let proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
+
+        // borrower obtains proof for another invalid quote tuple (tuple idx 3 has upfrontfee < 100% but tenor = 0)
+        quoteTupleIdx = 3
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
+
+        // borrower obtains proof for valid quote tuple (upfront fee = 100% and tenor = 0 and earliest repay = 0)
+        quoteTupleIdx = 4
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.emit(lenderVault, 'QuoteProcessed')
+
+        // borrower obtains proof for invalid quote tuple (tuple idx 5 has upfrontfee > 100%)
+        quoteTupleIdx = 5
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidUpfrontFee')
+      })
+
+      it('Should handle off-chain swap quotes correctly (2/2)', async function () {
+        const { borrowerGateway, lender, signer, borrower, usdc, weth, lenderVault } = await setupTest()
+
+        // lenderVault owner deposits usdc
+        await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+        // lender produces quote with earliest repay != 0
+        const { offChainQuote, quoteTuples, quoteTuplesTree } = await generateOffChainQuote({
+          lenderVault,
+          lender,
+          signer,
+          whitelistAuthority: ZERO_ADDRESS,
+          weth,
+          usdc,
+          earliestRepayTenor: 1
+        })
+
+        // borrower approves gateway and executes quote
+        await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+        const collSendAmount = ONE_WETH
+        const expectedProtocolAndVaultTransferFee = 0
+        const expectedCompartmentTransferFee = 0
+        const callbackAddr = ZERO_ADDRESS
+        const callbackData = ZERO_BYTES32
+        const borrowInstructions = {
+          collSendAmount,
+          expectedProtocolAndVaultTransferFee,
+          expectedCompartmentTransferFee,
+          deadline: MAX_UINT256,
+          minLoanAmount: 0,
+          callbackAddr,
+          callbackData,
+          mysoTokenManagerData: ZERO_BYTES32
+        }
+        // borrower obtains proof for invalid quote tuple (tuple idx 2 has upfrontfee = 100% but tenor != 0 and earliestRepayTenor != 0)
+        let quoteTupleIdx = 2
+        let selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        let proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidSwap')
+
+        // borrower obtains proof for another invalid quote tuple (tuple idx 3 has upfrontfee < 100% but tenor = 0 and earliestRepayTenor != 0)
+        quoteTupleIdx = 3
+        selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+        proof = quoteTuplesTree.getProof(quoteTupleIdx)
+        // should revert with invalid quote
+        await expect(
+          borrowerGateway
+            .connect(borrower)
+            .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+        ).to.be.revertedWithCustomError(lenderVault, 'InvalidEarliestRepay')
+      })
+    })
+
+    it('Should handle swap with protocol fee correctly', async function () {
+      const { borrowerGateway, quoteHandler, lender, team, borrower, usdc, weth, lenderVault } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      await borrowerGateway.connect(team).setProtocolFeeParams([BASE.div(500), BASE.div(100)])
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const buyPricePerCollToken = ONE_USDC.mul(1869)
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: buyPricePerCollToken,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE,
+          tenor: 0
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // check balance pre borrow
+      const borrowerWethBalPre = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPre = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPre = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPre = await usdc.balanceOf(lenderVault.address)
+      const numLoansPre = await lenderVault.totalNumLoans()
+      const lockedAmountsWethPre = await lenderVault.lockedAmounts(weth.address)
+      const lockedAmountsUsdcPre = await lenderVault.lockedAmounts(usdc.address)
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+      const sellAmountOfCollToken = ONE_WETH.mul(499).div(500)
+      const expectedProtocolAndVaultTransferFee = ONE_WETH.div(500)
+      const expectedCompartmentTransferFee = 0
+      const quoteTupleIdx = 0
+      const callbackAddr = ZERO_ADDRESS
+      const callbackData = ZERO_BYTES32
+      const borrowInstructions = {
+        collSendAmount: ONE_WETH,
+        expectedProtocolAndVaultTransferFee,
+        expectedCompartmentTransferFee,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr,
+        callbackData,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions, onChainQuote, quoteTupleIdx)
+      const borrowerWethBalPost = await weth.balanceOf(borrower.address)
+      const borrowerUsdcBalPost = await usdc.balanceOf(borrower.address)
+      const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
+      const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
+      const numLoansPost = await lenderVault.totalNumLoans()
+      const lockedAmountsWethPost = await lenderVault.lockedAmounts(weth.address)
+      const lockedAmountsUsdcPost = await lenderVault.lockedAmounts(usdc.address)
+
+      // check balance post borrow
+      expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(
+        vaultWethBalPost.sub(vaultWethBalPre).add(ONE_WETH.div(500))
+      )
+      expect(vaultWethBalPost.sub(vaultWethBalPre)).to.equal(sellAmountOfCollToken)
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(vaultUsdcBalPre.sub(vaultUsdcBalPost))
+      expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(
+        buyPricePerCollToken.mul(sellAmountOfCollToken).div(ONE_WETH)
+      )
+
+      // check no change in locked amounts
+      expect(lockedAmountsWethPost).to.equal(lockedAmountsWethPre)
+      expect(lockedAmountsWethPost).to.equal(0)
+      expect(lockedAmountsUsdcPost).to.equal(lockedAmountsUsdcPre)
+      expect(lockedAmountsUsdcPost).to.equal(0)
+
+      // check no loan was pushed
+      expect(numLoansPost).to.equal(numLoansPre)
+      expect(numLoansPost).to.equal(0)
+
+      // check no repay possible
+      await expect(
+        borrowerGateway.connect(borrower).repay(
+          {
+            targetLoanId: 0,
+            targetRepayAmount: buyPricePerCollToken,
+            expectedTransferFee: 0,
+            deadline: MAX_UINT256,
+            callbackAddr: callbackAddr,
+            callbackData: callbackData
+          },
+          lenderVault.address
+        )
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
+
+      // check lender can unlock swapped amount (=upfront fee) immediately
+      const userWethBalPreWithdraw = await weth.balanceOf(lender.address)
+      const vaultWethBalPreWithdraw = await weth.balanceOf(lenderVault.address)
+      await lenderVault.connect(lender).withdraw(weth.address, sellAmountOfCollToken)
+      const userWethBalPostWithdraw = await weth.balanceOf(lender.address)
+      const vaultWethBalPostWithdraw = await weth.balanceOf(lenderVault.address)
+      expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(
+        vaultWethBalPreWithdraw.sub(vaultWethBalPostWithdraw)
+      )
+      expect(userWethBalPostWithdraw.sub(userWethBalPreWithdraw)).to.be.equal(sellAmountOfCollToken)
+    })
+
+    it('It should handle potential compartment callback reentrancy on withdraw correctly', async function () {
+      const { quoteHandler, addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } =
+        await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // step 1: lender owner gives regular quote
+      const loanPerCollUnit = ONE_USDC.mul(1000)
+      let quoteTuples1 = [
+        {
+          loanPerCollUnitOrLtv: loanPerCollUnit,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(30)
+        }
+      ]
+      let onChainQuote1 = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: MAX_UINT256,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples1,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // step 2: borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const collSendAmount1 = ONE_WETH
+      const quoteTupleIdx1 = 0
+      const borrowInstructions1 = {
+        collSendAmount: collSendAmount1,
+        expectedProtocolAndVaultTransferFee: 0,
+        expectedCompartmentTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+
+      // step 3: deploy malicious owner callback contract
+      const MaliciousOwnerContract = await ethers.getContractFactory('MaliciousOwnerContract')
+      MaliciousOwnerContract.connect(lender)
+      const maliciousOwnerContract = await MaliciousOwnerContract.deploy()
+      await maliciousOwnerContract.deployed()
+      await weth.connect(lender).mint(lenderVault.address, ONE_WETH) // mint some coll token to vault to process quote
+
+      // step 4: malicious compartment is added to the system
+      const MaliciousCompartment = await ethers.getContractFactory('MaliciousCompartment')
+      MaliciousCompartment.connect(lender)
+      const maliciousCompartment = await MaliciousCompartment.deploy(weth.address, maliciousOwnerContract.address)
+      await maliciousCompartment.deployed()
+      await addressRegistry.connect(team).setWhitelistState([maliciousCompartment.address], 3)
+      await addressRegistry.connect(team).setAllowedTokensForCompartment(maliciousCompartment.address, [usdc.address], true)
+
+      // step 4: lender quotes with malicious compartment
+      const loanPerCollUnit2 = ONE_WETH
+      let quoteTuples2 = [
+        {
+          loanPerCollUnitOrLtv: loanPerCollUnit2,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(30)
+        }
+      ]
+      let onChainQuote2 = {
+        generalQuoteInfo: {
+          collToken: usdc.address,
+          loanToken: weth.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: MAX_UINT256,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: maliciousCompartment.address,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples2,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote2)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // step 5: lender transfers vault ownership to malicious callback contract that gets called on
+      // compartment initialize
+      await lenderVault.connect(lender).transferOwnership(maliciousOwnerContract.address)
+      await maliciousOwnerContract.connect(lender).claimVaultOwnership(lenderVault.address)
+      expect(await lenderVault.owner()).to.be.equal(maliciousOwnerContract.address)
+
+      // step 6: lender consumes own quote with malicious compartment
+      await usdc.connect(lender).mint(lender.address, ONE_USDC)
+      await usdc.connect(lender).approve(borrowerGateway.address, MAX_UINT256)
+      const collSendAmount2 = ONE_USDC
+      const quoteTupleIdx2 = 0
+      const borrowInstructions2 = {
+        collSendAmount: collSendAmount2,
+        expectedProtocolAndVaultTransferFee: 0,
+        expectedCompartmentTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+      await expect(
+        borrowerGateway
+          .connect(lender)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions2, onChainQuote2, quoteTupleIdx2)
+      ).to.be.revertedWithCustomError(lenderVault, 'InsufficientVaultFunds')
+
+      // check locked amounts and balances
+      const vaultLockedWeth = await lenderVault.lockedAmounts(weth.address)
+      const vaultBalWeth = await weth.balanceOf(lenderVault.address)
+      expect(vaultLockedWeth).to.be.lte(vaultBalWeth)
     })
   })
 })
