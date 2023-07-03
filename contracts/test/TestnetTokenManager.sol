@@ -10,6 +10,8 @@ import {Errors} from "../Errors.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
 contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
+    // solhint-disable no-empty-blocks
+
     uint8 internal _decimals;
     address internal _vaultCompartmentVictim;
     address internal _vaultAddr;
@@ -111,6 +113,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
     }
 
     function transferOwnership(address _newOwnerProposal) public override {
+        _checkOwner();
         if (
             _newOwnerProposal == address(0) ||
             _newOwnerProposal == address(this) ||
@@ -119,7 +122,7 @@ contract TestnetTokenManager is ERC20, Ownable2Step, IMysoTokenManager {
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        super.transferOwnership(_newOwnerProposal);
+        super._transferOwnership(_newOwnerProposal);
     }
 
     function decimals() public view override returns (uint8) {

@@ -41,7 +41,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     address[] internal _registeredVaults;
 
     constructor() {
-        _transferOwnership(msg.sender);
+        super._transferOwnership(msg.sender);
     }
 
     function initialize(
@@ -73,7 +73,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         address[] calldata addrs,
         DataTypesPeerToPeer.WhitelistState state
     ) external {
-        _checkSenderAndIsInitialized();
+        _checkIsInitialized();
+        _checkOwner();
         uint256 addrsLen = addrs.length;
         if (addrsLen < 1) {
             revert Errors.InvalidArrayLength();
@@ -135,7 +136,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         address[] calldata tokens,
         bool allowTokensForCompartment
     ) external {
-        _checkSenderAndIsInitialized();
+        _checkIsInitialized();
+        _checkOwner();
         // check that tokens can only be whitelisted for valid compartment (whereas de-whitelisting is always possible)
         if (
             allowTokensForCompartment &&
@@ -173,6 +175,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     }
 
     function addLenderVault(address addr) external returns (uint256) {
+        _checkIsInitialized();
         // catches case where address registry is uninitialized (lenderVaultFactory == address(0))
         if (msg.sender != lenderVaultFactory) {
             revert Errors.InvalidSender();
@@ -348,15 +351,19 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         return _registeredVaults.length;
     }
 
-    function transferOwnership(address _newOwnerProposal) public override {
+    function transferOwnership(
+        address _newOwnerProposal
+    ) public override(Ownable2Step, IAddressRegistry) {
+        _checkIsInitialized();
         if (
-            _newOwnerProposal == address(0) ||
             _newOwnerProposal == address(this) ||
             _newOwnerProposal == pendingOwner() ||
             _newOwnerProposal == owner()
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
+        // @dev: access control via super.transferOwnership()
+        // as well as _newOwnerProposal check against address(0)
         super.transferOwnership(_newOwnerProposal);
     }
 
@@ -367,6 +374,15 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         returns (address)
     {
         return super.owner();
+    }
+
+    function pendingOwner()
+        public
+        view
+        override(Ownable2Step, IAddressRegistry)
+        returns (address)
+    {
+        return super.pendingOwner();
     }
 
     function isWhitelistedERC20(address token) public view returns (bool) {
@@ -380,6 +396,10 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             DataTypesPeerToPeer
                 .WhitelistState
                 .ERC20_TOKEN_REQUIRING_COMPARTMENT;
+    }
+
+    function renounceOwnership() public pure override {
+        revert Errors.Disabled();
     }
 
     function _updateSingletonAddr(
@@ -430,8 +450,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         }
     }
 
-    function _checkSenderAndIsInitialized() internal view {
-        _checkOwner();
+    function _checkIsInitialized() internal view {
         if (_getInitializedVersion() == 0) {
             revert Errors.Uninitialized();
         }

@@ -93,7 +93,15 @@ const getForkingConfig = () => {
 export const HARDHAT_CHAIN_ID_AND_FORKING_CONFIG = getForkingConfig()
 
 const config: HardhatUserConfig = {
-  solidity: '0.8.19',
+  solidity: {
+    version: '0.8.19',
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000
+      }
+    }
+  },
   networks: {
     hardhat: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG
   },

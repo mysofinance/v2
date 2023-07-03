@@ -263,19 +263,13 @@ describe('Peer-to-Peer: Local Tests', function () {
     const erc20Wrapper = await ERC20Wrapper.connect(team).deploy(addressRegistry.address, wrappedERC20Impl.address)
     await erc20Wrapper.deployed()
 
-    // reverts if user tries to create vault before initialized because address registry doesn't have lender vault factory set yet
+    // reverts if user tries to create vault before address registry has been initialized (otherwise couldn't keep track of registered vaults)
     await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(
-      addressRegistry,
-      'InvalidSender'
-    )
-
-    // reverts if trying to set whitelist state to tokens (=1) before address registry is initialized
-    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 1)).to.be.revertedWithCustomError(
       addressRegistry,
       'Uninitialized'
     )
 
-    // initialize address registry
+    // check reverts on invalid initialization
     await expect(
       addressRegistry.connect(lender).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
     ).to.be.revertedWith('Ownable: caller is not the owner')
@@ -299,13 +293,40 @@ describe('Peer-to-Peer: Local Tests', function () {
     await expect(
       addressRegistry.connect(team).initialize(lenderVaultFactory.address, quoteHandler.address, quoteHandler.address)
     ).to.be.revertedWithCustomError(addressRegistry, 'DuplicateAddresses')
+
+    // reverts if trying to set whitelist state to tokens (=1) before address registry is initialized
+    await expect(addressRegistry.connect(team).setWhitelistState([team.address], 1)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'Uninitialized'
+    )
+
+    // valid initialization
     await addressRegistry.connect(team).initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
+
+    // check revert when trying to initialize again
     await expect(
       addressRegistry.connect(team).initialize(team.address, borrower.address, lender.address)
     ).to.be.revertedWith('Initializable: contract is already initialized')
     await expect(
       addressRegistry.connect(lender).initialize(team.address, borrower.address, lender.address)
     ).to.be.revertedWith('Initializable: contract is already initialized')
+
+    // reverts if trying to set whitelist state while uninitialized
+    await expect(addressRegistry.connect(team).setWhitelistState([], 1)).to.be.revertedWithCustomError(
+      addressRegistry,
+      'InvalidArrayLength'
+    )
+
+    // check revert when trying to set singleton address (wrappers and myso token manager) with array length > 1
+    await expect(
+      addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address, team.address], 7)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+    await expect(
+      addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address, team.address], 8)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
+    await expect(
+      addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address, team.address], 9)
+    ).to.be.revertedWithCustomError(addressRegistry, 'InvalidArrayLength')
 
     // test erc721 wrapper whitelisting
     let whitelistState
@@ -447,7 +468,11 @@ describe('Peer-to-Peer: Local Tests', function () {
     /* ********************************** */
 
     // create a vault
+    const numVaultsPre = await addressRegistry.numRegisteredVaults()
+    expect(numVaultsPre).to.be.equal(0)
     await lenderVaultFactory.connect(lender).createVault()
+    const numVaultsPost = await addressRegistry.numRegisteredVaults()
+    expect(numVaultsPost).to.be.equal(1)
     const lenderVaultAddrs = await addressRegistry.registeredVaults()
     const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
@@ -528,8 +553,8 @@ describe('Peer-to-Peer: Local Tests', function () {
   }
 
   describe('Address Registry', function () {
-    it('Should handle borrower whitelist correctly', async function () {
-      const { addressRegistry, team, lender, borrower, whitelistAuthority } = await setupTest()
+    it('Should handle borrower whitelist correctly (1/2)', async function () {
+      const { addressRegistry, team, borrower, whitelistAuthority } = await setupTest()
 
       // define whitelistedUntil
       let blocknum = await ethers.provider.getBlockNumber()
@@ -637,11 +662,146 @@ describe('Peer-to-Peer: Local Tests', function () {
       await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([borrower.address], MAX_UINT256)
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
     })
+
+    it('Should handle borrower whitelist correctly (2/2', async function () {
+      const { addressRegistry, whitelistAuthority, lender } = await setupTest()
+      // should revert when trying to update lender whitelist with empty array
+      await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([], 1)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidArrayLength'
+      )
+
+      // valid whitelisting
+      await addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([lender.address], 1)
+
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      const whitelistedUntil = timestamp + 10
+
+      // construct payload and signature
+      const payload = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [
+          addressRegistry.address,
+          lender.address,
+          whitelistedUntil,
+          HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+          ZERO_BYTES32
+        ]
+      )
+      const payloadHash = ethers.utils.keccak256(payload)
+      const signature = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash))
+      const sig = ethers.utils.splitSignature(signature)
+      const compactSig = sig.compact
+      const recoveredAddr = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash), sig)
+      expect(recoveredAddr).to.equal(whitelistAuthority.address)
+
+      // claim whitelist status
+      await addressRegistry
+        .connect(lender)
+        .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, ZERO_BYTES32)
+
+      // should revert when trying to update lender whitelist with same value
+      await expect(
+        addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([lender.address], whitelistedUntil)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+
+      // should revert when trying to update lender whitelist with zero address
+      await expect(
+        addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([ZERO_ADDRESS], whitelistedUntil)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+
+      // construct 2nd payload with outdated "whitelisted until" and sign
+      const outdatedWhitelistedUntil = whitelistedUntil - 1
+      const payload2 = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256', 'bytes32'],
+        [
+          addressRegistry.address,
+          lender.address,
+          outdatedWhitelistedUntil,
+          HARDHAT_CHAIN_ID_AND_FORKING_CONFIG.chainId,
+          ZERO_BYTES32
+        ]
+      )
+      const payloadHash2 = ethers.utils.keccak256(payload2)
+      const signature2 = await whitelistAuthority.signMessage(ethers.utils.arrayify(payloadHash2))
+      const sig2 = ethers.utils.splitSignature(signature2)
+      const compactSig2 = sig2.compact
+      const recoveredAddr2 = ethers.utils.verifyMessage(ethers.utils.arrayify(payloadHash2), sig2)
+      expect(recoveredAddr2).to.equal(whitelistAuthority.address)
+
+      // should revert when trying to update lender whitelist with same value
+      await expect(
+        addressRegistry
+          .connect(lender)
+          .claimBorrowerWhitelistStatus(whitelistAuthority.address, outdatedWhitelistedUntil, compactSig2, ZERO_BYTES32)
+      ).to.be.revertedWithCustomError(addressRegistry, 'CannotClaimOutdatedStatus')
+    })
+
+    it('Should handle ownership transfers correctly', async function () {
+      const { addressRegistry, team, lender, borrower } = await setupTest()
+      const currOwner = await addressRegistry.owner()
+      expect(currOwner).to.be.equal(team.address)
+      expect(await addressRegistry.pendingOwner()).to.be.equal(ZERO_ADDRESS)
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+      await expect(addressRegistry.connect(lender).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+
+      // check revert on invalid new owner proposals
+      await expect(addressRegistry.connect(team).transferOwnership(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(addressRegistry.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(team.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // propose valid new owner
+      await addressRegistry.connect(team).transferOwnership(lender.address)
+      const newOwnerProposal = await addressRegistry.pendingOwner()
+      expect(newOwnerProposal).to.be.equal(lender.address)
+
+      // check revert when trying to propose already currently pending new owner
+      await expect(addressRegistry.connect(team).transferOwnership(lender.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).acceptOwnership()).to.be.revertedWith(
+        'Ownable2Step: caller is not the new owner'
+      )
+
+      // claim ownership
+      await addressRegistry.connect(lender).acceptOwnership()
+      const newOwner = await addressRegistry.owner()
+      expect(newOwner).to.be.equal(lender.address)
+
+      // check renouncing ownership is disabled
+      await expect(addressRegistry.connect(newOwner).renounceOwnership()).to.be.revertedWithCustomError(
+        addressRegistry,
+        'Disabled'
+      )
+    })
   })
 
   describe('Lender Vault', function () {
-    it('Should handle ownership transfer correctly', async function () {
-      const { lender, team, borrower, lenderVault } = await setupTest()
+    it('Should handle ownership transfers correctly', async function () {
+      const { lender, team, lenderVault, signer } = await setupTest()
+
+      const currOwner = await lenderVault.owner()
+      expect(currOwner).to.be.equal(lender.address)
+      expect(await lenderVault.pendingOwner()).to.be.equal(ZERO_ADDRESS)
 
       // check that only owner can propose new owner
       await expect(lenderVault.connect(team).transferOwnership(team.address)).to.be.revertedWith(
@@ -660,11 +820,17 @@ describe('Peer-to-Peer: Local Tests', function () {
         'InvalidNewOwnerProposal'
       )
 
+      // check that new owner can't be current owner
+      await expect(lenderVault.connect(lender).transferOwnership(currOwner)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidNewOwnerProposal'
+      )
+
       // add signer
-      await lenderVault.connect(lender).addSigners([borrower.address])
+      await lenderVault.connect(lender).addSigners([signer.address])
 
       // check that new owner can't be a signer
-      await expect(lenderVault.connect(lender).transferOwnership(borrower.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).transferOwnership(signer.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidNewOwnerProposal'
       )
@@ -683,10 +849,71 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // claim ownership
       await expect(lenderVault.connect(team).acceptOwnership()).to.emit(lenderVault, 'OwnershipTransferred')
+      const newOwner = await lenderVault.owner()
+      expect(newOwner).to.be.equal(team.address)
 
       // check that old owner can't propose new owner anymore
-      await expect(lenderVault.connect(lender).transferOwnership(borrower.address)).to.be.revertedWith(
+      await expect(lenderVault.connect(lender).transferOwnership(lender.address)).to.be.revertedWith(
         'Ownable: caller is not the owner'
+      )
+
+      // check renouncing ownership is disabled
+      await expect(lenderVault.connect(lender).renounceOwnership()).to.be.revertedWithCustomError(lenderVault, 'Disabled')
+    })
+
+    it('Should handle address registry ownership transferrals correctly', async function () {
+      const { addressRegistry, team, lender, borrower } = await setupTest()
+      const currOwner = await addressRegistry.owner()
+      expect(currOwner).to.be.equal(team.address)
+      expect(await addressRegistry.pendingOwner()).to.be.equal(ZERO_ADDRESS)
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+      await expect(addressRegistry.connect(lender).transferOwnership(borrower.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+
+      // check revert on invalid new owner proposals
+      await expect(addressRegistry.connect(team).transferOwnership(ZERO_ADDRESS)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(addressRegistry.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+      await expect(addressRegistry.connect(team).transferOwnership(team.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // propose valid new owner
+      await addressRegistry.connect(team).transferOwnership(lender.address)
+      const newOwnerProposal = await addressRegistry.pendingOwner()
+      expect(newOwnerProposal).to.be.equal(lender.address)
+
+      // check revert when trying to propose already currently pending new owner
+      await expect(addressRegistry.connect(team).transferOwnership(lender.address)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'InvalidNewOwnerProposal'
+      )
+
+      // revert if unauthorized party tries to claim ownership
+      await expect(addressRegistry.connect(borrower).acceptOwnership()).to.be.revertedWith(
+        'Ownable2Step: caller is not the new owner'
+      )
+
+      // claim ownership
+      await addressRegistry.connect(lender).acceptOwnership()
+      const newOwner = await addressRegistry.owner()
+      expect(newOwner).to.be.equal(lender.address)
+
+      // check renouncing ownership is disabled
+      await expect(addressRegistry.connect(newOwner).renounceOwnership()).to.be.revertedWithCustomError(
+        addressRegistry,
+        'Disabled'
       )
     })
 
@@ -787,7 +1014,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         circuitBreaker,
         usdc,
         weth,
-        lenderVault
+        lenderVault,
+        signer
       } = await setupTest()
 
       let depositAmount
@@ -937,6 +1165,13 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // should revert when trying to set invalid reverse circuit breaker address
       await expect(lenderVault.connect(lender).setReverseCircuitBreaker(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // should revert when trying to set invalid reverse circuit breaker address
+      await lenderVault.addSigners([signer.address])
+      await expect(lenderVault.connect(lender).setReverseCircuitBreaker(signer.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidAddress'
       )
@@ -1400,6 +1635,9 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler,
         lender,
         signer,
+        signer1,
+        signer2,
+        signer3,
         borrower,
         team,
         whitelistAuthority,
@@ -1422,26 +1660,44 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(minNumSigners).to.be.equal(4)
       await lenderVault.connect(lender).setMinNumOfSigners(1)
       await expect(lenderVault.addSigners([lender.address])).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
-      await lenderVault.connect(lender).addSigners([team.address, borrower.address])
+      await lenderVault
+        .connect(lender)
+        .addSigners([signer.address, signer1.address, signer2.address, signer3.address, team.address, borrower.address])
       // errors in handling signers
-      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).addSigners([borrower.address])).to.be.revertedWithCustomError(
+        lenderVault,
+        'AlreadySigner'
+      )
+
+      // reverts when trying to remove with signer idx that is out-of-bounds
+      let numSigners = Number((await lenderVault.numSigners()).toString())
+      await expect(lenderVault.connect(lender).removeSigner(borrower.address, numSigners)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidArrayIndex'
       )
-      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 2)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidArrayIndex'
-      )
+
+      // reverts when trying to remove unknown signer address
       await expect(lenderVault.connect(lender).removeSigner(weth.address, 0)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidSignerRemoveInfo'
       )
-      await expect(lenderVault.connect(lender).removeSigner(borrower.address, 0)).to.be.revertedWithCustomError(
+
+      // reverts when trying to remove signer but with non-matching idx
+      const signerAddr = await lenderVault.signers(0)
+      await expect(lenderVault.connect(lender).removeSigner(signerAddr, 1)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidSignerRemoveInfo'
       )
+
       // valid remove
-      await lenderVault.connect(lender).removeSigner(borrower.address, 1)
+      await lenderVault.connect(lender).removeSigner(signerAddr, 0)
+
+      // remove all signers (always remove last one to test edge case handling)
+      numSigners = Number((await lenderVault.numSigners()).toString())
+      for (let i = 0; i < numSigners; i++) {
+        const lastSignerAddr = await lenderVault.signers(numSigners - i - 1)
+        await lenderVault.connect(lender).removeSigner(lastSignerAddr, numSigners - i - 1)
+      }
 
       // set borrower whitelist
       const blocknum = await ethers.provider.getBlockNumber()
@@ -2913,6 +3169,13 @@ describe('Peer-to-Peer: Local Tests', function () {
         .connect(team)
         .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
 
+      // should revert when trying to set same state again
+      await expect(
+        addressRegistry
+          .connect(team)
+          .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, [weth.address], true)
+      ).to.be.revertedWithCustomError(addressRegistry, 'InvalidUpdate')
+
       // add new valid onchain quote with compartment
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
@@ -3004,6 +3267,15 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // set token wrapper contract in address registry
       await addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
+
+      // should revert when trying to set same state again
+      await expect(
+        addressRegistry.connect(team).setWhitelistState([erc721Wrapper.address], 7)
+      ).to.be.revertedWithCustomError(addressRegistry, 'StateAlreadySet')
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 7)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
 
       // should revert if token is not whitelisted
       await expect(
@@ -4293,6 +4565,28 @@ describe('Peer-to-Peer: Local Tests', function () {
         onChainQuote.generalQuoteInfo.earliestRepayTenor = 0
         onChainQuote.quoteTuples[0].upfrontFeePctInBase = BASE
         onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation = ZERO_ADDRESS
+
+        // should revert with on chain quote that has min or max loan limit of zero
+        onChainQuote.generalQuoteInfo.minLoan = ethers.BigNumber.from(0)
+        onChainQuote.generalQuoteInfo.maxLoan = ethers.BigNumber.from(0)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+        onChainQuote.generalQuoteInfo.maxLoan = MAX_UINT256
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+        onChainQuote.generalQuoteInfo.minLoan = ONE_USDC.mul(1000)
+        onChainQuote.generalQuoteInfo.maxLoan = ethers.BigNumber.from(0)
+        await expect(
+          quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+        ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+        // reset to be valid min loan (and max loan)
+        onChainQuote.generalQuoteInfo.minLoan = ONE_USDC.mul(1000)
+        onChainQuote.generalQuoteInfo.maxLoan = MAX_UINT256
+
+        // add valid on chain quote
         await quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
         await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
         const sellAmountOfCollToken = ONE_WETH
