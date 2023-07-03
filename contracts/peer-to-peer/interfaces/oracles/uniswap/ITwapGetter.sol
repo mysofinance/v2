@@ -21,12 +21,12 @@ interface ITwapGetter {
      * @dev returns the sqrt twap for the given uniswap v3 pool
      * @param uniswapV3Pool Address of the Uniswap V3 Pool
      * @param twapInterval Time interval for the twap
-     * @return sqrtTwaoPriceX96 The sqrt twap for the given uniswap v3 pool
+     * @return sqrtTwapPriceX96 The sqrt twap for the given uniswap v3 pool
      */
     function getSqrtTwapX96(
         address uniswapV3Pool,
         uint32 twapInterval
-    ) external view returns (uint160 sqrtTwaoPriceX96);
+    ) external view returns (uint160 sqrtTwapPriceX96);
 
     /**
      * @dev returns the priceX96 for the given sqrtPriceX96
