@@ -622,12 +622,17 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     )
 
     // check repay
-    const loan = await lenderVault.loan(0)
+    const loanId = 0
+    const loan = await lenderVault.loan(loanId)
     const minSwapReceiveLoanToken = 0
     const callbackDataRepay = ethers.utils.defaultAbiCoder.encode(
       ['uint256', 'uint256', 'uint24'],
       [minSwapReceiveLoanToken, deadline, poolFee]
     )
+
+    // borrower approves borrower gateway for repay
+    await usdc.connect(borrower).approve(borrowerGateway.address, loan.initRepayAmount)
+
     await expect(
       borrowerGateway.connect(borrower).repay(
         {
@@ -636,11 +641,13 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
           expectedTransferFee: 0,
           deadline: MAX_UINT256,
           callbackAddr: callbackAddr,
-          callbackData: callbackData
+          callbackData: callbackDataRepay
         },
         lenderVault.address
       )
     )
+      .to.emit(borrowerGateway, 'Repaid')
+      .withArgs(lenderVault.address, loanId, loan.initRepayAmount)
   })
 
   it('Should revert GLP borrow with compartment and univ3 looping because of missing pool', async function () {

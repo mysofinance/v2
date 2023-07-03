@@ -94,7 +94,6 @@ library Errors {
     error TransferToWrappedTokenFailed();
     error TransferFromWrappedTokenFailed();
     error StateAlreadySet();
-    error IOUCannotBeRedeemedOnChain();
     error ReclaimableCollateralAmountZero();
     error InvalidSwap();
     error InvalidUpfrontFee();

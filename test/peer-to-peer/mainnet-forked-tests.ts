@@ -2103,7 +2103,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
 
       // check repay callback reverts when called by anyone else than borrower gateway
-      const loan = await lenderVault.loan(0)
+      const loanId = 0
+      const loan = await lenderVault.loan(loanId)
       await expect(uniV3Looping.connect(borrower).repayCallback(loan, callbackData)).to.be.revertedWithCustomError(
         uniV3Looping,
         'InvalidSender'
@@ -2119,6 +2120,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['uint256', 'uint256', 'uint24'],
         [minSwapReceiveLoanToken, deadline, poolFee]
       )
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, loan.initRepayAmount)
+
       await expect(
         borrowerGateway.connect(borrower).repay(
           {
@@ -2127,11 +2132,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             expectedTransferFee: 0,
             deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
-            callbackData: callbackData
+            callbackData: callbackDataRepay
           },
           lenderVault.address
         )
       )
+        .to.emit(borrowerGateway, 'Repaid')
+        .withArgs(lenderVault.address, loanId, loan.initRepayAmount)
 
       // post callback allowances
       postWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
