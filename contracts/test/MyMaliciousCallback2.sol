@@ -3,7 +3,6 @@
 pragma solidity 0.8.19;
 
 contract MyMaliciousCallback2 {
-    // solhint-disable avoid-low-level-calls no-inline-assembly no-empty-blocks
     address internal _vaultVictim;
     address internal _withdrawToken;
     uint256 internal _withdrawAmount;
@@ -20,6 +19,7 @@ contract MyMaliciousCallback2 {
 
     function balanceOf(address) external returns (uint256) {
         // Try hijacking control flow by calling back into vault and trying to withdraw again
+        // solhint-disable avoid-low-level-calls
         (bool success, bytes memory result) = _vaultVictim.call(
             abi.encodeWithSignature(
                 "withdraw(address,uint256)",
@@ -33,6 +33,7 @@ contract MyMaliciousCallback2 {
          * NOT on balance of vault, hence the vault balance wouldn't be at risk
          */
         if (!success) {
+            // solhint-disable no-inline-assembly
             assembly {
                 revert(add(result, 32), mload(result))
             }
@@ -40,5 +41,6 @@ contract MyMaliciousCallback2 {
         return 0;
     }
 
+    // solhint-disable no-empty-blocks
     function transfer(address, uint256) external returns (bool) {}
 }

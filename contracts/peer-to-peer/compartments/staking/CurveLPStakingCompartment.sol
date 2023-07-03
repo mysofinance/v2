@@ -13,8 +13,6 @@ import {BaseCompartment} from "../BaseCompartment.sol";
 import {Errors} from "../../../Errors.sol";
 
 contract CurveLPStakingCompartment is BaseCompartment {
-    // solhint-disable no-empty-blocks
-
     using SafeERC20 for IERC20;
 
     address public liqGaugeAddr;
@@ -164,6 +162,7 @@ contract CurveLPStakingCompartment is BaseCompartment {
                     withdrawAmount,
                     true
                 )
+            // solhint-disable no-empty-blocks
             {
                 // version 3, 4, or 5 gauge
             } catch {

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-/* solhint-disable no-empty-blocks var-name-mixedcase */
 
 pragma solidity 0.8.19;
 
@@ -10,6 +9,7 @@ import {Errors} from "../../../Errors.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 contract ChainlinkBasic is ChainlinkBase {
+    // solhint-disable var-name-mixedcase
     address public immutable BASE_CURRENCY;
 
     constructor(
