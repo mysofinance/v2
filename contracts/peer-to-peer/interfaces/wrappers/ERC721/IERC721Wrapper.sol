@@ -42,7 +42,14 @@ interface IERC721Wrapper {
      * @notice Returns array of tokens created
      * @return array of tokens created
      */
-    function tokensCreated() external view returns (address[] memory);
+    function allTokensCreated() external view returns (address[] memory);
+
+    /**
+     * @notice Returns the address of a token created by index
+     * @param idx the index of the token
+     * @return address of the token created
+     */
+    function tokensCreated(uint256 idx) external view returns (address);
 
     /**
      * @notice Returns number of tokens created
