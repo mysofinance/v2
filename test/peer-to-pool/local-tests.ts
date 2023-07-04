@@ -439,7 +439,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     ).to.be.revertedWithCustomError(loanProposal, 'InvalidGracePeriod')
   })
 
-  it('Should handle loan proposals correctly', async function () {
+  it('Should handle loan proposals correctly (1/2)', async function () {
     const { fundingPool, factory, usdc, daoToken, arranger, team, lender1 } = await setupTest()
 
     // arranger creates loan proposal
@@ -659,6 +659,72 @@ describe('Peer-to-Pool: Local Tests', function () {
     // should not revert if same min and max loan amount
     loanTerms.maxTotalSubscriptions = loanTerms.minTotalSubscriptions
     await loanProposal.connect(arranger).proposeLoanTerms(loanTerms)
+  })
+
+  it('Should handle loan proposals correctly (2/2)', async function () {
+    const { fundingPool, factory, daoToken, arranger } = await setupTest()
+
+    // test scenario with overlapping due dates
+    //
+    // conversion grace period = 1 day
+    // repayment grace period = 29 days
+    // time between due dates = 7 days
+    //
+    // first due date = 0
+    // first conversion period = [0, 1 day)
+    // first repayment period = [1 day, 30 days)
+    //
+    // second due date = 7 days
+    // second conversion period = [7 days, 8 days)
+    // second repayment period = [8 days, 37 days)
+
+    // arranger creates loan proposal
+    const conversionGracePeriod = ONE_DAY
+    const repaymentGracePeriod = ONE_DAY.mul(29)
+    await factory
+      .connect(arranger)
+      .createLoanProposal(
+        fundingPool.address,
+        daoToken.address,
+        ADDRESS_ZERO,
+        REL_ARRANGER_FEE,
+        UNSUBSCRIBE_GRACE_PERIOD,
+        conversionGracePeriod,
+        repaymentGracePeriod
+      )
+    const loanProposalAddr = await factory.loanProposals(0)
+    const LoanProposalImpl = await ethers.getContractFactory('LoanProposalImpl')
+    const loanProposal = await LoanProposalImpl.attach(loanProposalAddr)
+
+    // get current time for due date calculation
+    const blocknum = await ethers.provider.getBlockNumber()
+    const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+
+    // set basic loan terms
+    let loanTerms = getLoanTermsTemplate()
+    loanTerms.minTotalSubscriptions = ONE_USDC
+    loanTerms.maxTotalSubscriptions = ONE_USDC.mul(2)
+
+    // 1st repayment entry
+    const firstDueDate = ethers.BigNumber.from(timestamp)
+      .add(UNSUBSCRIBE_GRACE_PERIOD)
+      .add(LOAN_EXECUTION_GRACE_PERIOD)
+      .add(MIN_TIME_UNTIL_FIRST_DUE_DATE)
+      .add(15)
+    const firstRepaymentScheduleEntry = getRepaymentScheduleEntry(BASE, ONE_WETH, firstDueDate)
+
+    // 2nd repayment entry
+    const secondDueDate = firstDueDate.add(ONE_DAY.mul(7))
+    const secondRepaymentScheduleEntry = getRepaymentScheduleEntry(BASE, ONE_WETH, secondDueDate)
+
+    // check overlapping loan terms (due to long repayment grace period) reverts
+    const repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
+    loanTerms.repaymentSchedule = repaymentSchedule
+    // revert on too close first due date
+    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+      loanProposal,
+      'InvalidDueDates'
+    )
   })
 
   it('Should handle loan term subscriptions and locking correctly', async function () {

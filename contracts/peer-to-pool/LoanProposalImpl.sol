@@ -609,6 +609,13 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.FirstDueDateTooCloseOrPassed();
         }
+        // @dev: the minimum time required between due dates is
+        // max{ MIN_TIME_BETWEEN_DUE_DATES, conversion + repayment grace period }
+        uint256 minTimeBetweenDueDates = _getConversionAndRepaymentGracePeriod();
+        minTimeBetweenDueDates = minTimeBetweenDueDates >
+            Constants.MIN_TIME_BETWEEN_DUE_DATES
+            ? minTimeBetweenDueDates
+            : Constants.MIN_TIME_BETWEEN_DUE_DATES;
         for (uint256 i; i < repaymentScheduleLen; ) {
             if (
                 SafeCast.toUint128(
@@ -621,8 +628,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             if (
                 i > 0 &&
                 repaymentSchedule[i].dueTimestamp <
-                repaymentSchedule[i - 1].dueTimestamp +
-                    Constants.MIN_TIME_BETWEEN_DUE_DATES
+                repaymentSchedule[i - 1].dueTimestamp + minTimeBetweenDueDates
             ) {
                 revert Errors.InvalidDueDates();
             }
@@ -637,8 +643,16 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     ) internal view returns (uint256 repaymentCutoffTime) {
         repaymentCutoffTime =
             _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-            staticData.conversionGracePeriod +
-            staticData.repaymentGracePeriod;
+            _getConversionAndRepaymentGracePeriod();
+    }
+
+    function _getConversionAndRepaymentGracePeriod()
+        internal
+        view
+        returns (uint256)
+    {
+        return
+            staticData.conversionGracePeriod + staticData.repaymentGracePeriod;
     }
 
     function _checkIsAuthorizedSender(address authorizedSender) internal view {
