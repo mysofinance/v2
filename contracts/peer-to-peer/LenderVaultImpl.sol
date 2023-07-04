@@ -223,7 +223,6 @@ contract LenderVaultImpl is
             }
             _loan.initRepayAmount = SafeCast.toUint128(repayAmount);
             _loans.push(_loan);
-            transferInstructions.isLoan = true;
         } else {
             // note: only case left is upfrontFee = 100% and this corresponds to an outright swap;
             // check that tenor is zero and earliest repay is nonzero, and compartment is zero, with no compartment transfer fee
