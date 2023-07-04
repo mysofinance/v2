@@ -3415,6 +3415,12 @@ describe('Peer-to-Peer: Local Tests', function () {
         'ERC20: insufficient allowance'
       )
 
+      // revert when recipient is zero address
+      await expect(wrappedToken.connect(borrower).redeem(borrower.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'InvalidAddress'
+      )
+
       await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)
 
       // check ownership of all NFTs has shifted back to borrower
@@ -4061,6 +4067,11 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // approve 3rd party to redeem
       await wrappedToken.connect(borrower).approve(team.address, totalSupply.div(2))
+
+      // revert when recipient is zero address
+      await expect(
+        wrappedToken.connect(team).redeem(borrower.address, ZERO_ADDRESS, totalSupply.div(2))
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidAddress')
 
       // redeem half the balance
       await wrappedToken.connect(team).redeem(borrower.address, team.address, totalSupply.div(2))
