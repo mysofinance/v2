@@ -3428,8 +3428,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
 
-      const tokensCreated1 = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr1 = tokensCreated1[0]
+      const newWrappedTokenAddr1 = await erc721Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr1)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr1)
 
@@ -3515,8 +3514,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           ZERO_BYTES32
         )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(2)
-      const tokensCreated2 = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr2 = tokensCreated2[1]
+      const newWrappedTokenAddr2 = await erc721Wrapper.tokensCreated(1)
       const wrappedToken2 = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr2)
 
       // approve 3rd party to redeem
@@ -3587,8 +3585,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         ZERO_BYTES32
       )
 
-      const tokensCreated = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr = tokensCreated[0]
+      const newWrappedTokenAddr = await erc721Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
 
@@ -3826,8 +3823,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
 
-      const tokensCreated1 = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr1 = tokensCreated1[0]
+      const newWrappedTokenAddr1 = await erc721Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr1)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr1)
 
@@ -4063,8 +4059,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check new token has been created
       expect(await erc20Wrapper.numTokensCreated()).to.be.equal(1)
 
-      const tokensCreated = await erc20Wrapper.tokensCreated()
-      const newWrappedTokenAddr = tokensCreated[0]
+      const newWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC20Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
       const isIOU = await wrappedToken.isIOU()
@@ -4158,8 +4153,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // check new token has been created
       expect(await erc20Wrapper.numTokensCreated()).to.be.equal(2)
-      const tokensCreated2 = await erc20Wrapper.tokensCreated()
-      const newPlaceholderWrappedTokenAddr = tokensCreated2[1]
+      const newPlaceholderWrappedTokenAddr = await erc20Wrapper.tokensCreated(1)
       const wrappedPlaceholderToken = await ethers.getContractAt('WrappedERC20Impl', newPlaceholderWrappedTokenAddr)
       const whitelistPlaceholderTokenState = await addressRegistry.whitelistState(newPlaceholderWrappedTokenAddr)
 

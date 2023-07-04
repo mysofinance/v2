@@ -19,7 +19,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
     using SafeERC20 for IERC20;
     address public immutable addressRegistry;
     address public immutable wrappedErc20Impl;
-    address[] internal _tokensCreated;
+    address[] public tokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc20Impl) {
         if (_addressRegistry == address(0) || _wrappedErc20Impl == address(0)) {
@@ -45,7 +45,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             revert Errors.InvalidAddress();
         }
         newErc20Addr = Clones.clone(wrappedErc20Impl);
-        _tokensCreated.push(newErc20Addr);
+        tokensCreated.push(newErc20Addr);
 
         // @dev: external call happens before state update due to minTokenAmount determination
         (bool isIOU, uint256 minTokenAmount) = _transferTokens(
@@ -64,17 +64,17 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         emit ERC20WrapperCreated(
             newErc20Addr,
             minter,
-            _tokensCreated.length,
+            tokensCreated.length,
             tokensToBeWrapped
         );
     }
 
-    function tokensCreated() external view returns (address[] memory) {
-        return _tokensCreated;
+    function allTokensCreated() external view returns (address[] memory) {
+        return tokensCreated;
     }
 
     function numTokensCreated() external view returns (uint256) {
-        return _tokensCreated.length;
+        return tokensCreated.length;
     }
 
     function _transferTokens(
