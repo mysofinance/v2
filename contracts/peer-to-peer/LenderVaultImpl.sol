@@ -90,10 +90,8 @@ contract LenderVaultImpl is
                 IBaseCompartment(_loan.collTokenCompartmentAddr)
                     .unlockCollToVault(collToken);
             } else {
-                totalUnlockableColl +=
-                    ((_loan.initRepayAmount - _loan.amountRepaidSoFar) *
-                        _loan.initCollAmount) /
-                    _loan.initRepayAmount;
+                totalUnlockableColl += (_loan.initCollAmount -
+                    _loan.amountReclaimedSoFar);
             }
             _loan.collUnlocked = true;
             unchecked {
