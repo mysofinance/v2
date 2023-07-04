@@ -548,11 +548,72 @@ describe('Peer-to-Peer: Local Tests', function () {
       erc20Wrapper,
       myFirstNFT,
       mySecondNFT,
-      testnetTokenManager
+      testnetTokenManager,
+      addr1,
+      addr2,
+      addr3
     }
   }
 
   describe('Address Registry', function () {
+    it('Should handle singleton state updates correctly', async function () {
+      const { addressRegistry, team, testnetTokenManager, addr1, addr2, addr3 } = await setupTest()
+      // reset testnet token manager
+      await addressRegistry.connect(team).setWhitelistState([testnetTokenManager.address], 0)
+
+      // check that initially all singleton states are zero/not set
+      expect(await addressRegistry.erc721Wrapper()).to.be.equal(ZERO_ADDRESS)
+      expect(await addressRegistry.erc20Wrapper()).to.be.equal(ZERO_ADDRESS)
+      expect(await addressRegistry.mysoTokenManager()).to.be.equal(ZERO_ADDRESS)
+
+      // 1) add ERC721 wrapper (state=7)
+      await addressRegistry.connect(team).setWhitelistState([addr1.address], 7)
+
+      // 2) add ERC20 wrapper (state=8)
+      await addressRegistry.connect(team).setWhitelistState([addr2.address], 8)
+
+      // 3) add testnet token manager (state=9)
+      await addressRegistry.connect(team).setWhitelistState([addr3.address], 9)
+
+      // check revert when trying to overwrite singleton state with other singleton address
+      await expect(addressRegistry.connect(team).setWhitelistState([addr3.address], 7)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([addr2.address], 8)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([addr1.address], 9)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+
+      // check revert when trying to overwrite singleton state with non-singleton address
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 7)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 8)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 9)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+
+      // check that singleton states can be reset/deleted
+      await addressRegistry.connect(team).setWhitelistState([addr1.address], 0)
+      await addressRegistry.connect(team).setWhitelistState([addr2.address], 0)
+      await addressRegistry.connect(team).setWhitelistState([addr3.address], 0)
+
+      // check that singleton states can be set again with different values
+      await addressRegistry.connect(team).setWhitelistState([addr3.address], 7)
+      await addressRegistry.connect(team).setWhitelistState([addr2.address], 8)
+      await addressRegistry.connect(team).setWhitelistState([addr1.address], 9)
+    })
+
     it('Should handle borrower whitelist correctly (1/2)', async function () {
       const { addressRegistry, team, borrower, whitelistAuthority } = await setupTest()
 
