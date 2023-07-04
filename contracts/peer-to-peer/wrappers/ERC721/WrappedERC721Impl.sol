@@ -48,6 +48,9 @@ contract WrappedERC721Impl is
         // mutex is used to prevent entrancy into the sweepTokensLeftAfterRedeem function
         // in case the redeemer/recipient is one of the NFTs being transferred
         _mutex = true;
+        if (recipient == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         if (msg.sender != account) {
             _spendAllowance(account, msg.sender, 1);
         }
