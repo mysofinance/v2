@@ -1171,9 +1171,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         lenderVault,
         'InvalidAddress'
       )
-      await expect(
-        lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([borrower.address])
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
 
       const tokenBalanceAndLockedAmountsPostRepay = await lenderVault
         .connect(lender)

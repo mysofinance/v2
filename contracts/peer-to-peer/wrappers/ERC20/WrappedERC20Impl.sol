@@ -69,8 +69,7 @@ contract WrappedERC20Impl is
         }
         _burn(account, amount);
         if (!isIOU) {
-            uint256 wrappedTokensLen = _wrappedTokens.length;
-            for (uint256 i; i < wrappedTokensLen; ) {
+            for (uint256 i; i < _wrappedTokens.length; ) {
                 address tokenAddr = _wrappedTokens[i].tokenAddr;
                 IERC20(tokenAddr).safeTransfer(
                     recipient,
