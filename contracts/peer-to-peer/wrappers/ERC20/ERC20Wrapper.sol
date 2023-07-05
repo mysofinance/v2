@@ -6,7 +6,6 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {DataTypesPeerToPeer} from "../../../peer-to-peer/DataTypesPeerToPeer.sol";
 import {Errors} from "../../../Errors.sol";
 import {IERC20Wrapper} from "../../interfaces/wrappers/ERC20/IERC20Wrapper.sol";
@@ -70,9 +69,6 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             isIOU ? 10 ** 6 : minTokenAmount,
             name,
             symbol,
-            tokensToBeWrapped.length == 1
-                ? IERC20Metadata(tokensToBeWrapped[0].tokenAddr).decimals()
-                : 6,
             isIOU
         );
         emit ERC20WrapperCreated(

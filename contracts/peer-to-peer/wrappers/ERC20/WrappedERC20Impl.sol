@@ -8,6 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {Errors} from "../../../Errors.sol";
 import {IWrappedERC20Impl} from "../../interfaces/wrappers/ERC20/IWrappedERC20Impl.sol";
@@ -36,7 +37,6 @@ contract WrappedERC20Impl is
         uint256 totalInitialSupply,
         string calldata _name,
         string calldata _symbol,
-        uint8 _decimals,
         bool _isIOU
     ) external initializer {
         for (uint256 i; i < wrappedTokens.length; ) {
@@ -47,7 +47,9 @@ contract WrappedERC20Impl is
         }
         _tokenName = _name;
         _tokenSymbol = _symbol;
-        _tokenDecimals = _decimals;
+        _tokenDecimals = wrappedTokens.length == 1
+            ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
+            : 6;
         isIOU = _isIOU;
         _mint(
             minter,
