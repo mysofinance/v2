@@ -52,13 +52,30 @@ abstract contract ChainlinkBase is IOracle {
         address collToken,
         address loanToken
     ) external view virtual returns (uint256 collTokenPriceInLoanToken) {
-        uint256 priceOfCollToken = _getPriceOfToken(collToken);
-        uint256 priceOfLoanToken = _getPriceOfToken(loanToken);
+        (uint256 priceOfCollToken, uint256 priceOfLoanToken) = getRawPrices(
+            collToken,
+            loanToken
+        );
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         collTokenPriceInLoanToken = Math.mulDiv(
             priceOfCollToken,
             10 ** loanTokenDecimals,
             priceOfLoanToken
+        );
+    }
+
+    function getRawPrices(
+        address collToken,
+        address loanToken
+    )
+        public
+        view
+        virtual
+        returns (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw)
+    {
+        (collTokenPriceRaw, loanTokenPriceRaw) = (
+            _getPriceOfToken(collToken),
+            _getPriceOfToken(loanToken)
         );
     }
 

@@ -496,21 +496,29 @@ contract LenderVaultImpl is
             ) {
                 revert Errors.LtvHigherThanMax();
             }
-            loanPerCollUnit = Math.mulDiv(
-                quoteTuple.loanPerCollUnitOrLtv,
-                IOracle(generalQuoteInfo.oracleAddr).getPrice(
+            (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw) = IOracle(
+                generalQuoteInfo.oracleAddr
+            ).getRawPrices(
                     generalQuoteInfo.collToken,
                     generalQuoteInfo.loanToken
-                ),
-                Constants.BASE
-            );
+                );
+            loanPerCollUnit =
+                Math.mulDiv(
+                    quoteTuple.loanPerCollUnitOrLtv,
+                    collTokenPriceRaw *
+                        10 **
+                            IERC20Metadata(generalQuoteInfo.loanToken)
+                                .decimals(),
+                    loanTokenPriceRaw
+                ) /
+                Constants.BASE;
         }
         uint256 unscaledLoanAmount = loanPerCollUnit * netPledgeAmount;
+        uint256 collTokenDecimals = IERC20Metadata(generalQuoteInfo.collToken)
+            .decimals();
 
         // calculate loan amount
-        loanAmount =
-            unscaledLoanAmount /
-            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        loanAmount = unscaledLoanAmount / (10 ** collTokenDecimals);
 
         // calculate repay amount and interest rate factor only for loans
         if (upfrontFeePctInBase < Constants.BASE) {
@@ -530,7 +538,7 @@ contract LenderVaultImpl is
                     interestRateFactor,
                     Constants.BASE
                 ) /
-                (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+                (10 ** collTokenDecimals);
         }
     }
 
