@@ -720,7 +720,7 @@ describe('Peer-to-Pool: Local Tests', function () {
     const repaymentSchedule = [firstRepaymentScheduleEntry, secondRepaymentScheduleEntry]
     loanTerms.repaymentSchedule = repaymentSchedule
     // revert on too close first due date
-    await expect(loanProposal.connect(arranger).proposeLoanTerms(loanTerms)).to.be.revertedWithCustomError(
+    await expect(loanProposal.connect(arranger).updateLoanTerms(loanTerms)).to.be.revertedWithCustomError(
       loanProposal,
       'InvalidDueDates'
     )
@@ -1833,10 +1833,6 @@ describe('Peer-to-Pool: Local Tests', function () {
     const moveFwdToTime1 = Number(
       loanTermsLockedTime.add(unsubscribeGracePeriod).add(LOAN_EXECUTION_GRACE_PERIOD).toString()
     )
-    console.log('loanTermsLockedTime', loanTermsLockedTime)
-    console.log('unsubscribeGracePeriod', unsubscribeGracePeriod)
-    console.log('LOAN_EXECUTION_GRACE_PERIOD', LOAN_EXECUTION_GRACE_PERIOD)
-    console.log('moveFwdToTime1', moveFwdToTime1)
 
     await ethers.provider.send('evm_mine', [moveFwdToTime1])
 

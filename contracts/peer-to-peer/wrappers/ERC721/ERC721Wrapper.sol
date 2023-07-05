@@ -103,11 +103,9 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
                 revert Errors.InvalidArrayLength();
             }
             if (
-                addressRegistry != address(0) &&
                 IAddressRegistry(addressRegistry).whitelistState(
                     tokensToBeWrapped[i].tokenAddr
-                ) !=
-                DataTypesPeerToPeer.WhitelistState.ERC721_TOKEN
+                ) != DataTypesPeerToPeer.WhitelistState.ERC721_TOKEN
             ) {
                 revert Errors.NonWhitelistedToken();
             }

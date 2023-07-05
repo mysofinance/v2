@@ -13,4 +13,18 @@ interface IOracle {
         address collToken,
         address loanToken
     ) external view returns (uint256 collTokenPriceInLoanToken);
+
+    /**
+     * @notice function checks oracle validity and retrieves prices in base currency unit
+     * @param collToken address of coll token
+     * @param loanToken address of loan token
+     * @return collTokenPriceRaw and loanTokenPriceRaw denominated in base currency unit
+     */
+    function getRawPrices(
+        address collToken,
+        address loanToken
+    )
+        external
+        view
+        returns (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw);
 }

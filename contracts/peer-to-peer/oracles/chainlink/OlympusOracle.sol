@@ -35,8 +35,10 @@ contract OlympusOracle is ChainlinkBasic {
         if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {
             revert Errors.NeitherTokenIsGOHM();
         }
-        uint256 priceOfCollToken = _getPriceOfToken(collToken);
-        uint256 priceOfLoanToken = _getPriceOfToken(loanToken);
+        (uint256 priceOfCollToken, uint256 priceOfLoanToken) = (
+            _getPriceOfToken(collToken),
+            _getPriceOfToken(loanToken)
+        );
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
         uint256 index = IOlympus(GOHM_ADDR).index();
 
@@ -51,5 +53,37 @@ contract OlympusOracle is ChainlinkBasic {
                 (10 ** loanTokenDecimals) * (10 ** SOHM_DECIMALS),
                 priceOfLoanToken * index
             );
+    }
+
+    function getRawPrices(
+        address collToken,
+        address loanToken
+    )
+        public
+        view
+        override
+        returns (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw)
+    {
+        if (collToken != GOHM_ADDR && loanToken != GOHM_ADDR) {
+            revert Errors.NeitherTokenIsGOHM();
+        }
+        uint256 index = IOlympus(GOHM_ADDR).index();
+        (collTokenPriceRaw, loanTokenPriceRaw) = (
+            _getPriceOfToken(collToken),
+            _getPriceOfToken(loanToken)
+        );
+        if (collToken == GOHM_ADDR) {
+            collTokenPriceRaw = Math.mulDiv(
+                collTokenPriceRaw,
+                index,
+                10 ** SOHM_DECIMALS
+            );
+        } else {
+            loanTokenPriceRaw = Math.mulDiv(
+                loanTokenPriceRaw,
+                index,
+                10 ** SOHM_DECIMALS
+            );
+        }
     }
 }

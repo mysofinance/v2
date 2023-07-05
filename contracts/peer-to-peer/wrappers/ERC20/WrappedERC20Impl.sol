@@ -74,8 +74,7 @@ contract WrappedERC20Impl is
         }
         _burn(account, amount);
         if (!isIOU) {
-            uint256 wrappedTokensLen = _wrappedTokens.length;
-            for (uint256 i; i < wrappedTokensLen; ) {
+            for (uint256 i; i < _wrappedTokens.length; ) {
                 address tokenAddr = _wrappedTokens[i].tokenAddr;
                 // @dev: this is not caught and will revert if the even one token has wrapper blacklisted
                 // therefore minters in this wrapper need to weigh the risk of this happening and hence tokens

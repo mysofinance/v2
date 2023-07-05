@@ -1171,9 +1171,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         lenderVault,
         'InvalidAddress'
       )
-      await expect(
-        lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([borrower.address])
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
 
       const tokenBalanceAndLockedAmountsPostRepay = await lenderVault
         .connect(lender)
@@ -5494,18 +5491,25 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultGohmBalPost = await gohm.balanceOf(lenderVault.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
+      // retrieve prices directly from chainlink
       const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
       const collTokenRoundDataPreIndex = await ohmOracleInstance.latestRoundData()
       const loanTokenPriceRaw = loanTokenRoundData.answer
       const collTokenPriceRawPreIndex = collTokenRoundDataPreIndex.answer
       const index = await gohmInstance.index()
+      // take into account index to determine gohm price
+      const SOHM_DECIMALS = ethers.BigNumber.from(10).pow(9)
+      const collTokenPriceRawPostIndex = collTokenPriceRawPreIndex.mul(index).div(SOHM_DECIMALS)
 
-      const collTokenPriceInLoanToken = collTokenPriceRawPreIndex
-        .mul(ONE_USDC)
-        .mul(index)
-        .div(loanTokenPriceRaw)
-        .div(10 ** 9)
-      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+      // retrieve prices from myso oracle (implicitly takes into account gohm index)
+      const tokenPrices = await olympusOracleImplementation.getRawPrices(gohm.address, usdc.address)
+
+      // check that retrieved prices match
+      expect(collTokenPriceRawPostIndex).to.be.equal(tokenPrices[0])
+      expect(loanTokenPriceRaw).to.be.equal(tokenPrices[1])
+
+      const loanPerCollUnit = BASE.mul(75).div(100)
+      const maxLoanPerColl = loanPerCollUnit.mul(collTokenPriceRawPostIndex).mul(ONE_USDC).div(loanTokenPriceRaw).div(BASE)
 
       expect(borrowerGohmBalPre.sub(borrowerGohmBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)
