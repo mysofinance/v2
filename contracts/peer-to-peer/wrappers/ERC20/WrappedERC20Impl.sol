@@ -52,8 +52,8 @@ contract WrappedERC20Impl is
             ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
             : 6;
         isIOU = _isIOU;
-        // @dev: in many cases this will be 1-1 with underlyingin single token case, but in some cases
-        // it may not be, e.g. if the underlying token has a transfer fee or there were prior donations to address
+        // @dev: for single token case, often initial supply will be 1-1 with underlying, but in some cases
+        // it may differ, e.g. if the underlying token has a transfer fee or there were prior donations to address
         _mint(
             minter,
             totalInitialSupply < 10 ** 6 || wrappedTokens.length == 1
