@@ -114,4 +114,7 @@ library Errors {
     error DisallowedSubscriptionLockup();
     error IncorrectLoanAmount();
     error Disabled();
+    error CannotRemintUnlessZeroSupply();
+    error TokensStillMissingFromWrapper();
+    error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
 }
