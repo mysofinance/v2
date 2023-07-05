@@ -78,12 +78,9 @@ contract DsEthOracle is ChainlinkBase, TwapGetter {
         address loanToken
     ) external view override returns (uint256 collTokenPriceInLoanToken) {
         // must have at least one token is DS_ETH to use this oracle
-        if (collToken != DS_ETH && loanToken != DS_ETH) {
-            revert Errors.NoDsEth();
-        }
-        (uint256 priceOfCollToken, uint256 priceOfLoanToken) = (
-            _getPriceOfToken(collToken),
-            _getPriceOfToken(loanToken)
+        (uint256 priceOfCollToken, uint256 priceOfLoanToken) = getRawPrices(
+            collToken,
+            loanToken
         );
         uint256 loanTokenDecimals = (loanToken == WETH || loanToken == DS_ETH)
             ? 18
@@ -91,6 +88,25 @@ contract DsEthOracle is ChainlinkBase, TwapGetter {
         collTokenPriceInLoanToken =
             (priceOfCollToken * 10 ** loanTokenDecimals) /
             priceOfLoanToken;
+    }
+
+    function getRawPrices(
+        address collToken,
+        address loanToken
+    )
+        public
+        view
+        override
+        returns (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw)
+    {
+        // must have at least one token is DS_ETH to use this oracle
+        if (collToken != DS_ETH && loanToken != DS_ETH) {
+            revert Errors.NoDsEth();
+        }
+        (collTokenPriceRaw, loanTokenPriceRaw) = (
+            _getPriceOfToken(collToken),
+            _getPriceOfToken(loanToken)
+        );
     }
 
     function _getPriceOfToken(
