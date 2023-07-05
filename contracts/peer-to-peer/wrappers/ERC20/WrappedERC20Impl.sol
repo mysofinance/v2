@@ -60,6 +60,9 @@ contract WrappedERC20Impl is
         if (amount == 0) {
             revert Errors.InvalidAmount();
         }
+        if (recipient == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         uint256 currTotalSupply = totalSupply();
         if (msg.sender != account) {
             _spendAllowance(account, msg.sender, amount);

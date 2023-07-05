@@ -111,8 +111,6 @@ contract CurveLPStakingCompartment is BaseCompartment {
     }
 
     function getReclaimableBalance(
-        uint256 /*initCollAmount*/,
-        uint256 /*amountReclaimedSoFar*/,
         address collToken
     ) external view override returns (uint256 reclaimableCollBalance) {
         reclaimableCollBalance = IERC20(collToken).balanceOf(address(this));

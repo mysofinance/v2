@@ -20,7 +20,7 @@ import {IWrappedERC721Impl} from "../../interfaces/wrappers/ERC721/IWrappedERC72
 contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
     address public immutable addressRegistry;
     address public immutable wrappedErc721Impl;
-    address[] public _tokensCreated;
+    address[] public tokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc721Impl) {
         if (
@@ -51,7 +51,7 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
             revert Errors.InvalidArrayLength();
         }
         newErc20Addr = Clones.clone(wrappedErc721Impl);
-        _tokensCreated.push(newErc20Addr);
+        tokensCreated.push(newErc20Addr);
 
         IWrappedERC721Impl(newErc20Addr).initialize(
             minter,
@@ -69,17 +69,17 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         emit ERC721WrapperCreated(
             newErc20Addr,
             minter,
-            _tokensCreated.length,
+            tokensCreated.length,
             tokensToBeWrapped
         );
     }
 
-    function tokensCreated() external view returns (address[] memory) {
-        return _tokensCreated;
+    function allTokensCreated() external view returns (address[] memory) {
+        return tokensCreated;
     }
 
     function numTokensCreated() external view returns (uint256) {
-        return _tokensCreated.length;
+        return tokensCreated.length;
     }
 
     function _transferTokens(

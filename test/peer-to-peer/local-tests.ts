@@ -548,11 +548,72 @@ describe('Peer-to-Peer: Local Tests', function () {
       erc20Wrapper,
       myFirstNFT,
       mySecondNFT,
-      testnetTokenManager
+      testnetTokenManager,
+      addr1,
+      addr2,
+      addr3
     }
   }
 
   describe('Address Registry', function () {
+    it('Should handle singleton state updates correctly', async function () {
+      const { addressRegistry, team, testnetTokenManager, addr1, addr2, addr3 } = await setupTest()
+      // reset testnet token manager
+      await addressRegistry.connect(team).setWhitelistState([testnetTokenManager.address], 0)
+
+      // check that initially all singleton states are zero/not set
+      expect(await addressRegistry.erc721Wrapper()).to.be.equal(ZERO_ADDRESS)
+      expect(await addressRegistry.erc20Wrapper()).to.be.equal(ZERO_ADDRESS)
+      expect(await addressRegistry.mysoTokenManager()).to.be.equal(ZERO_ADDRESS)
+
+      // 1) add ERC721 wrapper (state=7)
+      await addressRegistry.connect(team).setWhitelistState([addr1.address], 7)
+
+      // 2) add ERC20 wrapper (state=8)
+      await addressRegistry.connect(team).setWhitelistState([addr2.address], 8)
+
+      // 3) add testnet token manager (state=9)
+      await addressRegistry.connect(team).setWhitelistState([addr3.address], 9)
+
+      // check revert when trying to overwrite singleton state with other singleton address
+      await expect(addressRegistry.connect(team).setWhitelistState([addr3.address], 7)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([addr2.address], 8)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([addr1.address], 9)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+
+      // check revert when trying to overwrite singleton state with non-singleton address
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 7)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 8)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+      await expect(addressRegistry.connect(team).setWhitelistState([team.address], 9)).to.be.revertedWithCustomError(
+        addressRegistry,
+        'StateAlreadySet'
+      )
+
+      // check that singleton states can be reset/deleted
+      await addressRegistry.connect(team).setWhitelistState([addr1.address], 0)
+      await addressRegistry.connect(team).setWhitelistState([addr2.address], 0)
+      await addressRegistry.connect(team).setWhitelistState([addr3.address], 0)
+
+      // check that singleton states can be set again with different values
+      await addressRegistry.connect(team).setWhitelistState([addr3.address], 7)
+      await addressRegistry.connect(team).setWhitelistState([addr2.address], 8)
+      await addressRegistry.connect(team).setWhitelistState([addr1.address], 9)
+    })
+
     it('Should handle borrower whitelist correctly (1/2)', async function () {
       const { addressRegistry, team, borrower, whitelistAuthority } = await setupTest()
 
@@ -3367,8 +3428,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
 
-      const tokensCreated1 = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr1 = tokensCreated1[0]
+      const newWrappedTokenAddr1 = await erc721Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr1)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr1)
 
@@ -3415,6 +3475,12 @@ describe('Peer-to-Peer: Local Tests', function () {
         'ERC20: insufficient allowance'
       )
 
+      // revert when recipient is zero address
+      await expect(wrappedToken.connect(borrower).redeem(borrower.address, ZERO_ADDRESS)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'InvalidAddress'
+      )
+
       await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)
 
       // check ownership of all NFTs has shifted back to borrower
@@ -3454,8 +3520,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           ZERO_BYTES32
         )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(2)
-      const tokensCreated2 = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr2 = tokensCreated2[1]
+      const newWrappedTokenAddr2 = await erc721Wrapper.tokensCreated(1)
       const wrappedToken2 = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr2)
 
       // approve 3rd party to redeem
@@ -3526,8 +3591,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         ZERO_BYTES32
       )
 
-      const tokensCreated = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr = tokensCreated[0]
+      const newWrappedTokenAddr = await erc721Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
 
@@ -3765,8 +3829,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
       expect(await erc721Wrapper.numTokensCreated()).to.be.equal(1)
 
-      const tokensCreated1 = await erc721Wrapper.tokensCreated()
-      const newWrappedTokenAddr1 = tokensCreated1[0]
+      const newWrappedTokenAddr1 = await erc721Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC721Impl', newWrappedTokenAddr1)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr1)
 
@@ -4002,8 +4065,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check new token has been created
       expect(await erc20Wrapper.numTokensCreated()).to.be.equal(1)
 
-      const tokensCreated = await erc20Wrapper.tokensCreated()
-      const newWrappedTokenAddr = tokensCreated[0]
+      const newWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
       const wrappedToken = await ethers.getContractAt('WrappedERC20Impl', newWrappedTokenAddr)
       const whitelistTokenState = await addressRegistry.whitelistState(newWrappedTokenAddr)
       const isIOU = await wrappedToken.isIOU()
@@ -4062,6 +4124,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       // approve 3rd party to redeem
       await wrappedToken.connect(borrower).approve(team.address, totalSupply.div(2))
 
+      // revert when recipient is zero address
+      await expect(
+        wrappedToken.connect(team).redeem(borrower.address, ZERO_ADDRESS, totalSupply.div(2))
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidAddress')
+
       // redeem half the balance
       await wrappedToken.connect(team).redeem(borrower.address, team.address, totalSupply.div(2))
 
@@ -4097,8 +4164,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // check new token has been created
       expect(await erc20Wrapper.numTokensCreated()).to.be.equal(2)
-      const tokensCreated2 = await erc20Wrapper.tokensCreated()
-      const newPlaceholderWrappedTokenAddr = tokensCreated2[1]
+      const newPlaceholderWrappedTokenAddr = await erc20Wrapper.tokensCreated(1)
       const wrappedPlaceholderToken = await ethers.getContractAt('WrappedERC20Impl', newPlaceholderWrappedTokenAddr)
       const whitelistPlaceholderTokenState = await addressRegistry.whitelistState(newPlaceholderWrappedTokenAddr)
 
