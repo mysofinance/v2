@@ -56,14 +56,11 @@ contract WrappedERC721Impl is
         }
         _burn(account, 1);
         redeemer = account;
-        uint256 tokensLength = _wrappedTokens.length;
         address tokenAddr;
         uint256 tokenId;
-        uint256 idsLength;
-        for (uint256 i; i < tokensLength; ) {
-            idsLength = _wrappedTokens[i].tokenIds.length;
+        for (uint256 i; i < _wrappedTokens.length; ) {
             tokenAddr = _wrappedTokens[i].tokenAddr;
-            for (uint256 j; j < idsLength; ) {
+            for (uint256 j; j < _wrappedTokens[i].tokenIds.length; ) {
                 tokenId = _wrappedTokens[i].tokenIds[j];
                 try
                     IERC721(tokenAddr).safeTransferFrom(

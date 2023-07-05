@@ -407,12 +407,8 @@ contract LenderVaultImpl is
         }
         balances = new uint256[](tokensLen);
         _lockedAmounts = new uint256[](tokensLen);
-        IAddressRegistry _addressRegistry = IAddressRegistry(addressRegistry);
         for (uint256 i; i < tokensLen; ) {
-            if (
-                tokens[i] == address(0) ||
-                !_addressRegistry.isWhitelistedERC20(tokens[i])
-            ) {
+            if (tokens[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }
             balances[i] = IERC20Metadata(tokens[i]).balanceOf(address(this));
