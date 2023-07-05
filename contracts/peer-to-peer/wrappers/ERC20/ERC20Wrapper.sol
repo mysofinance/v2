@@ -62,7 +62,6 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             tokensToBeWrapped,
             newErc20Addr
         );
-        // @dev: only on single token wrappers do we use the token decimals
         IWrappedERC20Impl(newErc20Addr).initialize(
             minter,
             tokensToBeWrapped,

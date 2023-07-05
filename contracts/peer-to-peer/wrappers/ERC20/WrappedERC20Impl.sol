@@ -47,6 +47,7 @@ contract WrappedERC20Impl is
         }
         _tokenName = _name;
         _tokenSymbol = _symbol;
+        // @dev: only on single token wrappers do we use the underlying token decimals
         _tokenDecimals = wrappedTokens.length == 1
             ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
             : 6;
