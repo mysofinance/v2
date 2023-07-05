@@ -52,6 +52,8 @@ contract WrappedERC20Impl is
             ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
             : 6;
         isIOU = _isIOU;
+        // @dev: in many cases this will be 1-1 with underlyingin single token case, but in some cases
+        // it may not be, e.g. if the underlying token has a transfer fee or there were prior donations to address
         _mint(
             minter,
             totalInitialSupply < 10 ** 6 || wrappedTokens.length == 1
@@ -116,7 +118,7 @@ contract WrappedERC20Impl is
         address tokenAddr = _wrappedTokens[0].tokenAddr;
         uint256 tokenPreBal = IERC20(tokenAddr).balanceOf(address(this));
         if (currTotalSupply > 0 && tokenPreBal == 0) {
-            // @dev: this would have been some sort of error or negative rebase down to 0 balance with outstanding supply
+            // @dev: this would be an unintended state, for instance a negative rebase down to 0 balance with still outstanding supply
             // in which case to not allow possibly diluted or unfair proportions for new minters, will revert
             revert Errors.NonMintableTokenState();
         }
