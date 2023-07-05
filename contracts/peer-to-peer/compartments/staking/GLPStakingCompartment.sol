@@ -15,8 +15,6 @@ contract GLPStakingCompartment is BaseCompartment {
     address private constant WETH = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
     address private constant FEE_GLP =
         0x4e971a87900b931fF39d1Aad67697F49835400b6;
-    uint256 public totalClaimedRewards; // cumulative value of claimed rewards
-    uint256 public totalTransferredRewards; // cumulative value of transferred to borrower rewards
 
     // transfer coll on repays
     function transferCollFromCompartment(
