@@ -116,5 +116,7 @@ library Errors {
     error Disabled();
     error CannotRemintUnlessZeroSupply();
     error TokensStillMissingFromWrapper();
+    error OnlyMintFromSingleTokenWrapper();
+    error NonMintableTokenState();
     error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
 }

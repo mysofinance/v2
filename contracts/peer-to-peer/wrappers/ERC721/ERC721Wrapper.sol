@@ -50,7 +50,13 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         if (numTokensToBeWrapped == 0) {
             revert Errors.InvalidArrayLength();
         }
-        newErc20Addr = Clones.clone(wrappedErc721Impl);
+        // note: this will revert if the wrapped token already exists
+        // this is to prevent the creation of duplicate wrapped tokens
+        // will need to use the remint on the already existing token address
+        newErc20Addr = Clones.cloneDeterministic(
+            wrappedErc721Impl,
+            keccak256(abi.encode(tokensToBeWrapped))
+        );
         tokensCreated.push(newErc20Addr);
 
         IWrappedERC721Impl(newErc20Addr).initialize(

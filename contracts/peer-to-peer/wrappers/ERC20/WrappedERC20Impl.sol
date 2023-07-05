@@ -22,6 +22,7 @@ contract WrappedERC20Impl is
 
     string internal _tokenName;
     string internal _tokenSymbol;
+    uint8 internal _tokenDecimals;
     DataTypesPeerToPeer.WrappedERC20TokenInfo[] internal _wrappedTokens;
     bool public isIOU;
 
@@ -35,6 +36,7 @@ contract WrappedERC20Impl is
         uint256 totalInitialSupply,
         string calldata _name,
         string calldata _symbol,
+        uint8 _decimals,
         bool _isIOU
     ) external initializer {
         for (uint256 i; i < wrappedTokens.length; ) {
@@ -45,10 +47,13 @@ contract WrappedERC20Impl is
         }
         _tokenName = _name;
         _tokenSymbol = _symbol;
+        _tokenDecimals = _decimals;
         isIOU = _isIOU;
         _mint(
             minter,
-            totalInitialSupply < 10 ** 6 ? totalInitialSupply : 10 ** 6
+            totalInitialSupply < 10 ** 6 || wrappedTokens.length == 1
+                ? totalInitialSupply
+                : 10 ** 6
         );
     }
 
@@ -72,6 +77,9 @@ contract WrappedERC20Impl is
             uint256 wrappedTokensLen = _wrappedTokens.length;
             for (uint256 i; i < wrappedTokensLen; ) {
                 address tokenAddr = _wrappedTokens[i].tokenAddr;
+                // @dev: this is not caught and will revert if the even one token has wrapper blacklisted
+                // therefore minters in this wrapper need to weigh the risk of this happening and hence tokens
+                // getting permanently stuck in the wrapper
                 IERC20(tokenAddr).safeTransfer(
                     recipient,
                     Math.mulDiv(
@@ -86,6 +94,45 @@ contract WrappedERC20Impl is
             }
         }
         emit Redeemed(account, recipient, amount);
+    }
+
+    function mint(
+        address recipient,
+        uint256 amount,
+        uint256 expectedTransferFee
+    ) external nonReentrant {
+        if (_wrappedTokens.length != 1) {
+            revert Errors.OnlyMintFromSingleTokenWrapper();
+        }
+        if (amount == 0) {
+            revert Errors.InvalidAmount();
+        }
+        if (recipient == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        uint256 currTotalSupply = totalSupply();
+        address tokenAddr = _wrappedTokens[0].tokenAddr;
+        uint256 tokenPreBal = IERC20(tokenAddr).balanceOf(address(this));
+        if (currTotalSupply > 0 && tokenPreBal == 0) {
+            // @dev: this would have been some sort of error or negative rebase down to 0 balance with outstanding supply
+            // in which case to not allow possibly diluted or unfair proportions for new minters, will revert
+            revert Errors.NonMintableTokenState();
+        }
+        currTotalSupply == 0
+            ? _mint(recipient, amount)
+            : _mint(
+                recipient,
+                Math.mulDiv(amount, currTotalSupply, tokenPreBal)
+            );
+        IERC20(tokenAddr).transferFrom(
+            msg.sender,
+            address(this),
+            amount + expectedTransferFee
+        );
+        uint256 tokenPostBal = IERC20(tokenAddr).balanceOf(address(this));
+        if (tokenPostBal != tokenPreBal + amount) {
+            revert Errors.InvalidSendAmount();
+        }
     }
 
     function getWrappedTokensInfo()
@@ -105,6 +152,6 @@ contract WrappedERC20Impl is
     }
 
     function decimals() public view virtual override returns (uint8) {
-        return 6;
+        return _tokenDecimals;
     }
 }

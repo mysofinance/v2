@@ -6,6 +6,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {DataTypesPeerToPeer} from "../../../peer-to-peer/DataTypesPeerToPeer.sol";
 import {Errors} from "../../../Errors.sol";
 import {IERC20Wrapper} from "../../interfaces/wrappers/ERC20/IERC20Wrapper.sol";
@@ -44,7 +45,16 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         if (minter == address(0) || minter == address(this)) {
             revert Errors.InvalidAddress();
         }
-        newErc20Addr = Clones.clone(wrappedErc20Impl);
+        // @dev: only on single token wrappers do we create a deterministic address
+        // note: in that case, this will revert if the wrapped token already exists
+        // this is to prevent the creation of duplicate wrapped tokens
+        // will need to use the remint functionality on the already existing token address
+        newErc20Addr = tokensToBeWrapped.length == 1
+            ? Clones.cloneDeterministic(
+                wrappedErc20Impl,
+                keccak256(abi.encode(tokensToBeWrapped[0].tokenAddr))
+            )
+            : Clones.clone(wrappedErc20Impl);
         tokensCreated.push(newErc20Addr);
 
         // @dev: external call happens before state update due to minTokenAmount determination
@@ -53,12 +63,16 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             tokensToBeWrapped,
             newErc20Addr
         );
+        // @dev: only on single token wrappers do we use the token decimals
         IWrappedERC20Impl(newErc20Addr).initialize(
             minter,
             tokensToBeWrapped,
             isIOU ? 10 ** 6 : minTokenAmount,
             name,
             symbol,
+            tokensToBeWrapped.length == 1
+                ? IERC20Metadata(tokensToBeWrapped[0].tokenAddr).decimals()
+                : 6,
             isIOU
         );
         emit ERC20WrapperCreated(

@@ -14,6 +14,7 @@ interface IWrappedERC20Impl {
      * @param totalInitialSupply Total initial supply of the wrapped token basket
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
+     * @param decimals Decimals of the new wrapper token
      * @param isIOU Whether the wrapped token is an IOU token, i.e. it is not backed by any real ERC20 token
      */
     function initialize(
@@ -22,6 +23,7 @@ interface IWrappedERC20Impl {
         uint256 totalInitialSupply,
         string calldata name,
         string calldata symbol,
+        uint8 decimals,
         bool isIOU
     ) external;
 

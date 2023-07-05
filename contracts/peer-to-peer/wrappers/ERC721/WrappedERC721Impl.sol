@@ -150,7 +150,7 @@ contract WrappedERC721Impl is
         emit TokenSweepAttempted(tokenAddr, tokenIds);
     }
 
-    function remintToken(
+    function remintERC20Token(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[]
             calldata _wrappedTokensForRemint,
         address recipient
