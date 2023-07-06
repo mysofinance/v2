@@ -1,12 +1,7 @@
 import { expect } from 'chai'
-import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG, getRecentMainnetForkingConfig } from '../../hardhat.config'
-import { collTokenAbi, chainlinkAggregatorAbi, payloadScheme } from './helpers/abi'
-import { fromReadableAmount, toReadableAmount, getOptimCollSendAndFlashBorrowAmount } from './helpers/uniV3'
-import { SupportedChainId, Token } from '@uniswap/sdk-core'
-import { calcLoanBalanceDelta, getExactLpTokenPriceInEth, getFairReservesPriceAndEthValue } from './helpers/misc'
+import { chainlinkAggregatorAbi } from './helpers/abi'
 
 // test config constants & vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -16,12 +11,10 @@ const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
-const ONE_WBTC = ethers.BigNumber.from(10).pow(8)
 const ONE_DSETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
-const YEAR_IN_SECONDS = 31_536_000
 const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const UNI_V3_SWAP_ROUTER = '0xE592427A0AEce92De3Edee1F18E0157C05861564'
@@ -67,7 +60,7 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, signer, borrower, team, whitelistAuthority] = await ethers.getSigners()
+    const [lender, signer, borrower, team, whitelistAuthority, someUser] = await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
     /* ************************************ */
@@ -166,7 +159,8 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
       btcToUSDChainlinkAddr,
       wBTCToBTCChainlinkAddr,
       lenderVault,
-      lenderVaultFactory
+      lenderVaultFactory,
+      someUser
     }
   }
 
@@ -414,6 +408,61 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
       expect(vaultDsEthBalPost.sub(vaultDsEthBalPre)).to.equal(collSendAmount)
       expect(borrowerUsdcDelta).to.equal(expectedBorrowerUsdcDelta)
       expect(vaultUsdcDelta).to.equal(expectedVaultUsdcDelta)
+    })
+
+    it('Should validate correctly the TWAP', async function () {
+      const { usdc, weth, dseth, someUser } = await setupTest()
+
+      const DsEthOracle = await ethers.getContractFactory('DsEthOracle')
+
+      const reth = '0xae78736Cd615f374D3085123A210448E74Fc6393'
+      const steth = '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0'
+
+      const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
+      const rethEthChainlinkAddr = '0x536218f9e9eb48863970252233c8f271f554c2d0'
+      const stethEthChainlinkAddr = '0x86392dc19c0b719886221c78ab11eb8cf5c52812'
+      const stakewiseEthEthUniV3PoolAddr = '0x7379e81228514a1D2a6Cf7559203998E20598346'
+
+      // deploy dsETH oracle with very long twap and low tolerance
+      await DsEthOracle.connect(someUser)
+      const dsEthOracle = await DsEthOracle.deploy(
+        [usdc.address, reth, steth],
+        [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
+        [stakewiseEthEthUniV3PoolAddr],
+        60 * 60 * 24 * 30, // long twap
+        1 // low tolerance
+      )
+      await dsEthOracle.deployed()
+
+      // check spot price pre swap
+      const dsEthCollUsdcLoanPricePreSwap = await dsEthOracle.getPrice(dseth.address, usdc.address)
+      console.log(dsEthCollUsdcLoanPricePreSwap)
+
+      // prepare large swap on uni v3 pool to skew pool and move spot price
+      const UniV3TestSwap = await ethers.getContractFactory('UniV3TestSwap')
+      const uniV3TestSwap = await UniV3TestSwap.deploy(UNI_V3_SWAP_ROUTER)
+      await uniV3TestSwap.deployed()
+
+      // mint eth
+      await ethers.provider.send('hardhat_setBalance', [someUser.address, '0x204FCE5E3E25026110000000'])
+      const amountIn = ONE_WETH.mul(10000000)
+      await weth.connect(someUser).deposit({ value: amountIn })
+
+      // check balances
+      expect(await weth.balanceOf(someUser.address)).to.be.equal(amountIn)
+      expect(await dseth.balanceOf(someUser.address)).to.be.equal(0)
+
+      // approve and swap weth for dsETH
+      await weth.connect(someUser).approve(uniV3TestSwap.address, amountIn)
+      await uniV3TestSwap.connect(someUser).swapExactInputSingle(amountIn)
+
+      // check balances
+      expect(await weth.balanceOf(someUser.address)).to.be.equal(0)
+      console.log('post bal dsEth', await dseth.balanceOf(someUser.address))
+
+      // check spot price post swap
+      const dsEthCollUsdcLoanPricePostSwap = await dsEthOracle.getPrice(dseth.address, usdc.address)
+      console.log(dsEthCollUsdcLoanPricePostSwap)
     })
   })
 })
