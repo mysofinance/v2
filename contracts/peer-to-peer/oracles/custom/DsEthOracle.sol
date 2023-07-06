@@ -24,14 +24,12 @@ contract DsEthOracle is ChainlinkBase, TwapGetter {
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint256 internal constant INDEX_COOP_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
     uint32 internal immutable _twapInterval; // in seconds (e.g. 1 hour = 3600 seconds)
-    uint32 internal immutable _spotProxPriceBaseUnit;
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _uniswapV3PairAddrs,
         uint32 twapInterval,
-        uint32 spotProxPriceBaseUnit,
         uint256 tolerance
     ) ChainlinkBase(_tokenAddrs, _oracleAddrs, INDEX_COOP_BASE_CURRENCY_UNIT) {
         if (tolerance >= 10000 || tolerance == 0) {
@@ -43,11 +41,6 @@ contract DsEthOracle is ChainlinkBase, TwapGetter {
             revert Errors.TooShortTwapInterval();
         }
         _twapInterval = twapInterval;
-
-        if (spotProxPriceBaseUnit == 0) {
-            revert Errors.InvalidSpotProxyPriceBaseUnit();
-        }
-        _spotProxPriceBaseUnit = spotProxPriceBaseUnit;
 
         // in future could be possible that all constituents are chainlink compatible
         // so _uniswapV3PairAddrs.length == 0 is allowed, hence no length == 0 check
@@ -178,21 +171,18 @@ contract DsEthOracle is ChainlinkBase, TwapGetter {
         );
         twapPriceRaw = getTwap(inToken, outToken, _twapInterval, uniV3PairAddr);
         (, int24 tick, , , , , ) = IUniswapV3Pool(uniV3PairAddr).slot0();
-        // @dev: get price for one base unit of in token; note that proxy price doesn't take into account
-        // potentially asymmetric price impact
-        uint128 inTokenBaseUnit = _spotProxPriceBaseUnit *
-            SafeCast.toUint128(10 ** IERC20Metadata(inToken).decimals());
-        uint256 spotProxyPrice = OracleLibrary.getQuoteAtTick(
+
+        uint256 spotPrice = OracleLibrary.getQuoteAtTick(
             tick,
-            inTokenBaseUnit,
+            SafeCast.toUint128(10 ** IERC20Metadata(inToken).decimals()),
             inToken,
             outToken
         );
 
         // if twap price exceeds threshold from spot proxy price, then revert
         if (
-            twapPriceRaw > ((10000 + _tolerance) * spotProxyPrice) / 10000 ||
-            twapPriceRaw < ((10000 - _tolerance) * spotProxyPrice) / 10000
+            twapPriceRaw > ((10000 + _tolerance) * spotPrice) / 10000 ||
+            twapPriceRaw < ((10000 - _tolerance) * spotPrice) / 10000
         ) {
             revert Errors.TwapExceedsThreshold();
         }

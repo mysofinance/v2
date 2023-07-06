@@ -114,5 +114,4 @@ library Errors {
     error DisallowedSubscriptionLockup();
     error IncorrectLoanAmount();
     error Disabled();
-    error InvalidSpotProxyPriceBaseUnit();
 }

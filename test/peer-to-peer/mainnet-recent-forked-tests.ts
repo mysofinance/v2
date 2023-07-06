@@ -171,7 +171,7 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
   }
 
   describe('TWAP Testing', function () {
-    it('Should validate correctly the TWAP (1/2)', async function () {
+    it('Should validate correctly the TWAP', async function () {
       const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, dseth, lenderVault } =
         await setupTest()
 
@@ -196,7 +196,6 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stakewiseEthEthUniV3PoolAddr],
           3600,
-          1,
           0
         )
       ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidOracleTolerance')
@@ -207,7 +206,6 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stakewiseEthEthUniV3PoolAddr],
           3600,
-          1,
           10000
         )
       ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidOracleTolerance')
@@ -218,7 +216,6 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stakewiseEthEthUniV3PoolAddr],
           300,
-          1,
           500
         )
       ).to.be.revertedWithCustomError(DsEthOracle, 'TooShortTwapInterval')
@@ -230,7 +227,6 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [ZERO_ADDR],
           3600,
-          1,
           500
         )
       ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
@@ -242,7 +238,6 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [stethCbethUniV3PoolAddr],
           3600,
-          1,
           500
         )
       ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
@@ -254,7 +249,6 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [usdcWethUniV3PoolAddr],
           3600,
-          1,
           500
         )
       ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
@@ -266,22 +260,9 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
           [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
           [wbtcUsdcUniV3PoolAddr],
           3600,
-          1,
           500
         )
       ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidAddress')
-
-      // revert if spot proxy price base unit is zero
-      await expect(
-        DsEthOracle.connect(team).deploy(
-          [usdc.address, reth, steth],
-          [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
-          [stakewiseEthEthUniV3PoolAddr],
-          3600,
-          0,
-          500
-        )
-      ).to.be.revertedWithCustomError(DsEthOracle, 'InvalidSpotProxyPriceBaseUnit')
 
       await DsEthOracle.connect(team)
       const dsEthOracle = await DsEthOracle.deploy(
@@ -289,7 +270,6 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
         [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
         [stakewiseEthEthUniV3PoolAddr],
         3600,
-        1,
         500
       )
       await dsEthOracle.deployed()
@@ -435,44 +415,5 @@ describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
       expect(borrowerUsdcDelta).to.equal(expectedBorrowerUsdcDelta)
       expect(vaultUsdcDelta).to.equal(expectedVaultUsdcDelta)
     })
-  })
-
-  it('Should validate correctly the TWAP (2/2)', async function () {
-    const { addressRegistry, borrowerGateway, quoteHandler, lender, borrower, team, usdc, weth, dseth, lenderVault } =
-      await setupTest()
-
-    const reth = '0xae78736Cd615f374D3085123A210448E74Fc6393'
-    const steth = '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0'
-
-    const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-    const rethEthChainlinkAddr = '0x536218f9e9eb48863970252233c8f271f554c2d0'
-    const stethEthChainlinkAddr = '0x86392dc19c0b719886221c78ab11eb8cf5c52812'
-
-    const stakewiseEthEthUniV3PoolAddr = '0x7379e81228514a1D2a6Cf7559203998E20598346'
-
-    // deploy uni v3 twap
-    const DsEthOracle = await ethers.getContractFactory('DsEthOracle')
-
-    // initialize with very large base unit for spot proxy price determination
-    await DsEthOracle.connect(team)
-    const dsEthOracle = await DsEthOracle.deploy(
-      [usdc.address, reth, steth],
-      [usdcEthChainlinkAddr, rethEthChainlinkAddr, stethEthChainlinkAddr],
-      [stakewiseEthEthUniV3PoolAddr],
-      60 * 60 * 24,
-      100000,
-      1
-    )
-    await dsEthOracle.deployed()
-
-    // check revert when assessing spot proxy price with large assumed swap amount which will exceed lagging twap
-    await expect(dsEthOracle.getPrice(dseth.address, usdc.address)).to.be.revertedWithCustomError(
-      dsEthOracle,
-      'TwapExceedsThreshold'
-    )
-    await expect(dsEthOracle.getPrice(usdc.address, dseth.address)).to.be.revertedWithCustomError(
-      dsEthOracle,
-      'TwapExceedsThreshold'
-    )
   })
 })
