@@ -118,5 +118,8 @@ library Errors {
     error TokensStillMissingFromWrapper();
     error OnlyMintFromSingleTokenWrapper();
     error NonMintableTokenState();
+    error NoTokensTransferred();
+    error TokenAlreadyCountedInWrapper();
+    error TokenNotOwnedByWrapper();
     error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
 }

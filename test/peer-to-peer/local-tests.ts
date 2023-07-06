@@ -3848,7 +3848,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // check wrapped remint reverts if total supply is non zero
       await expect(
-        wrappedToken.connect(borrower).remintERC20Token(
+        wrappedToken.connect(borrower).remint(
           [
             { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
             { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
@@ -3873,13 +3873,25 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(getTotalAndCurrentNumOfTokensInWrapperPreRedeem[0]).to.equal(4)
       expect(getTotalAndCurrentNumOfTokensInWrapperPreRedeem[1]).to.equal(4)
 
+      // block all transfers
+      await myFirstNFT.connect(team).toggleBlockTransferTokenId(1)
       await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
       await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
+      await mySecondNFT.connect(team).toggleBlockTransferTokenId(2)
 
-      const firstNFTIdx1InWrapper = await wrappedToken.isTokenInWrapper(myFirstNFT.address, 1)
-      const firstNFTIdx2InWrapper = await wrappedToken.isTokenInWrapper(myFirstNFT.address, 2)
-      const secondNFTIdx1InWrapper = await wrappedToken.isTokenInWrapper(mySecondNFT.address, 1)
-      const secondNFTIdx2InWrapper = await wrappedToken.isTokenInWrapper(mySecondNFT.address, 2)
+      await expect(wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'NoTokensTransferred'
+      )
+
+      // unblock two of the tokens
+      await myFirstNFT.connect(team).toggleBlockTransferTokenId(1)
+      await mySecondNFT.connect(team).toggleBlockTransferTokenId(2)
+
+      const firstNFTIdx1InWrapper = await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 1)
+      const firstNFTIdx2InWrapper = await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 2)
+      const secondNFTIdx1InWrapper = await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 1)
+      const secondNFTIdx2InWrapper = await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 2)
 
       expect(firstNFTIdx1InWrapper).to.be.true
       expect(firstNFTIdx2InWrapper).to.be.true
@@ -3944,10 +3956,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       // sweep stuck token in first NFT contract
       await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
 
-      // sweep stuck token should go into the catch statement since still stuck and emit event
-      await expect(wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1]))
-        .to.emit(wrappedToken, 'TransferFromWrappedTokenFailed')
-        .withArgs(mySecondNFT.address, 1)
+      // sweep stuck token should revert since no tokens removed
+      await expect(
+        wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1])
+      ).to.be.revertedWithCustomError(wrappedToken, 'NoTokensTransferred')
 
       // toggle block transfer back for second blocked token
       await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
@@ -3977,14 +3989,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(firstRedeemer).to.equal(borrower.address)
 
       // check remint reverts if empty array
-      await expect(wrappedToken.connect(borrower).remintERC20Token([], team.address)).to.be.revertedWithCustomError(
+      await expect(wrappedToken.connect(borrower).remint([], team.address)).to.be.revertedWithCustomError(
         wrappedToken,
         'InvalidArrayLength'
       )
 
       // check remint reverts if recipient is address zero
       await expect(
-        wrappedToken.connect(borrower).remintERC20Token(
+        wrappedToken.connect(borrower).remint(
           [
             { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
             { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
@@ -3994,7 +4006,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(wrappedToken, 'InvalidAddress')
 
       await expect(
-        wrappedToken.connect(borrower).remintERC20Token(
+        wrappedToken.connect(borrower).remint(
           [
             { tokenAddr: sortedNFTAddrs[0], tokenIds: [] },
             { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
@@ -4004,7 +4016,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(wrappedToken, 'InvalidArrayLength')
 
       await expect(
-        wrappedToken.connect(borrower).remintERC20Token(
+        wrappedToken.connect(borrower).remint(
           [
             { tokenAddr: sortedNFTAddrs[0], tokenIds: [3] },
             { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
@@ -4016,7 +4028,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         .withArgs(sortedNFTAddrs[0], 3)
 
       await expect(
-        wrappedToken.connect(borrower).remintERC20Token(
+        wrappedToken.connect(borrower).remint(
           [
             { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
             { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
@@ -4029,7 +4041,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await myFirstNFT.connect(borrower).setApprovalForAll(wrappedToken.address, true)
       await mySecondNFT.connect(borrower).setApprovalForAll(wrappedToken.address, true)
 
-      await wrappedToken.connect(borrower).remintERC20Token(
+      await wrappedToken.connect(borrower).remint(
         [
           { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
           { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
@@ -4195,7 +4207,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       const wrappedTokenDecimals = await wrappedToken.decimals()
       expect(wrappedTokenName).to.equal('testName')
       expect(wrappedTokenSymbol).to.equal('testSymbol')
-      expect(wrappedTokenDecimals).to.equal(6)
+      expect(wrappedTokenDecimals).to.equal(18)
       expect(whitelistTokenState).to.equal(1)
       expect(isIOU).to.equal(false)
 
@@ -4214,9 +4226,9 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnlyMintFromSingleTokenWrapper'
       )
 
-      // check borrower has balance of minimum of two amounts, but no more than 10 ** 6
+      // check borrower has balance of minimum of two amounts, but no more than 10 ** 18
       const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
-      const wrappedTokenSupplyCap = ethers.BigNumber.from(1000000)
+      const wrappedTokenSupplyCap = ethers.BigNumber.from(10).pow(18)
       const minOfWrappedUsdcAndEthAmounts = wrappedUsdcAmount.lt(wrappedEthAmount) ? wrappedUsdcAmount : wrappedEthAmount
       const expectedWrappedTokenBalance = minOfWrappedUsdcAndEthAmounts.lt(wrappedTokenSupplyCap)
         ? minOfWrappedUsdcAndEthAmounts
@@ -4299,12 +4311,12 @@ describe('Peer-to-Peer: Local Tests', function () {
       const wrappedPlaceholderTokenDecimals = await wrappedPlaceholderToken.decimals()
       expect(wrappedPlaceholderTokenName).to.equal('testPlaceholderName')
       expect(wrappedPlaceholderTokenSymbol).to.equal('testPlaceholderSymbol')
-      expect(wrappedPlaceholderTokenDecimals).to.equal(6)
+      expect(wrappedPlaceholderTokenDecimals).to.equal(18)
       expect(whitelistPlaceholderTokenState).to.equal(1)
       expect(await wrappedPlaceholderToken.isIOU()).to.equal(true)
 
       const totalPlaceHolderSupply = await wrappedPlaceholderToken.totalSupply()
-      expect(totalPlaceHolderSupply).to.equal(10 ** 6)
+      expect(totalPlaceHolderSupply).to.equal(BASE)
 
       // cannot mint from placeholder token
       await expect(wrappedPlaceholderToken.connect(borrower).mint(borrower.address, 1, 0)).to.be.revertedWithCustomError(

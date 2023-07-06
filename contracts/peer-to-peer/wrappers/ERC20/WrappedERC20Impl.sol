@@ -50,15 +50,15 @@ contract WrappedERC20Impl is
         // @dev: only on single token wrappers do we use the underlying token decimals
         _tokenDecimals = wrappedTokens.length == 1
             ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
-            : 6;
+            : 18;
         isIOU = _isIOU;
         // @dev: for single token case, often initial supply will be 1-1 with underlying, but in some cases
         // it may differ, e.g. if the underlying token has a transfer fee or there were prior donations to address
         _mint(
             minter,
-            totalInitialSupply < 10 ** 6 || wrappedTokens.length == 1
+            totalInitialSupply < 10 ** 18 || wrappedTokens.length == 1
                 ? totalInitialSupply
-                : 10 ** 6
+                : 10 ** 18
         );
     }
 
@@ -81,9 +81,10 @@ contract WrappedERC20Impl is
         if (!isIOU) {
             for (uint256 i; i < _wrappedTokens.length; ) {
                 address tokenAddr = _wrappedTokens[i];
-                // @dev: this is not caught and will revert if the even one token has wrapper blacklisted
-                // therefore minters in this wrapper need to weigh the risk of this happening and hence tokens
-                // getting permanently stuck in the wrapper
+                // @note: The underlying token transfers are all-or-nothing. In other words, if one token transfer fails,
+                // the entire redemption process will fail as well. Users should only use wrappers if they deem this risk
+                // to be acceptable or non-existent (for example, in cases where the underlying tokens can never have any
+                // transfer restrictions).
                 IERC20(tokenAddr).safeTransfer(
                     recipient,
                     Math.mulDiv(
@@ -120,14 +121,15 @@ contract WrappedERC20Impl is
         if (currTotalSupply > 0 && tokenPreBal == 0) {
             // @dev: this would be an unintended state, for instance a negative rebase down to 0 balance with still outstanding supply
             // in which case to not allow possibly diluted or unfair proportions for new minters, will revert
+            // @note: the state token balance > 0, but total supply == 0 is allowed (e.g. donations to address before mint)
             revert Errors.NonMintableTokenState();
         }
-        currTotalSupply == 0
-            ? _mint(recipient, amount)
-            : _mint(
-                recipient,
-                Math.mulDiv(amount, currTotalSupply, tokenPreBal)
-            );
+        _mint(
+            recipient,
+            currTotalSupply == 0
+                ? amount
+                : Math.mulDiv(amount, currTotalSupply, tokenPreBal)
+        );
         IERC20(tokenAddr).transferFrom(
             msg.sender,
             address(this),

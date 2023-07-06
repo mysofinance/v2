@@ -50,11 +50,20 @@ interface IWrappedERC721Impl {
      * @param _wrappedTokensForRemint Array of token info (address and ids array) for the tokens to be reminted
      * @param recipient Account that is receiving the reminted ERC20 token
      */
-    function remintERC20Token(
+    function remint(
         DataTypesPeerToPeer.WrappedERC721TokenInfo[]
             calldata _wrappedTokensForRemint,
         address recipient
     ) external;
+
+    /**
+     * @notice Function to sync the wrapper state with the underlying tokens
+     * @dev This function is callable by anyone and can sync back up accounting.
+     * e.g. in case of transfer occurring outside remint function directly to wrapped token address
+     * @param tokenAddr Address of the token to be synced
+     * @param tokenId Id of the token to be synced
+     */
+    function sync(address tokenAddr, uint256 tokenId) external;
 
     /**
      * @notice Returns wrapped token info
@@ -94,12 +103,12 @@ interface IWrappedERC721Impl {
     ) external view returns (bool);
 
     /**
-     * @notice Returns token in wrapper status
+     * @notice Returns token currently counted in wrapper status
      * @param tokenAddr Address of the token to be checked
      * @param tokenId Id of the token to be checked
-     * @return Returns true if the token is in the wrapper, false otherwise
+     * @return Returns true if the token is currently counted in the wrapper, false otherwise
      */
-    function isTokenInWrapper(
+    function isTokenCountedInWrapper(
         address tokenAddr,
         uint256 tokenId
     ) external view returns (bool);

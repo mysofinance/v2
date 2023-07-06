@@ -68,7 +68,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         IWrappedERC20Impl(newErc20Addr).initialize(
             minter,
             tokensToBeWrapped,
-            isIOU ? 10 ** 6 : minTokenAmount,
+            isIOU ? 10 ** 18 : minTokenAmount,
             name,
             symbol,
             isIOU
