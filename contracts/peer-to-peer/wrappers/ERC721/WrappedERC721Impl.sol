@@ -22,7 +22,7 @@ contract WrappedERC721Impl is
     address public lastRedeemer;
     mapping(address => mapping(uint256 => bool)) public stuckTokens;
     mapping(address => mapping(uint256 => bool)) public isTokenInWrapper;
-    uint128[2] public totalAndCurrentNumOfTokensInWrapper;
+    uint128[2] internal totalAndCurrentNumOfTokensInWrapper;
     bool internal _mutex;
 
     constructor() ERC20("Wrapped ERC721 Impl", "Wrapped ERC721 Impl") {
@@ -188,6 +188,14 @@ contract WrappedERC721Impl is
         returns (DataTypesPeerToPeer.WrappedERC721TokenInfo[] memory)
     {
         return _wrappedTokens;
+    }
+
+    function getTotalAndCurrentNumOfTokensInWrapper()
+        external
+        view
+        returns (uint128[2] memory)
+    {
+        return totalAndCurrentNumOfTokensInWrapper;
     }
 
     function name() public view virtual override returns (string memory) {

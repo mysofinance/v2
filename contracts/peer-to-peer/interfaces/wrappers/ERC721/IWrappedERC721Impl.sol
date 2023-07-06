@@ -46,6 +46,17 @@ interface IWrappedERC721Impl {
     function redeem(address account, address recipient) external;
 
     /**
+     * @notice Function to remint wrapped token for underlying tokens
+     * @param _wrappedTokensForRemint Array of token info (address and ids array) for the tokens to be reminted
+     * @param recipient Account that is receiving the reminted ERC20 token
+     */
+    function remintERC20Token(
+        DataTypesPeerToPeer.WrappedERC721TokenInfo[]
+            calldata _wrappedTokensForRemint,
+        address recipient
+    ) external;
+
+    /**
      * @notice Returns wrapped token info
      * @return wrappedTokens array of struct containing information about wrapped tokens
      */
@@ -55,4 +66,41 @@ interface IWrappedERC721Impl {
         returns (
             DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata wrappedTokens
         );
+
+    /**
+     * @notice Returns the total and current number of tokens in the wrapper
+     * @return Array of total and current number of tokens in the wrapper, respectively
+     */
+    function getTotalAndCurrentNumOfTokensInWrapper()
+        external
+        view
+        returns (uint128[2] memory);
+
+    /**
+     * @notice Returns the address of the last redeemer
+     * @return Address of the last redeemer
+     */
+    function lastRedeemer() external view returns (address);
+
+    /**
+     * @notice Returns stuck token status
+     * @param tokenAddr Address of the token to be checked
+     * @param tokenId Id of the token to be checked
+     * @return Returns true if the token is stuck, false otherwise
+     */
+    function stuckTokens(
+        address tokenAddr,
+        uint256 tokenId
+    ) external view returns (bool);
+
+    /**
+     * @notice Returns token in wrapper status
+     * @param tokenAddr Address of the token to be checked
+     * @param tokenId Id of the token to be checked
+     * @return Returns true if the token is in the wrapper, false otherwise
+     */
+    function isTokenInWrapper(
+        address tokenAddr,
+        uint256 tokenId
+    ) external view returns (bool);
 }

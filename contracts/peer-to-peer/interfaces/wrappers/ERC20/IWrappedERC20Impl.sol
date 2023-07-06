@@ -38,6 +38,19 @@ interface IWrappedERC20Impl {
     ) external;
 
     /**
+     * @notice Function to mint wrapped tokens for underlying token
+     * @dev This function is only callable when the wrapped token has only one underlying token
+     * @param recipient Account that is receiving the minted tokens
+     * @param amount Amount of wrapped tokens to be minted
+     * @param expectedTransferFee Expected transfer fee for the minted tokens (e.g. wrapping PAXG)
+     */
+    function mint(
+        address recipient,
+        uint256 amount,
+        uint256 expectedTransferFee
+    ) external;
+
+    /**
      * @notice Returns wrapped token info
      * @return wrappedTokens array of struct containing information about wrapped tokens
      */
