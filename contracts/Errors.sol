@@ -105,7 +105,7 @@ library Errors {
     error NoDsEth();
     error TooShortTwapInterval();
     error TooLongTwapInterval();
-    error SpotPriceDeviatesFromTwapPrice();
+    error TwapExceedsThreshold();
     error Reentrancy();
     error TokenNotStuck();
     error InconsistentExpTransferFee();
@@ -114,4 +114,5 @@ library Errors {
     error DisallowedSubscriptionLockup();
     error IncorrectLoanAmount();
     error Disabled();
+    error InvalidSpotProxyPriceBaseUnit();
 }

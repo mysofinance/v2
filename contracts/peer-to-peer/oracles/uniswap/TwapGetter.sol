@@ -51,10 +51,13 @@ abstract contract TwapGetter is ITwapGetter {
         if (twapInterval == 0) {
             (sqrtPriceX96, , , , , , ) = IUniswapV3Pool(uniswapV3Pool).slot0();
         } else {
-            int24 tick;
-            uint16 lastIndex;
-            (, tick, lastIndex, , , , ) = IUniswapV3Pool(uniswapV3Pool).slot0();
             uint32[] memory secondsAgo = new uint32[](2);
+
+            // @dev: revert if twapInterval doesn't fit into smaller int32
+            if (twapInterval > uint32(type(int32).max)) {
+                revert Errors.TooLongTwapInterval();
+            }
+
             secondsAgo[0] = twapInterval;
             secondsAgo[1] = 0;
             (int56[] memory tickCumulatives, ) = IUniswapV3Pool(uniswapV3Pool)
@@ -62,9 +65,6 @@ abstract contract TwapGetter is ITwapGetter {
 
             int56 tickCumulativesDelta = tickCumulatives[1] -
                 tickCumulatives[0];
-            if (uint32(int32(twapInterval)) != twapInterval) {
-                revert Errors.TooLongTwapInterval();
-            }
             int24 averageTick = SafeCast.toInt24(
                 tickCumulativesDelta / int32(twapInterval)
             );

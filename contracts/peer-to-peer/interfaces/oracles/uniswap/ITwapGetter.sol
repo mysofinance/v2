@@ -8,7 +8,7 @@ interface ITwapGetter {
      * @param outToken Address of the Out Token
      * @param twapInterval Time interval for the twap
      * @param uniswapV3Pool Address of the Uniswap V3 Pool
-     * @return twap The twap for the given uniswap v3 pool
+     * @return twap The twap (in out token) for the given uniswap v3 pool
      */
     function getTwap(
         address inToken,

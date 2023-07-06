@@ -3,6 +3,8 @@
 pragma solidity 0.8.19;
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {OracleLibrary} from "../uniswap/OracleLibrary.sol";
 import {ChainlinkBase} from "../chainlink/ChainlinkBase.sol";
 import {Errors} from "../../../Errors.sol";
 import {TwapGetter} from "../uniswap/TwapGetter.sol";
@@ -21,24 +23,32 @@ contract DsEthOracle is ChainlinkBase, TwapGetter {
         0x341c05c0E9b33C0E38d64de76516b2Ce970bB3BE;
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     uint256 internal constant INDEX_COOP_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
-    uint32 internal immutable twapInterval; // in seconds (e.g. 1 hour = 3600 seconds)
+    uint32 internal immutable _twapInterval; // in seconds (e.g. 1 hour = 3600 seconds)
+    uint32 internal immutable _spotProxPriceBaseUnit;
 
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address[] memory _uniswapV3PairAddrs,
-        uint32 _twapInterval,
-        uint256 _toleranceAmount
+        uint32 twapInterval,
+        uint32 spotProxPriceBaseUnit,
+        uint256 tolerance
     ) ChainlinkBase(_tokenAddrs, _oracleAddrs, INDEX_COOP_BASE_CURRENCY_UNIT) {
-        if (_toleranceAmount >= 10000 || _toleranceAmount == 0) {
+        if (tolerance >= 10000 || tolerance == 0) {
             revert Errors.InvalidOracleTolerance();
         }
-        _tolerance = _toleranceAmount;
+        _tolerance = tolerance;
         // min 30 minute twap interval
-        if (_twapInterval < 30 minutes) {
+        if (twapInterval < 30 minutes) {
             revert Errors.TooShortTwapInterval();
         }
-        twapInterval = _twapInterval;
+        _twapInterval = twapInterval;
+
+        if (spotProxPriceBaseUnit == 0) {
+            revert Errors.InvalidSpotProxyPriceBaseUnit();
+        }
+        _spotProxPriceBaseUnit = spotProxPriceBaseUnit;
+
         // in future could be possible that all constituents are chainlink compatible
         // so _uniswapV3PairAddrs.length == 0 is allowed, hence no length == 0 check
         address token1;
@@ -158,26 +168,33 @@ contract DsEthOracle is ChainlinkBase, TwapGetter {
     function _getTwapPrice(
         address uniV3PairAddr
     ) internal view returns (uint256 twapPriceRaw) {
-        address token0 = IUniswapV3Pool(uniV3PairAddr).token0();
-        address token1 = IUniswapV3Pool(uniV3PairAddr).token1();
-        twapPriceRaw = getTwap(
-            token0 == WETH ? token1 : token0,
-            token1 == WETH ? token1 : token0,
-            twapInterval,
-            uniV3PairAddr
+        (address token0, address token1) = (
+            IUniswapV3Pool(uniV3PairAddr).token0(),
+            IUniswapV3Pool(uniV3PairAddr).token1()
         );
-        (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(uniV3PairAddr)
-            .slot0();
-        uint256 currSpotPrice = token0 == WETH
-            ? (10 ** 36) / getPriceFromSqrtPriceX96(sqrtPriceX96, 18)
-            : getPriceFromSqrtPriceX96(sqrtPriceX96, 18);
+        (address inToken, address outToken) = (
+            token0 == WETH ? token1 : token0,
+            token1 == WETH ? token1 : token0
+        );
+        twapPriceRaw = getTwap(inToken, outToken, _twapInterval, uniV3PairAddr);
+        (, int24 tick, , , , , ) = IUniswapV3Pool(uniV3PairAddr).slot0();
+        // @dev: get price for one base unit of in token; note that proxy price doesn't take into account
+        // potentially asymmetric price impact
+        uint128 inTokenBaseUnit = _spotProxPriceBaseUnit *
+            SafeCast.toUint128(10 ** IERC20Metadata(inToken).decimals());
+        uint256 spotProxyPrice = OracleLibrary.getQuoteAtTick(
+            tick,
+            inTokenBaseUnit,
+            inToken,
+            outToken
+        );
 
-        // if twap price is exceeds threshold from spot price, then revert
+        // if twap price exceeds threshold from spot proxy price, then revert
         if (
-            twapPriceRaw > ((10000 + _tolerance) * currSpotPrice) / 10000 ||
-            twapPriceRaw < ((10000 - _tolerance) * currSpotPrice) / 10000
+            twapPriceRaw > ((10000 + _tolerance) * spotProxyPrice) / 10000 ||
+            twapPriceRaw < ((10000 - _tolerance) * spotProxyPrice) / 10000
         ) {
-            revert Errors.SpotPriceDeviatesFromTwapPrice();
+            revert Errors.TwapExceedsThreshold();
         }
     }
 }
