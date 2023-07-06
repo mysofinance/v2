@@ -4011,7 +4011,9 @@ describe('Peer-to-Peer: Local Tests', function () {
           ],
           team.address
         )
-      ).to.be.revertedWithCustomError(wrappedToken, 'TokenDoesNotBelongInWrapper')
+      )
+        .to.be.revertedWithCustomError(wrappedToken, 'TokenDoesNotBelongInWrapper')
+        .withArgs(sortedNFTAddrs[0], 3)
 
       await expect(
         wrappedToken.connect(borrower).remintERC20Token(

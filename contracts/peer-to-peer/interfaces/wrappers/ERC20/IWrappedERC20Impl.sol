@@ -51,8 +51,8 @@ interface IWrappedERC20Impl {
     ) external;
 
     /**
-     * @notice Returns wrapped token info
-     * @return wrappedTokens array of struct containing information about wrapped tokens
+     * @notice Returns wrapped token addresses
+     * @return wrappedTokens array of wrapped token addresses
      */
     function getWrappedTokensInfo()
         external
