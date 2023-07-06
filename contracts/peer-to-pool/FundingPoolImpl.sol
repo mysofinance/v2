@@ -176,7 +176,10 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
                 loanTerms
             );
         }
-        balanceOf[msg.sender] = _balanceOf - effectiveSubscriptionAmount;
+        unchecked {
+            // @dev: can't underflow due to previous `maxSubscriptionAmount > _balanceOf` check
+            balanceOf[msg.sender] = _balanceOf - effectiveSubscriptionAmount;
+        }
         totalSubscriptions[loanProposal] =
             _totalSubscriptions +
             effectiveSubscriptionAmount;
