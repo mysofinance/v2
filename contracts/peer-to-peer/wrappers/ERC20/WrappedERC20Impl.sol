@@ -107,6 +107,8 @@ contract WrappedERC20Impl is
         uint256 expectedTransferFee
     ) external nonReentrant {
         if (_wrappedTokens.length != 1) {
+            // @dev: only on single token wrappers do we allow minting
+            // @note: IOU has no underlying tokens, so they are also disabled from minting
             revert Errors.OnlyMintFromSingleTokenWrapper();
         }
         if (amount == 0) {

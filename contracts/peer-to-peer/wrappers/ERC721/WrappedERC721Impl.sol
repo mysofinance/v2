@@ -36,9 +36,9 @@ contract WrappedERC721Impl is
         string calldata _symbol
     ) external initializer {
         uint128 numTokens;
-        for (uint256 i = 0; i < wrappedTokens.length; ) {
+        for (uint256 i; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i]);
-            for (uint256 j = 0; j < wrappedTokens[i].tokenIds.length; ) {
+            for (uint256 j; j < wrappedTokens[i].tokenIds.length; ) {
                 mapping(uint256 => bool) storage isTokenAddr = isUnderlying[
                     wrappedTokens[i].tokenAddr
                 ];

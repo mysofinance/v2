@@ -112,4 +112,15 @@ interface IWrappedERC721Impl {
         address tokenAddr,
         uint256 tokenId
     ) external view returns (bool);
+
+    /**
+     * @notice Returns whether token is an underlying member of the wrapper
+     * @param tokenAddr Address of the token to be checked
+     * @param tokenId Id of the token to be checked
+     * @return Returns true if the token is an underlying member of the wrapper, false otherwise
+     */
+    function isUnderlying(
+        address tokenAddr,
+        uint256 tokenId
+    ) external view returns (bool);
 }

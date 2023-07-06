@@ -3988,7 +3988,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       expect(firstRedeemer).to.equal(borrower.address)
 
-      // check remint reverts if empty array
+      // check remint reverts if empty array and tokens are missing from wrapped token
       await expect(wrappedToken.connect(borrower).remint([], team.address)).to.be.revertedWithCustomError(
         wrappedToken,
         'InvalidArrayLength'
@@ -4065,6 +4065,82 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(getTotalAndCurrentNumOfTokensInWrapperPostRemint[1]).to.equal(4)
 
       expect(await wrappedToken.balanceOf(team.address)).to.be.equal(1)
+      expect(await wrappedToken.totalSupply()).to.be.equal(1)
+
+      await wrappedToken.connect(team).redeem(team.address, borrower.address)
+
+      expect(await wrappedToken.balanceOf(team.address)).to.be.equal(0)
+      expect(await wrappedToken.totalSupply()).to.be.equal(0)
+
+      // check ownership of all NFTs has shifted back to borrower
+      expect(await myFirstNFT.ownerOf(1)).to.equal(borrower.address)
+      expect(await myFirstNFT.ownerOf(2)).to.equal(borrower.address)
+      expect(await mySecondNFT.ownerOf(1)).to.equal(borrower.address)
+      expect(await mySecondNFT.ownerOf(2)).to.equal(borrower.address)
+
+      expect(await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()).to.eql([
+        ethers.BigNumber.from(4),
+        ethers.BigNumber.from(0)
+      ])
+
+      await myFirstNFT.connect(borrower).transferFrom(borrower.address, wrappedToken.address, 1)
+      await myFirstNFT.connect(borrower).transferFrom(borrower.address, wrappedToken.address, 2)
+      await mySecondNFT.connect(borrower).transferFrom(borrower.address, wrappedToken.address, 1)
+      await mySecondNFT.connect(borrower).transferFrom(borrower.address, wrappedToken.address, 2)
+
+      // check ownership of all NFTs has shifted to wrappedToken address
+      expect(await myFirstNFT.ownerOf(1)).to.equal(wrappedToken.address)
+      expect(await myFirstNFT.ownerOf(2)).to.equal(wrappedToken.address)
+      expect(await mySecondNFT.ownerOf(1)).to.equal(wrappedToken.address)
+      expect(await mySecondNFT.ownerOf(2)).to.equal(wrappedToken.address)
+
+      // no change though in total and current number of tokens in wrapper since these were transferred directly
+      expect(await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()).to.eql([
+        ethers.BigNumber.from(4),
+        ethers.BigNumber.from(0)
+      ])
+
+      // sync two of the tokens
+      await wrappedToken.connect(borrower).sync(myFirstNFT.address, 1)
+      await wrappedToken.connect(borrower).sync(mySecondNFT.address, 1)
+
+      // check sync reverts if token is currently counted in wrapper
+      await expect(wrappedToken.connect(borrower).sync(myFirstNFT.address, 1)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'TokenAlreadyCountedInWrapper'
+      )
+
+      // check sync reverts if token is not an underlying component
+      await expect(wrappedToken.connect(borrower).sync(myFirstNFT.address, 3))
+        .to.be.revertedWithCustomError(wrappedToken, 'TokenDoesNotBelongInWrapper')
+        .withArgs(myFirstNFT.address, 3)
+
+      expect(await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()).to.eql([
+        ethers.BigNumber.from(4),
+        ethers.BigNumber.from(2)
+      ])
+
+      //sync other two tokens
+      await wrappedToken.connect(borrower).sync(myFirstNFT.address, 2)
+      await wrappedToken.connect(borrower).sync(mySecondNFT.address, 2)
+
+      expect(await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()).to.eql([
+        ethers.BigNumber.from(4),
+        ethers.BigNumber.from(4)
+      ])
+
+      // only last redeemer can call remint when all tokens synced
+      await expect(wrappedToken.connect(borrower).remint([], borrower.address)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'InvalidSender'
+      )
+
+      await wrappedToken.connect(team).remint([], borrower.address)
+
+      // check status of redeemer, recipient and supply
+      expect(await wrappedToken.lastRedeemer()).to.equal(team.address)
+      expect(await wrappedToken.balanceOf(team.address)).to.be.equal(0)
+      expect(await wrappedToken.balanceOf(borrower.address)).to.be.equal(1)
       expect(await wrappedToken.totalSupply()).to.be.equal(1)
     })
   })
