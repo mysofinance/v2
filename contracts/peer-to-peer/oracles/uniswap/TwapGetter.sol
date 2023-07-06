@@ -32,16 +32,17 @@ abstract contract TwapGetter is ITwapGetter {
         // i.e., `1 unit of token0` corresponds to `sqrtPriceX96 units (divided by 2**96) of token1`
         uint256 priceX96 = getPriceX96FromSqrtPriceX96(sqrtPriceX96);
 
-        (uint256 nominator, uint256 denominator) = inToken == token0
-            ? (
-                priceX96 * 10 ** IERC20Metadata(token0).decimals(),
+        twap = inToken == token0
+            ? FullMath.mulDiv(
+                priceX96,
+                10 ** IERC20Metadata(token0).decimals(),
                 FixedPoint96.Q96
             )
-            : (
-                FixedPoint96.Q96 * 10 ** IERC20Metadata(token1).decimals(),
+            : FullMath.mulDiv(
+                FixedPoint96.Q96,
+                10 ** IERC20Metadata(token1).decimals(),
                 priceX96
             );
-        twap = FullMath.mulDiv(nominator, 1, denominator);
     }
 
     function getSqrtTwapX96(
