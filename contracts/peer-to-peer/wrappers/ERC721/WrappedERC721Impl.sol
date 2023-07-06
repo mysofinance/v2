@@ -155,8 +155,7 @@ contract WrappedERC721Impl is
         if (_mutex) {
             revert Errors.Reentrancy();
         }
-        uint256 wrappedTokensForRemintLen = _wrappedTokensForRemint.length;
-        if (wrappedTokensForRemintLen == 0) {
+        if (_wrappedTokensForRemint.length == 0) {
             revert Errors.InvalidArrayLength();
         }
         if (recipient == address(0)) {
@@ -174,7 +173,7 @@ contract WrappedERC721Impl is
         ] = totalAndCurrentNumOfTokensInWrapper[0];
         _mint(recipient, 1);
         uint128 tokensAdded = _transferTokens(
-            wrappedTokensForRemintLen,
+            _wrappedTokensForRemint.length,
             _wrappedTokensForRemint
         );
         if (tokensAdded != tokensNeeded) {
@@ -210,26 +209,19 @@ contract WrappedERC721Impl is
         return 0;
     }
 
+    // @dev: no need for ordering check here
     function _transferTokens(
         uint256 numTokensToBeWrapped,
         DataTypesPeerToPeer.WrappedERC721TokenInfo[] calldata tokensToBeWrapped
     ) internal returns (uint128 numTokensAdded) {
-        address prevNftAddress;
-        address currNftAddress;
         uint256 checkedId;
+        address currNftAddress;
         for (uint256 i; i < numTokensToBeWrapped; ) {
-            uint256 numTokenIds = tokensToBeWrapped[i].tokenIds.length;
-            if (numTokenIds == 0) {
+            if (tokensToBeWrapped[i].tokenIds.length == 0) {
                 revert Errors.InvalidArrayLength();
             }
             currNftAddress = tokensToBeWrapped[i].tokenAddr;
-            if (currNftAddress <= prevNftAddress) {
-                revert Errors.NonIncreasingTokenAddrs();
-            }
-            for (uint256 j; j < numTokenIds; ) {
-                if (tokensToBeWrapped[i].tokenIds[j] <= checkedId && j != 0) {
-                    revert Errors.NonIncreasingNonFungibleTokenIds();
-                }
+            for (uint256 j; j < tokensToBeWrapped[i].tokenIds.length; ) {
                 checkedId = tokensToBeWrapped[i].tokenIds[j];
                 if (!isTokenInWrapper[currNftAddress][checkedId]) {
                     revert Errors.TokenDoesNotBelongInWrapper(
@@ -238,7 +230,7 @@ contract WrappedERC721Impl is
                     );
                 }
                 try
-                    IERC721(tokensToBeWrapped[i].tokenAddr).transferFrom(
+                    IERC721(currNftAddress).transferFrom(
                         msg.sender,
                         address(this),
                         checkedId
@@ -252,7 +244,6 @@ contract WrappedERC721Impl is
                     revert Errors.TransferToWrappedTokenFailed();
                 }
             }
-            prevNftAddress = currNftAddress;
             unchecked {
                 ++i;
             }

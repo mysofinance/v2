@@ -3846,6 +3846,17 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       expect(totalSupply).to.equal(1)
 
+      // check wrapped remint reverts if total supply is non zero
+      await expect(
+        wrappedToken.connect(borrower).remintERC20Token(
+          [
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+          ],
+          team.address
+        )
+      ).to.be.revertedWithCustomError(wrappedToken, 'CannotRemintUnlessZeroSupply')
+
       // check wrapped token name, symbol and decimal overrides
       const wrappedTokenName = await wrappedToken.name()
       const wrappedTokenSymbol = await wrappedToken.symbol()
@@ -3857,10 +3868,30 @@ describe('Peer-to-Peer: Local Tests', function () {
       const wrappedTokensInfo = await wrappedToken.getWrappedTokensInfo()
       expect(wrappedTokensInfo.length).to.equal(2)
 
+      const getTotalAndCurrentNumOfTokensInWrapperPreRedeem = await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()
+
+      expect(getTotalAndCurrentNumOfTokensInWrapperPreRedeem[0]).to.equal(4)
+      expect(getTotalAndCurrentNumOfTokensInWrapperPreRedeem[1]).to.equal(4)
+
       await myFirstNFT.connect(team).toggleBlockTransferTokenId(2)
       await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
 
+      const firstNFTIdx1InWrapper = await wrappedToken.isTokenInWrapper(myFirstNFT.address, 1)
+      const firstNFTIdx2InWrapper = await wrappedToken.isTokenInWrapper(myFirstNFT.address, 2)
+      const secondNFTIdx1InWrapper = await wrappedToken.isTokenInWrapper(mySecondNFT.address, 1)
+      const secondNFTIdx2InWrapper = await wrappedToken.isTokenInWrapper(mySecondNFT.address, 2)
+
+      expect(firstNFTIdx1InWrapper).to.be.true
+      expect(firstNFTIdx2InWrapper).to.be.true
+      expect(secondNFTIdx1InWrapper).to.be.true
+      expect(secondNFTIdx2InWrapper).to.be.true
+
       await wrappedToken.connect(borrower).redeem(borrower.address, borrower.address)
+
+      const getTotalAndCurrentNumOfTokensInWrapperPostRedeem = await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()
+
+      expect(getTotalAndCurrentNumOfTokensInWrapperPostRedeem[0]).to.equal(4)
+      expect(getTotalAndCurrentNumOfTokensInWrapperPostRedeem[1]).to.equal(2)
 
       // check ownership of all unlocked NFTs have shifted back to borrower, but locked NFTs
       const currOwnerFirstNFTIdx1PostRedeem = await myFirstNFT.ownerOf(1)
@@ -3892,7 +3923,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(stuckTokenStatusSecondNFTIdx1PreSweep).to.be.true
       expect(stuckTokenStatusSecondNFTIdx2).to.be.false
 
-      // expect sweep to revert if not called by redeemer
+      // expect sweep to revert if not called by last redeemer
       await expect(
         wrappedToken.connect(team).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
       ).to.be.revertedWithCustomError(wrappedToken, 'InvalidSender')
@@ -3935,6 +3966,92 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       expect(stuckTokenStatusFirstNFTIdx2PostSweep).to.be.false
       expect(stuckTokenStatusSecondNFTIdx1PostSweep).to.be.false
+
+      const getTotalAndCurrentNumOfTokensInWrapperPostSweep = await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()
+
+      expect(getTotalAndCurrentNumOfTokensInWrapperPostSweep[0]).to.equal(4)
+      expect(getTotalAndCurrentNumOfTokensInWrapperPostSweep[1]).to.equal(0)
+
+      const firstRedeemer = await wrappedToken.lastRedeemer()
+
+      expect(firstRedeemer).to.equal(borrower.address)
+
+      // check remint reverts if empty array
+      await expect(wrappedToken.connect(borrower).remintERC20Token([], team.address)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'InvalidArrayLength'
+      )
+
+      // check remint reverts if recipient is address zero
+      await expect(
+        wrappedToken.connect(borrower).remintERC20Token(
+          [
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+          ],
+          ZERO_ADDRESS
+        )
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidAddress')
+
+      await expect(
+        wrappedToken.connect(borrower).remintERC20Token(
+          [
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [] },
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+          ],
+          team.address
+        )
+      ).to.be.revertedWithCustomError(wrappedToken, 'InvalidArrayLength')
+
+      await expect(
+        wrappedToken.connect(borrower).remintERC20Token(
+          [
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [3] },
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+          ],
+          team.address
+        )
+      ).to.be.revertedWithCustomError(wrappedToken, 'TokenDoesNotBelongInWrapper')
+
+      await expect(
+        wrappedToken.connect(borrower).remintERC20Token(
+          [
+            { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+            { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+          ],
+          team.address
+        )
+      ).to.be.revertedWithCustomError(wrappedToken, 'TransferToWrappedTokenFailed')
+
+      // set approval for wrapped token address
+      await myFirstNFT.connect(borrower).setApprovalForAll(wrappedToken.address, true)
+      await mySecondNFT.connect(borrower).setApprovalForAll(wrappedToken.address, true)
+
+      await wrappedToken.connect(borrower).remintERC20Token(
+        [
+          { tokenAddr: sortedNFTAddrs[0], tokenIds: [1, 2] },
+          { tokenAddr: sortedNFTAddrs[1], tokenIds: [1, 2] }
+        ],
+        team.address
+      )
+
+      const currOwnerFirstNFTIdx1PostRemint = await myFirstNFT.ownerOf(1)
+      const currOwnerFirstNFTIdx2PostRemint = await myFirstNFT.ownerOf(2)
+      const currOwnerSecondNFTIdx1PostRemint = await mySecondNFT.ownerOf(1)
+      const currOwnerSecondNFTIdx2PostRemint = await mySecondNFT.ownerOf(2)
+
+      expect(currOwnerFirstNFTIdx1PostRemint).to.equal(wrappedToken.address)
+      expect(currOwnerFirstNFTIdx2PostRemint).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx1PostRemint).to.equal(wrappedToken.address)
+      expect(currOwnerSecondNFTIdx2PostRemint).to.equal(wrappedToken.address)
+
+      const getTotalAndCurrentNumOfTokensInWrapperPostRemint = await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()
+
+      expect(getTotalAndCurrentNumOfTokensInWrapperPostRemint[0]).to.equal(4)
+      expect(getTotalAndCurrentNumOfTokensInWrapperPostRemint[1]).to.equal(4)
+
+      expect(await wrappedToken.balanceOf(team.address)).to.be.equal(1)
+      expect(await wrappedToken.totalSupply()).to.be.equal(1)
     })
   })
 

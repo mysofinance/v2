@@ -48,6 +48,9 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         // note: in that case, this will revert if the wrapped token already exists
         // this is to prevent the creation of duplicate wrapped tokens
         // will need to use the remint functionality on the already existing token address
+        // also unique ordering of token addresses enforces case where you cannot pass in
+        // token address A, amount B and then token address A, amount C, but single token wrappers
+        // must truly have one token address
         newErc20Addr = tokensToBeWrapped.length == 1
             ? Clones.cloneDeterministic(
                 wrappedErc20Impl,

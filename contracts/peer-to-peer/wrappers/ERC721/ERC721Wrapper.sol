@@ -53,6 +53,9 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         // note: this will revert if the wrapped token already exists
         // this is to prevent the creation of duplicate wrapped tokens
         // will need to use the remint on the already existing token address
+        // also unique ordering of token addresses and ids enforces uniqueness of wrapped token address
+        // e.g. you can't mint a wrapped token for token address A with token ids 1, 2, 3 and then
+        // mint a wrapped token for token address A with token ids 3, 2, 1
         newErc20Addr = Clones.cloneDeterministic(
             wrappedErc721Impl,
             keccak256(abi.encode(tokensToBeWrapped))
