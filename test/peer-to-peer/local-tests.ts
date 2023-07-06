@@ -4200,11 +4200,17 @@ describe('Peer-to-Peer: Local Tests', function () {
       // check that tokens were stored in instance storage correctly
       const tokenAddrs = await wrappedToken.getWrappedTokensInfo()
 
-      expect(tokenAddrs[0].tokenAddr).to.equal(sortedTokenInfo[0].tokenAddr)
-      expect(tokenAddrs[1].tokenAddr).to.equal(sortedTokenInfo[1].tokenAddr)
+      expect(tokenAddrs[0]).to.equal(sortedTokenInfo[0].tokenAddr)
+      expect(tokenAddrs[1]).to.equal(sortedTokenInfo[1].tokenAddr)
 
       // new token should be whitelisted as ERC20_TOKEN
       expect(whitelistTokenState).to.equal(1)
+
+      // cannot mint from token with multiple addresses
+      await expect(wrappedToken.connect(borrower).mint(borrower.address, 1, 0)).to.be.revertedWithCustomError(
+        wrappedToken,
+        'OnlyMintFromSingleTokenWrapper'
+      )
 
       // check borrower has balance of minimum of two amounts, but no more than 10 ** 6
       const borrowerWrappedTokenBalance = await wrappedToken.balanceOf(borrower.address)
@@ -4297,6 +4303,80 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       const totalPlaceHolderSupply = await wrappedPlaceholderToken.totalSupply()
       expect(totalPlaceHolderSupply).to.equal(10 ** 6)
+
+      // cannot mint from placeholder token
+      await expect(wrappedPlaceholderToken.connect(borrower).mint(borrower.address, 1, 0)).to.be.revertedWithCustomError(
+        wrappedPlaceholderToken,
+        'OnlyMintFromSingleTokenWrapper'
+      )
+
+      /** single token wrapper test **/
+
+      // create wrapped token basket
+      await addressRegistry.connect(borrower).createWrappedTokenForERC20s(
+        [
+          {
+            tokenAddr: weth.address,
+            tokenAmount: ONE_WETH
+          }
+        ],
+        'wethWrapper',
+        'wWeth',
+        ZERO_BYTES32
+      )
+
+      // check new token has been created
+      expect(await erc20Wrapper.numTokensCreated()).to.be.equal(3)
+
+      const newSingleWrappedTokenAddr = await erc20Wrapper.tokensCreated(2)
+      const wrappedSingleToken = await ethers.getContractAt('WrappedERC20Impl', newSingleWrappedTokenAddr)
+      const whitelistSingleTokenState = await addressRegistry.whitelistState(newSingleWrappedTokenAddr)
+      const isSingleIOU = await wrappedSingleToken.isIOU()
+
+      // check name, symbol, and decimal overrides
+      const wrappedSingleTokenName = await wrappedSingleToken.name()
+      const wrappedSingleTokenSymbol = await wrappedSingleToken.symbol()
+      const wrappedSingleTokenDecimals = await wrappedSingleToken.decimals()
+      expect(wrappedSingleTokenName).to.equal('wethWrapper')
+      expect(wrappedSingleTokenSymbol).to.equal('wWeth')
+      expect(wrappedSingleTokenDecimals).to.equal(18)
+      expect(whitelistSingleTokenState).to.equal(1)
+      expect(isSingleIOU).to.equal(false)
+
+      // check that tokens were stored in instance storage correctly
+      const singleTokenAddrInfo = await wrappedToken.getWrappedTokensInfo()
+
+      expect(singleTokenAddrInfo[0]).to.equal(weth.address)
+
+      const totalSupplyPreMint = await wrappedSingleToken.totalSupply()
+
+      expect(totalSupplyPreMint).to.equal(ONE_WETH)
+
+      await expect(wrappedSingleToken.connect(borrower).mint(borrower.address, 0, 0)).to.be.revertedWithCustomError(
+        wrappedSingleToken,
+        'InvalidAmount'
+      )
+
+      await expect(wrappedSingleToken.connect(borrower).mint(ZERO_ADDRESS, 1, 0)).to.be.revertedWithCustomError(
+        wrappedSingleToken,
+        'InvalidAddress'
+      )
+
+      await weth.connect(borrower).approve(wrappedSingleToken.address, MAX_UINT256)
+
+      await expect(
+        wrappedSingleToken.connect(borrower).mint(team.address, ONE_WETH.mul(2), 10)
+      ).to.be.revertedWithCustomError(wrappedSingleToken, 'InvalidSendAmount')
+
+      await wrappedSingleToken.connect(borrower).mint(team.address, ONE_WETH.mul(2), 0)
+
+      expect(await wrappedSingleToken.totalSupply()).to.equal(ONE_WETH.mul(3))
+      expect(await wrappedSingleToken.balanceOf(team.address)).to.equal(ONE_WETH.mul(2))
+
+      await wrappedSingleToken.connect(team).redeem(team.address, team.address, ONE_WETH.mul(1))
+
+      expect(await wrappedSingleToken.totalSupply()).to.equal(ONE_WETH.mul(2))
+      expect(await wrappedSingleToken.balanceOf(team.address)).to.equal(ONE_WETH.mul(1))
     })
   })
 

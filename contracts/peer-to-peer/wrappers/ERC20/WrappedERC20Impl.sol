@@ -24,7 +24,7 @@ contract WrappedERC20Impl is
     string internal _tokenName;
     string internal _tokenSymbol;
     uint8 internal _tokenDecimals;
-    DataTypesPeerToPeer.WrappedERC20TokenInfo[] internal _wrappedTokens;
+    address[] internal _wrappedTokens;
     bool public isIOU;
 
     constructor() ERC20("Wrapped ERC20 Impl", "Wrapped ERC20 Impl") {
@@ -40,7 +40,7 @@ contract WrappedERC20Impl is
         bool _isIOU
     ) external initializer {
         for (uint256 i; i < wrappedTokens.length; ) {
-            _wrappedTokens.push(wrappedTokens[i]);
+            _wrappedTokens.push(wrappedTokens[i].tokenAddr);
             unchecked {
                 ++i;
             }
@@ -80,7 +80,7 @@ contract WrappedERC20Impl is
         _burn(account, amount);
         if (!isIOU) {
             for (uint256 i; i < _wrappedTokens.length; ) {
-                address tokenAddr = _wrappedTokens[i].tokenAddr;
+                address tokenAddr = _wrappedTokens[i];
                 // @dev: this is not caught and will revert if the even one token has wrapper blacklisted
                 // therefore minters in this wrapper need to weigh the risk of this happening and hence tokens
                 // getting permanently stuck in the wrapper
@@ -115,7 +115,7 @@ contract WrappedERC20Impl is
             revert Errors.InvalidAddress();
         }
         uint256 currTotalSupply = totalSupply();
-        address tokenAddr = _wrappedTokens[0].tokenAddr;
+        address tokenAddr = _wrappedTokens[0];
         uint256 tokenPreBal = IERC20(tokenAddr).balanceOf(address(this));
         if (currTotalSupply > 0 && tokenPreBal == 0) {
             // @dev: this would be an unintended state, for instance a negative rebase down to 0 balance with still outstanding supply
@@ -139,11 +139,7 @@ contract WrappedERC20Impl is
         }
     }
 
-    function getWrappedTokensInfo()
-        external
-        view
-        returns (DataTypesPeerToPeer.WrappedERC20TokenInfo[] memory)
-    {
+    function getWrappedTokensInfo() external view returns (address[] memory) {
         return _wrappedTokens;
     }
 

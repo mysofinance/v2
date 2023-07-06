@@ -57,9 +57,7 @@ interface IWrappedERC20Impl {
     function getWrappedTokensInfo()
         external
         view
-        returns (
-            DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens
-        );
+        returns (address[] calldata wrappedTokens);
 
     /**
      * @notice Returns whether wrapped token is IOU
