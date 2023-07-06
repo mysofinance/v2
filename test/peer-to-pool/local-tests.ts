@@ -616,6 +616,23 @@ describe('Peer-to-Pool: Local Tests', function () {
     // loanTokenDue = 1 * 10 ^ 11
     // Constants.BASE = 10 ^ 18
     // brokenRepayment = (9 * 10 ^ 6) * (1 * 10 ^ 11) / 10 ^ 18 = 0.9 = 0
+    const finalLoanAmount = ethers.BigNumber.from(10).pow(6).mul(9)
+    const loanTokenDue = ethers.BigNumber.from(10).pow(11)
+    const someCollTokenDueIfConverted = ethers.BigNumber.from(1) // irrelevant for this test scenario
+
+    // generate bad loan terms struct
+    let badLoanTerms = await getDummyLoanTerms(ADDRESS_ZERO)
+
+    // generate repayment schedule based on above test data
+    let badRepaymentSchedule = [getRepaymentScheduleEntry(loanTokenDue, someCollTokenDueIfConverted, firstDueDate)]
+
+    // set bad repayment schedule
+    badLoanTerms.repaymentSchedule = badRepaymentSchedule
+
+    // assume that loan is matched with min subscription amount (final loan amount has to be at least min subscription)
+    badLoanTerms.minTotalSubscriptions = finalLoanAmount
+
+    // get some valid first due date
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
     firstDueDate = ethers.BigNumber.from(timestamp)
@@ -624,12 +641,8 @@ describe('Peer-to-Pool: Local Tests', function () {
       .add(LOAN_EXECUTION_GRACE_PERIOD)
       .add(MIN_TIME_UNTIL_FIRST_DUE_DATE)
       .add(60) // +60s
-    let badLoanTerms = await getDummyLoanTerms(ADDRESS_ZERO)
-    badLoanTerms.minTotalSubscriptions = ONE_USDC.mul(9)
-    let badRepaymentSchedule = [
-      getRepaymentScheduleEntry(ethers.BigNumber.from(10).pow(11), ethers.BigNumber.from(1), firstDueDate)
-    ]
-    badLoanTerms.repaymentSchedule = badRepaymentSchedule
+
+    // check revert on invalid repayment schedule that would lead to zero repayment amount due to truncation
     await expect(loanProposal.connect(arranger).updateLoanTerms(badLoanTerms)).to.be.revertedWithCustomError(
       loanProposal,
       'LoanTokenDueIsZero'
