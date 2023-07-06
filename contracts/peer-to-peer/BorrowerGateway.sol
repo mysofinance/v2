@@ -183,16 +183,11 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         // @dev: amountRepaidSoFar cannot exceed initRepayAmount
         uint128 leftRepaymentAmount = loan.initRepayAmount -
             loan.amountRepaidSoFar;
-        uint128 reclaimCollAmount;
-        if (leftRepaymentAmount == loanRepayInstructions.targetRepayAmount) {
-            reclaimCollAmount = SafeCast.toUint128(maxReclaimableCollAmount);
-        } else {
-            reclaimCollAmount = SafeCast.toUint128(
-                (maxReclaimableCollAmount *
-                    uint256(loanRepayInstructions.targetRepayAmount)) /
-                    uint256(leftRepaymentAmount)
-            );
-        }
+        uint128 reclaimCollAmount = SafeCast.toUint128(
+            (maxReclaimableCollAmount *
+                uint256(loanRepayInstructions.targetRepayAmount)) /
+                uint256(leftRepaymentAmount)
+        );
         if (reclaimCollAmount == 0) {
             revert Errors.ReclaimAmountIsZero();
         }
