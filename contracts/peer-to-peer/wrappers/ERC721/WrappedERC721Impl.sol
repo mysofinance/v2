@@ -66,8 +66,6 @@ contract WrappedERC721Impl is
     }
 
     function redeem(address account, address recipient) external nonReentrant {
-        // mutex is used to prevent entrancy into the sweepTokensLeftAfterRedeem function
-        // in case the redeemer/recipient is one of the NFTs being transferred
         if (recipient == address(0)) {
             revert Errors.InvalidAddress();
         }
@@ -141,7 +139,7 @@ contract WrappedERC721Impl is
                 )
             {
                 delete stuckTokenAddr[tokenIds[i]];
-                isTokenIdInWrapper[tokenIds[i]] = false;
+                delete isTokenIdInWrapper[tokenIds[i]];
                 ++tokensRemoved;
             } catch {
                 emit TransferFromWrappedTokenFailed(tokenAddr, tokenIds[i]);
@@ -269,10 +267,8 @@ contract WrappedERC721Impl is
                         checkedId
                     )
                 {
+                    isTokenCountedInWrapper[currNftAddress][checkedId] = true;
                     unchecked {
-                        isTokenCountedInWrapper[currNftAddress][
-                            checkedId
-                        ] = true;
                         ++numTokensAdded;
                         ++j;
                     }
