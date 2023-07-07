@@ -48,8 +48,8 @@ contract WrappedERC721Impl is
                     ];
                 isTokenAddr[wrappedTokens[i].tokenIds[j]] = true;
                 isTokenIdInWrapper[wrappedTokens[i].tokenIds[j]] = true;
-                ++numTokens;
                 unchecked {
+                    ++numTokens;
                     ++j;
                 }
             }
