@@ -3935,6 +3935,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(stuckTokenStatusSecondNFTIdx1PreSweep).to.be.true
       expect(stuckTokenStatusSecondNFTIdx2).to.be.false
 
+      expect(await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 1)).to.be.false
+      expect(await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 2)).to.be.true
+      expect(await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 1)).to.be.true
+      expect(await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 2)).to.be.false
+
       // expect sweep to revert if not called by last redeemer
       await expect(
         wrappedToken.connect(team).sweepTokensLeftAfterRedeem(myFirstNFT.address, [2])
@@ -3963,8 +3968,11 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // toggle block transfer back for second blocked token
       await mySecondNFT.connect(team).toggleBlockTransferTokenId(1)
-      // sweep stuck token skipping a non-stuck token
+      // sweep stuck token
       await wrappedToken.connect(borrower).sweepTokensLeftAfterRedeem(mySecondNFT.address, [1])
+
+      // after sweep check that token is not counted in wrapper
+      expect(await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 1)).to.be.false
 
       const currOwnerFirstNFTIdx2PostSweep = await myFirstNFT.ownerOf(2)
       const currOwnerSecondNFTIdx1PostSweep = await mySecondNFT.ownerOf(1)
@@ -4120,9 +4128,19 @@ describe('Peer-to-Peer: Local Tests', function () {
         ethers.BigNumber.from(2)
       ])
 
+      expect(await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 1)).to.be.true
+      expect(await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 1)).to.be.true
+      expect(await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 2)).to.be.false
+      expect(await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 2)).to.be.false
+
       //sync other two tokens
       await wrappedToken.connect(borrower).sync(myFirstNFT.address, 2)
       await wrappedToken.connect(borrower).sync(mySecondNFT.address, 2)
+
+      expect(await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 1)).to.be.true
+      expect(await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 1)).to.be.true
+      expect(await wrappedToken.isTokenCountedInWrapper(myFirstNFT.address, 2)).to.be.true
+      expect(await wrappedToken.isTokenCountedInWrapper(mySecondNFT.address, 2)).to.be.true
 
       expect(await wrappedToken.getTotalAndCurrentNumOfTokensInWrapper()).to.eql([
         ethers.BigNumber.from(4),

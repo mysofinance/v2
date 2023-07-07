@@ -43,11 +43,11 @@ contract WrappedERC721Impl is
                     wrappedTokens[i].tokenAddr
                 ];
                 mapping(uint256 => bool)
-                    storage isTokenId = isTokenCountedInWrapper[
+                    storage isTokenIdInWrapper = isTokenCountedInWrapper[
                         wrappedTokens[i].tokenAddr
                     ];
                 isTokenAddr[wrappedTokens[i].tokenIds[j]] = true;
-                isTokenId[wrappedTokens[i].tokenIds[j]] = true;
+                isTokenIdInWrapper[wrappedTokens[i].tokenIds[j]] = true;
                 ++numTokens;
                 unchecked {
                     ++j;
@@ -141,7 +141,7 @@ contract WrappedERC721Impl is
                 )
             {
                 delete stuckTokenAddr[tokenIds[i]];
-                isTokenIdInWrapper[tokenIds[i]] = true;
+                isTokenIdInWrapper[tokenIds[i]] = false;
                 ++tokensRemoved;
             } catch {
                 emit TransferFromWrappedTokenFailed(tokenAddr, tokenIds[i]);
@@ -180,8 +180,8 @@ contract WrappedERC721Impl is
         ] = totalAndCurrentNumOfTokensInWrapper[0];
         if (tokensNeeded == 0 && msg.sender != lastRedeemer) {
             // @note: tokensNeeded = 0 is case where the wrapper through sync function has all tokens accounted for
-            // in this special case, since no transfer is made, we allow the only the lastRedeemer to remint to
-            // avoid race conditions for anyone being able to remint. In cases where the wrapper has tokens being
+            // in this special case, since no transfer is made, we allow only the lastRedeemer to remint to
+            // avoid race conditions for anyone being able to remint. In cases where the wrapper has tokens
             // being transferred, then sender with that permission to transfer those tokens (owner or approved) can remint
             revert Errors.InvalidSender();
         }
