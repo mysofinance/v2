@@ -8,6 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {Errors} from "../../../Errors.sol";
 import {IWrappedERC20Impl} from "../../interfaces/wrappers/ERC20/IWrappedERC20Impl.sol";
@@ -22,8 +23,8 @@ contract WrappedERC20Impl is
 
     string internal _tokenName;
     string internal _tokenSymbol;
-    DataTypesPeerToPeer.WrappedERC20TokenInfo[] internal _wrappedTokens;
-    bool public isIOU;
+    uint8 internal _tokenDecimals;
+    address[] internal _wrappedTokens;
 
     constructor() ERC20("Wrapped ERC20 Impl", "Wrapped ERC20 Impl") {
         _disableInitializers();
@@ -34,21 +35,27 @@ contract WrappedERC20Impl is
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata _name,
-        string calldata _symbol,
-        bool _isIOU
+        string calldata _symbol
     ) external initializer {
         for (uint256 i; i < wrappedTokens.length; ) {
-            _wrappedTokens.push(wrappedTokens[i]);
+            _wrappedTokens.push(wrappedTokens[i].tokenAddr);
             unchecked {
                 ++i;
             }
         }
         _tokenName = _name;
         _tokenSymbol = _symbol;
-        isIOU = _isIOU;
+        // @dev: only on single token wrappers do we use the underlying token decimals
+        _tokenDecimals = wrappedTokens.length == 1
+            ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
+            : 18;
+        // @dev: for single token case, often initial supply will be 1-1 with underlying, but in some cases
+        // it may differ, e.g. if the underlying token has a transfer fee or there were prior donations to address
         _mint(
             minter,
-            totalInitialSupply < 10 ** 6 ? totalInitialSupply : 10 ** 6
+            totalInitialSupply < 10 ** 18 || wrappedTokens.length == 1
+                ? totalInitialSupply
+                : 10 ** 18
         );
     }
 
@@ -68,30 +75,76 @@ contract WrappedERC20Impl is
             _spendAllowance(account, msg.sender, amount);
         }
         _burn(account, amount);
-        if (!isIOU) {
-            for (uint256 i; i < _wrappedTokens.length; ) {
-                address tokenAddr = _wrappedTokens[i].tokenAddr;
-                IERC20(tokenAddr).safeTransfer(
-                    recipient,
-                    Math.mulDiv(
-                        IERC20(tokenAddr).balanceOf(address(this)),
-                        amount,
-                        currTotalSupply
-                    )
-                );
-                unchecked {
-                    ++i;
-                }
+
+        // @dev: if isIOU then _wrappedTokens.length == 0 and this loop is skipped automatically
+        for (uint256 i; i < _wrappedTokens.length; ) {
+            address tokenAddr = _wrappedTokens[i];
+            // @note: The underlying token transfers are all-or-nothing. In other words, if one token transfer fails,
+            // the entire redemption process will fail as well. Users should only use wrappers if they deem this risk
+            // to be acceptable or non-existent (for example, in cases where the underlying tokens can never have any
+            // transfer restrictions).
+            IERC20(tokenAddr).safeTransfer(
+                recipient,
+                Math.mulDiv(
+                    IERC20(tokenAddr).balanceOf(address(this)),
+                    amount,
+                    currTotalSupply
+                )
+            );
+            unchecked {
+                ++i;
             }
         }
         emit Redeemed(account, recipient, amount);
     }
 
-    function getWrappedTokensInfo()
-        external
-        view
-        returns (DataTypesPeerToPeer.WrappedERC20TokenInfo[] memory)
-    {
+    function mint(
+        address recipient,
+        uint256 amount,
+        uint256 expectedTransferFee
+    ) external nonReentrant {
+        if (_wrappedTokens.length != 1) {
+            // @dev: only on single token wrappers do we allow minting
+            // @note: IOU has no underlying tokens, so they are also disabled from minting
+            revert Errors.OnlyMintFromSingleTokenWrapper();
+        }
+        if (amount == 0) {
+            revert Errors.InvalidAmount();
+        }
+        if (recipient == address(0)) {
+            revert Errors.InvalidAddress();
+        }
+        uint256 currTotalSupply = totalSupply();
+        address tokenAddr = _wrappedTokens[0];
+        uint256 tokenPreBal = IERC20(tokenAddr).balanceOf(address(this));
+        if (currTotalSupply > 0 && tokenPreBal == 0) {
+            // @dev: this would be an unintended state, for instance a negative rebase down to 0 balance with still outstanding supply
+            // in which case to not allow possibly diluted or unfair proportions for new minters, will revert
+            // @note: the state token balance > 0, but total supply == 0 is allowed (e.g. donations to address before mint)
+            revert Errors.NonMintableTokenState();
+        }
+        _mint(
+            recipient,
+            currTotalSupply == 0
+                ? amount
+                : Math.mulDiv(amount, currTotalSupply, tokenPreBal)
+        );
+        IERC20(tokenAddr).transferFrom(
+            msg.sender,
+            address(this),
+            amount + expectedTransferFee
+        );
+        uint256 tokenPostBal = IERC20(tokenAddr).balanceOf(address(this));
+        if (tokenPostBal != tokenPreBal + amount) {
+            revert Errors.InvalidSendAmount();
+        }
+    }
+
+    function isIOU() external view returns (bool) {
+        return _wrappedTokens.length == 0;
+    }
+
+    function getWrappedTokensInfo() external view returns (address[] memory) {
         return _wrappedTokens;
     }
 
@@ -104,6 +157,6 @@ contract WrappedERC20Impl is
     }
 
     function decimals() public view virtual override returns (uint8) {
-        return 6;
+        return _tokenDecimals;
     }
 }
