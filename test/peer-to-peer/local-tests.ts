@@ -264,7 +264,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     await erc20Wrapper.deployed()
 
     // reverts if user tries to create vault before address registry has been initialized (otherwise couldn't keep track of registered vaults)
-    await expect(lenderVaultFactory.connect(lender).createVault()).to.be.revertedWithCustomError(
+    await expect(lenderVaultFactory.connect(lender).createVault(ZERO_BYTES32)).to.be.revertedWithCustomError(
       addressRegistry,
       'Uninitialized'
     )
@@ -470,7 +470,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     // create a vault
     const numVaultsPre = await addressRegistry.numRegisteredVaults()
     expect(numVaultsPre).to.be.equal(0)
-    await lenderVaultFactory.connect(lender).createVault()
+    await lenderVaultFactory.connect(lender).createVault(ZERO_BYTES32)
     const numVaultsPost = await addressRegistry.numRegisteredVaults()
     expect(numVaultsPost).to.be.equal(1)
     const lenderVaultAddrs = await addressRegistry.registeredVaults()
@@ -551,9 +551,53 @@ describe('Peer-to-Peer: Local Tests', function () {
       testnetTokenManager,
       addr1,
       addr2,
-      addr3
+      addr3,
+      lenderVaultFactory
     }
   }
+
+  describe('Lender Vault Factory', function () {
+    it('Should handle vault creation correctly', async function () {
+      const { addressRegistry, lenderVaultFactory, team, addr1, addr2, addr3 } = await setupTest()
+
+      // initially one vault in existence from setupTests
+      let numVaultsPre = await addressRegistry.numRegisteredVaults()
+      expect(numVaultsPre).to.be.equal(1)
+
+      // check user can create vault
+      await lenderVaultFactory.connect(team).createVault(ZERO_BYTES32)
+      numVaultsPre = await addressRegistry.numRegisteredVaults()
+      expect(numVaultsPre).to.be.equal(2)
+
+      // reverts if same user tries to create new vault with same salt
+      await expect(lenderVaultFactory.connect(team).createVault(ZERO_BYTES32)).to.be.revertedWith('ERC1167: create2 failed')
+
+      // check user can create vaults with different salts
+      await lenderVaultFactory.connect(team).createVault(ethers.utils.formatBytes32String('1'))
+      numVaultsPre = await addressRegistry.numRegisteredVaults()
+      expect(numVaultsPre).to.be.equal(3)
+
+      // check different users can create multiple vaults
+      await lenderVaultFactory.connect(addr1).createVault(ZERO_BYTES32)
+      await expect(lenderVaultFactory.connect(addr1).createVault(ZERO_BYTES32)).to.be.revertedWith('ERC1167: create2 failed')
+      await lenderVaultFactory.connect(addr1).createVault(ethers.utils.formatBytes32String('1'))
+      await lenderVaultFactory.connect(addr1).createVault(ethers.utils.formatBytes32String('2'))
+      numVaultsPre = await addressRegistry.numRegisteredVaults()
+      expect(numVaultsPre).to.be.equal(6)
+
+      await lenderVaultFactory.connect(addr2).createVault(ZERO_BYTES32)
+      await expect(lenderVaultFactory.connect(addr2).createVault(ZERO_BYTES32)).to.be.revertedWith('ERC1167: create2 failed')
+      await lenderVaultFactory.connect(addr1).createVault(ethers.utils.formatBytes32String('3'))
+      numVaultsPre = await addressRegistry.numRegisteredVaults()
+      expect(numVaultsPre).to.be.equal(8)
+
+      await lenderVaultFactory.connect(addr3).createVault(ZERO_BYTES32)
+      await expect(lenderVaultFactory.connect(addr3).createVault(ZERO_BYTES32)).to.be.revertedWith('ERC1167: create2 failed')
+      await lenderVaultFactory.connect(addr1).createVault(ethers.utils.formatBytes32String('4'))
+      numVaultsPre = await addressRegistry.numRegisteredVaults()
+      expect(numVaultsPre).to.be.equal(10)
+    })
+  })
 
   describe('Address Registry', function () {
     it('Should handle singleton state updates correctly', async function () {

@@ -22,12 +22,13 @@ contract LenderVaultFactory is ReentrancyGuard, ILenderVaultFactory {
         lenderVaultImpl = _lenderVaultImpl;
     }
 
-    function createVault()
-        external
-        nonReentrant
-        returns (address newLenderVaultAddr)
-    {
-        newLenderVaultAddr = Clones.clone(lenderVaultImpl);
+    function createVault(
+        bytes32 salt
+    ) external nonReentrant returns (address newLenderVaultAddr) {
+        newLenderVaultAddr = Clones.cloneDeterministic(
+            lenderVaultImpl,
+            keccak256(abi.encode(msg.sender, salt))
+        );
         ILenderVaultImpl(newLenderVaultAddr).initialize(
             msg.sender,
             addressRegistry
