@@ -25,7 +25,6 @@ contract WrappedERC20Impl is
     string internal _tokenSymbol;
     uint8 internal _tokenDecimals;
     address[] internal _wrappedTokens;
-    bool public isIOU;
 
     constructor() ERC20("Wrapped ERC20 Impl", "Wrapped ERC20 Impl") {
         _disableInitializers();
@@ -36,8 +35,7 @@ contract WrappedERC20Impl is
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata _name,
-        string calldata _symbol,
-        bool _isIOU
+        string calldata _symbol
     ) external initializer {
         for (uint256 i; i < wrappedTokens.length; ) {
             _wrappedTokens.push(wrappedTokens[i].tokenAddr);
@@ -51,7 +49,6 @@ contract WrappedERC20Impl is
         _tokenDecimals = wrappedTokens.length == 1
             ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
             : 18;
-        isIOU = _isIOU;
         // @dev: for single token case, often initial supply will be 1-1 with underlying, but in some cases
         // it may differ, e.g. if the underlying token has a transfer fee or there were prior donations to address
         _mint(
@@ -78,24 +75,24 @@ contract WrappedERC20Impl is
             _spendAllowance(account, msg.sender, amount);
         }
         _burn(account, amount);
-        if (!isIOU) {
-            for (uint256 i; i < _wrappedTokens.length; ) {
-                address tokenAddr = _wrappedTokens[i];
-                // @note: The underlying token transfers are all-or-nothing. In other words, if one token transfer fails,
-                // the entire redemption process will fail as well. Users should only use wrappers if they deem this risk
-                // to be acceptable or non-existent (for example, in cases where the underlying tokens can never have any
-                // transfer restrictions).
-                IERC20(tokenAddr).safeTransfer(
-                    recipient,
-                    Math.mulDiv(
-                        IERC20(tokenAddr).balanceOf(address(this)),
-                        amount,
-                        currTotalSupply
-                    )
-                );
-                unchecked {
-                    ++i;
-                }
+
+        // @dev: if isIOU then _wrappedTokens.length == 0 and this loop is skipped automatically
+        for (uint256 i; i < _wrappedTokens.length; ) {
+            address tokenAddr = _wrappedTokens[i];
+            // @note: The underlying token transfers are all-or-nothing. In other words, if one token transfer fails,
+            // the entire redemption process will fail as well. Users should only use wrappers if they deem this risk
+            // to be acceptable or non-existent (for example, in cases where the underlying tokens can never have any
+            // transfer restrictions).
+            IERC20(tokenAddr).safeTransfer(
+                recipient,
+                Math.mulDiv(
+                    IERC20(tokenAddr).balanceOf(address(this)),
+                    amount,
+                    currTotalSupply
+                )
+            );
+            unchecked {
+                ++i;
             }
         }
         emit Redeemed(account, recipient, amount);
@@ -141,6 +138,10 @@ contract WrappedERC20Impl is
         if (tokenPostBal != tokenPreBal + amount) {
             revert Errors.InvalidSendAmount();
         }
+    }
+
+    function isIOU() external view returns (bool) {
+        return _wrappedTokens.length == 0;
     }
 
     function getWrappedTokensInfo() external view returns (address[] memory) {

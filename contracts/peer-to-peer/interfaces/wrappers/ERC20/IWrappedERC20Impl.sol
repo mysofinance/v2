@@ -14,15 +14,13 @@ interface IWrappedERC20Impl {
      * @param totalInitialSupply Total initial supply of the wrapped token basket
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
-     * @param isIOU Whether the wrapped token is an IOU token, i.e. it is not backed by any real ERC20 token
      */
     function initialize(
         address minter,
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata name,
-        string calldata symbol,
-        bool isIOU
+        string calldata symbol
     ) external;
 
     /**
