@@ -29,5 +29,5 @@ abstract contract VaultCallback is IVaultCallback {
     function _repayCallback(
         DataTypesPeerToPeer.Loan calldata loan,
         bytes calldata data
-    ) internal virtual {}
+    ) internal virtual {} // solhint-disable no-empty-blocks
 }

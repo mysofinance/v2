@@ -24,8 +24,7 @@ import {
   getExactLpTokenPriceInEth,
   getFairReservesPriceAndEthValue,
   getDeltaBNComparison,
-  setupBorrowerWhitelist,
-  getTwoFeesIfPossible
+  setupBorrowerWhitelist
 } from './helpers/misc'
 
 // test config constants & vars
@@ -1171,9 +1170,6 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         lenderVault,
         'InvalidAddress'
       )
-      await expect(
-        lenderVault.connect(lender).getTokenBalancesAndLockedAmounts([borrower.address])
-      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
 
       const tokenBalanceAndLockedAmountsPostRepay = await lenderVault
         .connect(lender)
@@ -2103,7 +2099,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       preUsdcAllowance = await usdc.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
 
       // check repay callback reverts when called by anyone else than borrower gateway
-      const loan = await lenderVault.loan(0)
+      const loanId = 0
+      const loan = await lenderVault.loan(loanId)
       await expect(uniV3Looping.connect(borrower).repayCallback(loan, callbackData)).to.be.revertedWithCustomError(
         uniV3Looping,
         'InvalidSender'
@@ -2119,6 +2116,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         ['uint256', 'uint256', 'uint24'],
         [minSwapReceiveLoanToken, deadline, poolFee]
       )
+
+      // borrower approves borrower gateway for repay
+      await usdc.connect(borrower).approve(borrowerGateway.address, loan.initRepayAmount)
+
       await expect(
         borrowerGateway.connect(borrower).repay(
           {
@@ -2127,11 +2128,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
             expectedTransferFee: 0,
             deadline: MAX_UINT256,
             callbackAddr: callbackAddr,
-            callbackData: callbackData
+            callbackData: callbackDataRepay
           },
           lenderVault.address
         )
       )
+        .to.emit(borrowerGateway, 'Repaid')
+        .withArgs(lenderVault.address, loanId, loan.initRepayAmount)
 
       // post callback allowances
       postWethAllowance = await weth.allowance(callbackAddr, UNI_V3_SWAP_ROUTER)
@@ -5487,18 +5490,25 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       const vaultGohmBalPost = await gohm.balanceOf(lenderVault.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
+      // retrieve prices directly from chainlink
       const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
       const collTokenRoundDataPreIndex = await ohmOracleInstance.latestRoundData()
       const loanTokenPriceRaw = loanTokenRoundData.answer
       const collTokenPriceRawPreIndex = collTokenRoundDataPreIndex.answer
       const index = await gohmInstance.index()
+      // take into account index to determine gohm price
+      const SOHM_DECIMALS = ethers.BigNumber.from(10).pow(9)
+      const collTokenPriceRawPostIndex = collTokenPriceRawPreIndex.mul(index).div(SOHM_DECIMALS)
 
-      const collTokenPriceInLoanToken = collTokenPriceRawPreIndex
-        .mul(ONE_USDC)
-        .mul(index)
-        .div(loanTokenPriceRaw)
-        .div(10 ** 9)
-      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+      // retrieve prices from myso oracle (implicitly takes into account gohm index)
+      const tokenPrices = await olympusOracleImplementation.getRawPrices(gohm.address, usdc.address)
+
+      // check that retrieved prices match
+      expect(collTokenPriceRawPostIndex).to.be.equal(tokenPrices[0])
+      expect(loanTokenPriceRaw).to.be.equal(tokenPrices[1])
+
+      const loanPerCollUnit = BASE.mul(75).div(100)
+      const maxLoanPerColl = loanPerCollUnit.mul(collTokenPriceRawPostIndex).mul(ONE_USDC).div(loanTokenPriceRaw).div(BASE)
 
       expect(borrowerGohmBalPre.sub(borrowerGohmBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)

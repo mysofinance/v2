@@ -11,7 +11,6 @@ import {Errors} from "../../../Errors.sol";
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
 contract ChainlinkArbitrumSequencerUSD is ChainlinkBase {
-    // solhint-disable no-empty-blocks
     address internal constant SEQUENCER_FEED =
         0xFdB631F5EE196F0ed6FAa767959853A9F217697D; // arbitrum sequencer feed
     uint256 internal constant ARB_USD_BASE_CURRENCY_UNIT = 1e8; // 8 decimals for USD based oracles
@@ -19,7 +18,7 @@ contract ChainlinkArbitrumSequencerUSD is ChainlinkBase {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
-    ) ChainlinkBase(_tokenAddrs, _oracleAddrs, ARB_USD_BASE_CURRENCY_UNIT) {}
+    ) ChainlinkBase(_tokenAddrs, _oracleAddrs, ARB_USD_BASE_CURRENCY_UNIT) {} // solhint-disable no-empty-blocks
 
     function _checkAndReturnLatestRoundData(
         address oracleAddr

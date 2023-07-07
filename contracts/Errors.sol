@@ -94,7 +94,6 @@ library Errors {
     error TransferToWrappedTokenFailed();
     error TransferFromWrappedTokenFailed();
     error StateAlreadySet();
-    error IOUCannotBeRedeemedOnChain();
     error ReclaimableCollateralAmountZero();
     error InvalidSwap();
     error InvalidUpfrontFee();
@@ -106,7 +105,7 @@ library Errors {
     error NoDsEth();
     error TooShortTwapInterval();
     error TooLongTwapInterval();
-    error SpotPriceDeviatesFromTwapPrice();
+    error TwapExceedsThreshold();
     error Reentrancy();
     error TokenNotStuck();
     error InconsistentExpTransferFee();
@@ -115,4 +114,12 @@ library Errors {
     error DisallowedSubscriptionLockup();
     error IncorrectLoanAmount();
     error Disabled();
+    error CannotRemintUnlessZeroSupply();
+    error TokensStillMissingFromWrapper();
+    error OnlyMintFromSingleTokenWrapper();
+    error NonMintableTokenState();
+    error NoTokensTransferred();
+    error TokenAlreadyCountedInWrapper();
+    error TokenNotOwnedByWrapper();
+    error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
 }

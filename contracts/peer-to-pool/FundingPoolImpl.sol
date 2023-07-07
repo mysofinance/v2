@@ -20,7 +20,6 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
     address public depositToken;
     mapping(address => uint256) public balanceOf;
     mapping(address => uint256) public depositUnlockTime;
-    mapping(address => uint256) public subscriptionUnlockTime;
     mapping(address => uint256) public totalSubscriptions;
     mapping(address => mapping(address => uint256)) public subscriptionAmountOf;
     // note: earliest unsubscribe time is to prevent griefing loans through atomic flashborrow,
@@ -176,7 +175,10 @@ contract FundingPoolImpl is Initializable, ReentrancyGuard, IFundingPoolImpl {
                 loanTerms
             );
         }
-        balanceOf[msg.sender] = _balanceOf - effectiveSubscriptionAmount;
+        unchecked {
+            // @dev: can't underflow due to previous `maxSubscriptionAmount > _balanceOf` check
+            balanceOf[msg.sender] = _balanceOf - effectiveSubscriptionAmount;
+        }
         totalSubscriptions[loanProposal] =
             _totalSubscriptions +
             effectiveSubscriptionAmount;

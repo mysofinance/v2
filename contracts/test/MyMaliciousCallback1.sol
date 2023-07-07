@@ -3,8 +3,6 @@
 pragma solidity 0.8.19;
 
 contract MyMaliciousCallback1 {
-    // solhint-disable avoid-low-level-calls no-inline-assembly no-empty-blocks
-
     uint256 internal _vaultVictim;
     address internal _collToken;
     address internal _compartmentVictim;
@@ -28,6 +26,7 @@ contract MyMaliciousCallback1 {
          * token contract and then use delegate call transferCollFromCompartment(...) and pretend msg.sender to
          * be the vault.
          */
+        // solhint-disable avoid-low-level-calls
         (bool success, bytes memory result) = _compartmentVictim.delegatecall(
             abi.encodeWithSignature(
                 "transferCollFromCompartment(uint256,uint256,uint128,address,address,address)",
@@ -45,6 +44,7 @@ contract MyMaliciousCallback1 {
          * NOT on balance of compartment, hence the compartment balance wouldn't be at risk
          */
         if (!success) {
+            // solhint-disable no-inline-assembly
             assembly {
                 revert(add(result, 32), mload(result))
             }
@@ -52,5 +52,6 @@ contract MyMaliciousCallback1 {
         return 0;
     }
 
+    // solhint-disable no-empty-blocks
     function transfer(address, uint256) external returns (bool) {}
 }

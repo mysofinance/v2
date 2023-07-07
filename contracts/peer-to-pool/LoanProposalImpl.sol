@@ -13,6 +13,29 @@ import {IFundingPoolImpl} from "./interfaces/IFundingPoolImpl.sol";
 import {ILoanProposalImpl} from "./interfaces/ILoanProposalImpl.sol";
 import {IMysoTokenManager} from "../interfaces/IMysoTokenManager.sol";
 
+/**
+ * Loan Proposal Process:
+ *
+ * 1) Arranger initiates the loan proposal
+ *    - Function: factory.createLoanProposal()
+ *
+ * 2) Arranger adjusts loan terms
+ *    - Function: loanProposal.lockLoanTerms()
+ *    - NOTE: This triggers a cool-off period during which the arranger cannot modify loan terms.
+ *    - Lenders can subscribe or unsubscribe at any time during this phase.
+ *      - Functions: fundingPool.subscribe(), fundingPool.unsubscribe()
+ *
+ * 3) Arranger (or borrower) finalizes the loan terms
+ *    3.1) This action triggers a subscribe/unsubscribe grace period, during which lenders can still subscribe/unsubscribe.
+ *         - Functions: fundingPool.subscribe(), fundingPool.unsubscribe()
+ *    3.2) After the grace period, a loan execution grace period begins.
+ *
+ * 4) Borrower finalizes the loan terms and transfers collateral within the loan execution grace period.
+ *    - Function: loanProposal.finalizeLoanTermsAndTransferColl()
+ *    - NOTE: This must be done within the loan execution grace period.
+ *
+ * 5) The loan proposal execution can be triggered by anyone, concluding the process.
+ */
 contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     using SafeERC20 for IERC20Metadata;
 
@@ -75,7 +98,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         dynamicData.protocolFee = IFactory(_factory).protocolFee();
     }
 
-    function proposeLoanTerms(
+    function updateLoanTerms(
         DataTypesPeerToPool.LoanTerms calldata newLoanTerms
     ) external {
         _checkIsAuthorizedSender(staticData.arranger);
@@ -157,7 +180,9 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (
             dynamicData.status !=
             DataTypesPeerToPool.LoanStatus.LOAN_TERMS_LOCKED ||
-            block.timestamp < _lenderInOrOutCutoffTime()
+            block.timestamp < _lenderInOrOutCutoffTime() ||
+            block.timestamp >
+            _lenderInOrOutCutoffTime() + Constants.LOAN_EXECUTION_GRACE_PERIOD
         ) {
             revert Errors.InvalidActionForCurrentStatus();
         }
@@ -168,12 +193,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         if (totalSubscriptions < _unfinalizedLoanTerms.minTotalSubscriptions) {
             revert Errors.FellShortOfTotalSubscriptionTarget();
         }
-        if (
-            _unfinalizedLoanTerms.repaymentSchedule[0].dueTimestamp <=
-            block.timestamp + Constants.MIN_TIME_UNTIL_FIRST_DUE_DATE
-        ) {
-            revert Errors.FirstDueDateTooCloseOrPassed();
-        }
+
         dynamicData.status = DataTypesPeerToPool.LoanStatus.READY_TO_EXECUTE;
         // note: now that final subscription amounts are known, convert relative values
         // to absolute, i.e.:
@@ -609,6 +629,13 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
         ) {
             revert Errors.FirstDueDateTooCloseOrPassed();
         }
+        // @dev: the minimum time required between due dates is
+        // max{ MIN_TIME_BETWEEN_DUE_DATES, conversion + repayment grace period }
+        uint256 minTimeBetweenDueDates = _getConversionAndRepaymentGracePeriod();
+        minTimeBetweenDueDates = minTimeBetweenDueDates >
+            Constants.MIN_TIME_BETWEEN_DUE_DATES
+            ? minTimeBetweenDueDates
+            : Constants.MIN_TIME_BETWEEN_DUE_DATES;
         for (uint256 i; i < repaymentScheduleLen; ) {
             if (
                 SafeCast.toUint128(
@@ -621,8 +648,7 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
             if (
                 i > 0 &&
                 repaymentSchedule[i].dueTimestamp <
-                repaymentSchedule[i - 1].dueTimestamp +
-                    Constants.MIN_TIME_BETWEEN_DUE_DATES
+                repaymentSchedule[i - 1].dueTimestamp + minTimeBetweenDueDates
             ) {
                 revert Errors.InvalidDueDates();
             }
@@ -637,8 +663,16 @@ contract LoanProposalImpl is Initializable, ILoanProposalImpl {
     ) internal view returns (uint256 repaymentCutoffTime) {
         repaymentCutoffTime =
             _loanTerms.repaymentSchedule[repaymentIdx].dueTimestamp +
-            staticData.conversionGracePeriod +
-            staticData.repaymentGracePeriod;
+            _getConversionAndRepaymentGracePeriod();
+    }
+
+    function _getConversionAndRepaymentGracePeriod()
+        internal
+        view
+        returns (uint256)
+    {
+        return
+            staticData.conversionGracePeriod + staticData.repaymentGracePeriod;
     }
 
     function _checkIsAuthorizedSender(address authorizedSender) internal view {

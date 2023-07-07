@@ -14,15 +14,13 @@ interface IWrappedERC20Impl {
      * @param totalInitialSupply Total initial supply of the wrapped token basket
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
-     * @param isIOU Whether the wrapped token is an IOU token, i.e. it is not backed by any real ERC20 token
      */
     function initialize(
         address minter,
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata name,
-        string calldata symbol,
-        bool isIOU
+        string calldata symbol
     ) external;
 
     /**
@@ -38,15 +36,26 @@ interface IWrappedERC20Impl {
     ) external;
 
     /**
-     * @notice Returns wrapped token info
-     * @return wrappedTokens array of struct containing information about wrapped tokens
+     * @notice Function to mint wrapped tokens for underlying token
+     * @dev This function is only callable when the wrapped token has only one underlying token
+     * @param recipient Account that is receiving the minted tokens
+     * @param amount Amount of wrapped tokens to be minted
+     * @param expectedTransferFee Expected transfer fee for the minted tokens (e.g. wrapping PAXG)
+     */
+    function mint(
+        address recipient,
+        uint256 amount,
+        uint256 expectedTransferFee
+    ) external;
+
+    /**
+     * @notice Returns wrapped token addresses
+     * @return wrappedTokens array of wrapped token addresses
      */
     function getWrappedTokensInfo()
         external
         view
-        returns (
-            DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens
-        );
+        returns (address[] calldata wrappedTokens);
 
     /**
      * @notice Returns whether wrapped token is IOU

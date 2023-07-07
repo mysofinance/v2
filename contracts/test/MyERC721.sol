@@ -9,7 +9,6 @@ contract MyERC721 is ERC721, ERC721Burnable, Ownable {
     mapping(uint256 => bool) public tokenIdTransferBlocked;
     address internal _owner;
 
-    //solhint-disable-next-line no-empty-blocks
     constructor(
         string memory _name,
         string memory _symbol

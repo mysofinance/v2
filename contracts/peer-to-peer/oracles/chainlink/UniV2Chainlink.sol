@@ -55,24 +55,38 @@ contract UniV2Chainlink is ChainlinkBasic {
         address collToken,
         address loanToken
     ) external view override returns (uint256 collTokenPriceInLoanToken) {
-        bool isCollTokenLpToken = isLpToken[collToken];
-        bool isLoanTokenLpToken = isLpToken[loanToken];
-        if (!isCollTokenLpToken && !isLoanTokenLpToken) {
-            revert Errors.NoLpTokens();
-        }
+        (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw) = getRawPrices(
+            collToken,
+            loanToken
+        );
         uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
-        uint256 collTokenPriceRaw = isCollTokenLpToken
-            ? getLpTokenPrice(collToken)
-            : _getPriceOfToken(collToken);
-        uint256 loanTokenPriceRaw = isLoanTokenLpToken
-            ? getLpTokenPrice(loanToken)
-            : _getPriceOfToken(loanToken);
-
         collTokenPriceInLoanToken = Math.mulDiv(
             collTokenPriceRaw,
             10 ** loanTokenDecimals,
             loanTokenPriceRaw
         );
+    }
+
+    function getRawPrices(
+        address collToken,
+        address loanToken
+    )
+        public
+        view
+        override
+        returns (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw)
+    {
+        bool isCollTokenLpToken = isLpToken[collToken];
+        bool isLoanTokenLpToken = isLpToken[loanToken];
+        if (!isCollTokenLpToken && !isLoanTokenLpToken) {
+            revert Errors.NoLpTokens();
+        }
+        collTokenPriceRaw = isCollTokenLpToken
+            ? getLpTokenPrice(collToken)
+            : _getPriceOfToken(collToken);
+        loanTokenPriceRaw = isLoanTokenLpToken
+            ? getLpTokenPrice(loanToken)
+            : _getPriceOfToken(loanToken);
     }
 
     /**

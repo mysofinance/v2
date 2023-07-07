@@ -90,10 +90,8 @@ contract LenderVaultImpl is
                 IBaseCompartment(_loan.collTokenCompartmentAddr)
                     .unlockCollToVault(collToken);
             } else {
-                totalUnlockableColl +=
-                    ((_loan.initRepayAmount - _loan.amountRepaidSoFar) *
-                        _loan.initCollAmount) /
-                    _loan.initRepayAmount;
+                totalUnlockableColl += (_loan.initCollAmount -
+                    _loan.amountReclaimedSoFar);
             }
             _loan.collUnlocked = true;
             unchecked {
@@ -225,7 +223,6 @@ contract LenderVaultImpl is
             }
             _loan.initRepayAmount = SafeCast.toUint128(repayAmount);
             _loans.push(_loan);
-            transferInstructions.isLoan = true;
         } else {
             // note: only case left is upfrontFee = 100% and this corresponds to an outright swap;
             // check that tenor is zero and earliest repay is nonzero, and compartment is zero, with no compartment transfer fee
@@ -410,12 +407,8 @@ contract LenderVaultImpl is
         }
         balances = new uint256[](tokensLen);
         _lockedAmounts = new uint256[](tokensLen);
-        IAddressRegistry _addressRegistry = IAddressRegistry(addressRegistry);
         for (uint256 i; i < tokensLen; ) {
-            if (
-                tokens[i] == address(0) ||
-                !_addressRegistry.isWhitelistedERC20(tokens[i])
-            ) {
+            if (tokens[i] == address(0)) {
                 revert Errors.InvalidAddress();
             }
             balances[i] = IERC20Metadata(tokens[i]).balanceOf(address(this));
@@ -441,8 +434,7 @@ contract LenderVaultImpl is
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        // @dev: access control via super.transferOwnership()
-        // as well as _newOwnerProposal check against address(0)
+        // @dev: access control check via super.transferOwnership()
         super.transferOwnership(_newOwnerProposal);
     }
 
@@ -499,21 +491,29 @@ contract LenderVaultImpl is
             ) {
                 revert Errors.LtvHigherThanMax();
             }
-            loanPerCollUnit = Math.mulDiv(
-                quoteTuple.loanPerCollUnitOrLtv,
-                IOracle(generalQuoteInfo.oracleAddr).getPrice(
+            (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw) = IOracle(
+                generalQuoteInfo.oracleAddr
+            ).getRawPrices(
                     generalQuoteInfo.collToken,
                     generalQuoteInfo.loanToken
-                ),
-                Constants.BASE
-            );
+                );
+            loanPerCollUnit =
+                Math.mulDiv(
+                    quoteTuple.loanPerCollUnitOrLtv,
+                    collTokenPriceRaw *
+                        10 **
+                            IERC20Metadata(generalQuoteInfo.loanToken)
+                                .decimals(),
+                    loanTokenPriceRaw
+                ) /
+                Constants.BASE;
         }
         uint256 unscaledLoanAmount = loanPerCollUnit * netPledgeAmount;
+        uint256 collTokenDecimals = IERC20Metadata(generalQuoteInfo.collToken)
+            .decimals();
 
         // calculate loan amount
-        loanAmount =
-            unscaledLoanAmount /
-            (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+        loanAmount = unscaledLoanAmount / (10 ** collTokenDecimals);
 
         // calculate repay amount and interest rate factor only for loans
         if (upfrontFeePctInBase < Constants.BASE) {
@@ -533,7 +533,7 @@ contract LenderVaultImpl is
                     interestRateFactor,
                     Constants.BASE
                 ) /
-                (10 ** IERC20Metadata(generalQuoteInfo.collToken).decimals());
+                (10 ** collTokenDecimals);
         }
     }
 

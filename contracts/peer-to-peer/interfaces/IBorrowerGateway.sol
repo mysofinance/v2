@@ -30,6 +30,7 @@ interface IBorrowerGateway {
      * @param offChainQuote quote data (see DataTypesPeerToPeer comments)
      * @param quoteTuple quote data (see DataTypesPeerToPeer comments)
      * @param proof array of bytes needed for merkle tree verification of quote
+     * @return loan data
      */
     function borrowWithOffChainQuote(
         address lenderVault,
@@ -38,7 +39,7 @@ interface IBorrowerGateway {
         DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] memory proof
-    ) external;
+    ) external returns (DataTypesPeerToPeer.Loan memory);
 
     /**
      * @notice function which allows a borrower to use an onChain quote to borrow
@@ -46,6 +47,7 @@ interface IBorrowerGateway {
      * @param borrowInstructions data needed for borrow (see DataTypesPeerToPeer comments)
      * @param onChainQuote quote data (see DataTypesPeerToPeer comments)
      * @param quoteTupleIdx index of quote tuple array
+     * @return loan data
      */
     function borrowWithOnChainQuote(
         address lenderVault,
@@ -53,7 +55,7 @@ interface IBorrowerGateway {
             calldata borrowInstructions,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote,
         uint256 quoteTupleIdx
-    ) external;
+    ) external returns (DataTypesPeerToPeer.Loan memory);
 
     /**
      * @notice function which allows a borrower to repay a loan

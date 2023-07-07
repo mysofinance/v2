@@ -9,8 +9,6 @@ import {IGLPStakingHelper} from "../../interfaces/compartments/staking/IGLPStaki
 import {BaseCompartment} from "../BaseCompartment.sol";
 
 contract GLPStakingCompartment is BaseCompartment {
-    // solhint-disable no-empty-blocks
-
     using SafeERC20 for IERC20;
 
     // arbitrum WETH address
@@ -50,8 +48,6 @@ contract GLPStakingCompartment is BaseCompartment {
     }
 
     function getReclaimableBalance(
-        uint256 /*initCollAmount*/,
-        uint256 /*amountReclaimedSoFar*/,
         address collToken
     ) external view override returns (uint256) {
         return IERC20(collToken).balanceOf(address(this));
@@ -72,9 +68,10 @@ contract GLPStakingCompartment is BaseCompartment {
             return;
         }
 
-        //solhint-ignore-empty-blocks
+        // solhint-disable no-empty-blocks
         try IGLPStakingHelper(FEE_GLP).claim(address(this)) {
             // do nothing
+            // solhint-disable no-empty-blocks
         } catch {
             // do nothing
         }

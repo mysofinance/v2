@@ -7,6 +7,7 @@ library Helpers {
         bytes memory sig
     ) internal pure returns (bytes32 r, bytes32 vs) {
         require(sig.length == 64, "invalid signature length");
+        // solhint-disable no-inline-assembly
         assembly {
             // first 32 bytes, after the length prefix
             r := mload(add(sig, 32))

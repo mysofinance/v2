@@ -15,7 +15,7 @@ contract UniV3Looping is VaultCallback {
     address private constant UNI_V3_SWAP_ROUTER =
         0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
-    constructor(address _borrowerGateway) VaultCallback(_borrowerGateway) {}
+    constructor(address _borrowerGateway) VaultCallback(_borrowerGateway) {} // solhint-disable no-empty-blocks
 
     function borrowCallback(
         DataTypesPeerToPeer.Loan calldata loan,
