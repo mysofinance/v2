@@ -11,9 +11,12 @@ interface ILenderVaultFactory {
 
     /**
      * @notice function creates new lender vaults
+     * @param salt salt used for deterministic cloning
      * @return newLenderVaultAddr address of created vault
      */
-    function createVault() external returns (address newLenderVaultAddr);
+    function createVault(
+        bytes32 salt
+    ) external returns (address newLenderVaultAddr);
 
     /**
      * @notice function returns address registry

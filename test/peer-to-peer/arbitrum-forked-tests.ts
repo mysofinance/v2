@@ -113,7 +113,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     /* ********************************** */
 
     // create a vault
-    await lenderVaultFactory.connect(lender).createVault()
+    await lenderVaultFactory.connect(lender).createVault(ZERO_BYTES32)
     const lenderVaultAddrs = await addressRegistry.registeredVaults()
     const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)

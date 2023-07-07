@@ -30,7 +30,11 @@ abstract contract TwapGetter is ITwapGetter {
 
         // note: this returns the price in base 2**96 and denominated in token1
         // i.e., `1 unit of token0` corresponds to `sqrtPriceX96 units (divided by 2**96) of token1`
-        uint256 priceX96 = getPriceX96FromSqrtPriceX96(sqrtPriceX96);
+        uint256 priceX96 = FullMath.mulDiv(
+            sqrtPriceX96,
+            sqrtPriceX96,
+            FixedPoint96.Q96
+        );
 
         twap = inToken == token0
             ? FullMath.mulDiv(
@@ -72,20 +76,5 @@ abstract contract TwapGetter is ITwapGetter {
 
             sqrtPriceX96 = TickMath.getSqrtRatioAtTick(averageTick);
         }
-    }
-
-    function getPriceX96FromSqrtPriceX96(
-        uint160 sqrtPriceX96
-    ) public pure returns (uint256 priceX96) {
-        return FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96);
-    }
-
-    function getPriceFromSqrtPriceX96(
-        uint160 sqrtPriceX96,
-        uint256 decimals
-    ) public pure returns (uint256 price) {
-        return
-            (FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96) *
-                (10 ** decimals)) / FixedPoint96.Q96;
     }
 }

@@ -27,25 +27,4 @@ interface ITwapGetter {
         address uniswapV3Pool,
         uint32 twapInterval
     ) external view returns (uint160 sqrtTwapPriceX96);
-
-    /**
-     * @dev returns the priceX96 for the given sqrtPriceX96
-     * @notice priceX96 is the price in base 2**96
-     * @param sqrtPriceX96 The sqrt price for the given uniswap v3 pool
-     * @return priceX96 The priceX96 for the given sqrtPriceX96
-     */
-    function getPriceX96FromSqrtPriceX96(
-        uint160 sqrtPriceX96
-    ) external pure returns (uint256 priceX96);
-
-    /**
-     * @dev returns the price for the given sqrtPriceX96
-     * @param sqrtPriceX96 The sqrt price for the given uniswap v3 pool
-     * @param decimals The decimals for shifting the price
-     * @return price The price for the given sqrtPriceX96
-     */
-    function getPriceFromSqrtPriceX96(
-        uint160 sqrtPriceX96,
-        uint256 decimals
-    ) external pure returns (uint256 price);
 }
