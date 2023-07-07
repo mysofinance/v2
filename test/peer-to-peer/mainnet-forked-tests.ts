@@ -24,8 +24,7 @@ import {
   getExactLpTokenPriceInEth,
   getFairReservesPriceAndEthValue,
   getDeltaBNComparison,
-  setupBorrowerWhitelist,
-  getTwoFeesIfPossible
+  setupBorrowerWhitelist
 } from './helpers/misc'
 
 // test config constants & vars

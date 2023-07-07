@@ -1851,7 +1851,6 @@ describe('Peer-to-Pool: Local Tests', function () {
 
     blocknum = await ethers.provider.getBlockNumber()
     timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-    console.log('timestamp', timestamp)
 
     // reverts if trying to finalize after execution grace period
     await expect(
@@ -1861,7 +1860,6 @@ describe('Peer-to-Pool: Local Tests', function () {
     // move forward past first due date
     const firstDueDate = loanTerms.repaymentSchedule[0].dueTimestamp
     const moveFwdToTime2 = Number(firstDueDate.toString()) + 1
-    console.log('firstDueDate', firstDueDate)
 
     await ethers.provider.send('evm_mine', [moveFwdToTime2])
 
