@@ -7,19 +7,23 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {Errors} from "../../../Errors.sol";
 import {IWrappedERC20Impl} from "../../interfaces/wrappers/ERC20/IWrappedERC20Impl.sol";
 
+/**
+ * NOTE: Using this contract with rebasing tokens will leave users without any any rebasing gains.
+ * To be more precise, any potential rebasing gains will be -similarly to Uniswap v2- skimmed and
+ * given to the first new minter.
+ */
 contract WrappedERC20Impl is
     ERC20,
     Initializable,
     ReentrancyGuard,
     IWrappedERC20Impl
 {
-    using SafeERC20 for IERC20;
+    using SafeERC20 for IERC20Metadata;
 
     string internal _tokenName;
     string internal _tokenSymbol;
@@ -83,10 +87,10 @@ contract WrappedERC20Impl is
             // the entire redemption process will fail as well. Users should only use wrappers if they deem this risk
             // to be acceptable or non-existent (for example, in cases where the underlying tokens can never have any
             // transfer restrictions).
-            IERC20(tokenAddr).safeTransfer(
+            IERC20Metadata(tokenAddr).safeTransfer(
                 recipient,
                 Math.mulDiv(
-                    IERC20(tokenAddr).balanceOf(address(this)),
+                    IERC20Metadata(tokenAddr).balanceOf(address(this)),
                     amount,
                     currTotalSupply
                 )
@@ -116,25 +120,37 @@ contract WrappedERC20Impl is
         }
         uint256 currTotalSupply = totalSupply();
         address tokenAddr = _wrappedTokens[0];
-        uint256 tokenPreBal = IERC20(tokenAddr).balanceOf(address(this));
+        uint256 tokenPreBal = IERC20Metadata(tokenAddr).balanceOf(
+            address(this)
+        );
         if (currTotalSupply > 0 && tokenPreBal == 0) {
             // @dev: this would be an unintended state, for instance a negative rebase down to 0 balance with still outstanding supply
             // in which case to not allow possibly diluted or unfair proportions for new minters, will revert
             // @note: the state token balance > 0, but total supply == 0 is allowed (e.g. donations to address before mint)
             revert Errors.NonMintableTokenState();
         }
-        _mint(
-            recipient,
-            currTotalSupply == 0
-                ? amount
-                : Math.mulDiv(amount, currTotalSupply, tokenPreBal)
-        );
-        IERC20(tokenAddr).transferFrom(
+        // @dev: case with negative or non-rebasing token
+        if (tokenPreBal <= currTotalSupply) {
+            _mint(recipient, Math.mulDiv(amount, currTotalSupply, tokenPreBal));
+            // @dev: provide somewhat graceful recovery mechanism in case of positive rebasing token
+        } else {
+            _mint(recipient, amount);
+            // @dev: skim token surplus to caller
+            IERC20Metadata(tokenAddr).safeTransferFrom(
+                msg.sender,
+                address(this),
+                tokenPreBal - currTotalSupply
+            );
+        }
+
+        IERC20Metadata(tokenAddr).safeTransferFrom(
             msg.sender,
             address(this),
             amount + expectedTransferFee
         );
-        uint256 tokenPostBal = IERC20(tokenAddr).balanceOf(address(this));
+        uint256 tokenPostBal = IERC20Metadata(tokenAddr).balanceOf(
+            address(this)
+        );
         if (tokenPostBal != tokenPreBal + amount) {
             revert Errors.InvalidSendAmount();
         }

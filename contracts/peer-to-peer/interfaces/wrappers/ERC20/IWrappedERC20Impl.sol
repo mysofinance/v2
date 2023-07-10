@@ -38,6 +38,9 @@ interface IWrappedERC20Impl {
     /**
      * @notice Function to mint wrapped tokens for underlying token
      * @dev This function is only callable when the wrapped token has only one underlying token
+     * NOTE: Using this contract with rebasing tokens will leave users without any any rebasing gains.
+     * To be more precise, any potential rebasing gains will be -similarly to Uniswap v2- skimmed and
+     * given to the first new minter.
      * @param recipient Account that is receiving the minted tokens
      * @param amount Amount of wrapped tokens to be minted
      * @param expectedTransferFee Expected transfer fee for the minted tokens (e.g. wrapping PAXG)
