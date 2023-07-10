@@ -2,12 +2,12 @@ import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG, getRecentMainnetForkingConfig } from '../../hardhat.config'
 import { chainlinkAggregatorAbi } from './helpers/abi'
+import { getSlot, findBalanceSlot } from './helpers/misc'
 
 // test config constants & vars
 let snapshotId: String // use snapshot id to reset state before each test
 
 // constants
-const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
@@ -19,34 +19,6 @@ const ZERO_ADDR = '0x0000000000000000000000000000000000000000'
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const UNI_V3_SWAP_ROUTER = '0xE592427A0AEce92De3Edee1F18E0157C05861564'
 const STAKEWISE_SETH_ADDR = '0xFe2e637202056d30016725477c5da089Ab0A043A'
-
-function getSlot(userAddress: any, mappingSlot: any) {
-  return ethers.utils.solidityKeccak256(['uint256', 'uint256'], [userAddress, mappingSlot])
-}
-
-async function checkSlot(erc20: any, mappingSlot: any) {
-  const contractAddress = erc20.address
-  const userAddress = ethers.constants.AddressZero
-  const balanceSlot = getSlot(userAddress, mappingSlot)
-  const value = 0xdeadbeef
-  const storageValue = ethers.utils.hexlify(ethers.utils.zeroPad(value, 32))
-
-  await ethers.provider.send('hardhat_setStorageAt', [contractAddress, balanceSlot, storageValue])
-  return (await erc20.balanceOf(userAddress)) == value
-}
-
-async function findBalanceSlot(erc20: any) {
-  const snapshot = await hre.network.provider.send('evm_snapshot')
-  for (let slotNumber = 0; slotNumber < 1000; slotNumber++) {
-    try {
-      if (await checkSlot(erc20, slotNumber)) {
-        await ethers.provider.send('evm_revert', [snapshot])
-        return slotNumber
-      }
-    } catch {}
-    await ethers.provider.send('evm_revert', [snapshot])
-  }
-}
 
 describe('Peer-to-Peer: Recent Forked Mainnet Tests', function () {
   before(async () => {

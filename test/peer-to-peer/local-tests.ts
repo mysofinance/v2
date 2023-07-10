@@ -4,8 +4,9 @@ import { StandardMerkleTree } from '@openzeppelin/merkle-tree'
 import { LenderVaultImpl, MyERC20 } from '../../typechain-types'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
-import { setupBorrowerWhitelist } from './helpers/misc'
+import { setupBorrowerWhitelist, getSlot, findBalanceSlot } from './helpers/misc'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
+import { wrappers } from '../../typechain-types/contracts/peer-to-peer'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -19,7 +20,6 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-const YEAR_IN_SECONDS = 31_536_000
 
 async function generateOffChainQuote({
   lenderVault,
@@ -4529,6 +4529,258 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       expect(await wrappedSingleToken.totalSupply()).to.equal(ONE_WETH.mul(2))
       expect(await wrappedSingleToken.balanceOf(team.address)).to.equal(ONE_WETH.mul(1))
+    })
+
+    it('Should handle negative rebasing tokens correctly', async function () {
+      const { addressRegistry, borrower, team, weth, erc20Wrapper } = await setupTest()
+
+      // mint test tokens
+      await weth.mint(borrower.address, ONE_WETH.mul(1000))
+      await weth.mint(team.address, ONE_WETH.mul(1000))
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address], 8)
+
+      // approve wrapper for initial mint
+      await weth.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
+
+      // create wrapped token
+      const initialMintAmount = ONE_WETH
+      await addressRegistry.connect(borrower).createWrappedTokenForERC20s(
+        [
+          {
+            tokenAddr: weth.address,
+            tokenAmount: initialMintAmount
+          }
+        ],
+        'wethWrapper',
+        'wWeth',
+        ZERO_BYTES32
+      )
+
+      // check new token has been created
+      expect(await erc20Wrapper.numTokensCreated()).to.be.equal(1)
+
+      // get new wrapper token contract
+      const newSingleWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
+      const wrappedSingleToken = await ethers.getContractAt('WrappedERC20Impl', newSingleWrappedTokenAddr)
+
+      // approve and mint again
+      const secondMintAmount = ONE_WETH.mul(2)
+      await weth.connect(borrower).approve(wrappedSingleToken.address, MAX_UINT256)
+      await wrappedSingleToken.connect(borrower).mint(borrower.address, secondMintAmount, 0)
+
+      expect(await wrappedSingleToken.totalSupply()).to.equal(initialMintAmount.add(secondMintAmount))
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.add(secondMintAmount))
+
+      // automatically find mapping slot
+      const mappingSlot = await findBalanceSlot(weth)
+
+      // calculate balanceOf wrappedSingleToken slot
+      const signerBalanceSlot = getSlot(wrappedSingleToken.address, mappingSlot)
+
+      // set it to the value to mock negative rebasing token
+      const targetBal = ONE_WETH
+      await ethers.provider.send('hardhat_setStorageAt', [
+        weth.address,
+        signerBalanceSlot,
+        ethers.utils.hexlify(ethers.utils.zeroPad(targetBal, 32))
+      ])
+
+      // check that the user balance is equal to the expected value
+      expect(await weth.balanceOf(wrappedSingleToken.address)).to.be.eq(targetBal)
+
+      // check that another mint takes into account downwards rebased wrapper balance
+      await weth.connect(team).approve(wrappedSingleToken.address, MAX_UINT256)
+      const preMintBal = await wrappedSingleToken.balanceOf(team.address)
+      const totalSupply = await wrappedSingleToken.totalSupply()
+      const thirdMintAmount = ONE_WETH.mul(2)
+      await wrappedSingleToken.connect(team).mint(team.address, thirdMintAmount, 0)
+      const postMintBal = await wrappedSingleToken.balanceOf(team.address)
+      expect(thirdMintAmount.mul(totalSupply).div(targetBal)).to.be.eq(postMintBal.sub(preMintBal))
+
+      // check redemption
+      const totalBal = await weth.balanceOf(wrappedSingleToken.address)
+      const preRedemptionBal = await weth.balanceOf(borrower.address)
+      const preRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
+      const redemptionAmount = await wrappedSingleToken.balanceOf(borrower.address)
+      await wrappedSingleToken.connect(borrower).redeem(borrower.address, borrower.address, redemptionAmount)
+      const postRedemptionBal = await weth.balanceOf(borrower.address)
+      const postRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
+      expect(redemptionAmount.mul(totalBal).div(preRedemptionTotalSupply)).to.be.eq(postRedemptionBal.sub(preRedemptionBal))
+      expect(preRedemptionTotalSupply.sub(redemptionAmount)).to.be.equal(postRedemptionTotalSupply)
+    })
+
+    it('Should handle positive rebasing tokens correctly', async function () {
+      const { addressRegistry, borrower, team, weth, erc20Wrapper } = await setupTest()
+
+      // mint test tokens
+      await weth.mint(borrower.address, ONE_WETH.mul(1000))
+      await weth.mint(team.address, ONE_WETH.mul(1000))
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address], 8)
+
+      // approve wrapper for initial mint
+      await weth.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
+
+      // create wrapped token
+      const initialMintAmount = ONE_WETH
+      await addressRegistry.connect(borrower).createWrappedTokenForERC20s(
+        [
+          {
+            tokenAddr: weth.address,
+            tokenAmount: initialMintAmount
+          }
+        ],
+        'wethWrapper',
+        'wWeth',
+        ZERO_BYTES32
+      )
+
+      // check new token has been created
+      expect(await erc20Wrapper.numTokensCreated()).to.be.equal(1)
+
+      // get new wrapper token contract
+      const newSingleWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
+      const wrappedSingleToken = await ethers.getContractAt('WrappedERC20Impl', newSingleWrappedTokenAddr)
+
+      // approve and mint again
+      const secondMintAmount = ONE_WETH.mul(2)
+      await weth.connect(borrower).approve(wrappedSingleToken.address, MAX_UINT256)
+      await wrappedSingleToken.connect(borrower).mint(borrower.address, secondMintAmount, 0)
+
+      expect(await wrappedSingleToken.totalSupply()).to.equal(initialMintAmount.add(secondMintAmount))
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.add(secondMintAmount))
+
+      // automatically find mapping slot
+      const mappingSlot = await findBalanceSlot(weth)
+
+      // calculate balanceOf wrappedSingleToken slot
+      const signerBalanceSlot = getSlot(wrappedSingleToken.address, mappingSlot)
+
+      // set it to the value to mock negative rebasing token
+      const targetBal = ONE_WETH.mul(1000)
+      await ethers.provider.send('hardhat_setStorageAt', [
+        weth.address,
+        signerBalanceSlot,
+        ethers.utils.hexlify(ethers.utils.zeroPad(targetBal, 32))
+      ])
+
+      // check that the user balance is equal to the expected value
+      expect(await weth.balanceOf(wrappedSingleToken.address)).to.be.eq(targetBal)
+
+      // check that another mint takes into account upwards rebased wrapper balance and skims excess to caller
+      await weth.connect(team).approve(wrappedSingleToken.address, MAX_UINT256)
+      const preMintWrappedTokenBal = await wrappedSingleToken.balanceOf(team.address)
+      const preMintUndTokenBal = await weth.balanceOf(team.address)
+      const totalSupply = await wrappedSingleToken.totalSupply()
+      const totalBal = await weth.balanceOf(wrappedSingleToken.address)
+      const excessBal = totalBal.sub(totalSupply)
+      const thirdMintAmount = ONE_WETH.mul(2)
+      await wrappedSingleToken.connect(team).mint(team.address, thirdMintAmount, 0)
+      const postMintWrappedTokenBal = await wrappedSingleToken.balanceOf(team.address)
+      const postMintUndTokenBal = await weth.balanceOf(team.address)
+      expect(thirdMintAmount).to.be.eq(postMintWrappedTokenBal.sub(preMintWrappedTokenBal))
+      expect(excessBal.sub(thirdMintAmount)).to.be.eq(postMintUndTokenBal.sub(preMintUndTokenBal))
+
+      // check that balance and supply are in sync again after mint
+      const preRedemptionTotalBal = await weth.balanceOf(wrappedSingleToken.address)
+      const preRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
+
+      // check redemption
+      const preRedemptionBal = await weth.balanceOf(borrower.address)
+      expect(preRedemptionTotalSupply).to.be.equal(preRedemptionTotalBal)
+      const redemptionAmount = await wrappedSingleToken.balanceOf(borrower.address)
+      await wrappedSingleToken.connect(borrower).redeem(borrower.address, borrower.address, redemptionAmount)
+      const postRedemptionBal = await weth.balanceOf(borrower.address)
+      const postRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
+      expect(redemptionAmount.mul(preRedemptionTotalBal).div(preRedemptionTotalSupply)).to.be.eq(
+        postRedemptionBal.sub(preRedemptionBal)
+      )
+      expect(preRedemptionTotalSupply.sub(redemptionAmount)).to.be.equal(postRedemptionTotalSupply)
+    })
+
+    it('Should handle donations correctly', async function () {
+      const { addressRegistry, borrower, team, weth, erc20Wrapper } = await setupTest()
+
+      // mint test tokens
+      await weth.mint(borrower.address, ONE_WETH.mul(1000))
+      await weth.mint(team.address, ONE_WETH.mul(1000))
+
+      // set token wrapper contract in address registry
+      await addressRegistry.connect(team).setWhitelistState([erc20Wrapper.address], 8)
+
+      // approve wrapper for initial mint
+      await weth.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
+
+      // create wrapped token
+      const initialMintAmount = ONE_WETH
+      await addressRegistry.connect(borrower).createWrappedTokenForERC20s(
+        [
+          {
+            tokenAddr: weth.address,
+            tokenAmount: initialMintAmount
+          }
+        ],
+        'wethWrapper',
+        'wWeth',
+        ZERO_BYTES32
+      )
+
+      // check new token has been created
+      expect(await erc20Wrapper.numTokensCreated()).to.be.equal(1)
+
+      // get new wrapper token contract
+      const newSingleWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
+      const wrappedSingleToken = await ethers.getContractAt('WrappedERC20Impl', newSingleWrappedTokenAddr)
+
+      // approve and mint again
+      const secondMintAmount = ONE_WETH.mul(2)
+      await weth.connect(borrower).approve(wrappedSingleToken.address, MAX_UINT256)
+      await wrappedSingleToken.connect(borrower).mint(borrower.address, secondMintAmount, 0)
+
+      expect(await wrappedSingleToken.totalSupply()).to.equal(initialMintAmount.add(secondMintAmount))
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.add(secondMintAmount))
+
+      // donate some tokens
+      const donationAmount = ONE_WETH.mul(1000)
+      await weth.mint(wrappedSingleToken.address, donationAmount)
+
+      // check that the user balance is equal to the expected value
+      expect(await weth.balanceOf(wrappedSingleToken.address)).to.be.eq(
+        donationAmount.add(initialMintAmount).add(secondMintAmount)
+      )
+
+      // check that another mint takes into account donated balance and skims excess to caller
+      await weth.connect(team).approve(wrappedSingleToken.address, MAX_UINT256)
+      const preMintWrappedTokenBal = await wrappedSingleToken.balanceOf(team.address)
+      const preMintUndTokenBal = await weth.balanceOf(team.address)
+      const totalSupply = await wrappedSingleToken.totalSupply()
+      const totalBal = await weth.balanceOf(wrappedSingleToken.address)
+      const excessBal = totalBal.sub(totalSupply)
+      const thirdMintAmount = ONE_WETH.mul(2)
+      await wrappedSingleToken.connect(team).mint(team.address, thirdMintAmount, 0)
+      const postMintWrappedTokenBal = await wrappedSingleToken.balanceOf(team.address)
+      const postMintUndTokenBal = await weth.balanceOf(team.address)
+      expect(thirdMintAmount).to.be.eq(postMintWrappedTokenBal.sub(preMintWrappedTokenBal))
+      expect(excessBal.sub(thirdMintAmount)).to.be.eq(postMintUndTokenBal.sub(preMintUndTokenBal))
+
+      // check that balance and supply are in sync again after mint
+      const preRedemptionTotalBal = await weth.balanceOf(wrappedSingleToken.address)
+      const preRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
+
+      // check redemption
+      const preRedemptionBal = await weth.balanceOf(borrower.address)
+      expect(preRedemptionTotalSupply).to.be.equal(preRedemptionTotalBal)
+      const redemptionAmount = await wrappedSingleToken.balanceOf(borrower.address)
+      await wrappedSingleToken.connect(borrower).redeem(borrower.address, borrower.address, redemptionAmount)
+      const postRedemptionBal = await weth.balanceOf(borrower.address)
+      const postRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
+      expect(redemptionAmount.mul(preRedemptionTotalBal).div(preRedemptionTotalSupply)).to.be.eq(
+        postRedemptionBal.sub(preRedemptionBal)
+      )
+      expect(preRedemptionTotalSupply.sub(redemptionAmount)).to.be.equal(postRedemptionTotalSupply)
     })
   })
 

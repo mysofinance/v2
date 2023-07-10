@@ -6,6 +6,7 @@ import { LenderVaultImpl, QuoteHandler, AddressRegistry } from '../typechain-typ
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { chainlinkAggregatorAbi, collTokenAbi, uniV2Abi } from './abi'
 
+const hre = require('hardhat')
 const BASE = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
@@ -294,4 +295,32 @@ export const setupBorrowerWhitelist = async ({
   await addressRegistry
     .connect(borrower)
     .claimBorrowerWhitelistStatus(whitelistAuthority.address, whitelistedUntil, compactSig, salt)
+}
+
+export const getSlot = (userAddress: any, mappingSlot: any) => {
+  return ethers.utils.solidityKeccak256(['uint256', 'uint256'], [userAddress, mappingSlot])
+}
+
+export const checkSlot = async (erc20: any, mappingSlot: any) => {
+  const contractAddress = erc20.address
+  const userAddress = ethers.constants.AddressZero
+  const balanceSlot = getSlot(userAddress, mappingSlot)
+  const value = 0xdeadbeef
+  const storageValue = ethers.utils.hexlify(ethers.utils.zeroPad(value, 32))
+
+  await ethers.provider.send('hardhat_setStorageAt', [contractAddress, balanceSlot, storageValue])
+  return (await erc20.balanceOf(userAddress)) == value
+}
+
+export const findBalanceSlot = async (erc20: any) => {
+  const snapshot = await hre.network.provider.send('evm_snapshot')
+  for (let slotNumber = 0; slotNumber < 1000; slotNumber++) {
+    try {
+      if (await checkSlot(erc20, slotNumber)) {
+        await ethers.provider.send('evm_revert', [snapshot])
+        return slotNumber
+      }
+    } catch {}
+    await ethers.provider.send('evm_revert', [snapshot])
+  }
 }

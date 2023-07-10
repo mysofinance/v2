@@ -87,6 +87,8 @@ contract WrappedERC20Impl is
             // the entire redemption process will fail as well. Users should only use wrappers if they deem this risk
             // to be acceptable or non-existent (for example, in cases where the underlying tokens can never have any
             // transfer restrictions).
+            // @note: In case of positive rebasing token redemption will not take into account any positive rebasing
+            // gains, see also inline comment on mint
             IERC20Metadata(tokenAddr).safeTransfer(
                 recipient,
                 Math.mulDiv(
@@ -129,18 +131,18 @@ contract WrappedERC20Impl is
             // @note: the state token balance > 0, but total supply == 0 is allowed (e.g. donations to address before mint)
             revert Errors.NonMintableTokenState();
         }
-        // @dev: case with negative or non-rebasing token
+        uint256 surplus;
         if (tokenPreBal <= currTotalSupply) {
+            // @dev: case with negative or non-rebasing token
             _mint(recipient, Math.mulDiv(amount, currTotalSupply, tokenPreBal));
-            // @dev: provide somewhat graceful recovery mechanism in case of positive rebasing token
         } else {
+            unchecked {
+                surplus = tokenPreBal - currTotalSupply;
+            }
             _mint(recipient, amount);
-            // @dev: skim token surplus to caller
-            IERC20Metadata(tokenAddr).safeTransferFrom(
-                msg.sender,
-                address(this),
-                tokenPreBal - currTotalSupply
-            );
+            // @dev: provide somewhat graceful recovery mechanism in case of positive rebasing token;
+            // skim token surplus to caller, similarly to Uniswap v2
+            IERC20Metadata(tokenAddr).safeTransfer(msg.sender, surplus);
         }
 
         IERC20Metadata(tokenAddr).safeTransferFrom(
@@ -151,7 +153,7 @@ contract WrappedERC20Impl is
         uint256 tokenPostBal = IERC20Metadata(tokenAddr).balanceOf(
             address(this)
         );
-        if (tokenPostBal != tokenPreBal + amount) {
+        if (tokenPostBal + surplus != tokenPreBal + amount) {
             revert Errors.InvalidSendAmount();
         }
     }
