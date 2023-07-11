@@ -49,10 +49,8 @@ contract WrappedERC20Impl is
             if (totalInitialSupply <= Constants.SINGLE_WRAPPER_MIN_MINT) {
                 revert Errors.InvalidMintAmount();
             }
-
             _tokenDecimals = IERC20Metadata(wrappedTokens[0].tokenAddr)
                 .decimals();
-
             _wrappedTokens.push(wrappedTokens[0].tokenAddr);
 
             // @dev: mint small dust amount to this address, which will be locked in contract
@@ -155,7 +153,7 @@ contract WrappedERC20Impl is
         uint256 tokenPreBal = IERC20Metadata(tokenAddr).balanceOf(
             address(this)
         );
-        if (currTotalSupply > 0 && tokenPreBal == 0) {
+        if (tokenPreBal == 0) {
             // @dev: this would be an unintended state, for instance a negative rebase down to 0 balance with still outstanding supply
             // in which case to not allow possibly diluted or unfair proportions for new minters, will revert
             // @note: the state token balance > 0, but total supply == 0 is allowed (e.g. donations to address before mint)
