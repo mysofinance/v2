@@ -41,31 +41,42 @@ contract WrappedERC20Impl is
         address addressRegistry
     ) external initializer {
         uint256 wrappedTokensLen = wrappedTokens.length;
-        for (uint256 i; i < wrappedTokensLen; ) {
-            _wrappedTokens.push(wrappedTokens[i].tokenAddr);
+        if (wrappedTokensLen == 1) {
             // @dev: only need to set address registry in case of single underlying
             // @note: address registry receives redemption fees
-            if (wrappedTokensLen == 1) {
-                _addressRegistry = addressRegistry;
+            _addressRegistry = addressRegistry;
+            // check for minimum mint amount
+            if (totalInitialSupply <= Constants.SINGLE_WRAPPER_MIN_MINT) {
+                revert Errors.InvalidMintAmount();
             }
-            unchecked {
-                ++i;
+
+            _tokenDecimals = IERC20Metadata(wrappedTokens[0].tokenAddr)
+                .decimals();
+
+            _wrappedTokens.push(wrappedTokens[0].tokenAddr);
+
+            // @dev: mint small dust amount to this address, which will be locked in contract
+            // @note: this way small initial mint amounts cannot easily lock up the wrapper for future mints
+            _mint(address(this), Constants.SINGLE_WRAPPER_MIN_MINT);
+            _mint(
+                minter,
+                totalInitialSupply - Constants.SINGLE_WRAPPER_MIN_MINT
+            );
+        } else {
+            _tokenDecimals = 18;
+            for (uint256 i; i < wrappedTokensLen; ) {
+                _wrappedTokens.push(wrappedTokens[i].tokenAddr);
+                unchecked {
+                    ++i;
+                }
             }
+            _mint(
+                minter,
+                totalInitialSupply < 10 ** 18 ? totalInitialSupply : 10 ** 18
+            );
         }
         _tokenName = _name;
         _tokenSymbol = _symbol;
-        // @dev: only on single token wrappers do we use the underlying token decimals
-        _tokenDecimals = wrappedTokensLen == 1
-            ? IERC20Metadata(wrappedTokens[0].tokenAddr).decimals()
-            : 18;
-        // @dev: for single token case, often initial supply will be 1-1 with underlying, but in some cases
-        // it may differ, e.g. if the underlying token has a transfer fee or there were prior donations to address
-        _mint(
-            minter,
-            totalInitialSupply < 10 ** 18 || wrappedTokensLen == 1
-                ? totalInitialSupply
-                : 10 ** 18
-        );
     }
 
     function redeem(
@@ -150,9 +161,7 @@ contract WrappedERC20Impl is
             // @note: the state token balance > 0, but total supply == 0 is allowed (e.g. donations to address before mint)
             revert Errors.NonMintableTokenState();
         }
-        uint256 mintAmount = currTotalSupply == 0
-            ? amount
-            : Math.mulDiv(amount, currTotalSupply, tokenPreBal);
+        uint256 mintAmount = Math.mulDiv(amount, currTotalSupply, tokenPreBal);
         // @dev: revert in case mint amount is truncated to zero. This may also happen in case the mint transaction is front-run
         // with donations. Note that griefing with donations will be costly due to redemption fee.
         if (mintAmount == 0) {

@@ -21,6 +21,7 @@ const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const SINGLE_WRAPPER_REDEMPTION_FEE = BASE.mul(5).div(1000)
+const SINGLE_WRAPPER_MIN_MINT = ethers.BigNumber.from(10).pow(6)
 
 async function generateOffChainQuote({
   lenderVault,
@@ -4571,13 +4572,18 @@ describe('Peer-to-Peer: Local Tests', function () {
       const newSingleWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
       const wrappedSingleToken = await ethers.getContractAt('WrappedERC20Impl', newSingleWrappedTokenAddr)
 
+      // check received mint amount
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.sub(SINGLE_WRAPPER_MIN_MINT))
+
       // approve and mint again
       const secondMintAmount = ONE_WETH.mul(2)
       await weth.connect(borrower).approve(wrappedSingleToken.address, MAX_UINT256)
       await wrappedSingleToken.connect(borrower).mint(borrower.address, secondMintAmount, 0)
 
       expect(await wrappedSingleToken.totalSupply()).to.equal(initialMintAmount.add(secondMintAmount))
-      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.add(secondMintAmount))
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(
+        initialMintAmount.sub(SINGLE_WRAPPER_MIN_MINT).add(secondMintAmount)
+      )
 
       // automatically find mapping slot
       const mappingSlot = await findBalanceSlot(weth)
@@ -4603,7 +4609,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       const thirdMintAmount = ONE_WETH.mul(2)
       await wrappedSingleToken.connect(team).mint(team.address, thirdMintAmount, 0)
       const postMintBal = await wrappedSingleToken.balanceOf(team.address)
-      expect(thirdMintAmount.mul(totalSupply).div(targetBal)).to.be.eq(postMintBal.sub(preMintBal))
+      const expMintAmount = thirdMintAmount.mul(totalSupply).div(targetBal)
+      expect(expMintAmount).to.be.eq(postMintBal.sub(preMintBal))
 
       // check redemption
       const addressRegistryOwner = await addressRegistry.owner()
@@ -4657,13 +4664,18 @@ describe('Peer-to-Peer: Local Tests', function () {
       const newSingleWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
       const wrappedSingleToken = await ethers.getContractAt('WrappedERC20Impl', newSingleWrappedTokenAddr)
 
+      // check received mint amount
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.sub(SINGLE_WRAPPER_MIN_MINT))
+
       // approve and mint again
       const secondMintAmount = ONE_WETH.mul(2)
       await weth.connect(borrower).approve(wrappedSingleToken.address, MAX_UINT256)
       await wrappedSingleToken.connect(borrower).mint(borrower.address, secondMintAmount, 0)
 
       expect(await wrappedSingleToken.totalSupply()).to.equal(initialMintAmount.add(secondMintAmount))
-      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.add(secondMintAmount))
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(
+        initialMintAmount.sub(SINGLE_WRAPPER_MIN_MINT).add(secondMintAmount)
+      )
 
       // automatically find mapping slot
       const mappingSlot = await findBalanceSlot(weth)
@@ -4716,7 +4728,7 @@ describe('Peer-to-Peer: Local Tests', function () {
     })
 
     it('Should handle single underlying with donations correctly', async function () {
-      const { addressRegistry, borrower, team, weth, erc20Wrapper } = await setupTest()
+      const { addressRegistry, wrappedERC20Impl, borrower, team, weth, erc20Wrapper } = await setupTest()
 
       // mint test tokens
       await weth.mint(borrower.address, ONE_WETH.mul(1000))
@@ -4728,8 +4740,23 @@ describe('Peer-to-Peer: Local Tests', function () {
       // approve wrapper for initial mint
       await weth.connect(borrower).approve(erc20Wrapper.address, MAX_UINT256)
 
+      // check revert on too small mint amount
+      await expect(
+        addressRegistry.connect(borrower).createWrappedTokenForERC20s(
+          [
+            {
+              tokenAddr: weth.address,
+              tokenAmount: 1
+            }
+          ],
+          'wethWrapper',
+          'wWeth',
+          ZERO_BYTES32
+        )
+      ).to.be.revertedWithCustomError(wrappedERC20Impl, 'InvalidMintAmount')
+
       // create wrapped token
-      const initialMintAmount = 1
+      const initialMintAmount = SINGLE_WRAPPER_MIN_MINT.add(1)
       await addressRegistry.connect(borrower).createWrappedTokenForERC20s(
         [
           {
@@ -4749,20 +4776,27 @@ describe('Peer-to-Peer: Local Tests', function () {
       const newSingleWrappedTokenAddr = await erc20Wrapper.tokensCreated(0)
       const wrappedSingleToken = await ethers.getContractAt('WrappedERC20Impl', newSingleWrappedTokenAddr)
 
-      // check expected balances
-      expect(await wrappedSingleToken.totalSupply()).to.equal(1)
-      expect(await weth.balanceOf(wrappedSingleToken.address)).to.equal(1)
+      // check received mint amount
+      expect(await wrappedSingleToken.balanceOf(borrower.address)).to.equal(initialMintAmount.sub(SINGLE_WRAPPER_MIN_MINT))
 
-      // front-run mint with donation to cause truncation
-      const donationAmount = ONE_WETH.mul(2)
-      await weth.mint(wrappedSingleToken.address, donationAmount)
+      // check expected balances
+      expect(await wrappedSingleToken.totalSupply()).to.equal(initialMintAmount)
+      expect(await weth.balanceOf(wrappedSingleToken.address)).to.equal(initialMintAmount)
+
+      // specify some 2nd mint amount
+      const secondMint = ONE_WETH
+
+      // front-run mint with donation that causes truncation
+      const totalSupply = await wrappedSingleToken.totalSupply()
+      const totalBalance = await weth.balanceOf(wrappedSingleToken.address)
+      const donationToCauseTruncation = secondMint.mul(totalSupply).sub(totalBalance).add(1)
+      await weth.mint(wrappedSingleToken.address, donationToCauseTruncation)
 
       // check that underlying balance increased by donation amount
-      expect(await weth.balanceOf(wrappedSingleToken.address)).to.be.eq(donationAmount.add(initialMintAmount))
+      expect(await weth.balanceOf(wrappedSingleToken.address)).to.be.eq(donationToCauseTruncation.add(initialMintAmount))
 
       // check that mint reverts
       await weth.connect(team).approve(wrappedSingleToken.address, MAX_UINT256)
-      const secondMint = donationAmount
       await expect(wrappedSingleToken.connect(team).mint(team.address, secondMint, 0)).to.be.revertedWithCustomError(
         wrappedSingleToken,
         'InvalidMintAmount'
@@ -4783,8 +4817,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         .div(preRedemptionTokenSupply)
       const expRedemptionFee = expReceivedRedemptionAmountWithoutFees.mul(SINGLE_WRAPPER_REDEMPTION_FEE).div(BASE)
       expect(postRedemptionUserTokenBal).to.be.equal(0)
-      expect(postRedemptionTotalSupply).to.be.equal(0)
-      expect(postRedemptionWrapperUndBal).to.be.equal(0)
+      expect(postRedemptionTotalSupply).to.be.equal(SINGLE_WRAPPER_MIN_MINT)
+      expect(postRedemptionWrapperUndBal).to.be.equal(preRedemptionWrapperUndBal.sub(expReceivedRedemptionAmountWithoutFees))
       expect(postRedemptionUserUndBal.sub(preRedemptionUserUndBal)).to.be.equal(
         expReceivedRedemptionAmountWithoutFees.sub(expRedemptionFee)
       )
