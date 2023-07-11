@@ -43,7 +43,7 @@ contract WrappedERC20Impl is
         uint256 wrappedTokensLen = wrappedTokens.length;
         for (uint256 i; i < wrappedTokensLen; ) {
             _wrappedTokens.push(wrappedTokens[i].tokenAddr);
-            // @dev: only set address registry for case where there's only a single underlying
+            // @dev: only need to set address registry in case of single underlying
             // @note: address registry receives redemption fees
             if (wrappedTokensLen == 1) {
                 _addressRegistry = addressRegistry;
@@ -154,7 +154,7 @@ contract WrappedERC20Impl is
             ? amount
             : Math.mulDiv(amount, currTotalSupply, tokenPreBal);
         // @dev: revert in case mint amount is truncated to zero. This may also happen in case the mint transaction is front-run
-        // with donations. Note that griefing with donations will be costly due to redemption fee
+        // with donations. Note that griefing with donations will be costly due to redemption fee.
         if (mintAmount == 0) {
             revert Errors.InvalidMintAmount();
         }
