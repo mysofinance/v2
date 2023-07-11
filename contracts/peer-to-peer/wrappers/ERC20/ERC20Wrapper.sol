@@ -44,9 +44,19 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
         if (minter == address(0) || minter == address(this)) {
             revert Errors.InvalidAddress();
         }
-        // @dev: allow multiple wrappers with same underlyings to exist
-        // note: in case a griefer wanted to lock-up a wrapper token one could easily create another one
-        newErc20Addr = Clones.clone(wrappedErc20Impl);
+        // @dev: only on single token wrappers do we create a deterministic address
+        // note: in that case, this will revert if the wrapped token already exists
+        // this is to prevent the creation of duplicate wrapped tokens
+        // will need to use the remint functionality on the already existing token address
+        // also unique ordering of token addresses enforces case where you cannot pass in
+        // token address A, amount B and then token address A, amount C, but single token wrappers
+        // must truly have one token address
+        newErc20Addr = tokensToBeWrapped.length == 1
+            ? Clones.cloneDeterministic(
+                wrappedErc20Impl,
+                keccak256(abi.encode(tokensToBeWrapped[0].tokenAddr))
+            )
+            : Clones.clone(wrappedErc20Impl);
         tokensCreated.push(newErc20Addr);
 
         // @dev: external call happens before state update due to minTokenAmount determination
@@ -60,8 +70,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             tokensToBeWrapped,
             numTokensToBeWrapped == 0 ? 10 ** 18 : minTokenAmount,
             name,
-            symbol,
-            addressRegistry
+            symbol
         );
         emit ERC20WrapperCreated(
             newErc20Addr,
