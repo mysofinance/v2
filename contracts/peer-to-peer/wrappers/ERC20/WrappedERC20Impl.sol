@@ -11,6 +11,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Constants} from "../../../Constants.sol";
 import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 import {Errors} from "../../../Errors.sol";
+import {IAddressRegistry} from "../../interfaces/IAddressRegistry.sol";
 import {IWrappedERC20Impl} from "../../interfaces/wrappers/ERC20/IWrappedERC20Impl.sol";
 
 contract WrappedERC20Impl is
@@ -106,11 +107,13 @@ contract WrappedERC20Impl is
                     Constants.SINGLE_WRAPPER_REDEMPTION_FEE,
                     Constants.BASE
                 );
-                IERC20Metadata(tokenAddr).safeTransfer(
-                    _addressRegistry,
-                    redemptionFee
-                );
-                redemptionAmount -= redemptionFee;
+                if (redemptionFee > 0) {
+                    IERC20Metadata(tokenAddr).safeTransfer(
+                        IAddressRegistry(_addressRegistry).owner(),
+                        redemptionFee
+                    );
+                    redemptionAmount -= redemptionFee;
+                }
             }
             IERC20Metadata(tokenAddr).safeTransfer(recipient, redemptionAmount);
             unchecked {
@@ -150,6 +153,8 @@ contract WrappedERC20Impl is
         uint256 mintAmount = currTotalSupply == 0
             ? amount
             : Math.mulDiv(amount, currTotalSupply, tokenPreBal);
+        // @dev: revert in case mint amount is truncated to zero. This may also happen in case the mint transaction is front-run
+        // with donations. Note that griefing with donations will be costly due to redemption fee
         if (mintAmount == 0) {
             revert Errors.InvalidMintAmount();
         }
