@@ -4725,6 +4725,19 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(expReceivedRedemptionAmountWithoutFees.sub(redemptionFee)).to.be.eq(postRedemptionBal.sub(preRedemptionBal))
       expect(postRedemptionBalOfAddressRegistry.sub(preRedemptionBalOfAddressRegistry)).to.be.equal(redemptionFee)
       expect(preRedemptionTotalSupply.sub(redemptionAmount)).to.be.equal(postRedemptionTotalSupply)
+
+      // reset balance to zero
+      await ethers.provider.send('hardhat_setStorageAt', [
+        weth.address,
+        signerBalanceSlot,
+        ethers.utils.hexlify(ethers.utils.zeroPad(0, 32))
+      ])
+
+      // check mint reverts
+      await expect(wrappedSingleToken.connect(team).mint(team.address, thirdMintAmount, 0)).to.be.revertedWithCustomError(
+        wrappedSingleToken,
+        'NonMintableTokenState'
+      )
     })
 
     it('Should handle single underlying with donations correctly', async function () {
