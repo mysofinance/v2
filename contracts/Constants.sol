@@ -25,4 +25,5 @@ library Constants {
     uint256 internal constant MAX_ARRANGER_FEE = 0.5e18; // 50% max in base
     uint256 internal constant LOAN_TERMS_UPDATE_COOL_OFF_PERIOD = 15 minutes;
     uint256 internal constant MAX_REPAYMENT_SCHEDULE_LENGTH = 20;
+    uint256 internal constant SINGLE_WRAPPER_REDEMPTION_FEE = 0.005e18; // 50bps in base
 }

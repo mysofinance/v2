@@ -122,4 +122,5 @@ library Errors {
     error TokenAlreadyCountedInWrapper();
     error TokenNotOwnedByWrapper();
     error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
+    error InvalidMintAmount();
 }
