@@ -1,124 +1,201 @@
 import { ethers } from 'hardhat'
+import * as readline from 'readline/promises'
 
 const { Console } = require('console')
 const fs = require('fs')
 const path = require('path')
 const hre = require('hardhat')
 const currDate = new Date()
-const logfname =
-  'deploy-log-' +
-  currDate.toJSON().slice(0, 10) +
-  '_' +
-  currDate.getHours() +
-  '-' +
-  currDate.getMinutes() +
-  '-' +
-  currDate.getSeconds()
+const logFileName = `deploy-log-${currDate
+  .toJSON()
+  .slice(0, 10)}-${currDate.getHours()}-${currDate.getMinutes()}-${currDate.getSeconds()}`
+const logFileNameWithPath = path.join(__dirname, `logs/${logFileName}.txt`)
 const logger = new Console({
-  stdout: fs.createWriteStream(path.join(__dirname, `logs/${logfname}.txt`))
+  stdout: fs.createWriteStream(logFileNameWithPath)
 })
 
+function formatConsoleDate(logMsg: string, ...rest: any) {
+  const currDate = new Date()
+  var hour = currDate.getHours()
+  var minutes = currDate.getMinutes()
+  var seconds = currDate.getSeconds()
+  var milliseconds = currDate.getMilliseconds()
+
+  const timestampPrefix =
+    '[' +
+    (hour < 10 ? '0' + hour : hour) +
+    ':' +
+    (minutes < 10 ? '0' + minutes : minutes) +
+    ':' +
+    (seconds < 10 ? '0' + seconds : seconds) +
+    '.' +
+    ('00' + milliseconds).slice(-3) +
+    '] '
+  return timestampPrefix.concat(logMsg).concat(rest)
+}
+function consoleLog(logMsg: string, ...rest: any) {
+  console.log(formatConsoleDate(logMsg, rest))
+}
+function consoleLogToFile(logMsg: string, ...rest: any) {
+  logger.log(formatConsoleDate(logMsg, rest))
+}
+
 async function main() {
-  console.log('Starting deploy script...')
-  console.log('Logging into:', path.join(__dirname, `logs/${logfname}.txt`), '\n')
+  consoleLog('Starting deploy script...')
+  consoleLog('Logging into:', logFileNameWithPath)
+  consoleLog('Loading signer info (check hardhat.config.ts)...')
   /*
   const provider = ethers.getDefaultProvider()
   const deployer = new ethers.Wallet(DEPLOYER_KEY, provider)
   const deployerAddr = await deployer.getAddress()
   */
   const [deployer] = await ethers.getSigners()
-  logger.log('Running deployment script with the following deployer:', deployer.address)
-  logger.log('Deployer ETH balance:', await ethers.provider.getBalance(deployer.address), '\n')
+  const deployerBal = await ethers.provider.getBalance(deployer.address)
+  const network = await ethers.getDefaultProvider().getNetwork()
+  const hardhatNetworkName = hre.network.name
 
-  await deploy(deployer)
+  consoleLog('Running deployment script with the following deployer:', deployer.address)
+  consoleLog('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
+  consoleLog(`Deploying to network '${network.name}' (Hardhat config network name '${hardhatNetworkName}')`)
+  consoleLog(`Configured chain id '${network.chainId}'`)
+  consoleLog(`Loading 'deploy-config.json' with the following config data:`)
+  let jsonDeployConfig
+  try {
+    const jsonString = fs.readFileSync(path.join(__dirname, 'deploy-config.json'), 'utf-8')
+    jsonDeployConfig = JSON.parse(jsonString)
+  } catch (err) {
+    console.error(err)
+  }
+  consoleLog(jsonDeployConfig)
 
-  console.log('Deploy script completed.')
+  consoleLogToFile('Running deployment script with the following deployer:', deployer.address)
+  consoleLogToFile('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
+  consoleLogToFile(`Deploying to network '${network.name}' (Hardhat config network name '${hardhatNetworkName}')`)
+  consoleLogToFile(`Configured chain id '${network.chainId}'.`)
+  consoleLogToFile(`Loading 'deploy-config.json' with the following config data:`, JSON.stringify(jsonDeployConfig))
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  })
+
+  try {
+    const answer = await rl.question('Do you want to continue the deployment script? [y/n] ', {
+      signal: AbortSignal.timeout(15_000) // 10s timeout
+    })
+
+    switch (answer.toLowerCase()) {
+      case 'y':
+        await deploy(deployer, hardhatNetworkName, jsonDeployConfig)
+        consoleLog('Deploy script completed.')
+        break
+      case 'n':
+        consoleLog('Ending deployment script.')
+        break
+      default:
+        consoleLog('Invalid input.')
+        consoleLog('Ending deployment script.')
+    }
+  } finally {
+    rl.close()
+  }
 }
 
-async function deploy(deployer: any) {
-  logger.log('Starting core contract deployment...\n')
+async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfig: any) {
+  consoleLogToFile(`Starting core contract deployment to '${hardhatNetworkName}'...`)
 
   // deploy address registry (1/6)
-  logger.log('======== Step 1 of 6 ========')
-  logger.log('Deploying AddressRegistry...')
+  consoleLogToFile('======== Step 1 of 6 ========')
+  consoleLogToFile('Deploying AddressRegistry...')
   const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
   const addressRegistry = await AddressRegistry.connect(deployer).deploy()
   await addressRegistry.deployed()
-  logger.log('AddressRegistry deployed at:', addressRegistry.address, '\n')
+  consoleLogToFile('AddressRegistry deployed at:', addressRegistry.address)
 
   // deploy borrower gateway (2/6)
-  logger.log('======== Step 2 of 6 ========')
-  logger.log('Deploying BorrowerGateway...')
+  consoleLogToFile('======== Step 2 of 6 ========')
+  consoleLogToFile('Deploying BorrowerGateway...')
   const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
   const borrowerGateway = await BorrowerGateway.connect(deployer).deploy(addressRegistry.address)
   await borrowerGateway.deployed()
-  logger.log('BorrowerGateway deployed at:', borrowerGateway.address, '\n')
+  consoleLogToFile('BorrowerGateway deployed at:', borrowerGateway.address)
 
   // deploy quote handler (3/6)
-  logger.log('======== Step 3 of 6 ========')
-  logger.log('Deploying QuoteHandler...')
+  consoleLogToFile('======== Step 3 of 6 ========')
+  consoleLogToFile('Deploying QuoteHandler...')
   const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
   const quoteHandler = await QuoteHandler.connect(deployer).deploy(addressRegistry.address)
   await quoteHandler.deployed()
-  logger.log('QuoteHandler deployed at:', quoteHandler.address, '\n')
+  consoleLogToFile('QuoteHandler deployed at:', quoteHandler.address)
 
   // deploy lender vault implementation (4/6)
-  logger.log('======== Step 4 of 6 ========')
-  logger.log('Deploying LenderVaultImplementation...')
+  consoleLogToFile('======== Step 4 of 6 ========')
+  consoleLogToFile('Deploying LenderVaultImplementation...')
   const LenderVaultImplementation = await ethers.getContractFactory('LenderVaultImpl')
   const lenderVaultImplementation = await LenderVaultImplementation.connect(deployer).deploy()
   await lenderVaultImplementation.deployed()
-  logger.log('LenderVaultImplementation deployed at:', lenderVaultImplementation.address, '\n')
+  consoleLogToFile('LenderVaultImplementation deployed at:', lenderVaultImplementation.address)
 
   // deploy LenderVaultFactory (5/6)
-  logger.log('======== Step 5 of 6 ========')
-  logger.log('Deploying LenderVaultFactory...')
+  consoleLogToFile('======== Step 5 of 6 ========')
+  consoleLogToFile('Deploying LenderVaultFactory...')
   const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
   const lenderVaultFactory = await LenderVaultFactory.connect(deployer).deploy(
     addressRegistry.address,
     lenderVaultImplementation.address
   )
   await lenderVaultFactory.deployed()
-  logger.log('LenderVaultFactory deployed at:', lenderVaultFactory.address, '\n')
+  consoleLogToFile('LenderVaultFactory deployed at:', lenderVaultFactory.address)
 
   // valid initialization (6/6)
-  logger.log('======== Step 6 of 6 ========')
-  logger.log('Initializing AddressRegistry...')
+  consoleLogToFile('======== Step 6 of 6 ========')
+  consoleLogToFile('Initializing AddressRegistry...')
   await addressRegistry
     .connect(deployer)
     .initialize(lenderVaultFactory.address, borrowerGateway.address, quoteHandler.address)
-  logger.log('AddressRegistry initialized.\n')
+  consoleLogToFile('AddressRegistry initialized.')
 
-  logger.log('Core contract deployment completed.\n')
+  consoleLogToFile('Core contract deployment completed.')
 
-  if (hre.network.name == 'localhost') {
-    const testnetTokenData = await deployTestnetTokens(deployer, addressRegistry)
-    await deployTestnetOracles(deployer, addressRegistry, testnetTokenData)
-    await deployCallbacks(deployer, borrowerGateway, addressRegistry)
+  if (hardhatNetworkName == 'localhost') {
+    consoleLogToFile(`Running peripheral contract deployments for '${hardhatNetworkName}'...`)
+
+    const testnetTokenData = await deployTestnetTokens(deployer, addressRegistry, jsonDeployConfig)
+
+    if (jsonDeployConfig['testnet-deployment-config']['deployOracles']) {
+      await deployTestnetOracles(deployer, addressRegistry, testnetTokenData)
+    } else {
+      consoleLogToFile('Skipping oracles.')
+    }
+
+    if (jsonDeployConfig['testnet-deployment-config']['deployCallbacks']) {
+      await deployCallbacks(deployer, borrowerGateway, addressRegistry)
+    } else {
+      consoleLogToFile('Skipping oracles.')
+    }
+
+    if (jsonDeployConfig['testnet-deployment-config']['deployCompartments']) {
+      await deployCompartments(deployer, borrowerGateway, addressRegistry)
+    } else {
+      consoleLogToFile('Skipping oracles.')
+    }
+  } else {
+    consoleLogToFile(`No peripheral contract deployments for '${hardhatNetworkName}' defined.`)
   }
 }
 
-async function deployTestnetTokens(deployer: any, addressRegistry: any) {
-  logger.log('Loading deploy config with testnet token parameters...')
-  let jsonData
-  try {
-    const jsonString = fs.readFileSync(path.join(__dirname, 'deploy-config.json'), 'utf-8')
-    jsonData = JSON.parse(jsonString)
-  } catch (err) {
-    console.error(err)
-  }
-
+async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDeployConfig: any) {
   const TestnetToken = await ethers.getContractFactory('TestnetToken')
 
-  logger.log('Deploying testnet tokens...\n')
+  consoleLogToFile('Deploying testnet tokens...')
 
-  const testnetTokenData = jsonData['testnet-deployment-config']['testnet-tokens']
+  const testnetTokenData = jsonDeployConfig['testnet-deployment-config']['testnet-tokens']
   if (testnetTokenData.length == 0) {
-    logger.log('Warning: no testnet token parameters configured in deploy-config.json!')
+    consoleLogToFile('Warning: no testnet token parameters configured in deploy-config.json!')
   }
   let tokenAddrs = []
   for (let testnetTokenParam of testnetTokenData) {
-    logger.log('Deploying token with the following parameters:', testnetTokenParam)
+    consoleLogToFile('Deploying token with the following parameters:', JSON.stringify(testnetTokenParam))
     const testnetToken = await TestnetToken.connect(deployer).deploy(
       testnetTokenParam['name'],
       testnetTokenParam['symbol'],
@@ -128,73 +205,78 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any) {
       testnetTokenParam['mintAmountPerCoolDownPeriod']
     )
     await testnetToken.deployed()
-    logger.log(`Test token deployed at: ${testnetToken.address}\n`)
+    consoleLogToFile(`Test token deployed at: ${testnetToken.address}`)
     tokenAddrs.push(testnetToken.address)
     testnetTokenParam['testnetTokenAddr'] = testnetToken.address
   }
-  logger.log('Testnet tokens deployed.\n')
+  consoleLogToFile('Testnet tokens deployed.')
 
-  logger.log('Whitelisting tokens with addresses:', tokenAddrs)
+  consoleLogToFile('Whitelisting tokens with addresses:', tokenAddrs)
   await addressRegistry.connect(deployer).setWhitelistState(tokenAddrs, 1)
-  logger.log('Tokens whitelisted.\n')
+  consoleLogToFile('Tokens whitelisted.')
 
   return testnetTokenData
 }
 
 async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegistry: any) {
-  logger.log('Deploying callback contracts...')
+  consoleLogToFile('Deploying callback contracts...')
 
-  logger.log('Deploying Balancer v2 callback...')
+  consoleLogToFile('Deploying Balancer v2 callback...')
   const BalancerV2Looping = await ethers.getContractFactory('BalancerV2Looping')
   await BalancerV2Looping.connect(deployer)
   const balancerV2Looping = await BalancerV2Looping.deploy(borrowerGateway.address)
   await balancerV2Looping.deployed()
-  logger.log('Balancer v2 callback deployed at:', balancerV2Looping.address, '\n')
+  consoleLogToFile('Balancer v2 callback deployed at:', balancerV2Looping.address)
 
-  logger.log('Deploying Uni v3 callback...')
+  consoleLogToFile('Deploying Uni v3 callback...')
   const UniV3Looping = await ethers.getContractFactory('UniV3Looping')
   await UniV3Looping.connect(deployer)
   const uniV3Looping = await UniV3Looping.deploy(borrowerGateway.address)
   await uniV3Looping.deployed()
-  logger.log('Uni v3 callback deployed at:', uniV3Looping.address, '\n')
+  consoleLogToFile('Uni v3 callback deployed at:', uniV3Looping.address)
 
-  logger.log('Setting whitelist state...')
+  consoleLogToFile('Setting whitelist state...')
   await addressRegistry.connect(deployer).setWhitelistState([balancerV2Looping.address, uniV3Looping.address], 4)
-  logger.log('Whitelist state set.\n')
+  consoleLogToFile('Whitelist state set.')
 
-  logger.log('Callback contract deployment completed.\n')
+  consoleLogToFile('Callback contract deployment completed.')
 }
 
+async function deployCompartments(deployer: any, addressRegistry: any, testnetTokenData: any) {}
+
 async function deployTestnetOracles(deployer: any, addressRegistry: any, testnetTokenData: any) {
-  logger.log('Deploying testnet oracle contract...')
+  consoleLogToFile('Deploying testnet oracle contract...')
   const TestnetOracle = await ethers.getContractFactory('TestnetOracle')
   const testnetOracle = await TestnetOracle.connect(deployer).deploy()
   await testnetOracle.deployed()
-  logger.log('Testnet oracle deployed at:', testnetOracle.address, '\n')
+  consoleLogToFile('Testnet oracle deployed at:', testnetOracle.address)
 
-  logger.log('Setting whitelist state...')
+  consoleLogToFile('Setting whitelist state...')
   await addressRegistry.connect(deployer).setWhitelistState([testnetOracle.address], 2)
-  logger.log('Whitelist state set.\n')
+  consoleLogToFile('Whitelist state set.')
 
-  logger.log('Testnet oracle contract deployment completed.\n')
+  consoleLogToFile('Testnet oracle contract deployment completed.')
 
-  logger.log('Setting initial oracle prices for tokens...')
+  consoleLogToFile('Setting initial oracle prices for tokens...')
 
   if (testnetTokenData.length == 0) {
-    logger.log('Warning: no testnet token!')
+    consoleLogToFile('Warning: no testnet token!')
   }
 
   let tokenAddrs = []
   let initialOracleUsdcPrice = []
   for (let testnetTokenRowData of testnetTokenData) {
-    logger.log('Preparing testnet token oracle price according to following data:', testnetTokenRowData)
+    consoleLogToFile(
+      'Preparing testnet token oracle price according to following data:',
+      JSON.stringify(testnetTokenRowData)
+    )
     tokenAddrs.push(testnetTokenRowData['testnetTokenAddr'])
     initialOracleUsdcPrice.push(testnetTokenRowData['initialOracleUsdcPrice'])
   }
 
-  logger.log('Initializing oracle with following initial price data:', tokenAddrs, initialOracleUsdcPrice)
+  consoleLogToFile('Initializing oracle with following initial price data:', tokenAddrs, initialOracleUsdcPrice)
   await testnetOracle.connect(deployer).setPrices(tokenAddrs, initialOracleUsdcPrice)
-  logger.log('Initial oracle prices set.\n')
+  consoleLogToFile('Initial oracle prices set.')
 }
 
 main().catch(error => {
