@@ -6,6 +6,7 @@ typechain
 typechain-types
 v1.2-venv
 .VSCodeCounter/
+scripts/**/logs
 
 # Hardhat files
 cache

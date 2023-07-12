@@ -1,0 +1,13 @@
+{
+    "testnet-deployment-config": {
+        "testnet-tokens": [
+            {"type": "ERC20", "whitelistState": 1, "name": "wETH", "symbol": "wETH", "decimals": 18, "initialSupply": "1000000000000000000000000"},
+            {"type": "ERC20", "whitelistState": 1, "name": "rETH", "symbol": "rETH", "decimals": 18, "initialSupply": "1000000000000000000000000"},
+            {"type": "ERC20", "whitelistState": 1, "name": "RPL", "symbol": "RPL", "decimals": 18, "initialSupply": "1000000000000000000000000"},
+            {"type": "ERC20", "whitelistState": 1, "name": "USDC", "symbol": "USDC", "decimals": 6, "initialSupply": "100000000000000"}
+        ]
+    },
+    "mainnet-deployment-config": {
+        "addressRegistryOwner": ""
+    }
+}

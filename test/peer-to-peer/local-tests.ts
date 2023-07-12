@@ -6,7 +6,6 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist, getSlot, findBalanceSlot } from './helpers/misc'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
-import { erc20 } from '../../typechain-types/@openzeppelin/contracts/token'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
