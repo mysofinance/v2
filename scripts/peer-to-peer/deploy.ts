@@ -4,9 +4,7 @@ const { Console } = require('console')
 const fs = require('fs')
 const path = require('path')
 const hre = require('hardhat')
-
 const currDate = new Date()
-
 const logfname =
   'deploy-log-' +
   currDate.toJSON().slice(0, 10) +
@@ -16,22 +14,28 @@ const logfname =
   currDate.getMinutes() +
   '-' +
   currDate.getSeconds()
-
 const logger = new Console({
   stdout: fs.createWriteStream(path.join(__dirname, `logs/${logfname}.txt`))
 })
 
 async function main() {
+  console.log('Starting deploy script...')
+  console.log('Logging into:', path.join(__dirname, `logs/${logfname}.txt`), '\n')
   /*
-  const { DEPLOYER_PRIVATE_KEY } = process.env
   const provider = ethers.getDefaultProvider()
-  deployer = new ethers.Wallet(DEPLOYER_PRIVATE_KEY, provider)
+  const deployer = new ethers.Wallet(DEPLOYER_KEY, provider)
+  const deployerAddr = await deployer.getAddress()
   */
   const [deployer] = await ethers.getSigners()
-  await deployCore(deployer, logger)
+  logger.log('Running deployment script with the following deployer:', deployer.address)
+  logger.log('Deployer ETH balance:', await ethers.provider.getBalance(deployer.address), '\n')
+
+  await deploy(deployer)
+
+  console.log('Deploy script completed.')
 }
 
-async function deployCore(deployer: any, logger: any) {
+async function deploy(deployer: any) {
   logger.log('Starting core contract deployment...\n')
 
   // deploy address registry (1/6)
@@ -88,14 +92,14 @@ async function deployCore(deployer: any, logger: any) {
   logger.log('Core contract deployment completed.\n')
 
   if (hre.network.name == 'localhost') {
-    await deployTestTokens(deployer, addressRegistry)
+    const testnetTokenData = await deployTestnetTokens(deployer, addressRegistry)
+    await deployTestnetOracles(deployer, addressRegistry, testnetTokenData)
     await deployCallbacks(deployer, borrowerGateway, addressRegistry)
-    await deployOralces(deployer, addressRegistry)
   }
 }
 
-async function deployTestTokens(deployer: any, addressRegistry: any) {
-  logger.log('Loading deploy config with test token info...')
+async function deployTestnetTokens(deployer: any, addressRegistry: any) {
+  logger.log('Loading deploy config with testnet token parameters...')
   let jsonData
   try {
     const jsonString = fs.readFileSync(path.join(__dirname, 'deploy-config.json'), 'utf-8')
@@ -104,28 +108,37 @@ async function deployTestTokens(deployer: any, addressRegistry: any) {
     console.error(err)
   }
 
-  const MyERC20 = await ethers.getContractFactory('MyERC20')
-  const MyERC721 = await ethers.getContractFactory('MyERC721')
+  const TestnetToken = await ethers.getContractFactory('TestnetToken')
 
-  logger.log('Deploying test tokens...\n')
+  logger.log('Deploying testnet tokens...\n')
 
-  // deploy test tokens
-  const testTokenParams = jsonData['testnet-deployment-config']['testnet-tokens']
-  for (var testTokenParam of testTokenParams) {
-    const Contract = testTokenParam['type'] == 'ERC20' ? MyERC20 : MyERC721
-    Contract.connect(deployer)
-    const testToken = await Contract.deploy(testTokenParam['name'], testTokenParam['symbol'], testTokenParam['decimals'])
-    await testToken.deployed()
-    logger.log(
-      `Test token with name '${testTokenParam['name']}', symbol '${testTokenParam['symbol']} and '${testTokenParam['decimals']}' decimals deployed at: ${testToken.address}`
-    )
-
-    logger.log(`Setting whitelist state to '${testTokenParam['whitelistState']}'...`)
-    await addressRegistry.connect(deployer).setWhitelistState([testToken.address], testTokenParam['whitelistState'])
-    logger.log('Whitelist state set.\n')
+  const testnetTokenData = jsonData['testnet-deployment-config']['testnet-tokens']
+  if (testnetTokenData.length == 0) {
+    logger.log('Warning: no testnet token parameters configured in deploy-config.json!')
   }
+  let tokenAddrs = []
+  for (let testnetTokenParam of testnetTokenData) {
+    logger.log('Deploying token with the following parameters:', testnetTokenParam)
+    const testnetToken = await TestnetToken.connect(deployer).deploy(
+      testnetTokenParam['name'],
+      testnetTokenParam['symbol'],
+      testnetTokenParam['decimals'],
+      testnetTokenParam['initialMint'],
+      testnetTokenParam['mintCoolDownPeriod'],
+      testnetTokenParam['mintAmountPerCoolDownPeriod']
+    )
+    await testnetToken.deployed()
+    logger.log(`Test token deployed at: ${testnetToken.address}\n`)
+    tokenAddrs.push(testnetToken.address)
+    testnetTokenParam['testnetTokenAddr'] = testnetToken.address
+  }
+  logger.log('Testnet tokens deployed.\n')
 
-  logger.log('Test tokens deployed.\n')
+  logger.log('Whitelisting tokens with addresses:', tokenAddrs)
+  await addressRegistry.connect(deployer).setWhitelistState(tokenAddrs, 1)
+  logger.log('Tokens whitelisted.\n')
+
+  return testnetTokenData
 }
 
 async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegistry: any) {
@@ -152,35 +165,38 @@ async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegis
   logger.log('Callback contract deployment completed.\n')
 }
 
-async function deployOralces(deployer: any, addressRegistry: any) {
-  logger.log('Deploying callback contracts...')
-
-  /*
-  logger.log('Deploying Chainlink basic...')
-  const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'
-  const paxgEthChainlinkAddr = '0x9b97304ea12efed0fad976fbecaad46016bf269e'
-  const BASE_TOKEN = '0x12345678912efed0fad976fbecaad46016bf269e'
-  const BASE_UNIT = '1000000000000000000'
-  const ChainlinkBasicImplementation = await ethers.getContractFactory('ChainlinkBasic')
-  const chainlinkBasicImplementation = await ChainlinkBasicImplementation.connect(deployer).deploy(
-    ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x45804880De22913dAFE09f4980848ECE6EcbAf78'],
-    [usdcEthChainlinkAddr, paxgEthChainlinkAddr],
-    BASE_TOKEN,
-    BASE_UNIT
-  )
-  await chainlinkBasicImplementation.deployed()
-  logger.log('Chainlink basic deployed at:', chainlinkBasicImplementation.address, '\n')
+async function deployTestnetOracles(deployer: any, addressRegistry: any, testnetTokenData: any) {
+  logger.log('Deploying testnet oracle contract...')
+  const TestnetOracle = await ethers.getContractFactory('TestnetOracle')
+  const testnetOracle = await TestnetOracle.connect(deployer).deploy()
+  await testnetOracle.deployed()
+  logger.log('Testnet oracle deployed at:', testnetOracle.address, '\n')
 
   logger.log('Setting whitelist state...')
-  await addressRegistry.connect(deployer).setWhitelistState([chainlinkBasicImplementation.address], 2)
+  await addressRegistry.connect(deployer).setWhitelistState([testnetOracle.address], 2)
   logger.log('Whitelist state set.\n')
-  */
 
-  logger.log('Oracle contract deployment completed.\n')
+  logger.log('Testnet oracle contract deployment completed.\n')
+
+  logger.log('Setting initial oracle prices for tokens...')
+
+  if (testnetTokenData.length == 0) {
+    logger.log('Warning: no testnet token!')
+  }
+
+  let tokenAddrs = []
+  let initialOracleUsdcPrice = []
+  for (let testnetTokenRowData of testnetTokenData) {
+    logger.log('Preparing testnet token oracle price according to following data:', testnetTokenRowData)
+    tokenAddrs.push(testnetTokenRowData['testnetTokenAddr'])
+    initialOracleUsdcPrice.push(testnetTokenRowData['initialOracleUsdcPrice'])
+  }
+
+  logger.log('Initializing oracle with following initial price data:', tokenAddrs, initialOracleUsdcPrice)
+  await testnetOracle.connect(deployer).setPrices(tokenAddrs, initialOracleUsdcPrice)
+  logger.log('Initial oracle prices set.\n')
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
 main().catch(error => {
   console.error(error)
   process.exitCode = 1

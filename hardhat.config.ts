@@ -103,7 +103,16 @@ const config: HardhatUserConfig = {
     }
   },
   networks: {
-    hardhat: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG
+    hardhat: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG,
+    localhost: {
+      chainId: 31337,
+      accounts: [`0x${process.env.LOCAL_HOST_DEPLOYER_KEY}`]
+    },
+    sepolia: {
+      chainId: 1234,
+      url: `https://xyz.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      accounts: [`0x${process.env.SEPOLIA_DEPLOYER_KEY}`]
+    }
   },
   mocha: {
     timeout: 100000000
