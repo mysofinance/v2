@@ -16,11 +16,10 @@ const logger = new Console({
 
 function formatConsoleDate(logMsg: string, ...rest: any) {
   const currDate = new Date()
-  var hour = currDate.getHours()
-  var minutes = currDate.getMinutes()
-  var seconds = currDate.getSeconds()
-  var milliseconds = currDate.getMilliseconds()
-
+  const hour = currDate.getHours()
+  const minutes = currDate.getMinutes()
+  const seconds = currDate.getSeconds()
+  const milliseconds = currDate.getMilliseconds()
   const timestampPrefix =
     '[' +
     (hour < 10 ? '0' + hour : hour) +
