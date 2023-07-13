@@ -6,10 +6,10 @@ const fs = require('fs')
 const path = require('path')
 const hre = require('hardhat')
 const currDate = new Date()
-const logFileName = `deploy-log-${currDate
+const fileName = `deploy-${currDate
   .toJSON()
   .slice(0, 10)}-${currDate.getHours()}-${currDate.getMinutes()}-${currDate.getSeconds()}`
-const logFileNameWithPath = path.join(__dirname, `logs/${logFileName}.txt`)
+const logFileNameWithPath = path.join(__dirname, `logs/log-${fileName}.txt`)
 const logger = new Console({
   stdout: fs.createWriteStream(logFileNameWithPath)
 })
@@ -65,7 +65,7 @@ async function main() {
   } catch (err) {
     console.error(err)
   }
-  consoleLog(jsonDeployConfig)
+  consoleLog(JSON.stringify(jsonDeployConfig))
 
   consoleLogToFile('Running deployment script with the following deployer:', deployer.address)
   consoleLogToFile('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
@@ -101,6 +101,8 @@ async function main() {
 }
 
 async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfig: any) {
+  let deployedContracts = {}
+
   consoleLogToFile(`Starting core contract deployment to '${hardhatNetworkName}'...`)
 
   // deploy address registry (1/6)
@@ -109,6 +111,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
   const addressRegistry = await AddressRegistry.connect(deployer).deploy()
   await addressRegistry.deployed()
+  deployedContracts['addressRegistry'] = addressRegistry.address
   consoleLogToFile('AddressRegistry deployed at:', addressRegistry.address)
 
   // deploy borrower gateway (2/6)
@@ -117,6 +120,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
   const borrowerGateway = await BorrowerGateway.connect(deployer).deploy(addressRegistry.address)
   await borrowerGateway.deployed()
+  deployedContracts['borrowerGateway'] = borrowerGateway.address
   consoleLogToFile('BorrowerGateway deployed at:', borrowerGateway.address)
 
   // deploy quote handler (3/6)
@@ -125,6 +129,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
   const quoteHandler = await QuoteHandler.connect(deployer).deploy(addressRegistry.address)
   await quoteHandler.deployed()
+  deployedContracts['quoteHandler'] = quoteHandler.address
   consoleLogToFile('QuoteHandler deployed at:', quoteHandler.address)
 
   // deploy lender vault implementation (4/6)
@@ -133,6 +138,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   const LenderVaultImplementation = await ethers.getContractFactory('LenderVaultImpl')
   const lenderVaultImplementation = await LenderVaultImplementation.connect(deployer).deploy()
   await lenderVaultImplementation.deployed()
+  deployedContracts['lenderVaultImplementation'] = lenderVaultImplementation.address
   consoleLogToFile('LenderVaultImplementation deployed at:', lenderVaultImplementation.address)
 
   // deploy LenderVaultFactory (5/6)
@@ -144,6 +150,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
     lenderVaultImplementation.address
   )
   await lenderVaultFactory.deployed()
+  deployedContracts['lenderVaultFactory'] = lenderVaultFactory.address
   consoleLogToFile('LenderVaultFactory deployed at:', lenderVaultFactory.address)
 
   // valid initialization (6/6)
@@ -156,34 +163,49 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
 
   consoleLogToFile('Core contract deployment completed.')
 
-  if (hardhatNetworkName == 'localhost') {
+  if (hardhatNetworkName == 'hardhat' || hardhatNetworkName == 'localhost' || hardhatNetworkName == 'sepolia') {
     consoleLogToFile(`Running peripheral contract deployments for '${hardhatNetworkName}'...`)
 
-    const testnetTokenData = await deployTestnetTokens(deployer, addressRegistry, jsonDeployConfig)
+    const res = await deployTestnetTokens(deployer, addressRegistry, jsonDeployConfig, deployedContracts)
+    deployedContracts = res.deployedContracts
 
     if (jsonDeployConfig['testnet-deployment-config']['deployOracles']) {
-      await deployTestnetOracles(deployer, addressRegistry, testnetTokenData)
+      deployedContracts = await deployTestnetOracles(deployer, addressRegistry, res.testnetTokenData, deployedContracts)
     } else {
       consoleLogToFile('Skipping oracles.')
     }
 
     if (jsonDeployConfig['testnet-deployment-config']['deployCallbacks']) {
-      await deployCallbacks(deployer, borrowerGateway, addressRegistry)
+      deployedContracts = await deployCallbacks(deployer, borrowerGateway, addressRegistry, deployedContracts)
     } else {
       consoleLogToFile('Skipping oracles.')
     }
 
     if (jsonDeployConfig['testnet-deployment-config']['deployCompartments']) {
-      await deployCompartments(deployer, borrowerGateway, addressRegistry)
+      deployedContracts = await deployCompartments(deployer, borrowerGateway, addressRegistry, deployedContracts)
     } else {
       consoleLogToFile('Skipping oracles.')
     }
   } else {
     consoleLogToFile(`No peripheral contract deployments for '${hardhatNetworkName}' defined.`)
   }
+
+  fs.writeFile(
+    path.join(__dirname, `output/contract-addrs-${fileName}.json`),
+    JSON.stringify(deployedContracts),
+    (err: any) => {
+      if (err) {
+        console.error(err)
+        return
+      }
+      consoleLog('Output file created.')
+    }
+  )
 }
 
-async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDeployConfig: any) {
+async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDeployConfig: any, deployedContracts: any) {
+  deployedContracts['testnetTokens'] = {}
+
   const TestnetToken = await ethers.getContractFactory('TestnetToken')
 
   consoleLogToFile('Deploying testnet tokens...')
@@ -205,6 +227,7 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDepl
     )
     await testnetToken.deployed()
     consoleLogToFile(`Test token deployed at: ${testnetToken.address}`)
+    deployedContracts['testnetTokens'][testnetTokenParam['name']] = testnetToken.address
     tokenAddrs.push(testnetToken.address)
     testnetTokenParam['testnetTokenAddr'] = testnetToken.address
   }
@@ -214,10 +237,10 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDepl
   await addressRegistry.connect(deployer).setWhitelistState(tokenAddrs, 1)
   consoleLogToFile('Tokens whitelisted.')
 
-  return testnetTokenData
+  return { testnetTokenData, deployedContracts }
 }
 
-async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegistry: any) {
+async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegistry: any, deployedContracts: any) {
   consoleLogToFile('Deploying callback contracts...')
 
   consoleLogToFile('Deploying Balancer v2 callback...')
@@ -225,6 +248,7 @@ async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegis
   await BalancerV2Looping.connect(deployer)
   const balancerV2Looping = await BalancerV2Looping.deploy(borrowerGateway.address)
   await balancerV2Looping.deployed()
+  deployedContracts['balancerV2Looping'] = balancerV2Looping.address
   consoleLogToFile('Balancer v2 callback deployed at:', balancerV2Looping.address)
 
   consoleLogToFile('Deploying Uni v3 callback...')
@@ -232,6 +256,7 @@ async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegis
   await UniV3Looping.connect(deployer)
   const uniV3Looping = await UniV3Looping.deploy(borrowerGateway.address)
   await uniV3Looping.deployed()
+  deployedContracts['uniV3Looping'] = uniV3Looping.address
   consoleLogToFile('Uni v3 callback deployed at:', uniV3Looping.address)
 
   consoleLogToFile('Setting whitelist state...')
@@ -239,15 +264,18 @@ async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegis
   consoleLogToFile('Whitelist state set.')
 
   consoleLogToFile('Callback contract deployment completed.')
+
+  return deployedContracts
 }
 
-async function deployCompartments(deployer: any, addressRegistry: any, testnetTokenData: any) {}
+async function deployCompartments(deployer: any, addressRegistry: any, testnetTokenData: any, deployedContracts: any) {}
 
-async function deployTestnetOracles(deployer: any, addressRegistry: any, testnetTokenData: any) {
+async function deployTestnetOracles(deployer: any, addressRegistry: any, testnetTokenData: any, deployedContracts: any) {
   consoleLogToFile('Deploying testnet oracle contract...')
   const TestnetOracle = await ethers.getContractFactory('TestnetOracle')
   const testnetOracle = await TestnetOracle.connect(deployer).deploy()
   await testnetOracle.deployed()
+  deployedContracts['testnetOracle'] = testnetOracle.address
   consoleLogToFile('Testnet oracle deployed at:', testnetOracle.address)
 
   consoleLogToFile('Setting whitelist state...')
@@ -276,6 +304,8 @@ async function deployTestnetOracles(deployer: any, addressRegistry: any, testnet
   consoleLogToFile('Initializing oracle with following initial price data:', tokenAddrs, initialOracleUsdcPrice)
   await testnetOracle.connect(deployer).setPrices(tokenAddrs, initialOracleUsdcPrice)
   consoleLogToFile('Initial oracle prices set.')
+
+  return deployedContracts
 }
 
 main().catch(error => {
