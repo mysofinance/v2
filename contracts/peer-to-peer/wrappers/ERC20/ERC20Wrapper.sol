@@ -60,8 +60,7 @@ contract ERC20Wrapper is ReentrancyGuard, IERC20Wrapper {
             tokensToBeWrapped,
             numTokensToBeWrapped == 0 ? 10 ** 18 : minTokenAmount,
             name,
-            symbol,
-            addressRegistry
+            symbol
         );
         emit ERC20WrapperCreated(
             newErc20Addr,

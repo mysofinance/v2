@@ -170,7 +170,7 @@ File                                                     |  % Stmts | % Branch |
   DataTypesPeerToPeer.sol                                |      100 |      100 |      100 |      100 |                |
   LenderVaultFactory.sol                                 |      100 |     87.5 |      100 |      100 |                |
   LenderVaultImpl.sol                                    |      100 |    92.86 |      100 |    98.88 |         63,206 |
-  QuoteHandler.sol                                       |      100 |    98.04 |      100 |    99.34 |            371 |
+  QuoteHandler.sol                                       |      100 |    98.04 |      100 |    99.34 |            365 |
  contracts\peer-to-peer\callbacks\                       |      100 |       75 |    88.89 |    96.88 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
   UniV3Looping.sol                                       |      100 |      100 |      100 |      100 |                |
@@ -229,9 +229,9 @@ File                                                     |  % Stmts | % Branch |
   OracleLibrary.sol                                      |      100 |    66.67 |      100 |      100 |                |
   TickMath.sol                                           |      100 |    80.43 |      100 |    84.09 |... 63,65,67,73 |
   TwapGetter.sol                                         |      100 |     62.5 |      100 |    93.33 |             57 |
- contracts\peer-to-peer\wrappers\ERC20\                  |      100 |    82.69 |      100 |    98.95 |                |
+ contracts\peer-to-peer\wrappers\ERC20\                  |      100 |    83.33 |      100 |    98.88 |                |
   ERC20Wrapper.sol                                       |      100 |       75 |      100 |    96.88 |             45 |
-  WrappedERC20Impl.sol                                   |      100 |     87.5 |      100 |      100 |                |
+  WrappedERC20Impl.sol                                   |      100 |    89.29 |      100 |      100 |                |
  contracts\peer-to-peer\wrappers\ERC721\                 |    98.72 |    85.29 |    94.12 |    96.77 |                |
   ERC721Wrapper.sol                                      |    95.45 |    81.82 |       80 |    92.68 |      47,87,135 |
   WrappedERC721Impl.sol                                  |      100 |    86.96 |      100 |    98.25 |        194,212 |
@@ -245,6 +245,6 @@ File                                                     |  % Stmts | % Branch |
   IFundingPoolImpl.sol                                   |      100 |      100 |      100 |      100 |                |
   ILoanProposalImpl.sol                                  |      100 |      100 |      100 |      100 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    98.99 |    88.77 |    98.63 |    96.81 |                |
+All files                                                |    98.99 |    88.83 |    98.63 |     96.8 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```

@@ -5014,11 +5014,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         salt: ZERO_BYTES32
       }
       await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
-
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
-        quoteHandler,
-        'OnChainQuoteAdded'
-      )
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedOracle')
 
       // check balance pre borrow
       const borrowerWethBalPre = await weth.balanceOf(borrower.address)
@@ -5052,6 +5050,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedOracle')
 
       await addressRegistry.connect(team).setWhitelistState([chainlinkBasicImplementation.address], 2)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
 
       await borrowerGateway
         .connect(borrower)
