@@ -1,0 +1,59 @@
+[21:34:09.005] Running deployment script with the following deployer:
+[21:34:09.007] Deployer ETH balance:
+[21:34:09.007] Deploying to network 'homestead' (Hardhat config network name 'localhost')
+[21:34:09.007] Configured chain id '1'.
+[21:34:09.007] Loading 'deploy-config.json' with the following config data:
+[21:34:12.755] Starting core contract deployment to 'localhost'...
+[21:34:12.755] ======== Step 1 of 6 ========
+[21:34:12.755] Deploying AddressRegistry...
+[21:34:12.889] AddressRegistry deployed at:
+[21:34:12.889] ======== Step 2 of 6 ========
+[21:34:12.889] Deploying BorrowerGateway...
+[21:34:12.976] BorrowerGateway deployed at:
+[21:34:12.976] ======== Step 3 of 6 ========
+[21:34:12.976] Deploying QuoteHandler...
+[21:34:13.054] QuoteHandler deployed at:
+[21:34:13.054] ======== Step 4 of 6 ========
+[21:34:13.054] Deploying LenderVaultImplementation...
+[21:34:13.134] LenderVaultImplementation deployed at:
+[21:34:13.134] ======== Step 5 of 6 ========
+[21:34:13.134] Deploying LenderVaultFactory...
+[21:34:13.210] LenderVaultFactory deployed at:
+[21:34:13.210] ======== Step 6 of 6 ========
+[21:34:13.210] Initializing AddressRegistry...
+[21:34:13.369] AddressRegistry initialized.
+[21:34:13.369] Core contract deployment completed.
+[21:34:13.369] Running peripheral contract deployments for 'localhost'...
+[21:34:13.371] Deploying testnet tokens...
+[21:34:13.371] Deploying token with the following parameters:
+[21:34:13.457] Test token deployed at: 0x163B11b2A36Ed9c4912D916335Aa0D4f4BE189C0
+[21:34:13.457] Deploying token with the following parameters:
+[21:34:13.550] Test token deployed at: 0x1F9CecE95581476Bce93d71A4c207dB888AC8DCf
+[21:34:13.550] Deploying token with the following parameters:
+[21:34:13.641] Test token deployed at: 0xd1fCA0aDBA7018e0a83e33F49E1D4EF82cdF884a
+[21:34:13.641] Deploying token with the following parameters:
+[21:34:13.701] Test token deployed at: 0xb83223F706C656E5fEC06A44B144ebC7E87BBC85
+[21:34:13.701] Testnet tokens deployed.
+[21:34:13.701] Whitelisting tokens with addresses:
+[21:34:13.809] Tokens whitelisted.
+[21:34:13.809] Deploying testnet oracle contract...
+[21:34:13.876] Testnet oracle deployed at:
+[21:34:13.877] Setting whitelist state...
+[21:34:13.951] Whitelist state set.
+[21:34:13.951] Testnet oracle contract deployment completed.
+[21:34:13.951] Setting initial oracle prices for tokens...
+[21:34:13.951] Preparing testnet token oracle price according to following data:
+[21:34:13.951] Preparing testnet token oracle price according to following data:
+[21:34:13.951] Preparing testnet token oracle price according to following data:
+[21:34:13.951] Preparing testnet token oracle price according to following data:
+[21:34:13.951] Initializing oracle with following initial price data:
+[21:34:14.042] Initial oracle prices set.
+[21:34:14.042] Deploying callback contracts...
+[21:34:14.042] Deploying Balancer v2 callback...
+[21:34:14.109] Balancer v2 callback deployed at:
+[21:34:14.109] Deploying Uni v3 callback...
+[21:34:14.194] Uni v3 callback deployed at:
+[21:34:14.194] Setting whitelist state...
+[21:34:14.270] Whitelist state set.
+[21:34:14.270] Callback contract deployment completed.
+[21:34:14.270] Skipping oracles.

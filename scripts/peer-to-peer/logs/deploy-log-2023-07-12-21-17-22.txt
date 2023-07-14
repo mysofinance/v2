@@ -1,0 +1,169 @@
+Running deployment script with the following deployer: 0x7D21B0f200C9Bf1152D9f384b28db5b02216Eb63
+Deployer ETH balance: 99.999999999001026784
+Deploying to network 'homestead' (Hardhat config network name 'localhost')
+Configured chain id '1'.
+
+Loading 'deploy-config.json' with the following config data: {
+  'testnet-deployment-config': {
+    'testnet-tokens': [ [Object], [Object], [Object], [Object] ],
+    deployOracles: true,
+    deployCallbacks: true,
+    deployCompartments: false
+  },
+  'mainnet-deployment-config': {}
+}
+Starting core contract deployment to 'localhost'...
+
+======== Step 1 of 6 ========
+Deploying AddressRegistry...
+AddressRegistry deployed at: 0x70CF5086dF9823336F280D8eE0C7700013Ba3724 
+
+======== Step 2 of 6 ========
+Deploying BorrowerGateway...
+BorrowerGateway deployed at: 0xA48FBB0Aa15893f6Fdc5fB1dD648EAEa5266549d 
+
+======== Step 3 of 6 ========
+Deploying QuoteHandler...
+QuoteHandler deployed at: 0xD4CE36ba64Cb2b8AF1452e40aD4f1e4551213e1b 
+
+======== Step 4 of 6 ========
+Deploying LenderVaultImplementation...
+LenderVaultImplementation deployed at: 0x832c76d07Aa19C7Cf7B15DA6fa6FB3A99a953E55 
+
+======== Step 5 of 6 ========
+Deploying LenderVaultFactory...
+LenderVaultFactory deployed at: 0xcDaF48648Af3D36ab8b419A0e01677079CB21199 
+
+======== Step 6 of 6 ========
+Initializing AddressRegistry...
+AddressRegistry initialized.
+
+Core contract deployment completed.
+
+Running peripheral contract deployments for 'localhost'...
+Deploying testnet tokens...
+
+Deploying token with the following parameters: {
+  name: 'wETH',
+  symbol: 'wETH',
+  decimals: '18',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000000000000',
+  initialOracleUsdcPrice: '3000000000'
+}
+Test token deployed at: 0xE82B9430A15f8B568b98cCeF13ce3A0b476f2CA8
+
+Deploying token with the following parameters: {
+  name: 'rETH',
+  symbol: 'rETH',
+  decimals: '18',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000000000000',
+  initialOracleUsdcPrice: '3100000000'
+}
+Test token deployed at: 0xa89920C79d8518E3534D661a33cFF39AF094Da67
+
+Deploying token with the following parameters: {
+  name: 'RPL',
+  symbol: 'RPL',
+  decimals: '18',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000000000000',
+  initialOracleUsdcPrice: '30000000'
+}
+Test token deployed at: 0xf4f2592f7B9e429D463cD43297384B2d7a8Ee98B
+
+Deploying token with the following parameters: {
+  name: 'USDC',
+  symbol: 'USDC',
+  decimals: '6',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000',
+  initialOracleUsdcPrice: '1000000'
+}
+Test token deployed at: 0xd262BF47b9BeafdF1089EDF69cc54a9949B6db31
+
+Testnet tokens deployed.
+
+Whitelisting tokens with addresses: [
+  '0xE82B9430A15f8B568b98cCeF13ce3A0b476f2CA8',
+  '0xa89920C79d8518E3534D661a33cFF39AF094Da67',
+  '0xf4f2592f7B9e429D463cD43297384B2d7a8Ee98B',
+  '0xd262BF47b9BeafdF1089EDF69cc54a9949B6db31'
+]
+Tokens whitelisted.
+
+Deploying testnet oracle contract...
+Testnet oracle deployed at: 0xADb7bf3513D99423DaFFebd47f8c28894E84E8dD 
+
+Setting whitelist state...
+Whitelist state set.
+
+Testnet oracle contract deployment completed.
+
+Setting initial oracle prices for tokens...
+Preparing testnet token oracle price according to following data: {
+  name: 'wETH',
+  symbol: 'wETH',
+  decimals: '18',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000000000000',
+  initialOracleUsdcPrice: '3000000000',
+  testnetTokenAddr: '0xE82B9430A15f8B568b98cCeF13ce3A0b476f2CA8'
+}
+Preparing testnet token oracle price according to following data: {
+  name: 'rETH',
+  symbol: 'rETH',
+  decimals: '18',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000000000000',
+  initialOracleUsdcPrice: '3100000000',
+  testnetTokenAddr: '0xa89920C79d8518E3534D661a33cFF39AF094Da67'
+}
+Preparing testnet token oracle price according to following data: {
+  name: 'RPL',
+  symbol: 'RPL',
+  decimals: '18',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000000000000',
+  initialOracleUsdcPrice: '30000000',
+  testnetTokenAddr: '0xf4f2592f7B9e429D463cD43297384B2d7a8Ee98B'
+}
+Preparing testnet token oracle price according to following data: {
+  name: 'USDC',
+  symbol: 'USDC',
+  decimals: '6',
+  initialMint: '10000000000000000000000000',
+  mintCoolDownPeriod: '86400',
+  mintAmountPerCoolDownPeriod: '10000000000',
+  initialOracleUsdcPrice: '1000000',
+  testnetTokenAddr: '0xd262BF47b9BeafdF1089EDF69cc54a9949B6db31'
+}
+Initializing oracle with following initial price data: [
+  '0xE82B9430A15f8B568b98cCeF13ce3A0b476f2CA8',
+  '0xa89920C79d8518E3534D661a33cFF39AF094Da67',
+  '0xf4f2592f7B9e429D463cD43297384B2d7a8Ee98B',
+  '0xd262BF47b9BeafdF1089EDF69cc54a9949B6db31'
+] [ '3000000000', '3100000000', '30000000', '1000000' ]
+Initial oracle prices set.
+
+Deploying callback contracts...
+Deploying Balancer v2 callback...
+Balancer v2 callback deployed at: 0x545512df2c0EEDA554fC17eA6767298Dc5b3C917 
+
+Deploying Uni v3 callback...
+Uni v3 callback deployed at: 0x978dA90CFE32EE30384750ACa9B7084eFEf65f15 
+
+Setting whitelist state...
+Whitelist state set.
+
+Callback contract deployment completed.
+
+Skipping oracles.

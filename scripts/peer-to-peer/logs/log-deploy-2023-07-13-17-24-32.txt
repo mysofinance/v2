@@ -1,0 +1,59 @@
+[17:24:34.916] Running deployment script with the following deployer:0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+[17:24:34.917] Deployer ETH balance:10000.0
+[17:24:34.917] Deploying to network 'homestead' (Hardhat config network name 'hardhat')
+[17:24:34.917] Configured chain id '1'.
+[17:24:34.917] Loading 'deploy-config.json' with the following config data:{"testnet-deployment-config":{"testnet-tokens":[{"name":"wETH","symbol":"wETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3000000000"},{"name":"rETH","symbol":"rETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3100000000"},{"name":"RPL","symbol":"RPL","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"30000000"},{"name":"USDC","symbol":"USDC","decimals":"6","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000","initialOracleUsdcPrice":"1000000"}],"deployOracles":true,"deployCallbacks":true,"deployCompartments":false},"mainnet-deployment-config":{}}
+[17:24:35.493] Starting core contract deployment to 'hardhat'...
+[17:24:35.493] ======== Step 1 of 6 ========
+[17:24:35.493] Deploying AddressRegistry...
+[17:24:35.627] AddressRegistry deployed at:0x5FbDB2315678afecb367f032d93F642f64180aa3
+[17:24:35.627] ======== Step 2 of 6 ========
+[17:24:35.627] Deploying BorrowerGateway...
+[17:24:35.679] BorrowerGateway deployed at:0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+[17:24:35.680] ======== Step 3 of 6 ========
+[17:24:35.680] Deploying QuoteHandler...
+[17:24:35.752] QuoteHandler deployed at:0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+[17:24:35.753] ======== Step 4 of 6 ========
+[17:24:35.753] Deploying LenderVaultImplementation...
+[17:24:35.797] LenderVaultImplementation deployed at:0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
+[17:24:35.797] ======== Step 5 of 6 ========
+[17:24:35.797] Deploying LenderVaultFactory...
+[17:24:35.832] LenderVaultFactory deployed at:0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+[17:24:35.832] ======== Step 6 of 6 ========
+[17:24:35.832] Initializing AddressRegistry...
+[17:24:35.852] AddressRegistry initialized.
+[17:24:35.852] Core contract deployment completed.
+[17:24:35.852] Running peripheral contract deployments for 'hardhat'...
+[17:24:35.861] Deploying testnet tokens...
+[17:24:35.861] Deploying token with the following parameters:{"name":"wETH","symbol":"wETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3000000000"}
+[17:24:35.904] Test token deployed at: 0x0165878A594ca255338adfa4d48449f69242Eb8F
+[17:24:35.904] Deploying token with the following parameters:{"name":"rETH","symbol":"rETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3100000000"}
+[17:24:35.943] Test token deployed at: 0xa513E6E4b8f2a923D98304ec87F64353C4D5C853
+[17:24:35.943] Deploying token with the following parameters:{"name":"RPL","symbol":"RPL","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"30000000"}
+[17:24:35.979] Test token deployed at: 0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6
+[17:24:35.979] Deploying token with the following parameters:{"name":"USDC","symbol":"USDC","decimals":"6","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000","initialOracleUsdcPrice":"1000000"}
+[17:24:36.016] Test token deployed at: 0x8A791620dd6260079BF849Dc5567aDC3F2FdC318
+[17:24:36.016] Testnet tokens deployed.
+[17:24:36.016] Whitelisting tokens with addresses:0x0165878A594ca255338adfa4d48449f69242Eb8F,0xa513E6E4b8f2a923D98304ec87F64353C4D5C853,0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6,0x8A791620dd6260079BF849Dc5567aDC3F2FdC318
+[17:24:36.037] Tokens whitelisted.
+[17:24:36.037] Deploying testnet oracle contract...
+[17:24:36.071] Testnet oracle deployed at:0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e
+[17:24:36.071] Setting whitelist state...
+[17:24:36.084] Whitelist state set.
+[17:24:36.084] Testnet oracle contract deployment completed.
+[17:24:36.084] Setting initial oracle prices for tokens...
+[17:24:36.084] Preparing testnet token oracle price according to following data:{"name":"wETH","symbol":"wETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3000000000","testnetTokenAddr":"0x0165878A594ca255338adfa4d48449f69242Eb8F"}
+[17:24:36.084] Preparing testnet token oracle price according to following data:{"name":"rETH","symbol":"rETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3100000000","testnetTokenAddr":"0xa513E6E4b8f2a923D98304ec87F64353C4D5C853"}
+[17:24:36.084] Preparing testnet token oracle price according to following data:{"name":"RPL","symbol":"RPL","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"30000000","testnetTokenAddr":"0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"}
+[17:24:36.084] Preparing testnet token oracle price according to following data:{"name":"USDC","symbol":"USDC","decimals":"6","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000","initialOracleUsdcPrice":"1000000","testnetTokenAddr":"0x8A791620dd6260079BF849Dc5567aDC3F2FdC318"}
+[17:24:36.084] Initializing oracle with following initial price data:0x0165878A594ca255338adfa4d48449f69242Eb8F,0xa513E6E4b8f2a923D98304ec87F64353C4D5C853,0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6,0x8A791620dd6260079BF849Dc5567aDC3F2FdC318,3000000000,3100000000,30000000,1000000
+[17:24:36.099] Initial oracle prices set.
+[17:24:36.099] Deploying callback contracts...
+[17:24:36.099] Deploying Balancer v2 callback...
+[17:24:36.148] Balancer v2 callback deployed at:0x9A676e781A523b5d0C0e43731313A708CB607508
+[17:24:36.148] Deploying Uni v3 callback...
+[17:24:36.173] Uni v3 callback deployed at:0x0B306BF915C4d645ff596e518fAf3F9669b97016
+[17:24:36.173] Setting whitelist state...
+[17:24:36.188] Whitelist state set.
+[17:24:36.188] Callback contract deployment completed.
+[17:24:36.188] Skipping oracles.

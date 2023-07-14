@@ -1,0 +1,8 @@
+[17:02:29.495] Running deployment script with the following deployer:0x7D21B0f200C9Bf1152D9f384b28db5b02216Eb63
+[17:02:29.496] Deployer ETH balance:0.0
+[17:02:29.496] Deploying to network 'homestead' (Hardhat config network name 'localhost')
+[17:02:29.496] Configured chain id '1'.
+[17:02:29.496] Loading 'deploy-config.json' with the following config data:{"testnet-deployment-config":{"testnet-tokens":[{"name":"wETH","symbol":"wETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3000000000"},{"name":"rETH","symbol":"rETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3100000000"},{"name":"RPL","symbol":"RPL","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"30000000"},{"name":"USDC","symbol":"USDC","decimals":"6","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000","initialOracleUsdcPrice":"1000000"}],"deployOracles":true,"deployCallbacks":true,"deployCompartments":false},"mainnet-deployment-config":{}}
+[17:02:31.924] Starting core contract deployment to 'localhost'...
+[17:02:31.925] ======== Step 1 of 6 ========
+[17:02:31.925] Deploying AddressRegistry...

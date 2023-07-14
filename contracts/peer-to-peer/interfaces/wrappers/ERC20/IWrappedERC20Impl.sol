@@ -14,15 +14,13 @@ interface IWrappedERC20Impl {
      * @param totalInitialSupply Total initial supply of the wrapped token basket
      * @param name Name of the new wrapper token
      * @param symbol Symbol of the new wrapper token
-     * @param addressRegistry Address of the address registry
      */
     function initialize(
         address minter,
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata name,
-        string calldata symbol,
-        address addressRegistry
+        string calldata symbol
     ) external;
 
     /**

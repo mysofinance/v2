@@ -1,0 +1,14 @@
+Running deployment script with the following deployer: 0x7D21B0f200C9Bf1152D9f384b28db5b02216Eb63
+Deployer ETH balance: 99.999999998715606304
+Deploying to network 'homestead' (Hardhat config network name 'localhost')
+Configured chain id '1'.
+
+Loading 'deploy-config.json' with the following config data: {
+  'testnet-deployment-config': {
+    'testnet-tokens': [ [Object], [Object], [Object], [Object] ],
+    deployOracles: true,
+    deployCallbacks: true,
+    deployCompartments: false
+  },
+  'mainnet-deployment-config': {}
+}

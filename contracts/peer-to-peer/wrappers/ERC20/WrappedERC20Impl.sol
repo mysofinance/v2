@@ -26,7 +26,6 @@ contract WrappedERC20Impl is
     string internal _tokenSymbol;
     uint8 internal _tokenDecimals;
     address[] internal _wrappedTokens;
-    address internal _addressRegistry;
 
     constructor() ERC20("Wrapped ERC20 Impl", "Wrapped ERC20 Impl") {
         _disableInitializers();
@@ -37,14 +36,10 @@ contract WrappedERC20Impl is
         DataTypesPeerToPeer.WrappedERC20TokenInfo[] calldata wrappedTokens,
         uint256 totalInitialSupply,
         string calldata _name,
-        string calldata _symbol,
-        address addressRegistry
+        string calldata _symbol
     ) external initializer {
         uint256 wrappedTokensLen = wrappedTokens.length;
         if (wrappedTokensLen == 1) {
-            // @dev: only need to set address registry in case of single underlying
-            // @note: address registry receives redemption fees
-            _addressRegistry = addressRegistry;
             // check for minimum mint amount
             if (totalInitialSupply <= Constants.SINGLE_WRAPPER_MIN_MINT) {
                 revert Errors.InvalidMintAmount();
@@ -54,7 +49,7 @@ contract WrappedERC20Impl is
             _wrappedTokens.push(wrappedTokens[0].tokenAddr);
 
             // @dev: mint small dust amount to this address, which will be locked in contract
-            // @note: this way small initial mint amounts cannot easily lock up the wrapper for future mints
+            // @note: given this initial mint amount the wrapper cannot easily be locked up for future mints
             _mint(address(this), Constants.SINGLE_WRAPPER_MIN_MINT);
             _mint(
                 minter,
@@ -107,23 +102,6 @@ contract WrappedERC20Impl is
                 amount,
                 currTotalSupply
             );
-            // @note: In case of a single underlying token a redemption fee is applied. This makes griefing attacks
-            // that front-run mint transactions with donations costly because the griefer will not be able to recoup
-            // the full amount even if they're the only token holder.
-            if (wrappedTokensLen == 1) {
-                uint256 redemptionFee = Math.mulDiv(
-                    redemptionAmount,
-                    Constants.SINGLE_WRAPPER_REDEMPTION_FEE,
-                    Constants.BASE
-                );
-                if (redemptionFee > 0) {
-                    IERC20Metadata(tokenAddr).safeTransfer(
-                        IAddressRegistry(_addressRegistry).owner(),
-                        redemptionFee
-                    );
-                    redemptionAmount -= redemptionFee;
-                }
-            }
             IERC20Metadata(tokenAddr).safeTransfer(recipient, redemptionAmount);
             unchecked {
                 ++i;

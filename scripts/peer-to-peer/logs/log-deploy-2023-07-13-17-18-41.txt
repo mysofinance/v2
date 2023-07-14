@@ -1,0 +1,26 @@
+[17:18:43.555] Running deployment script with the following deployer:0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+[17:18:43.556] Deployer ETH balance:10000.0
+[17:18:43.556] Deploying to network 'homestead' (Hardhat config network name 'hardhat')
+[17:18:43.556] Configured chain id '1'.
+[17:18:43.556] Loading 'deploy-config.json' with the following config data:{"testnet-deployment-config":{"testnet-tokens":[{"name":"wETH","symbol":"wETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3000000000"},{"name":"rETH","symbol":"rETH","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"3100000000"},{"name":"RPL","symbol":"RPL","decimals":"18","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000000000000","initialOracleUsdcPrice":"30000000"},{"name":"USDC","symbol":"USDC","decimals":"6","initialMint":"10000000000000000000000000","mintCoolDownPeriod":"86400","mintAmountPerCoolDownPeriod":"10000000000","initialOracleUsdcPrice":"1000000"}],"deployOracles":true,"deployCallbacks":true,"deployCompartments":false},"mainnet-deployment-config":{}}
+[17:18:46.196] Starting core contract deployment to 'hardhat'...
+[17:18:46.196] ======== Step 1 of 6 ========
+[17:18:46.196] Deploying AddressRegistry...
+[17:18:46.341] AddressRegistry deployed at:0x5FbDB2315678afecb367f032d93F642f64180aa3
+[17:18:46.341] ======== Step 2 of 6 ========
+[17:18:46.341] Deploying BorrowerGateway...
+[17:18:46.404] BorrowerGateway deployed at:0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+[17:18:46.404] ======== Step 3 of 6 ========
+[17:18:46.404] Deploying QuoteHandler...
+[17:18:46.450] QuoteHandler deployed at:0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+[17:18:46.450] ======== Step 4 of 6 ========
+[17:18:46.450] Deploying LenderVaultImplementation...
+[17:18:46.496] LenderVaultImplementation deployed at:0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
+[17:18:46.496] ======== Step 5 of 6 ========
+[17:18:46.496] Deploying LenderVaultFactory...
+[17:18:46.525] LenderVaultFactory deployed at:0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+[17:18:46.525] ======== Step 6 of 6 ========
+[17:18:46.525] Initializing AddressRegistry...
+[17:18:46.543] AddressRegistry initialized.
+[17:18:46.543] Core contract deployment completed.
+[17:18:46.543] No peripheral contract deployments for 'hardhat' defined.
