@@ -263,10 +263,11 @@ contract QuoteHandler is IQuoteHandler {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
         }
-        _checkTokensAndCompartmentWhitelist(
+        _checkWhitelist(
             generalQuoteInfo.collToken,
             generalQuoteInfo.loanToken,
             generalQuoteInfo.borrowerCompartmentImplementation,
+            generalQuoteInfo.oracleAddr,
             _isSwap(generalQuoteInfo, quoteTuple)
         );
         if (generalQuoteInfo.validUntil < block.timestamp) {
@@ -291,15 +292,6 @@ contract QuoteHandler is IQuoteHandler {
                     )))
         ) {
             revert Errors.InvalidBorrower();
-        }
-        if (
-            generalQuoteInfo.oracleAddr != address(0) &&
-            IAddressRegistry(addressRegistry).whitelistState(
-                generalQuoteInfo.oracleAddr
-            ) !=
-            DataTypesPeerToPeer.WhitelistState.ORACLE
-        ) {
-            revert Errors.NonWhitelistedOracle();
         }
     }
 
@@ -344,19 +336,21 @@ contract QuoteHandler is IQuoteHandler {
                 ++k;
             }
         }
-        _checkTokensAndCompartmentWhitelist(
+        _checkWhitelist(
             onChainQuote.generalQuoteInfo.collToken,
             onChainQuote.generalQuoteInfo.loanToken,
             onChainQuote.generalQuoteInfo.borrowerCompartmentImplementation,
+            onChainQuote.generalQuoteInfo.oracleAddr,
             isSwap
         );
         return true;
     }
 
-    function _checkTokensAndCompartmentWhitelist(
+    function _checkWhitelist(
         address collToken,
         address loanToken,
         address compartmentImpl,
+        address oracleAddr,
         bool isSwap
     ) internal view {
         if (
@@ -393,6 +387,13 @@ contract QuoteHandler is IQuoteHandler {
             ) {
                 revert Errors.InvalidCompartmentForToken();
             }
+        }
+        if (
+            oracleAddr != address(0) &&
+            IAddressRegistry(addressRegistry).whitelistState(oracleAddr) !=
+            DataTypesPeerToPeer.WhitelistState.ORACLE
+        ) {
+            revert Errors.NonWhitelistedOracle();
         }
     }
 

@@ -19,8 +19,7 @@ const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-const SINGLE_WRAPPER_REDEMPTION_FEE = BASE.mul(5).div(1000)
-const SINGLE_WRAPPER_MIN_MINT = ethers.BigNumber.from(10).pow(6)
+const SINGLE_WRAPPER_MIN_MINT = ethers.BigNumber.from(1000)
 
 async function generateOffChainQuote({
   lenderVault,
@@ -769,7 +768,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(await addressRegistry.isWhitelistedBorrower(whitelistAuthority.address, borrower.address)).to.be.true
     })
 
-    it('Should handle borrower whitelist correctly (2/2', async function () {
+    it('Should handle borrower whitelist correctly (2/2)', async function () {
       const { addressRegistry, whitelistAuthority, lender } = await setupTest()
       // should revert when trying to update lender whitelist with empty array
       await expect(addressRegistry.connect(whitelistAuthority).updateBorrowerWhitelist([], 1)).to.be.revertedWithCustomError(
@@ -1522,6 +1521,14 @@ describe('Peer-to-Peer: Local Tests', function () {
         ],
         salt: ZERO_BYTES32
       }
+      // check on-chain quote with non-whitelisted oracle cannot be added
+      onChainQuote.generalQuoteInfo.oracleAddr = lenderVault.address
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedOracle')
+      onChainQuote.generalQuoteInfo.oracleAddr = ZERO_ADDRESS
+
+      // check valid add
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -4615,17 +4622,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       const addressRegistryOwner = await addressRegistry.owner()
       const totalBal = await weth.balanceOf(wrappedSingleToken.address)
       const preRedemptionBal = await weth.balanceOf(borrower.address)
-      const preRedemptionBalOfAddressRegistry = await weth.balanceOf(addressRegistryOwner)
       const preRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
       const redemptionAmount = await wrappedSingleToken.balanceOf(borrower.address)
       await wrappedSingleToken.connect(borrower).redeem(borrower.address, borrower.address, redemptionAmount)
       const postRedemptionBal = await weth.balanceOf(borrower.address)
       const postRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
-      const expReceivedRedemptionAmountWithoutFees = redemptionAmount.mul(totalBal).div(preRedemptionTotalSupply)
-      const redemptionFee = expReceivedRedemptionAmountWithoutFees.mul(SINGLE_WRAPPER_REDEMPTION_FEE).div(BASE)
-      const postRedemptionBalOfAddressRegistry = await weth.balanceOf(addressRegistryOwner)
-      expect(expReceivedRedemptionAmountWithoutFees.sub(redemptionFee)).to.be.eq(postRedemptionBal.sub(preRedemptionBal))
-      expect(postRedemptionBalOfAddressRegistry.sub(preRedemptionBalOfAddressRegistry)).to.be.equal(redemptionFee)
+      const expReceivedRedemptionAmount = redemptionAmount.mul(totalBal).div(preRedemptionTotalSupply)
+      expect(expReceivedRedemptionAmount).to.be.eq(postRedemptionBal.sub(preRedemptionBal))
       expect(preRedemptionTotalSupply.sub(redemptionAmount)).to.be.equal(postRedemptionTotalSupply)
     })
 
@@ -4709,20 +4712,15 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(expMintAmount).to.be.eq(postMintTotalSupply.sub(preMintTotalSupply))
 
       // check redemption
-      const addressRegistryOwner = await addressRegistry.owner()
       const totalBal = await weth.balanceOf(wrappedSingleToken.address)
       const preRedemptionBal = await weth.balanceOf(borrower.address)
-      const preRedemptionBalOfAddressRegistry = await weth.balanceOf(addressRegistryOwner)
       const preRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
       const redemptionAmount = await wrappedSingleToken.balanceOf(borrower.address)
       await wrappedSingleToken.connect(borrower).redeem(borrower.address, borrower.address, redemptionAmount)
       const postRedemptionBal = await weth.balanceOf(borrower.address)
       const postRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
-      const expReceivedRedemptionAmountWithoutFees = redemptionAmount.mul(totalBal).div(preRedemptionTotalSupply)
-      const redemptionFee = expReceivedRedemptionAmountWithoutFees.mul(SINGLE_WRAPPER_REDEMPTION_FEE).div(BASE)
-      const postRedemptionBalOfAddressRegistry = await weth.balanceOf(addressRegistryOwner)
-      expect(expReceivedRedemptionAmountWithoutFees.sub(redemptionFee)).to.be.eq(postRedemptionBal.sub(preRedemptionBal))
-      expect(postRedemptionBalOfAddressRegistry.sub(preRedemptionBalOfAddressRegistry)).to.be.equal(redemptionFee)
+      const expReceivedRedemptionAmount = redemptionAmount.mul(totalBal).div(preRedemptionTotalSupply)
+      expect(expReceivedRedemptionAmount).to.be.eq(postRedemptionBal.sub(preRedemptionBal))
       expect(preRedemptionTotalSupply.sub(redemptionAmount)).to.be.equal(postRedemptionTotalSupply)
 
       // reset balance to zero
@@ -4824,16 +4822,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       const postRedemptionUserUndBal = await weth.balanceOf(borrower.address)
       const postRedemptionWrapperUndBal = await weth.balanceOf(wrappedSingleToken.address)
       const postRedemptionTotalSupply = await wrappedSingleToken.totalSupply()
-      const expReceivedRedemptionAmountWithoutFees = preRedemptionUserTokenBal
+      const expReceivedRedemptionAmount = preRedemptionUserTokenBal
         .mul(preRedemptionWrapperUndBal)
         .div(preRedemptionTokenSupply)
-      const expRedemptionFee = expReceivedRedemptionAmountWithoutFees.mul(SINGLE_WRAPPER_REDEMPTION_FEE).div(BASE)
       expect(postRedemptionUserTokenBal).to.be.equal(0)
       expect(postRedemptionTotalSupply).to.be.equal(SINGLE_WRAPPER_MIN_MINT)
-      expect(postRedemptionWrapperUndBal).to.be.equal(preRedemptionWrapperUndBal.sub(expReceivedRedemptionAmountWithoutFees))
-      expect(postRedemptionUserUndBal.sub(preRedemptionUserUndBal)).to.be.equal(
-        expReceivedRedemptionAmountWithoutFees.sub(expRedemptionFee)
-      )
+      expect(postRedemptionWrapperUndBal).to.be.equal(preRedemptionWrapperUndBal.sub(expReceivedRedemptionAmount))
+      expect(postRedemptionUserUndBal.sub(preRedemptionUserUndBal)).to.be.equal(expReceivedRedemptionAmount)
     })
   })
 
