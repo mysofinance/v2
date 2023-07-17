@@ -58,6 +58,18 @@ export function loadP2PCreateVaultConfig() {
   return loadConfig('createVaultConfig')
 }
 
+export function loadP2PVaultReportConfig() {
+  return loadConfig('getVaultReportConfig')
+}
+
+export function loadP2PManageTokenWhitelistConfig() {
+  return loadConfig('manageTokenWhitelistConfig')
+}
+
+export function loadP2PWithdrawConfig() {
+  return loadConfig('withdrawConfig')
+}
+
 export function saveP2PDeployedContracts(deployedContracts: any) {
   log(`Save deployed contracts to ${path.join(__dirname, `../peer-to-peer/output/contract-addrs-${fileName}.json`)}.`)
   fs.writeFile(

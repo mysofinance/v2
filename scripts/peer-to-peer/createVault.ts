@@ -23,53 +23,52 @@ async function main() {
   log(`Loading 'configs/createVaultConfig.json' with the following config data:`)
   const jsonConfig = loadP2PCreateVaultConfig()
   log(JSON.stringify(jsonConfig))
-
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  })
-
-  try {
-    const answer = await rl.question('Do you want to continue the script? [y/n] ', {
-      signal: AbortSignal.timeout(15_000) // 10s timeout
+  if (hardhatNetworkName in jsonConfig) {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
     })
 
-    switch (answer.toLowerCase()) {
-      case 'y':
-        await createVault(deployer, hardhatNetworkName, jsonConfig)
-        log('Script completed.')
-        break
-      case 'n':
-        log('Ending script.')
-        break
-      default:
-        log('Invalid input.')
-        log('Ending script.')
+    try {
+      const answer = await rl.question('Do you want to continue the script? [y/n] ', {
+        signal: AbortSignal.timeout(15_000) // 10s timeout
+      })
+
+      switch (answer.toLowerCase()) {
+        case 'y':
+          await createVault(deployer, hardhatNetworkName, jsonConfig)
+          log('Script completed.')
+          break
+        case 'n':
+          log('Ending script.')
+          break
+        default:
+          log('Invalid input.')
+          log('Ending script.')
+      }
+    } finally {
+      rl.close()
     }
-  } finally {
-    rl.close()
+  } else {
+    log(`No config defined for '${hardhatNetworkName}'!`)
   }
 }
 
 async function createVault(deployer: any, hardhatNetworkName: string, jsonConfig: any) {
-  if (hardhatNetworkName in jsonConfig) {
-    log(
-      `Deploying new vault using lender vault factory with address '${jsonConfig[hardhatNetworkName]['lenderVaultFactory']}' and salt '${jsonConfig[hardhatNetworkName]['salt']}'.`
-    )
-    log('Note that salt must be unique per deployer/sender, otherwise tx will fail!')
-    const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
-    const lenderVaultFactory = await LenderVaultFactory.attach(jsonConfig[hardhatNetworkName]['lenderVaultFactory'])
-    const tx = await lenderVaultFactory.connect(deployer).createVault(jsonConfig[hardhatNetworkName]['salt'])
-    log('Waiting for NewVaultCreated...')
-    const receipt = await tx.wait()
-    const newVaultCreatedEvent = receipt.events?.find(x => {
-      return x.event === 'NewVaultCreated'
-    })
-    const newVaultAddr = newVaultCreatedEvent?.args?.['newLenderVaultAddr']
-    log(`New vault created with address '${newVaultAddr}' and salt '${jsonConfig[hardhatNetworkName]['salt']}'.`)
-  } else {
-    log(`No config defined for '${hardhatNetworkName}', check '${loadP2PCreateVaultConfig}'`)
-  }
+  log(
+    `Deploying new vault using lender vault factory with address '${jsonConfig[hardhatNetworkName]['lenderVaultFactory']}' and salt '${jsonConfig[hardhatNetworkName]['salt']}'.`
+  )
+  log('Note that salt must be unique per deployer/sender, otherwise tx will fail!')
+  const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
+  const lenderVaultFactory = await LenderVaultFactory.attach(jsonConfig[hardhatNetworkName]['lenderVaultFactory'])
+  const tx = await lenderVaultFactory.connect(deployer).createVault(jsonConfig[hardhatNetworkName]['salt'])
+  log('Waiting for NewVaultCreated...')
+  const receipt = await tx.wait()
+  const newVaultCreatedEvent = receipt.events?.find(x => {
+    return x.event === 'NewVaultCreated'
+  })
+  const newVaultAddr = newVaultCreatedEvent?.args?.['newLenderVaultAddr']
+  log(`New vault created with address '${newVaultAddr}' and salt '${jsonConfig[hardhatNetworkName]['salt']}'.`)
 }
 
 main().catch(error => {
