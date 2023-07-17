@@ -1,46 +1,13 @@
 import { ethers } from 'hardhat'
 import * as readline from 'readline/promises'
+import { log, logFileNameWithPathP2P, loadP2PDeployConfig, saveP2PDeployedContracts } from '../helpers/misc'
 
-const { Console } = require('console')
-const fs = require('fs')
-const path = require('path')
 const hre = require('hardhat')
-const currDate = new Date()
-const fileName = `deploy-${currDate
-  .toJSON()
-  .slice(0, 10)}-${currDate.getHours()}-${currDate.getMinutes()}-${currDate.getSeconds()}`
-const logFileNameWithPath = path.join(__dirname, `logs/log-${fileName}.txt`)
-const logger = new Console({
-  stdout: fs.createWriteStream(logFileNameWithPath)
-})
-
-function formatConsoleDate(logMsg: string, ...rest: any) {
-  const currDate = new Date()
-  const hour = currDate.getHours()
-  const minutes = currDate.getMinutes()
-  const seconds = currDate.getSeconds()
-  const milliseconds = currDate.getMilliseconds()
-  const timestampPrefix =
-    '[' +
-    (hour < 10 ? '0' + hour : hour) +
-    ':' +
-    (minutes < 10 ? '0' + minutes : minutes) +
-    ':' +
-    (seconds < 10 ? '0' + seconds : seconds) +
-    '.' +
-    ('00' + milliseconds).slice(-3) +
-    '] '
-  return timestampPrefix.concat(logMsg).concat(rest)
-}
-
-function log(logMsg: string, ...rest: any) {
-  console.log(formatConsoleDate(logMsg, rest))
-  logger.log(formatConsoleDate(logMsg, rest))
-}
+const path = require('path')
 
 async function main() {
-  log('Starting deploy script...')
-  log('Logging into:', logFileNameWithPath)
+  log(`Starting ${path.basename(__filename)}...`)
+  log('Logging into:', logFileNameWithPathP2P)
   log('Loading signer info (check hardhat.config.ts)...')
 
   const [deployer] = await ethers.getSigners()
@@ -53,14 +20,8 @@ async function main() {
   log('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
   log(`Deploying to network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  log(`Loading 'deploy-config.json' with the following config data:`)
-  let jsonDeployConfig
-  try {
-    const jsonString = fs.readFileSync(path.join(__dirname, 'deploy-config.json'), 'utf-8')
-    jsonDeployConfig = JSON.parse(jsonString)
-  } catch (err) {
-    console.error(err)
-  }
+  log(`Loading 'configs/deployConfig.json' with the following config data:`)
+  const jsonDeployConfig = loadP2PDeployConfig()
   log(JSON.stringify(jsonDeployConfig))
 
   const rl = readline.createInterface({
@@ -191,17 +152,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
     log('Skipping compartment.')
   }
 
-  log(`Save deployed contracts to ${path.join(__dirname, `output/contract-addrs-${fileName}.json`)}.`)
-  fs.writeFile(
-    path.join(__dirname, `output/contract-addrs-${fileName}.json`),
-    JSON.stringify(deployedContracts),
-    (err: any) => {
-      if (err) {
-        console.error(err)
-        return
-      }
-    }
-  )
+  saveP2PDeployedContracts(deployedContracts)
 }
 
 async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDeployConfig: any, hardhatNetworkName: string) {
@@ -211,7 +162,7 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDepl
 
   const testnetTokenData = jsonDeployConfig[hardhatNetworkName]['deployTestnetTokens']
   if (testnetTokenData.length == 0) {
-    log('Warning: no testnet token parameters configured in deploy-config.json!')
+    log('Warning: no testnet token parameters configured in deployConfig.json!')
   }
   let tokenAddrs = []
   let tokenNamesToAddrs = []
