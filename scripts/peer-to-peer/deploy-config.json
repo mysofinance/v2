@@ -1,15 +1,25 @@
 {
-    "testnet-deployment-config": {
-        "testnet-tokens": [
+    "hardhat":
+    {
+        "deployTestnetTokens": [
             {"name": "wETH", "symbol": "wETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000"},
             {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000"},
             {"name": "RPL", "symbol": "RPL", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "30000000"},
             {"name": "USDC", "symbol": "USDC", "decimals": "6", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000", "initialOracleUsdcPrice": "1000000"}
         ],
-        "deployOracles": true,
+        "deployTestnetOracle": true,
         "deployCallbacks": true,
-        "deployCompartments": false
+        "deployCompartments": true
     },
-    "mainnet-deployment-config": {
+    "mantleTestnet": {
+        "deployTestnetTokens": [
+            {"name": "wETH", "symbol": "wETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000"},
+            {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000"},
+            {"name": "RPL", "symbol": "RPL", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "30000000"},
+            {"name": "USDC", "symbol": "USDC", "decimals": "6", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000", "initialOracleUsdcPrice": "1000000"}
+        ],
+        "deployTestnetOracle": false,
+        "deployCallbacks": false,
+        "deployCompartments": false
     }
 }

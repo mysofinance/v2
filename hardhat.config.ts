@@ -109,9 +109,14 @@ const config: HardhatUserConfig = {
       accounts: [`0x${process.env.LOCAL_HOST_DEPLOYER_KEY}`]
     },
     sepolia: {
-      chainId: 1234,
-      url: `https://xyz.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      chainId: 11155111,
+      url: `https://rpc.sepolia.dev`,
       accounts: [`0x${process.env.SEPOLIA_DEPLOYER_KEY}`]
+    },
+    mantleTestnet: {
+      chainId: 5001,
+      url: `https://rpc.testnet.mantle.xyz/`,
+      accounts: [`0x${process.env.MANTLE_TESTNET_DEPLOYER_KEY}`]
     }
   },
   mocha: {
