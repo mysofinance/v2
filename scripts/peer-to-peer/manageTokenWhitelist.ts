@@ -1,14 +1,15 @@
 import { ethers } from 'hardhat'
 import * as readline from 'readline/promises'
-import { log, logFileNameWithPathP2P, loadP2PManageTokenWhitelistConfig } from '../helpers/misc'
+import { Logger, loadConfig } from '../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
+const scriptName = path.parse(__filename).name
+const logger = new Logger(__dirname, scriptName)
 
 async function main() {
-  log(`Starting ${path.basename(__filename)}...`)
-  log('Logging into:', logFileNameWithPathP2P)
-  log('Loading signer info (check hardhat.config.ts)...')
+  logger.log(`Starting ${path.basename(__filename)}...`)
+  logger.log('Loading signer info (check hardhat.config.ts)...')
 
   const [signer] = await ethers.getSigners()
   const signerBal = await ethers.provider.getBalance(signer.address)
@@ -16,13 +17,13 @@ async function main() {
   const hardhatNetworkName = hre.network.name
   const hardhatChainId = hre.network.config.chainId
 
-  log('Running script with the following signer:', signer.address)
-  log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
-  log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
-  log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  log(`Loading 'configs/manageTokenWhitelistConfig.json' with the following config data:`)
-  const jsonConfig = loadP2PManageTokenWhitelistConfig()
-  log(JSON.stringify(jsonConfig))
+  logger.log('Running script with the following signer:', signer.address)
+  logger.log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
+  logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
+  logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
+  logger.log(`Loading 'configs/manageTokenWhitelistConfig.json' with the following config data:`)
+  const jsonConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
+  logger.log(JSON.stringify(jsonConfig))
   if (hardhatNetworkName in jsonConfig) {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -37,20 +38,20 @@ async function main() {
       switch (answer.toLowerCase()) {
         case 'y':
           await addTokenToWhitelist(signer, hardhatNetworkName, jsonConfig)
-          log('Script completed.')
+          logger.log('Script completed.')
           break
         case 'n':
-          log('Ending script.')
+          logger.log('Ending script.')
           break
         default:
-          log('Invalid input.')
-          log('Ending script.')
+          logger.log('Invalid input.')
+          logger.log('Ending script.')
       }
     } finally {
       rl.close()
     }
   } else {
-    log(`No config defined for '${hardhatNetworkName}'!`)
+    logger.log(`No config defined for '${hardhatNetworkName}'!`)
   }
 }
 
@@ -58,13 +59,13 @@ async function addTokenToWhitelist(signer: any, hardhatNetworkName: string, json
   const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
   const addressRegistry = await AddressRegistry.attach(jsonConfig[hardhatNetworkName]['addressRegistry'])
 
-  log('Retrieving adress registry owner...')
+  logger.log('Retrieving adress registry owner...')
   const owner = await addressRegistry.owner()
 
   if (signer.address == owner) {
-    log(`Registry owner is ${owner} and matches signer.`)
+    logger.log(`Registry owner is ${owner} and matches signer.`)
     if (jsonConfig[hardhatNetworkName]['tokenWhitelist']['tokenAddrs'].length > 0) {
-      log(
+      logger.log(
         `Setting token whitelist to '${jsonConfig[hardhatNetworkName]['tokenWhitelist']['isWhitelisted']}' for token addresses: ${jsonConfig[hardhatNetworkName]['tokenWhitelist']['tokenAddrs']}`
       )
       const tx = await addressRegistry.setWhitelistState(
@@ -77,13 +78,12 @@ async function addTokenToWhitelist(signer: any, hardhatNetworkName: string, json
       })
       const whitelistAddrs = whitelistStateUpdatedEvent?.args?.['whitelistAddrs']
       const whitelistState = whitelistStateUpdatedEvent?.args?.['whitelistState']
-      console.log(whitelistStateUpdatedEvent)
-      log(`Whitelisted address '${whitelistAddrs}' set to whitelist state '${whitelistState}'.`)
+      logger.log(`Whitelisted address '${whitelistAddrs}' set to whitelist state '${whitelistState}'.`)
     } else {
-      log(`Empty token whitelist, check config!`)
+      logger.log(`Empty token whitelist, check config!`)
     }
   } else {
-    log(`Registry owner is ${owner} but doesn't match signer.`)
+    logger.log(`Registry owner is ${owner} but doesn't match signer.`)
   }
 }
 

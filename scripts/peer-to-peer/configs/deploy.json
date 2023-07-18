@@ -1,7 +1,10 @@
 {
     "hardhat":
-    {
-        "deployTestnetTokens": [
+    {        
+        "deployCore": true,
+        "preExistingCore": {},
+        "deployTestnetTokens": true,
+        "testnetTokenConfig": [
             {"name": "WETH", "symbol": "WETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000", "isRebasing": false},
             {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000", "isRebasing": false},
             {"name": "RPL", "symbol": "RPL", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "30000000", "isRebasing": false},
@@ -18,7 +21,10 @@
         "deployCompartments": true
     },
     "mantleTestnet": {
-        "deployTestnetTokens": [
+        "deployCore": true,
+        "preExistingCore": {},
+        "deployTestnetTokens": true,
+        "testnetTokenConfig": [
             {"name": "wETH", "symbol": "wETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000"},
             {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000"},
             {"name": "RPL", "symbol": "RPL", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "30000000"},
@@ -29,7 +35,13 @@
         "deployCompartments": false
     },
     "sepolia": {
-        "deployTestnetTokens": [
+        "deployCore": false,
+        "deployTestnetTokens": false,
+        "preExistingCore": {
+            "addressRegistry": "0x8154a288c6a9fbB49bC686897F01913451f1d991",
+            "borrowerGateway": "0x15f60eB1d7D79adCBfb35F85BBC8e378f2f28695"
+        },
+        "testnetTokenConfig": [
             {"name": "WETH", "symbol": "WETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000", "isRebasing": false},
             {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000", "isRebasing": false},
             {"name": "RPL", "symbol": "RPL", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "30000000", "isRebasing": false},
@@ -41,8 +53,8 @@
             {"name": "HT", "symbol": "HT", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "100000000000000000000000", "initialOracleUsdcPrice": "2710000", "isRebasing": false},
             {"name": "dsETH", "symbol": "dsETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1932100000", "isRebasing": false}
         ],
-        "deployTestnetOracle": true,
+        "deployTestnetOracle": false,
         "deployCallbacks": true,
-        "deployCompartments": true
+        "deployCompartments": false
     }
 }

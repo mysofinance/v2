@@ -1,43 +1,28 @@
 import { ethers } from 'hardhat'
-import { BigNumber } from 'ethers'
-import { log, logFileNameWithPathP2P, loadP2PVaultReportConfig } from '../helpers/misc'
-import { StringSupportOption } from 'prettier'
-
-type Loan = {
-  collToken: string
-  loanToken: String
-  expiry: BigNumber
-  earliestRepay: BigNumber
-  initCollAmount: BigNumber
-  initLoanAmount: BigNumber
-  initRepayAmount: BigNumber
-  amountRepaidSoFar: BigNumber
-  amountReclaimedSoFar: BigNumber
-  collUnlocked: boolean
-  collTokenCompartmentAddr: string
-}
+import { Logger, loadConfig } from '../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
+const scriptName = path.parse(__filename).name
+const logger = new Logger(__dirname, scriptName)
 
 async function main() {
-  log(`Starting ${path.basename(__filename)}...`)
-  log('Logging into:', logFileNameWithPathP2P)
-  log('Loading signer info (check hardhat.config.ts)...')
+  logger.log(`Starting ${path.basename(__filename)}...`)
+  logger.log('Loading signer info (check hardhat.config.ts)...')
 
   const network = await ethers.getDefaultProvider().getNetwork()
   const hardhatNetworkName = hre.network.name
   const hardhatChainId = hre.network.config.chainId
 
-  log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
-  log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  log(`Loading 'configs/getVaultReportConfig.json' with the following config data:`)
-  const jsonConfig = loadP2PVaultReportConfig()
-  log(JSON.stringify(jsonConfig))
+  logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
+  logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
+  logger.log(`Loading 'configs/getVaultReportConfig.json' with the following config data:`)
+  const jsonConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
+  logger.log(JSON.stringify(jsonConfig))
   if (hardhatNetworkName in jsonConfig) {
     getVaultReport(hardhatNetworkName, jsonConfig)
   } else {
-    log(`No config defined for '${hardhatNetworkName}'!`)
+    logger.log(`No config defined for '${hardhatNetworkName}'!`)
   }
 }
 
@@ -46,27 +31,27 @@ async function getVaultReport(hardhatNetworkName: string, jsonConfig: any) {
 
   // get owner
   const vaultOwner = await lenderVault.owner()
-  log(`Vault owner is ${vaultOwner}`)
+  logger.log(`Vault owner is ${vaultOwner}`)
 
   // get signer info
   const numSigners = parseInt(await ethers.provider.getStorageAt(jsonConfig[hardhatNetworkName]['lenderVault'], 1), 16)
-  log(`Num. signers ${numSigners}`)
+  logger.log(`Num. signers ${numSigners}`)
   const minNumOfSigners = await lenderVault.minNumOfSigners()
-  log(`Vault min. number of signers is ${minNumOfSigners}`)
+  logger.log(`Vault min. number of signers is ${minNumOfSigners}`)
 
   for (let i = 0; i < numSigners; ++i) {
     const signer = await lenderVault.signers(i)
-    log(`Signer ${i} is: ${signer}`)
+    logger.log(`Signer ${i} is: ${signer}`)
   }
 
   // get circuit breakers
   const circuitBreaker = await lenderVault.circuitBreaker()
-  log(`Circuit breaker is ${circuitBreaker}`)
+  logger.log(`Circuit breaker is ${circuitBreaker}`)
   const reverseCircuitBreaker = await lenderVault.reverseCircuitBreaker()
-  log(`Reverse circuit breaker is ${reverseCircuitBreaker}`)
+  logger.log(`Reverse circuit breaker is ${reverseCircuitBreaker}`)
 
   // get balances
-  log('tokenAddr;name;symbol;balance')
+  logger.log('tokenAddr;name;symbol;balance')
   let tokenLookups: any = {}
   for (let tokenAddr of jsonConfig[hardhatNetworkName]['tokenAddrsToCheck']) {
     const token = await ethers.getContractAt('IERC20Metadata', tokenAddr)
@@ -75,15 +60,15 @@ async function getVaultReport(hardhatNetworkName: string, jsonConfig: any) {
     const decimals = await token.decimals()
     const balance = await token.balanceOf(jsonConfig[hardhatNetworkName]['lenderVault'])
     tokenLookups[tokenAddr] = { symbol: symbol, decimals: decimals }
-    log(`${tokenAddr};${name};${symbol};${ethers.utils.formatUnits(balance, decimals)}`)
+    logger.log(`${tokenAddr};${name};${symbol};${ethers.utils.formatUnits(balance, decimals)}`)
   }
 
   // get loans
   const totalNumLoans = await lenderVault.totalNumLoans()
-  log(`Total number of loans: ${totalNumLoans}`)
+  logger.log(`Total number of loans: ${totalNumLoans}`)
   const blocknum = await ethers.provider.getBlockNumber()
   const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-  log(`Current block timestamp is: ${timestamp}`)
+  logger.log(`Current block timestamp is: ${timestamp}`)
 
   let openLoans = []
   let repaidLoans = []
@@ -91,7 +76,7 @@ async function getVaultReport(hardhatNetworkName: string, jsonConfig: any) {
   let defaultedAndUnlockableLoans = []
   let unlockableCollAmounts: any = {}
   for (let i = 0; i < parseInt(totalNumLoans.toString()); ++i) {
-    log(`Checking loan id: ${i}`)
+    logger.log(`Checking loan id: ${i}`)
     const loan = await lenderVault.loan(i)
     const repaid = loan.initRepayAmount == loan.amountRepaidSoFar
     const expired = ethers.BigNumber.from(loan.expiry).lte(ethers.BigNumber.from(timestamp))
@@ -116,7 +101,7 @@ async function getVaultReport(hardhatNetworkName: string, jsonConfig: any) {
     }
   }
 
-  log(
+  logger.log(
     'loanId;status;borrower;collToken;loanToken;expiry;earliestRepay;initCollAmount;initLoanAmount;initRepayAmount;initRepaidSoFar;amountReclaimedSoFar;collUnlocked;collTokenCompartmentAddr'
   )
   for (let openLoan of openLoans) {
@@ -155,7 +140,7 @@ function logLoan(loanId: number, status: string, loan: any, tokenLookups: any) {
     loan.amountReclaimedSoFar.toString(),
     tokenLookups[loan.collToken]['decimals']
   )
-  log(
+  logger.log(
     `${loanId};${status};${
       loan.borrower
     };${collTokenSymbol};${loanTokenSymbol};${loan.expiry.toString()};${loan.earliestRepay.toString()};${initCollAmount};${initLoanAmount};${initRepayAmount};${amountRepaidSoFar};${amountReclaimedSoFar};${

@@ -1,14 +1,15 @@
 import { ethers } from 'hardhat'
 import * as readline from 'readline/promises'
-import { log, logFileNameWithPathP2P, loadP2PCreateVaultConfig } from '../helpers/misc'
+import { Logger, loadConfig, saveDeployedContracts } from '../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
+const scriptName = path.parse(__filename).name
+const logger = new Logger(__dirname, scriptName)
 
 async function main() {
-  log(`Starting ${path.basename(__filename)}...`)
-  log('Logging into:', logFileNameWithPathP2P)
-  log('Loading signer info (check hardhat.config.ts)...')
+  logger.log(`Starting ${scriptName}...`)
+  logger.log('Loading signer info (check hardhat.config.ts)...')
 
   const [deployer] = await ethers.getSigners()
   const deployerBal = await ethers.provider.getBalance(deployer.address)
@@ -16,13 +17,13 @@ async function main() {
   const hardhatNetworkName = hre.network.name
   const hardhatChainId = hre.network.config.chainId
 
-  log('Running script with the following deployer:', deployer.address)
-  log('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
-  log(`Deploying to network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
-  log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  log(`Loading 'configs/createVaultConfig.json' with the following config data:`)
-  const jsonConfig = loadP2PCreateVaultConfig()
-  log(JSON.stringify(jsonConfig))
+  logger.log('Running script with the following deployer:', deployer.address)
+  logger.log('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
+  logger.log(`Deploying to network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
+  logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
+  logger.log(`Loading 'configs/createVaultConfig.json' with the following config data:`)
+  const jsonConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
+  logger.log(JSON.stringify(jsonConfig))
   if (hardhatNetworkName in jsonConfig) {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -37,38 +38,42 @@ async function main() {
       switch (answer.toLowerCase()) {
         case 'y':
           await createVault(deployer, hardhatNetworkName, jsonConfig)
-          log('Script completed.')
+          logger.log('Script completed.')
           break
         case 'n':
-          log('Ending script.')
+          logger.log('Ending script.')
           break
         default:
-          log('Invalid input.')
-          log('Ending script.')
+          logger.log('Invalid input.')
+          logger.log('Ending script.')
       }
     } finally {
       rl.close()
     }
   } else {
-    log(`No config defined for '${hardhatNetworkName}'!`)
+    logger.log(`No config defined for '${hardhatNetworkName}'!`)
   }
 }
 
 async function createVault(deployer: any, hardhatNetworkName: string, jsonConfig: any) {
-  log(
+  logger.log(
     `Deploying new vault using lender vault factory with address '${jsonConfig[hardhatNetworkName]['lenderVaultFactory']}' and salt '${jsonConfig[hardhatNetworkName]['salt']}'.`
   )
-  log('Note that salt must be unique per deployer/sender, otherwise tx will fail!')
+  logger.log('Note that salt must be unique per deployer/sender, otherwise tx will fail!')
   const LenderVaultFactory = await ethers.getContractFactory('LenderVaultFactory')
   const lenderVaultFactory = await LenderVaultFactory.attach(jsonConfig[hardhatNetworkName]['lenderVaultFactory'])
   const tx = await lenderVaultFactory.connect(deployer).createVault(jsonConfig[hardhatNetworkName]['salt'])
-  log('Waiting for NewVaultCreated...')
+  logger.log('Waiting for NewVaultCreated...')
   const receipt = await tx.wait()
   const newVaultCreatedEvent = receipt.events?.find(x => {
     return x.event === 'NewVaultCreated'
   })
   const newVaultAddr = newVaultCreatedEvent?.args?.['newLenderVaultAddr']
-  log(`New vault created with address '${newVaultAddr}' and salt '${jsonConfig[hardhatNetworkName]['salt']}'.`)
+  logger.log(`New vault created with address '${newVaultAddr}' and salt '${jsonConfig[hardhatNetworkName]['salt']}'.`)
+
+  logger.log('Saving contracts to json...')
+  saveDeployedContracts({ newVaultAddr: newVaultAddr }, path.join(__dirname, 'output/'), scriptName)
+  logger.log('Saving completed.')
 }
 
 main().catch(error => {

@@ -1,14 +1,15 @@
 import { ethers } from 'hardhat'
 import * as readline from 'readline/promises'
-import { log, logFileNameWithPathP2P, loadP2PAddOnChainQuoteConfig } from '../helpers/misc'
+import { Logger, loadConfig } from '../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
+const scriptName = path.parse(__filename).name
+const logger = new Logger(__dirname, scriptName)
 
 async function main() {
-  log(`Starting ${path.basename(__filename)}...`)
-  log('Logging into:', logFileNameWithPathP2P)
-  log('Loading signer info (check hardhat.config.ts)...')
+  logger.log(`Starting ${path.basename(__filename)}...`)
+  logger.log('Loading signer info (check hardhat.config.ts)...')
 
   const [signer] = await ethers.getSigners()
   const signerBal = await ethers.provider.getBalance(signer.address)
@@ -16,13 +17,13 @@ async function main() {
   const hardhatNetworkName = hre.network.name
   const hardhatChainId = hre.network.config.chainId
 
-  log('Running script with the following signer:', signer.address)
-  log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
-  log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
-  log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  log(`Loading 'configs/createVaultConfig.json' with the following config data:`)
-  const jsonConfig = loadP2PAddOnChainQuoteConfig()
-  log(JSON.stringify(jsonConfig))
+  logger.log('Running script with the following signer:', signer.address)
+  logger.log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
+  logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
+  logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
+  logger.log(`Loading 'configs/createVaultConfig.json' with the following config data:`)
+  const jsonConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
+  logger.log(JSON.stringify(jsonConfig))
   if (hardhatNetworkName in jsonConfig) {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -37,42 +38,41 @@ async function main() {
       switch (answer.toLowerCase()) {
         case 'y':
           await addOnChainQuote(signer, hardhatNetworkName, jsonConfig)
-          log('Script completed.')
+          logger.log('Script completed.')
           break
         case 'n':
-          log('Ending script.')
+          logger.log('Ending script.')
           break
         default:
-          log('Invalid input.')
-          log('Ending script.')
+          logger.log('Invalid input.')
+          logger.log('Ending script.')
       }
     } finally {
       rl.close()
     }
   } else {
-    log(`No config defined for '${hardhatNetworkName}'!`)
+    logger.log(`No config defined for '${hardhatNetworkName}'!`)
   }
 }
 
 async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  log(
+  logger.log(
     `Adding on-chain quote for lender vault '${jsonConfig[hardhatNetworkName]['lenderVaultAddr']}' and quote handler '${jsonConfig[hardhatNetworkName]['quoteHandler']}'.`
   )
 
   const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
   const quoteHandler = await QuoteHandler.attach(jsonConfig[hardhatNetworkName]['quoteHandler'])
 
-  log('Retrieving vault owner from lender vault...')
+  logger.log('Retrieving vault owner from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
   const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVaultAddr'])
   const vaultOwner = await lenderVault.owner()
 
   if (signer.address == vaultOwner) {
-    log(`Vault owner is ${vaultOwner} and matches signer.`)
+    logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
 
     for (let onChainQuote of jsonConfig[hardhatNetworkName]['onChainQuotes']) {
-      log(`Adding on-chain quote...`)
-      console.log(onChainQuote)
+      logger.log(`Adding on-chain quote...`)
       const tx = await quoteHandler
         .connect(signer)
         .addOnChainQuote(jsonConfig[hardhatNetworkName]['lenderVaultAddr'], onChainQuote)
@@ -81,10 +81,10 @@ async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConf
         return x.event === 'OnChainQuoteAdded'
       })
       const quoteHash = event?.args?.['onChainQuoteHash']
-      log(`Added on-chain quote with quote hash '${quoteHash}'.`)
+      logger.log(`Added on-chain quote with quote hash '${quoteHash}'.`)
     }
   } else {
-    log(`Vault owner is ${vaultOwner} but doesn't match signer.`)
+    logger.log(`Vault owner is ${vaultOwner} but doesn't match signer.`)
   }
 }
 
