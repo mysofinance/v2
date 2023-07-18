@@ -29,18 +29,6 @@ contract TestnetToken is Ownable, ERC20 {
         _mint(msg.sender, initialMint);
     }
 
-    function testnetMint() external {
-        uint256 _lastMintTime = lastMintTime[msg.sender];
-        if (
-            _lastMintTime != 0 &&
-            block.timestamp < _lastMintTime + mintCoolDownPeriod
-        ) {
-            revert Errors.InvalidActionForCurrentStatus();
-        }
-        lastMintTime[msg.sender] = block.timestamp;
-        _mint(msg.sender, mintAmountPerCoolDownPeriod);
-    }
-
     function ownerMint(address recipient, uint256 amount) external onlyOwner {
         if (recipient == address(0)) {
             revert Errors.InvalidAddress();
@@ -60,6 +48,18 @@ contract TestnetToken is Ownable, ERC20 {
         }
         mintCoolDownPeriod = _mintCoolDownPeriod;
         mintAmountPerCoolDownPeriod = _mintAmountPerCoolDownPeriod;
+    }
+
+    function testnetMint() public virtual {
+        uint256 _lastMintTime = lastMintTime[msg.sender];
+        if (
+            _lastMintTime != 0 &&
+            block.timestamp < _lastMintTime + mintCoolDownPeriod
+        ) {
+            revert Errors.InvalidActionForCurrentStatus();
+        }
+        lastMintTime[msg.sender] = block.timestamp;
+        _mint(msg.sender, mintAmountPerCoolDownPeriod);
     }
 
     function decimals() public view override returns (uint8) {

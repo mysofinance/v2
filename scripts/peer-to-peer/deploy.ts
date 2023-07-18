@@ -137,9 +137,10 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   } else {
     log('Skipping testnet oracles.')
   }
-
   log('Checking whether to deploy callbacks...')
   if (hardhatNetworkName in jsonDeployConfig && jsonDeployConfig[hardhatNetworkName]['deployCallbacks']) {
+    //const borrowerGateway = await ethers.getContractAt('BorrowerGateway', "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")
+    //const addressRegistry = await ethers.getContractAt('AddressRegistry', "0x5FbDB2315678afecb367f032d93F642f64180aa3")
     deployedContracts['deployedCallbacks'] = await deployCallbacks(deployer, borrowerGateway, addressRegistry)
   } else {
     log('Skipping callbacks.')
@@ -147,7 +148,23 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
 
   log('Checking whether to deploy compartment...')
   if (hardhatNetworkName in jsonDeployConfig && jsonDeployConfig[hardhatNetworkName]['deployCompartments']) {
-    deployedContracts['deployedCompartments'] = await deployCompartments(deployer, borrowerGateway, addressRegistry)
+    const tokensThatRequireCompartment = []
+    for (let testnetTokenParam of _testnetTokenData) {
+      if (testnetTokenParam['isRebasing']) {
+        for (let deployedTestnetTokens of deployedContracts['deployedTestnetTokens']) {
+          if (testnetTokenParam['name'] == deployedTestnetTokens['name']) {
+            tokensThatRequireCompartment.push(deployedTestnetTokens['address'])
+          }
+        }
+      }
+    }
+    deployedContracts['deployedCompartments'] = await deployCompartments(
+      deployer,
+      addressRegistry,
+      tokensThatRequireCompartment
+    )
+    //const addressRegistry = await ethers.getContractAt('AddressRegistry', "0x5FbDB2315678afecb367f032d93F642f64180aa3")
+    //deployedContracts['deployedCompartments'] = await deployCompartments(deployer, addressRegistry, ["0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"])
   } else {
     log('Skipping compartment.')
   }
@@ -157,6 +174,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
 
 async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDeployConfig: any, hardhatNetworkName: string) {
   const TestnetToken = await ethers.getContractFactory('TestnetToken')
+  const RebasingTestnetToken = await ethers.getContractFactory('RebasingTestnetToken')
 
   log('Deploying testnet tokens...')
 
@@ -168,7 +186,8 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDepl
   let tokenNamesToAddrs = []
   for (let testnetTokenParam of testnetTokenData) {
     log('Deploying token with the following parameters:', JSON.stringify(testnetTokenParam))
-    const testnetToken = await TestnetToken.connect(deployer).deploy(
+    const Token = testnetTokenParam['isRebasing'] ? RebasingTestnetToken : TestnetToken
+    const testnetToken = await Token.connect(deployer).deploy(
       testnetTokenParam['name'],
       testnetTokenParam['symbol'],
       testnetTokenParam['decimals'],
@@ -220,9 +239,31 @@ async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegis
   return res
 }
 
-async function deployCompartments(deployer: any, addressRegistry: any, testnetTokenData: any) {
-  log('Not implemented...')
-  return []
+async function deployCompartments(deployer: any, addressRegistry: any, tokensThatRequireCompartment: any) {
+  let res = []
+  log('Deploying compartment contracts...')
+
+  log('Deploying aToken compartment...')
+  const AaveStakingCompartmentImplementation = await ethers.getContractFactory('AaveStakingCompartment')
+  await AaveStakingCompartmentImplementation.connect(deployer)
+  const aaveStakingCompartmentImplementation = await AaveStakingCompartmentImplementation.deploy()
+  await aaveStakingCompartmentImplementation.deployed()
+  res.push({ name: 'aaveStakingCompartmentImplementation', address: aaveStakingCompartmentImplementation.address })
+  log('aToken compartment implementation deployed at:', aaveStakingCompartmentImplementation.address)
+
+  log('Setting whitelist state of compartment...')
+  // whitelist compartment
+  await addressRegistry.connect(deployer).setWhitelistState([aaveStakingCompartmentImplementation.address], 3)
+  log('Whitelist state set.')
+
+  log('Setting allowed tokens for compartment...')
+  await addressRegistry
+    .connect(deployer)
+    .setAllowedTokensForCompartment(aaveStakingCompartmentImplementation.address, tokensThatRequireCompartment, true)
+  log('Allowed tokens for compartment set.')
+
+  log('Compartment contract deployment completed.')
+  return res
 }
 
 async function deployTestnetOracle(deployer: any, addressRegistry: any, testnetTokenData: any) {
