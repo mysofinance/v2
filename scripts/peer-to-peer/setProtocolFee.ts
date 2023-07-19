@@ -25,6 +25,7 @@ async function main() {
   logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
   const jsonConfig = loadConfig(__dirname, expectedConfigFile)
   logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
+
   if (hardhatNetworkName in jsonConfig) {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -38,7 +39,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await addOnChainQuote(signer, hardhatNetworkName, jsonConfig)
+          await setProtocolFee(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -56,36 +57,39 @@ async function main() {
   }
 }
 
-async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  logger.log(
-    `Adding on-chain quote for lender vault '${jsonConfig[hardhatNetworkName]['lenderVaultAddr']}' and quote handler '${jsonConfig[hardhatNetworkName]['quoteHandler']}'.`
-  )
+async function setProtocolFee(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+  logger.log(`Setting protocol fee for address registry '${jsonConfig[hardhatNetworkName]['addressRegistry']}'.`)
 
-  const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
-  const quoteHandler = await QuoteHandler.attach(jsonConfig[hardhatNetworkName]['quoteHandler'])
+  const addressRegistryAddr = jsonConfig[hardhatNetworkName]['addressRegistry']
+  logger.log(`Retrieving owner from address registry at ${addressRegistryAddr}...`)
+  const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
+  const addressRegistry = await AddressRegistry.attach(addressRegistryAddr)
+  const owner = await addressRegistry.owner()
 
-  logger.log('Retrieving vault owner from lender vault...')
-  const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
-  const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVaultAddr'])
-  const vaultOwner = await lenderVault.owner()
+  if (signer.address == owner) {
+    logger.log(`Address registry owner is ${owner} and matches signer.`)
 
-  if (signer.address == vaultOwner) {
-    logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
+    const borrowerGatewayAddr = jsonConfig[hardhatNetworkName]['borrowerGateway']
+    logger.log(`Retrieving borrower gateway at ${borrowerGatewayAddr}...`)
+    const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
+    const borrowerGateway = await BorrowerGateway.attach(borrowerGatewayAddr)
 
-    for (let onChainQuote of jsonConfig[hardhatNetworkName]['onChainQuotes']) {
-      logger.log(`Adding on-chain quote...`)
-      const tx = await quoteHandler
-        .connect(signer)
-        .addOnChainQuote(jsonConfig[hardhatNetworkName]['lenderVaultAddr'], onChainQuote)
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(x => {
-        return x.event === 'OnChainQuoteAdded'
-      })
-      const quoteHash = event?.args?.['onChainQuoteHash']
-      logger.log(`Added on-chain quote with quote hash '${quoteHash}'.`)
+    logger.log(`Retrieving current protocol fee params from borrower gateway...`)
+    const currProtocolFeeParams = await borrowerGateway.getProtocolFeeParams()
+    logger.log(`Current protocol fee params are '${currProtocolFeeParams[0]}' and '${currProtocolFeeParams[1]}'...`)
+
+    const newProtocolFeeParams = jsonConfig[hardhatNetworkName]['protocolFeeParams']
+    if (
+      ethers.BigNumber.from(newProtocolFeeParams[0]).eq(currProtocolFeeParams[0]) &&
+      ethers.BigNumber.from(newProtocolFeeParams[1]).eq(currProtocolFeeParams[1])
+    ) {
+      logger.log(`Current protocol fee params already match the target params!`)
+    } else {
+      await borrowerGateway.setProtocolFeeParams(newProtocolFeeParams)
+      logger.log(`New protocol fee set to '${newProtocolFeeParams[0]}' and '${newProtocolFeeParams[1]}'.`)
     }
   } else {
-    logger.log(`Vault owner is ${vaultOwner} and doesn't match signer.`)
+    logger.log(`Address registry owner is ${owner} and doesn't match signer.`)
   }
 }
 

@@ -16,9 +16,10 @@ async function main() {
 
   logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  logger.log(`Loading 'configs/getVaultReportConfig.json' with the following config data:`)
-  const jsonConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
-  logger.log(JSON.stringify(jsonConfig))
+  const expectedConfigFile = `/configs/${scriptName}.json`
+  logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
+  const jsonConfig = loadConfig(__dirname, expectedConfigFile)
+  logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
   if (hardhatNetworkName in jsonConfig) {
     getVaultReport(hardhatNetworkName, jsonConfig)
   } else {

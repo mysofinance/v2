@@ -21,9 +21,10 @@ async function main() {
   logger.log('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
   logger.log(`Deploying to network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  logger.log(`Loading 'configs/createVaultConfig.json' with the following config data:`)
-  const jsonConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
-  logger.log(JSON.stringify(jsonConfig))
+  const expectedConfigFile = `/configs/${scriptName}.json`
+  logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
+  const jsonConfig = loadConfig(__dirname, expectedConfigFile)
+  logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
   if (hardhatNetworkName in jsonConfig) {
     const rl = readline.createInterface({
       input: process.stdin,

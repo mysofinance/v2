@@ -21,9 +21,11 @@ async function main() {
   logger.log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
   logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  logger.log(`Loading 'configs/withdrawConfig.json' with the following config data:`)
-  const jsonConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
-  logger.log(JSON.stringify(jsonConfig))
+  const expectedConfigFile = `/configs/${scriptName}.json`
+  logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
+  const jsonConfig = loadConfig(__dirname, expectedConfigFile)
+  logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
+
   if (hardhatNetworkName in jsonConfig) {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -79,7 +81,7 @@ async function withdraw(signer: any, hardhatNetworkName: string, jsonConfig: any
       logger.log(`Withdrew '${withdrawAmount}' of token '${tokenAddr}'.`)
     }
   } else {
-    logger.log(`Vault owner is ${vaultOwner} but doesn't match signer.`)
+    logger.log(`Vault owner is ${vaultOwner} and doesn't match signer.`)
   }
 }
 

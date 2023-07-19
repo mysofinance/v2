@@ -21,9 +21,10 @@ async function main() {
   logger.log('Deployer ETH balance:', ethers.utils.formatEther(deployerBal.toString()))
   logger.log(`Deploying to network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  logger.log(`Loading 'configs/deployConfig.json' with the following config data:`)
-  const jsonDeployConfig = loadConfig(__dirname, `/configs/${scriptName}.json`)
-  logger.log(JSON.stringify(jsonDeployConfig))
+  const expectedConfigFile = `/configs/${scriptName}.json`
+  logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
+  const jsonConfig = loadConfig(__dirname, expectedConfigFile)
+  logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -37,7 +38,7 @@ async function main() {
 
     switch (answer.toLowerCase()) {
       case 'y':
-        await deploy(deployer, hardhatNetworkName, jsonDeployConfig)
+        await deploy(deployer, hardhatNetworkName, jsonConfig)
         logger.log('Deploy script completed.')
         break
       case 'n':
@@ -52,13 +53,13 @@ async function main() {
   }
 }
 
-async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfig: any) {
+async function deploy(deployer: any, hardhatNetworkName: string, jsonConfig: any) {
   let deployedContracts: any = {}
 
   let addressRegistry
   let borrowerGateway
   logger.log('Checking whether to deploy core contracts...')
-  if (hardhatNetworkName in jsonDeployConfig && jsonDeployConfig[hardhatNetworkName]['deployCore']) {
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployCore']) {
     logger.log(`Starting core contract deployment to '${hardhatNetworkName}'...`)
 
     // deploy address registry (1/6)
@@ -123,11 +124,11 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
     logger.log(`Loading pre-existing core contracts peripheral contracts...`)
     addressRegistry = await ethers.getContractAt(
       'AddressRegistry',
-      jsonDeployConfig[hardhatNetworkName]['preExistingCore']['addressRegistry']
+      jsonConfig[hardhatNetworkName]['preExistingCore']['addressRegistry']
     )
     borrowerGateway = await ethers.getContractAt(
       'BorrowerGateway',
-      jsonDeployConfig[hardhatNetworkName]['preExistingCore']['borrowerGateway']
+      jsonConfig[hardhatNetworkName]['preExistingCore']['borrowerGateway']
     )
   }
 
@@ -135,11 +136,11 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
 
   logger.log('Checking whether to deploy testnet tokens...')
   let _testnetTokenData
-  if (hardhatNetworkName in jsonDeployConfig && jsonDeployConfig[hardhatNetworkName]['deployTestnetTokens']) {
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployTestnetTokens']) {
     const { testnetTokenData, tokenNamesToAddrs } = await deployTestnetTokens(
       deployer,
       addressRegistry,
-      jsonDeployConfig,
+      jsonConfig,
       hardhatNetworkName
     )
     deployedContracts['deployedTestnetTokens'] = tokenNamesToAddrs
@@ -149,13 +150,13 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   }
 
   logger.log('Checking whether to deploy testnet oracle...')
-  if (hardhatNetworkName in jsonDeployConfig && jsonDeployConfig[hardhatNetworkName]['deployTestnetOracle']) {
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployTestnetOracle']) {
     deployedContracts['deployedTestnetOracle'] = await deployTestnetOracle(deployer, addressRegistry, _testnetTokenData)
   } else {
     logger.log('Skipping testnet oracles.')
   }
   logger.log('Checking whether to deploy callbacks...')
-  if (hardhatNetworkName in jsonDeployConfig && jsonDeployConfig[hardhatNetworkName]['deployCallbacks']) {
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployCallbacks']) {
     //const borrowerGateway = await ethers.getContractAt('BorrowerGateway', "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")
     //const addressRegistry = await ethers.getContractAt('AddressRegistry', "0x5FbDB2315678afecb367f032d93F642f64180aa3")
     deployedContracts['deployedCallbacks'] = await deployCallbacks(deployer, borrowerGateway, addressRegistry)
@@ -164,7 +165,7 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   }
 
   logger.log('Checking whether to deploy compartment...')
-  if (hardhatNetworkName in jsonDeployConfig && jsonDeployConfig[hardhatNetworkName]['deployCompartments']) {
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployCompartments']) {
     const tokensThatRequireCompartment = []
     for (let testnetTokenParam of _testnetTokenData) {
       if (testnetTokenParam['isRebasing']) {
@@ -191,8 +192,9 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonDeployConfi
   logger.log('Saving completed.')
 }
 
-async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDeployConfig: any, hardhatNetworkName: string) {
+async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonConfig: any, hardhatNetworkName: string) {
   const TestnetToken = await ethers.getContractFactory('TestnetToken')
+  const TestnetTokenWithTransferFee = await ethers.getContractFactory('TestnetTokenWithTransferFee')
   const RebasingTestnetToken = await ethers.getContractFactory('RebasingTestnetToken')
 
   logger.log('Deploying testnet tokens...')
@@ -200,13 +202,17 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonDepl
   let tokenAddrs = []
   let tokenNamesToAddrs = []
 
-  const testnetTokenData = jsonDeployConfig[hardhatNetworkName]['testnetTokenConfig']
+  const testnetTokenData = jsonConfig[hardhatNetworkName]['testnetTokenConfig']
   if (testnetTokenData.length == 0) {
     logger.log('Warning: no testnet token parameters configured in deployConfig.json!')
   } else {
     for (let testnetTokenParam of testnetTokenData) {
       logger.log('Deploying token with the following parameters:', JSON.stringify(testnetTokenParam))
-      const Token = testnetTokenParam['isRebasing'] ? RebasingTestnetToken : TestnetToken
+      const Token = testnetTokenParam['hasTransferFee']
+        ? TestnetTokenWithTransferFee
+        : testnetTokenParam['isRebasing']
+        ? RebasingTestnetToken
+        : TestnetToken
       const testnetToken = await Token.connect(deployer).deploy(
         testnetTokenParam['name'],
         testnetTokenParam['symbol'],

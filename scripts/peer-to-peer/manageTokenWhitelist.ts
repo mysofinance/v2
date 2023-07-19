@@ -83,7 +83,7 @@ async function addTokenToWhitelist(signer: any, hardhatNetworkName: string, json
       logger.log(`Empty token whitelist, check config!`)
     }
   } else {
-    logger.log(`Registry owner is ${owner} but doesn't match signer.`)
+    logger.log(`Registry owner is ${owner} and doesn't match signer.`)
   }
 }
 
