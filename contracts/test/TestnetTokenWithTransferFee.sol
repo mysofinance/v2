@@ -26,7 +26,7 @@ contract TestnetTokenWithTransferFee is TestnetToken {
             _mintAmountPerCoolDownPeriod
         )
     {
-        // set initially to 20bps
+        // set initially to 2bps
         feeRate = 200;
     }
 
@@ -45,7 +45,7 @@ contract TestnetTokenWithTransferFee is TestnetToken {
         if (currFeeRate == 0) {
             return 0;
         }
-        return (value * currFeeRate) / feeParts;
+        return (value * currFeeRate) / FEE_PARTS;
     }
 
     function _transfer(

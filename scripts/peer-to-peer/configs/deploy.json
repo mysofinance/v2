@@ -22,9 +22,12 @@
         "deployCompartments": true
     },
     "mantleTestnet": {
-        "deployCore": true,
-        "preExistingCore": {},
-        "deployTestnetTokens": true,
+        "deployCore": false,
+        "preExistingCore": {
+            "addressRegistry": "0xd589bA4478a47844D5FaeAC292F8daEa6b2A5887",
+            "borrowerGateway": "0x4cc29943399A61AA8B2A53eb4b7BBc4b7365d1Db"
+        },
+        "deployTestnetTokens": false,
         "testnetTokenConfig": [
             {"name": "wETH", "symbol": "wETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000"},
             {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000"},
@@ -33,11 +36,12 @@
         ],
         "deployTestnetOracle": false,
         "deployCallbacks": false,
-        "deployCompartments": false
+        "deployCompartments": false,
+        "deployTestnetTokenManager": true
     },
     "sepolia": {
         "deployCore": false,
-        "deployTestnetTokens": true,
+        "deployTestnetTokens": false,
         "preExistingCore": {
             "addressRegistry": "0x8154a288c6a9fbB49bC686897F01913451f1d991",
             "borrowerGateway": "0x15f60eB1d7D79adCBfb35F85BBC8e378f2f28695"
@@ -47,6 +51,7 @@
         ],
         "deployTestnetOracle": false,
         "deployCallbacks": false,
-        "deployCompartments": false
+        "deployCompartments": false,
+        "deployTestnetTokenManager": true
     }
 }

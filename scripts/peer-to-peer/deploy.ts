@@ -187,6 +187,13 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonConfig: any
     logger.log('Skipping compartment.')
   }
 
+  logger.log('Checking whether to deploy testnet token manager...')
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployTestnetTokenManager']) {
+    deployTestnetTokenManager(deployer, addressRegistry)
+  } else {
+    logger.log('Skipping testnet token manager.')
+  }
+
   logger.log('Saving contracts to json...')
   saveDeployedContracts(deployedContracts, path.join(__dirname, 'output/'), scriptName)
   logger.log('Saving completed.')
@@ -324,6 +331,18 @@ async function deployTestnetOracle(deployer: any, addressRegistry: any, testnetT
   logger.log('Initial oracle prices set.')
 
   return testnetOracle.address
+}
+
+async function deployTestnetTokenManager(deployer: any, addressRegistry: any) {
+  logger.log('Deploying testnet token manager contract...')
+  const TestnetTokenManager = await ethers.getContractFactory('TestnetTokenManager')
+  const testnetTokenManager = await TestnetTokenManager.connect(deployer).deploy()
+  await testnetTokenManager.deployed()
+  logger.log('Testnet token manager deployed at:', testnetTokenManager.address)
+  logger.log('Setting whitelist state...')
+  await addressRegistry.connect(deployer).setWhitelistState([testnetTokenManager.address], 9)
+  logger.log('Whitelist state set.')
+  return testnetTokenManager.address
 }
 
 main().catch(error => {
