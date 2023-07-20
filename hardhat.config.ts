@@ -115,7 +115,7 @@ const config: HardhatUserConfig = {
     },
     mantleTestnet: {
       chainId: 5001,
-      url: `https://rpc.testnet.mantle.xyz/`,
+      url: `https://rpc.ankr.com/mantle_testnet/${process.env.ANKR_API_KEY}`, //`https://rpc.testnet.mantle.xyz/`,
       accounts: [`0x${process.env.MANTLE_TESTNET_DEPLOYER_KEY}`]
     }
   },

@@ -71,8 +71,34 @@ async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConf
 
   if (signer.address == vaultOwner) {
     logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
+    const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
+    const addressRegistry = await AddressRegistry.attach(jsonConfig[hardhatNetworkName]['addressRegistry'])
 
     for (let onChainQuote of jsonConfig[hardhatNetworkName]['onChainQuotes']) {
+      logger.log(`Checking general quote info...`)
+
+      const collTokenWhitelistStatus = await addressRegistry.whitelistState(onChainQuote['generalQuoteInfo']['collToken'])
+      logger.log(
+        `Coll token '${onChainQuote['generalQuoteInfo']['collToken']}' has whitelist status '${collTokenWhitelistStatus}!`
+      )
+
+      const loanTokenWhitelistStatus = await addressRegistry.whitelistState(onChainQuote['generalQuoteInfo']['loanToken'])
+      logger.log(
+        `Loan token '${onChainQuote['generalQuoteInfo']['loanToken']}' has whitelist status '${loanTokenWhitelistStatus}!`
+      )
+
+      const oracleAddrWhitelistStatus = await addressRegistry.whitelistState(onChainQuote['generalQuoteInfo']['oracleAddr'])
+      logger.log(
+        `Oracle '${onChainQuote['generalQuoteInfo']['oracleAddr']}' has whitelist status '${oracleAddrWhitelistStatus}!`
+      )
+
+      const compartmentWhitelistStatus = await addressRegistry.whitelistState(
+        onChainQuote['generalQuoteInfo']['borrowerCompartmentImplementation']
+      )
+      logger.log(
+        `Compartment impl '${onChainQuote['generalQuoteInfo']['borrowerCompartmentImplementation']}' has whitelist status '${compartmentWhitelistStatus}!`
+      )
+
       logger.log(`Adding on-chain quote...`)
       const tx = await quoteHandler
         .connect(signer)
