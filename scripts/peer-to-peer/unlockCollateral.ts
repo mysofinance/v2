@@ -39,7 +39,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await mintTestnetTokens(signer, hardhatNetworkName, jsonConfig)
+          await withdraw(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -57,21 +57,36 @@ async function main() {
   }
 }
 
-async function mintTestnetTokens(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  logger.log(`Minting testnet tokens...`)
+async function withdraw(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+  logger.log(`Withdrawing from lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
 
-  for (let mintInfo of jsonConfig[hardhatNetworkName]['mintInfo']) {
-    logger.log(`Loading testnet token with address '${mintInfo['tokenAddr']}'...`)
-    const TestnetToken = await ethers.getContractFactory('TestnetToken')
-    const testnetToken = TestnetToken.attach(mintInfo['tokenAddr'])
-    const owner = await testnetToken.owner()
-    if (owner == signer.address) {
-      logger.log(`Minting '${mintInfo['amount']}' to ${mintInfo['to']}...`)
-      await testnetToken.ownerMint(mintInfo['to'], mintInfo['amount'])
-      logger.log(`Minted.`)
-    } else {
-      logger.log(`Testnet token owner is '${owner}' and doesn't match signer '${signer.address}'.`)
+  logger.log('Retrieving vault owner from lender vault...')
+  const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
+  const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVault'])
+  const vaultOwner = await lenderVault.owner()
+
+  if (signer.address == vaultOwner) {
+    logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
+
+    for (let unlockInstructions of jsonConfig[hardhatNetworkName]['unlockInstructions']) {
+      const unlockToken = await ethers.getContractAt('IERC20Metadata', unlockInstructions['token'])
+      const symbol = await unlockToken.symbol()
+      const decimals = await unlockToken.decimals()
+      const balance = await unlockToken.balanceOf(jsonConfig[hardhatNetworkName]['lenderVault'])
+      logger.log(`Initiating unlock for token ${symbol} and for loan ids: ${unlockInstructions['loanIds']}`)
+      logger.log(`Note: Vault's relevant token balance is: ${ethers.utils.formatUnits(balance, decimals)} ${symbol}...`)
+      const tx = await lenderVault
+        .connect(signer)
+        .unlockCollateral(unlockInstructions['token'], unlockInstructions['loanIds'])
+      const receipt = await tx.wait()
+      const event = receipt.events?.find(x => {
+        return x.event === 'CollateralUnlocked'
+      })
+      const amountUnlocked = event?.args?.['amountUnlocked']
+      logger.log(`Unlocked '${ethers.utils.formatUnits(amountUnlocked, decimals)}' ${symbol}.`)
     }
+  } else {
+    logger.log(`Vault owner is ${vaultOwner} and doesn't match signer.`)
   }
 }
 

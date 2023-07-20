@@ -33,7 +33,7 @@ async function main() {
 
   try {
     const answer = await rl.question('Do you want to continue the deployment script? [y/n] ', {
-      signal: AbortSignal.timeout(15_000) // 10s timeout
+      signal: AbortSignal.timeout(15_000)
     })
 
     switch (answer.toLowerCase()) {
