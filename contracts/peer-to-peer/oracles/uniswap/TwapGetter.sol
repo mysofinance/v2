@@ -30,18 +30,23 @@ abstract contract TwapGetter is ITwapGetter {
 
         // note: this returns the price in base 2**96 and denominated in token1
         // i.e., `1 unit of token0` corresponds to `sqrtPriceX96 units (divided by 2**96) of token1`
-        uint256 priceX96 = getPriceX96FromSqrtPriceX96(sqrtPriceX96);
+        uint256 priceX96 = FullMath.mulDiv(
+            sqrtPriceX96,
+            sqrtPriceX96,
+            FixedPoint96.Q96
+        );
 
-        (uint256 nominator, uint256 denominator) = inToken == token0
-            ? (
-                priceX96 * 10 ** IERC20Metadata(token0).decimals(),
+        twap = inToken == token0
+            ? FullMath.mulDiv(
+                priceX96,
+                10 ** IERC20Metadata(token0).decimals(),
                 FixedPoint96.Q96
             )
-            : (
-                FixedPoint96.Q96 * 10 ** IERC20Metadata(token1).decimals(),
+            : FullMath.mulDiv(
+                FixedPoint96.Q96,
+                10 ** IERC20Metadata(token1).decimals(),
                 priceX96
             );
-        twap = FullMath.mulDiv(nominator, 1, denominator);
     }
 
     function getSqrtTwapX96(
@@ -51,10 +56,13 @@ abstract contract TwapGetter is ITwapGetter {
         if (twapInterval == 0) {
             (sqrtPriceX96, , , , , , ) = IUniswapV3Pool(uniswapV3Pool).slot0();
         } else {
-            int24 tick;
-            uint16 lastIndex;
-            (, tick, lastIndex, , , , ) = IUniswapV3Pool(uniswapV3Pool).slot0();
             uint32[] memory secondsAgo = new uint32[](2);
+
+            // @dev: revert if twapInterval doesn't fit into smaller int32
+            if (twapInterval > uint32(type(int32).max)) {
+                revert Errors.TooLongTwapInterval();
+            }
+
             secondsAgo[0] = twapInterval;
             secondsAgo[1] = 0;
             (int56[] memory tickCumulatives, ) = IUniswapV3Pool(uniswapV3Pool)
@@ -62,29 +70,11 @@ abstract contract TwapGetter is ITwapGetter {
 
             int56 tickCumulativesDelta = tickCumulatives[1] -
                 tickCumulatives[0];
-            if (uint32(int32(twapInterval)) != twapInterval) {
-                revert Errors.TooLongTwapInterval();
-            }
             int24 averageTick = SafeCast.toInt24(
                 tickCumulativesDelta / int32(twapInterval)
             );
 
             sqrtPriceX96 = TickMath.getSqrtRatioAtTick(averageTick);
         }
-    }
-
-    function getPriceX96FromSqrtPriceX96(
-        uint160 sqrtPriceX96
-    ) public pure returns (uint256 priceX96) {
-        return FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96);
-    }
-
-    function getPriceFromSqrtPriceX96(
-        uint160 sqrtPriceX96,
-        uint256 decimals
-    ) public pure returns (uint256 price) {
-        return
-            (FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, FixedPoint96.Q96) *
-                (10 ** decimals)) / FixedPoint96.Q96;
     }
 }

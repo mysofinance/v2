@@ -113,7 +113,7 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
     /* ********************************** */
 
     // create a vault
-    await lenderVaultFactory.connect(lender).createVault()
+    await lenderVaultFactory.connect(lender).createVault(ZERO_BYTES32)
     const lenderVaultAddrs = await addressRegistry.registeredVaults()
     const lenderVaultAddr = lenderVaultAddrs[0]
     const lenderVault = await LenderVaultImplementation.attach(lenderVaultAddr)
@@ -851,13 +851,21 @@ describe('Peer-to-Peer: Arbitrum Tests', function () {
       const vaultWethBalPost = await weth.balanceOf(lenderVault.address)
       const vaultUsdcBalPost = await usdc.balanceOf(lenderVault.address)
 
+      // retrieve prices directly from chainlink
       const loanTokenRoundData = await usdcOracleInstance.latestRoundData()
       const collTokenRoundData = await wethOracleInstance.latestRoundData()
       const loanTokenPriceRaw = loanTokenRoundData.answer
       const collTokenPriceRaw = collTokenRoundData.answer
 
-      const collTokenPriceInLoanToken = collTokenPriceRaw.mul(ONE_USDC).div(loanTokenPriceRaw)
-      const maxLoanPerColl = collTokenPriceInLoanToken.mul(75).div(100)
+      // retrieve prices from myso oracle
+      const tokenPrices = await chainlinkBasicWithSequencerImplementation.getRawPrices(weth.address, usdc.address)
+
+      // check that retrieved raw prices match
+      expect(collTokenPriceRaw).to.be.equal(tokenPrices[0])
+      expect(loanTokenPriceRaw).to.be.equal(tokenPrices[1])
+
+      const loanPerCollUnit = BASE.mul(75).div(100)
+      const maxLoanPerColl = loanPerCollUnit.mul(collTokenPriceRaw).mul(ONE_USDC).div(loanTokenPriceRaw).div(BASE)
 
       expect(borrowerWethBalPre.sub(borrowerWethBalPost)).to.equal(collSendAmount)
       expect(borrowerUsdcBalPost.sub(borrowerUsdcBalPre)).to.equal(maxLoanPerColl)

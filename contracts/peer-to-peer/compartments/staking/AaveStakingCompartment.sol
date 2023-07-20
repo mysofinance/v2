@@ -32,8 +32,6 @@ contract AaveStakingCompartment is BaseCompartment {
     }
 
     function getReclaimableBalance(
-        uint256 /*initCollAmount*/,
-        uint256 /*amountReclaimedSoFar*/,
         address collToken
     ) external view override returns (uint256) {
         return IERC20(collToken).balanceOf(address(this));

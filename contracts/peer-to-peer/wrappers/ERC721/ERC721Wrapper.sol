@@ -20,7 +20,7 @@ import {IWrappedERC721Impl} from "../../interfaces/wrappers/ERC721/IWrappedERC72
 contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
     address public immutable addressRegistry;
     address public immutable wrappedErc721Impl;
-    address[] public _tokensCreated;
+    address[] public tokensCreated;
 
     constructor(address _addressRegistry, address _wrappedErc721Impl) {
         if (
@@ -50,8 +50,17 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         if (numTokensToBeWrapped == 0) {
             revert Errors.InvalidArrayLength();
         }
-        newErc20Addr = Clones.clone(wrappedErc721Impl);
-        _tokensCreated.push(newErc20Addr);
+        // note: this will revert if the wrapped token already exists
+        // this is to prevent the creation of duplicate wrapped tokens
+        // will need to use the remint on the already existing token address
+        // also unique ordering of token addresses and ids enforces uniqueness of wrapped token address
+        // e.g. you can't mint a wrapped token for token address A with token ids 1, 2, 3 and then
+        // mint a wrapped token for token address A with token ids 3, 2, 1
+        newErc20Addr = Clones.cloneDeterministic(
+            wrappedErc721Impl,
+            keccak256(abi.encode(tokensToBeWrapped))
+        );
+        tokensCreated.push(newErc20Addr);
 
         IWrappedERC721Impl(newErc20Addr).initialize(
             minter,
@@ -69,17 +78,17 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
         emit ERC721WrapperCreated(
             newErc20Addr,
             minter,
-            _tokensCreated.length,
+            tokensCreated.length,
             tokensToBeWrapped
         );
     }
 
-    function tokensCreated() external view returns (address[] memory) {
-        return _tokensCreated;
+    function allTokensCreated() external view returns (address[] memory) {
+        return tokensCreated;
     }
 
     function numTokensCreated() external view returns (uint256) {
-        return _tokensCreated.length;
+        return tokensCreated.length;
     }
 
     function _transferTokens(
@@ -97,11 +106,9 @@ contract ERC721Wrapper is ReentrancyGuard, IERC721Wrapper {
                 revert Errors.InvalidArrayLength();
             }
             if (
-                addressRegistry != address(0) &&
                 IAddressRegistry(addressRegistry).whitelistState(
                     tokensToBeWrapped[i].tokenAddr
-                ) !=
-                DataTypesPeerToPeer.WhitelistState.ERC721_TOKEN
+                ) != DataTypesPeerToPeer.WhitelistState.ERC721_TOKEN
             ) {
                 revert Errors.NonWhitelistedToken();
             }

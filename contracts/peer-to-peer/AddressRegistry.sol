@@ -362,8 +362,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         ) {
             revert Errors.InvalidNewOwnerProposal();
         }
-        // @dev: access control via super.transferOwnership()
-        // as well as _newOwnerProposal check against address(0)
+        // @dev: access control check via super.transferOwnership()
         super.transferOwnership(_newOwnerProposal);
     }
 

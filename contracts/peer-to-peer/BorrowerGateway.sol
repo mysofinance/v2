@@ -40,7 +40,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         DataTypesPeerToPeer.OffChainQuote calldata offChainQuote,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] calldata proof
-    ) external nonReentrant {
+    ) external nonReentrant returns (DataTypesPeerToPeer.Loan memory) {
         _checkDeadlineAndRegisteredVault(
             borrowInstructions.deadline,
             lenderVault
@@ -77,6 +77,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData
         );
+        return loan;
     }
 
     function borrowWithOnChainQuote(
@@ -85,7 +86,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             calldata borrowInstructions,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote,
         uint256 quoteTupleIdx
-    ) external nonReentrant {
+    ) external nonReentrant returns (DataTypesPeerToPeer.Loan memory) {
         // borrow gateway just forwards data to respective vault and orchestrates transfers
         // borrow gateway is oblivious towards and specific borrow details, and only fwds info
         // vaults needs to check details of given quote and whether it's valid
@@ -132,6 +133,7 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
             borrowInstructions.callbackAddr,
             borrowInstructions.callbackData
         );
+        return loan;
     }
 
     function repay(
@@ -178,25 +180,16 @@ contract BorrowerGateway is ReentrancyGuard, IBorrowerGateway {
         uint256 maxReclaimableCollAmount = noCompartment
             ? loan.initCollAmount - loan.amountReclaimedSoFar
             : IBaseCompartment(loan.collTokenCompartmentAddr)
-                .getReclaimableBalance(
-                    loan.initCollAmount,
-                    loan.amountReclaimedSoFar,
-                    loan.collToken
-                );
+                .getReclaimableBalance(loan.collToken);
 
         // @dev: amountRepaidSoFar cannot exceed initRepayAmount
         uint128 leftRepaymentAmount = loan.initRepayAmount -
             loan.amountRepaidSoFar;
-        uint128 reclaimCollAmount;
-        if (leftRepaymentAmount == loanRepayInstructions.targetRepayAmount) {
-            reclaimCollAmount = SafeCast.toUint128(maxReclaimableCollAmount);
-        } else {
-            reclaimCollAmount = SafeCast.toUint128(
-                (maxReclaimableCollAmount *
-                    uint256(loanRepayInstructions.targetRepayAmount)) /
-                    uint256(leftRepaymentAmount)
-            );
-        }
+        uint128 reclaimCollAmount = SafeCast.toUint128(
+            (maxReclaimableCollAmount *
+                uint256(loanRepayInstructions.targetRepayAmount)) /
+                uint256(leftRepaymentAmount)
+        );
         if (reclaimCollAmount == 0) {
             revert Errors.ReclaimAmountIsZero();
         }

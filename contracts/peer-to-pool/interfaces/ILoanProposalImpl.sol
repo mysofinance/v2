@@ -61,7 +61,7 @@ interface ILoanProposalImpl {
      * @param newLoanTerms The new loan terms
      * @dev Can only be called by the arranger
      */
-    function proposeLoanTerms(
+    function updateLoanTerms(
         DataTypesPeerToPool.LoanTerms calldata newLoanTerms
     ) external;
 
