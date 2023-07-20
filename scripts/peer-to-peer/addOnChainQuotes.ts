@@ -77,6 +77,17 @@ async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConf
     for (let onChainQuote of jsonConfig[hardhatNetworkName]['onChainQuotes']) {
       logger.log(`Checking general quote info...`)
 
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      logger.log(
+        `Valid until timestamp is '${onChainQuote['generalQuoteInfo']['validUntil']}' vs block timestamp '${timestamp}'.`
+      )
+
+      if (ethers.BigNumber.from(onChainQuote['generalQuoteInfo']['validUntil']).lte(ethers.BigNumber.from(timestamp))) {
+        logger.log(`Valid until date is in the past...`)
+        process.exitCode = 1
+      }
+
       const collTokenWhitelistStatus = await addressRegistry.whitelistState(onChainQuote['generalQuoteInfo']['collToken'])
       logger.log(
         `Coll token '${onChainQuote['generalQuoteInfo']['collToken']}' has whitelist status '${collTokenWhitelistStatus}!`
