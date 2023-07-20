@@ -58,7 +58,7 @@ async function main() {
 
 async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConfig: any) {
   logger.log(
-    `Adding on-chain quote for lender vault '${jsonConfig[hardhatNetworkName]['lenderVaultAddr']}' and quote handler '${jsonConfig[hardhatNetworkName]['quoteHandler']}'.`
+    `Adding on-chain quote for lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}' and quote handler '${jsonConfig[hardhatNetworkName]['quoteHandler']}'.`
   )
 
   const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
@@ -66,7 +66,7 @@ async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConf
 
   logger.log('Retrieving vault owner from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
-  const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVaultAddr'])
+  const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVault'])
   const vaultOwner = await lenderVault.owner()
 
   if (signer.address == vaultOwner) {
@@ -87,16 +87,26 @@ async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConf
         logger.log(`Valid until date is in the past...`)
         process.exitCode = 1
       }
-
+      console.log(onChainQuote['generalQuoteInfo']['collToken'])
+      const collToken = await ethers.getContractAt('IERC20Metadata', onChainQuote['generalQuoteInfo']['collToken'])
+      const collTokenSymbol = await collToken.symbol()
+      const collTokenDecimals = await collToken.decimals()
+      const collTokenBalance = await collToken.balanceOf(jsonConfig[hardhatNetworkName]['lenderVault'])
       const collTokenWhitelistStatus = await addressRegistry.whitelistState(onChainQuote['generalQuoteInfo']['collToken'])
       logger.log(
-        `Coll token '${onChainQuote['generalQuoteInfo']['collToken']}' has whitelist status '${collTokenWhitelistStatus}!`
+        `Coll token ${collTokenSymbol} (${onChainQuote['generalQuoteInfo']['collToken']}) has whitelist status '${collTokenWhitelistStatus}!`
       )
+      logger.log(`Vault balance is ${ethers.utils.formatUnits(collTokenBalance, collTokenDecimals)} ${collTokenSymbol}.`)
 
+      const loanToken = await ethers.getContractAt('IERC20Metadata', onChainQuote['generalQuoteInfo']['loanToken'])
+      const loanTokenSymbol = await loanToken.symbol()
+      const loanTokenDecimals = await loanToken.decimals()
+      const loanTokenBalance = await loanToken.balanceOf(jsonConfig[hardhatNetworkName]['lenderVault'])
       const loanTokenWhitelistStatus = await addressRegistry.whitelistState(onChainQuote['generalQuoteInfo']['loanToken'])
       logger.log(
-        `Loan token '${onChainQuote['generalQuoteInfo']['loanToken']}' has whitelist status '${loanTokenWhitelistStatus}!`
+        `Loan token ${loanTokenSymbol} (${onChainQuote['generalQuoteInfo']['loanToken']}) has whitelist status '${loanTokenWhitelistStatus}!`
       )
+      logger.log(`Vault balance is ${ethers.utils.formatUnits(loanTokenBalance, loanTokenDecimals)} ${loanTokenSymbol}.`)
 
       const oracleAddrWhitelistStatus = await addressRegistry.whitelistState(onChainQuote['generalQuoteInfo']['oracleAddr'])
       logger.log(
@@ -113,7 +123,7 @@ async function addOnChainQuote(signer: any, hardhatNetworkName: string, jsonConf
       logger.log(`Adding on-chain quote...`)
       const tx = await quoteHandler
         .connect(signer)
-        .addOnChainQuote(jsonConfig[hardhatNetworkName]['lenderVaultAddr'], onChainQuote)
+        .addOnChainQuote(jsonConfig[hardhatNetworkName]['lenderVault'], onChainQuote)
       const receipt = await tx.wait()
       const event = receipt.events?.find(x => {
         return x.event === 'OnChainQuoteAdded'

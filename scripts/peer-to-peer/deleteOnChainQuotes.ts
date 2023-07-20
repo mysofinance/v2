@@ -25,7 +25,6 @@ async function main() {
   logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
   const jsonConfig = loadConfig(__dirname, expectedConfigFile)
   logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
-
   if (hardhatNetworkName in jsonConfig) {
     const rl = readline.createInterface({
       input: process.stdin,
@@ -39,7 +38,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await withdraw(signer, hardhatNetworkName, jsonConfig)
+          await deleteOnChainQuote(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -57,8 +56,13 @@ async function main() {
   }
 }
 
-async function withdraw(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  logger.log(`Unlocking tokens on lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
+async function deleteOnChainQuote(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+  logger.log(
+    `Deleting on-chain quote for lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}' and quote handler '${jsonConfig[hardhatNetworkName]['quoteHandler']}'.`
+  )
+
+  const QuoteHandler = await ethers.getContractFactory('QuoteHandler')
+  const quoteHandler = await QuoteHandler.attach(jsonConfig[hardhatNetworkName]['quoteHandler'])
 
   logger.log('Retrieving vault owner from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
@@ -68,22 +72,30 @@ async function withdraw(signer: any, hardhatNetworkName: string, jsonConfig: any
   if (signer.address == vaultOwner) {
     logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
 
-    for (let unlockInstructions of jsonConfig[hardhatNetworkName]['unlockInstructions']) {
-      const unlockToken = await ethers.getContractAt('IERC20Metadata', unlockInstructions['token'])
-      const symbol = await unlockToken.symbol()
-      const decimals = await unlockToken.decimals()
-      const balance = await unlockToken.balanceOf(jsonConfig[hardhatNetworkName]['lenderVault'])
-      logger.log(`Initiating unlock for token ${symbol} and for loan ids: ${unlockInstructions['loanIds']}`)
-      logger.log(`Note: Vault's relevant token balance is: ${ethers.utils.formatUnits(balance, decimals)} ${symbol}...`)
-      const tx = await lenderVault
-        .connect(signer)
-        .unlockCollateral(unlockInstructions['token'], unlockInstructions['loanIds'])
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(x => {
-        return x.event === 'CollateralUnlocked'
-      })
-      const amountUnlocked = event?.args?.['amountUnlocked']
-      logger.log(`Unlocked '${ethers.utils.formatUnits(amountUnlocked, decimals)}' ${symbol}.`)
+    for (let onChainQuotesToBeDeleted of jsonConfig[hardhatNetworkName]['onChainQuotesToBeDeleted']) {
+      logger.log(
+        `Initiating deletion of on-chain quote with the following info: ${JSON.stringify(onChainQuotesToBeDeleted)}`
+      )
+      logger.log(`Checking whether on-chain quote with hash '${onChainQuotesToBeDeleted['onChainQuoteHash']}' exists...`)
+      const isOnChainQuote = await quoteHandler.isOnChainQuote(
+        jsonConfig[hardhatNetworkName]['lenderVault'],
+        onChainQuotesToBeDeleted['onChainQuoteHash']
+      )
+      if (isOnChainQuote) {
+        logger.log(`On-chain quote found.`)
+        logger.log(`Deleting on-chain quote...`)
+        const tx = await quoteHandler
+          .connect(signer)
+          .deleteOnChainQuote(jsonConfig[hardhatNetworkName]['lenderVault'], onChainQuotesToBeDeleted['onChainQuote'])
+        const receipt = await tx.wait()
+        const event = receipt.events?.find(x => {
+          return x.event === 'OnChainQuoteDeleted'
+        })
+        logger.log(`On-chain quote deleted.`)
+      } else {
+        logger.log(`On-chain quote not found.`)
+        logger.log(`Skipping.`)
+      }
     }
   } else {
     logger.log(`Vault owner is ${vaultOwner} and doesn't match signer.`)

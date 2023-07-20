@@ -39,7 +39,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await withdraw(signer, hardhatNetworkName, jsonConfig)
+          await circuitBreaker(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -57,36 +57,49 @@ async function main() {
   }
 }
 
-async function withdraw(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  logger.log(`Unlocking tokens on lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
+async function circuitBreaker(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+  logger.log(`Running circuit breaker script on lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
 
-  logger.log('Retrieving vault owner from lender vault...')
+  logger.log('Retrieving circuit breaker from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
   const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVault'])
-  const vaultOwner = await lenderVault.owner()
 
-  if (signer.address == vaultOwner) {
-    logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
+  const owner = await lenderVault.owner()
+  logger.log(`Vault owner is ${owner}.`)
 
-    for (let unlockInstructions of jsonConfig[hardhatNetworkName]['unlockInstructions']) {
-      const unlockToken = await ethers.getContractAt('IERC20Metadata', unlockInstructions['token'])
-      const symbol = await unlockToken.symbol()
-      const decimals = await unlockToken.decimals()
-      const balance = await unlockToken.balanceOf(jsonConfig[hardhatNetworkName]['lenderVault'])
-      logger.log(`Initiating unlock for token ${symbol} and for loan ids: ${unlockInstructions['loanIds']}`)
-      logger.log(`Note: Vault's relevant token balance is: ${ethers.utils.formatUnits(balance, decimals)} ${symbol}...`)
-      const tx = await lenderVault
-        .connect(signer)
-        .unlockCollateral(unlockInstructions['token'], unlockInstructions['loanIds'])
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(x => {
-        return x.event === 'CollateralUnlocked'
-      })
-      const amountUnlocked = event?.args?.['amountUnlocked']
-      logger.log(`Unlocked '${ethers.utils.formatUnits(amountUnlocked, decimals)}' ${symbol}.`)
+  const circuitBreaker = await lenderVault.circuitBreaker()
+  logger.log(`Registered circuit breaker is ${circuitBreaker}.`)
+
+  logger.log('Retrieving reverse circuit breaker from lender vault...')
+  const reverseCircuitBreaker = await lenderVault.reverseCircuitBreaker()
+  logger.log(`Registered reverse circuit breaker is ${reverseCircuitBreaker}.`)
+
+  logger.log('Retrieving pause state...')
+  const isPaused = await lenderVault.paused()
+  logger.log(`Lender vault is ${isPaused ? '' : 'not'} paused.`)
+
+  if (jsonConfig[hardhatNetworkName]['unpauseVault'] == jsonConfig[hardhatNetworkName]['pauseVault']) {
+    logger.log(`Invalid config!`)
+  } else if (isPaused && jsonConfig[hardhatNetworkName]['pauseVault']) {
+    logger.log(`Nothing to do, vault already paused.`)
+  } else if (!isPaused && jsonConfig[hardhatNetworkName]['unpauseVault']) {
+    logger.log(`Nothing to do, vault already unpaused.`)
+  } else if (isPaused && jsonConfig[hardhatNetworkName]['unpauseVault']) {
+    if (signer.address == reverseCircuitBreaker || signer.address == owner) {
+      logger.log(`Unpausing vault as ${signer.address == reverseCircuitBreaker ? 'reverse circuite breaker' : 'owner'}...`)
+      await lenderVault.unpauseQuotes()
+      logger.log(`All quotes unpaused.`)
+    } else {
+      logger.log(`Invalid signer ${signer.address}, neither matches reverse circuit breaker nor owner.`)
     }
-  } else {
-    logger.log(`Vault owner is ${vaultOwner} and doesn't match signer.`)
+  } else if (!isPaused && jsonConfig[hardhatNetworkName]['pauseVault']) {
+    if (signer.address == circuitBreaker || signer.address == owner) {
+      logger.log(`Pausing vault as ${signer.address == circuitBreaker ? 'circuite breaker' : 'owner'}...`)
+      await lenderVault.pauseQuotes()
+      logger.log(`All quotes paused`)
+    } else {
+      logger.log(`Invalid signer ${signer.address}, neither matches circuit breaker nor owner.`)
+    }
   }
 }
 

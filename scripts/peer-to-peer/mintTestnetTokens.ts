@@ -64,10 +64,24 @@ async function mintTestnetTokens(signer: any, hardhatNetworkName: string, jsonCo
     logger.log(`Loading testnet token with address '${mintInfo['tokenAddr']}'...`)
     const TestnetToken = await ethers.getContractFactory('TestnetToken')
     const testnetToken = TestnetToken.attach(mintInfo['tokenAddr'])
+    const testnetTokenSymbol = await testnetToken.symbol()
+    const testnetTokenDecimals = await testnetToken.decimals()
+
     const owner = await testnetToken.owner()
     if (owner == signer.address) {
-      logger.log(`Minting '${mintInfo['amount']}' to ${mintInfo['to']}...`)
+      logger.log(
+        `Minting ${ethers.utils.formatUnits(mintInfo['amount'], testnetTokenDecimals)} ${testnetTokenSymbol} to ${
+          mintInfo['to']
+        }...`
+      )
       await testnetToken.ownerMint(mintInfo['to'], mintInfo['amount'])
+      const testnetTokenBalance = await testnetToken.balanceOf(mintInfo['to'])
+      logger.log(
+        `New balance of ${mintInfo['to']} is now ${ethers.utils.formatUnits(
+          testnetTokenBalance,
+          testnetTokenDecimals
+        )} ${testnetTokenSymbol}.`
+      )
       logger.log(`Minted.`)
     } else {
       logger.log(`Testnet token owner is '${owner}' and doesn't match signer '${signer.address}'.`)
