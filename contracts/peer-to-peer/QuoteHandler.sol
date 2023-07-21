@@ -19,6 +19,8 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool))
         public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
+    mapping(address => DataTypesPeerToPeer.OnChainQuoteInfo[])
+        internal onChainQuoteHistory;
 
     constructor(address _addressRegistry) {
         if (_addressRegistry == address(0)) {
@@ -41,13 +43,20 @@ contract QuoteHandler is IQuoteHandler {
         if (isOnChainQuoteFromVault[onChainQuoteHash]) {
             revert Errors.OnChainQuoteAlreadyAdded();
         }
+        // @dev: on-chain quote history is append only
+        onChainQuoteHistory[lenderVault].push(
+            DataTypesPeerToPeer.OnChainQuoteInfo({
+                quoteHash: onChainQuoteHash,
+                validUntil: onChainQuote.generalQuoteInfo.validUntil
+            })
+        );
         isOnChainQuoteFromVault[onChainQuoteHash] = true;
         emit OnChainQuoteAdded(lenderVault, onChainQuote, onChainQuoteHash);
     }
 
     function updateOnChainQuote(
         address lenderVault,
-        DataTypesPeerToPeer.OnChainQuote calldata oldOnChainQuote,
+        bytes32 oldOnChainQuoteHash,
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external {
         _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
@@ -56,7 +65,6 @@ contract QuoteHandler is IQuoteHandler {
         }
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
-        bytes32 oldOnChainQuoteHash = _hashOnChainQuote(oldOnChainQuote);
         bytes32 newOnChainQuoteHash = _hashOnChainQuote(newOnChainQuote);
         // this check will catch the case where the old quote is the same as the new quote
         if (isOnChainQuoteFromVault[newOnChainQuoteHash]) {
@@ -65,6 +73,13 @@ contract QuoteHandler is IQuoteHandler {
         if (!isOnChainQuoteFromVault[oldOnChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
+        // @dev: on-chain quote history is append only
+        onChainQuoteHistory[lenderVault].push(
+            DataTypesPeerToPeer.OnChainQuoteInfo({
+                quoteHash: newOnChainQuoteHash,
+                validUntil: newOnChainQuote.generalQuoteInfo.validUntil
+            })
+        );
         isOnChainQuoteFromVault[oldOnChainQuoteHash] = false;
         emit OnChainQuoteDeleted(lenderVault, oldOnChainQuoteHash);
 
@@ -78,12 +93,11 @@ contract QuoteHandler is IQuoteHandler {
 
     function deleteOnChainQuote(
         address lenderVault,
-        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
+        bytes32 onChainQuoteHash
     ) external {
         _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
-        bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
         if (!isOnChainQuoteFromVault[onChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
@@ -203,6 +217,29 @@ contract QuoteHandler is IQuoteHandler {
             toBeRegisteredLoanId,
             quoteTuple
         );
+    }
+
+    function getOnChainQuoteHistory(
+        address lenderVault,
+        uint256 idx
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo memory) {
+        if (idx < onChainQuoteHistory[lenderVault].length) {
+            return onChainQuoteHistory[lenderVault][idx];
+        } else {
+            revert Errors.InvalidArrayIndex();
+        }
+    }
+
+    function getFullOnChainQuoteHistory(
+        address lenderVault
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo[] memory) {
+        return onChainQuoteHistory[lenderVault];
+    }
+
+    function getOnChainQuoteHistoryLength(
+        address lenderVault
+    ) external view returns (uint256) {
+        return onChainQuoteHistory[lenderVault].length;
     }
 
     /**

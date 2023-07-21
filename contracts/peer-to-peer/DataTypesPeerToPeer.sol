@@ -153,6 +153,13 @@ library DataTypesPeerToPeer {
         uint256 tokenAmount;
     }
 
+    struct OnChainQuoteInfo {
+        // hash of on chain quote
+        bytes32 quoteHash;
+        // valid until timestamp
+        uint256 validUntil;
+    }
+
     enum WhitelistState {
         // not whitelisted
         NOT_WHITELISTED,

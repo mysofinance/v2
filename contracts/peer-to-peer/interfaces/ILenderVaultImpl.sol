@@ -297,4 +297,10 @@ interface ILenderVaultImpl {
      * @return total number of loans
      */
     function totalNumLoans() external view returns (uint256);
+
+    /**
+     * @notice function returns total number of signers
+     * @return total number of signers
+     */
+    function totalNumSigners() external view returns (uint256);
 }

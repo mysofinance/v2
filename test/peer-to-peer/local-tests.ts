@@ -142,7 +142,10 @@ async function generateOffChainQuote({
   expect(recoveredAddr).to.equal(signer.address)
 
   // add signer
+  const preNumSigners = await lenderVault.totalNumSigners()
   await lenderVault.connect(lender).addSigners([signer.address])
+  const postNumSigners = await lenderVault.totalNumSigners()
+  expect(postNumSigners.sub(preNumSigners)).to.be.equal(1)
 
   // lender add sig to quote and pass to borrower
   offChainQuote.compactSigs = customSignatures.length != 0 ? customSignatures : [compactSig]
@@ -3343,6 +3346,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         salt: ZERO_BYTES32
       }
 
+      expect(await quoteHandler.getOnChainQuoteHistoryLength(lenderVault.address)).to.equal(0)
+
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -3354,10 +3359,15 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
-        quoteHandler,
-        'OnChainQuoteDeleted'
-      )
+      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+      const historyLen = await quoteHandler.getOnChainQuoteHistoryLength(lenderVault.address)
+
+      expect(quoteHashAndValidUntilArr.length).to.equal(2)
+      expect(quoteHashAndValidUntilArr.length).to.equal(historyLen)
+
+      await expect(
+        quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash)
+      ).to.emit(quoteHandler, 'OnChainQuoteDeleted')
     })
   })
 

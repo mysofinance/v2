@@ -879,6 +879,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
+      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+
+      expect(quoteHashAndValidUntilArr.length).to.equal(2)
+
       let newOnChainQuote = {
         ...onChainQuote,
         generalQuoteInfo: {
@@ -892,25 +896,35 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await addressRegistry.connect(team).setWhitelistState([usdc.address], 0)
 
       await expect(
-        quoteHandler.connect(lender).updateOnChainQuote(borrower.address, onChainQuote, newOnChainQuote)
+        quoteHandler
+          .connect(lender)
+          .updateOnChainQuote(borrower.address, quoteHashAndValidUntilArr[0].quoteHash, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
       await expect(
-        quoteHandler.connect(borrower).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+        quoteHandler
+          .connect(borrower)
+          .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
       await expect(
-        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+        quoteHandler
+          .connect(lender)
+          .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       newOnChainQuote.generalQuoteInfo.loanToken = usdc.address
 
       await expect(
-        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+        quoteHandler
+          .connect(lender)
+          .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).setWhitelistState([compAddress], 1)
 
       await expect(
-        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+        quoteHandler
+          .connect(lender)
+          .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'NonWhitelistedToken')
 
       await addressRegistry.connect(team).setWhitelistState([usdc.address], 1)
@@ -918,23 +932,27 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       onChainQuote.generalQuoteInfo.loanToken = compAddress
 
       await expect(
-        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, ZERO_BYTES32, newOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnknownOnChainQuote')
 
       onChainQuote.generalQuoteInfo.loanToken = usdc.address
 
       // should revert if you add new quote same as old quote
       await expect(
-        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, onChainQuote)
+        quoteHandler
+          .connect(lender)
+          .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
       // should revert if you add new quote which is already added
       await expect(
-        quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, onChainQuote, otherOnChainQuote)
+        quoteHandler
+          .connect(lender)
+          .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash, otherOnChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
 
       const updateOnChainQuoteTransaction = await quoteHandler
         .connect(lender)
-        .updateOnChainQuote(lenderVault.address, onChainQuote, newOnChainQuote)
+        .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash, newOnChainQuote)
 
       const updateOnChainQuoteReceipt = await updateOnChainQuoteTransaction.wait()
 
@@ -950,7 +968,15 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(borrowQuoteAddedEvent).to.be.not.undefined
 
-      await quoteHandler.connect(lender).updateOnChainQuote(lenderVault.address, newOnChainQuote, onChainQuote)
+      const quoteHashAndValidUntilArrAfterUpdate = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+
+      expect(quoteHashAndValidUntilArrAfterUpdate.length).to.equal(3)
+
+      await quoteHandler
+        .connect(lender)
+        .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArrAfterUpdate[2].quoteHash, onChainQuote)
+
+      expect(await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)).to.have.lengthOf(4)
 
       // borrower approves borrower gateway
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1870,85 +1896,30 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
+      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+      // revert if index out of bounds
+      await expect(quoteHandler.getOnChainQuoteHistory(lenderVault.address, 5)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'InvalidArrayIndex'
+      )
+      const onChainQuoteHistoryElem = await quoteHandler.getOnChainQuoteHistory(lenderVault.address, 0)
+      expect(quoteHashAndValidUntilArr.length).to.equal(1)
+      expect(quoteHashAndValidUntilArr[0].quoteHash).to.be.equal(onChainQuoteHistoryElem.quoteHash)
+      expect(quoteHashAndValidUntilArr[0].validUntil).to.be.equal(onChainQuoteHistoryElem.validUntil)
+
       await expect(
-        quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, onChainQuote)
+        quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, quoteHashAndValidUntilArr[0].quoteHash)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
       await expect(
-        quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)
+        quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
-      onChainQuote.generalQuoteInfo.loanToken = weth.address
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
-
-      onChainQuote.generalQuoteInfo.loanToken = usdc.address
-
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
-        quoteHandler,
-        'OnChainQuoteDeleted'
-      )
-    })
-
-    it('Should validate correctly the wrong deleteOnChainQuote', async function () {
-      const { addressRegistry, quoteHandler, lender, borrower, team, usdc, weth, lenderVault } = await setupTest()
-
-      // lenderVault owner deposits usdc
-      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
-
-      // lenderVault owner gives quote
-      const blocknum = await ethers.provider.getBlockNumber()
-      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
-      let quoteTuples = [
-        {
-          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
-          interestRatePctInBase: BASE.mul(10).div(100),
-          upfrontFeePctInBase: BASE.mul(1).div(100),
-          tenor: ONE_DAY.mul(365)
-        },
-        {
-          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
-          interestRatePctInBase: BASE.mul(20).div(100),
-          upfrontFeePctInBase: 0,
-          tenor: ONE_DAY.mul(180)
-        }
-      ]
-      let onChainQuote = {
-        generalQuoteInfo: {
-          collToken: weth.address,
-          loanToken: usdc.address,
-          oracleAddr: ZERO_ADDR,
-          minLoan: ONE_USDC.mul(1000),
-          maxLoan: MAX_UINT256,
-          validUntil: timestamp + 60,
-          earliestRepayTenor: 0,
-          borrowerCompartmentImplementation: ZERO_ADDR,
-          isSingleUse: false,
-          whitelistAddr: ZERO_ADDR,
-          isWhitelistAddrSingleBorrower: false
-        },
-        quoteTuples: quoteTuples,
-        salt: ZERO_BYTES32
-      }
-      await addressRegistry.connect(team).setWhitelistState([weth.address, usdc.address], 1)
-
-      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
-        quoteHandler,
-        'OnChainQuoteAdded'
-      )
+      await expect(
+        quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, ZERO_BYTES32)
+      ).to.revertedWithCustomError(quoteHandler, 'UnknownOnChainQuote')
 
       await expect(
-        quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
-      await expect(
-        quoteHandler.connect(borrower).deleteOnChainQuote(lenderVault.address, onChainQuote)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
-      onChainQuote.generalQuoteInfo.loanToken = weth.address
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.reverted
-
-      onChainQuote.generalQuoteInfo.loanToken = usdc.address
-
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
-        quoteHandler,
-        'OnChainQuoteDeleted'
-      )
+        quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash)
+      ).to.emit(quoteHandler, 'OnChainQuoteDeleted')
     })
   })
 
@@ -5209,7 +5180,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
+      const preTotalNumSigners = await lenderVault.numSigners()
       await lenderVault.connect(lender).addSigners([team.address])
+      const postTotalNumSigners = await lenderVault.numSigners()
+      expect(postTotalNumSigners.sub(preTotalNumSigners)).to.be.equal(1)
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'

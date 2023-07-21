@@ -394,6 +394,10 @@ contract LenderVaultImpl is
         return _loans.length;
     }
 
+    function totalNumSigners() external view returns (uint256) {
+        return signers.length;
+    }
+
     function getTokenBalancesAndLockedAmounts(
         address[] calldata tokens
     )
