@@ -3354,10 +3354,13 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      await expect(quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
-        quoteHandler,
-        'OnChainQuoteDeleted'
-      )
+      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashAndValidDeadlinePerVault(lenderVault.address)
+
+      expect(quoteHashAndValidUntilArr.length).to.equal(2)
+
+      await expect(
+        quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash)
+      ).to.emit(quoteHandler, 'OnChainQuoteDeleted')
     })
   })
 

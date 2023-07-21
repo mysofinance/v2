@@ -56,12 +56,12 @@ interface IQuoteHandler {
      * @notice function updates on chain quote
      * @dev function can only be called by vault owner
      * @param lenderVault address of the vault updating quote
-     * @param oldOnChainQuote data for the old onChain quote (See notes in DataTypesPeerToPeer.sol)
+     * @param oldOnChainQuoteHash quote hash for the old onChain quote marked for deletion
      * @param newOnChainQuote data for the new onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
     function updateOnChainQuote(
         address lenderVault,
-        DataTypesPeerToPeer.OnChainQuote calldata oldOnChainQuote,
+        bytes32 oldOnChainQuoteHash,
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external;
 
@@ -69,11 +69,11 @@ interface IQuoteHandler {
      * @notice function deletes on chain quote
      * @dev function can only be called by vault owner
      * @param lenderVault address of the vault deleting
-     * @param onChainQuote data for the onChain quote marked for deletion (See notes in DataTypesPeerToPeer.sol)
+     * @param onChainQuoteHash quote hash for the onChain quote marked for deletion
      */
     function deleteOnChainQuote(
         address lenderVault,
-        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
+        bytes32 onChainQuoteHash
     ) external;
 
     /**
@@ -163,4 +163,16 @@ interface IQuoteHandler {
         address lenderVault,
         bytes32 hashToCheck
     ) external view returns (bool);
+
+    /**
+     * @notice function returns array of structs containing the on chain quote hash and validUntil timestamp
+     * @param lenderVault address of vault
+     * @return array of quote hash and validUntil data for every on chain quote in a vault
+     */
+    function getQuoteHashAndValidDeadlinePerVault(
+        address lenderVault
+    )
+        external
+        view
+        returns (DataTypesPeerToPeer.QuoteHashAndValidDeadline[] memory);
 }
