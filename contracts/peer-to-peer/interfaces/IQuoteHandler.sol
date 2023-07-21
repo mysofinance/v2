@@ -169,7 +169,7 @@ interface IQuoteHandler {
      * @param lenderVault address of vault
      * @return array of quote hash and validUntil data for every on chain quote in a vault
      */
-    function getQuoteHashAndValidDeadlinePerVault(
+    function getQuoteHashesAndValidUntilTimestampsPerVault(
         address lenderVault
     )
         external

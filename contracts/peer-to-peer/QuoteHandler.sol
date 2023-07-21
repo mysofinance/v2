@@ -20,7 +20,7 @@ contract QuoteHandler is IQuoteHandler {
         public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
     mapping(address => DataTypesPeerToPeer.QuoteHashAndValidDeadline[])
-        internal quoteHashAndValidDeadlinePerVault;
+        internal quoteHashesAndValidUntilTimestampsPerVault;
 
     constructor(address _addressRegistry) {
         if (_addressRegistry == address(0)) {
@@ -45,7 +45,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         // note: in case of a vault re-adding a prior invalidated quote, this does create duplicate entry in array
         // but that should be very rare and not worth tracking index with extra storage variable
-        quoteHashAndValidDeadlinePerVault[lenderVault].push(
+        quoteHashesAndValidUntilTimestampsPerVault[lenderVault].push(
             DataTypesPeerToPeer.QuoteHashAndValidDeadline({
                 quoteHash: onChainQuoteHash,
                 validUntil: onChainQuote.generalQuoteInfo.validUntil
@@ -76,7 +76,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         // note: in case of a vault re-adding a prior invalidated quote, this does create duplicate entry in array
         // but that should be very rare and not worth tracking index with extra storage variable
-        quoteHashAndValidDeadlinePerVault[lenderVault].push(
+        quoteHashesAndValidUntilTimestampsPerVault[lenderVault].push(
             DataTypesPeerToPeer.QuoteHashAndValidDeadline({
                 quoteHash: newOnChainQuoteHash,
                 validUntil: newOnChainQuote.generalQuoteInfo.validUntil
@@ -221,14 +221,14 @@ contract QuoteHandler is IQuoteHandler {
         );
     }
 
-    function getQuoteHashAndValidDeadlinePerVault(
+    function getQuoteHashesAndValidUntilTimestampsPerVault(
         address lenderVault
     )
         external
         view
         returns (DataTypesPeerToPeer.QuoteHashAndValidDeadline[] memory)
     {
-        return quoteHashAndValidDeadlinePerVault[lenderVault];
+        return quoteHashesAndValidUntilTimestampsPerVault[lenderVault];
     }
 
     /**

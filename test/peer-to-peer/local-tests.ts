@@ -3354,7 +3354,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashAndValidDeadlinePerVault(lenderVault.address)
+      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(lenderVault.address)
 
       expect(quoteHashAndValidUntilArr.length).to.equal(2)
 

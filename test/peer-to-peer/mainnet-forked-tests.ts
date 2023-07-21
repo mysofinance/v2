@@ -879,7 +879,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashAndValidDeadlinePerVault(lenderVault.address)
+      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(lenderVault.address)
 
       expect(quoteHashAndValidUntilArr.length).to.equal(2)
 
@@ -968,7 +968,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(borrowQuoteAddedEvent).to.be.not.undefined
 
-      const quoteHashAndValidUntilArrAfterUpdate = await quoteHandler.getQuoteHashAndValidDeadlinePerVault(
+      const quoteHashAndValidUntilArrAfterUpdate = await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(
         lenderVault.address
       )
 
@@ -978,7 +978,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         .connect(lender)
         .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArrAfterUpdate[2].quoteHash, onChainQuote)
 
-      expect(await quoteHandler.getQuoteHashAndValidDeadlinePerVault(lenderVault.address)).to.have.lengthOf(4)
+      expect(await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(lenderVault.address)).to.have.lengthOf(4)
 
       // borrower approves borrower gateway
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1898,7 +1898,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashAndValidDeadlinePerVault(lenderVault.address)
+      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(lenderVault.address)
 
       expect(quoteHashAndValidUntilArr.length).to.equal(1)
 
