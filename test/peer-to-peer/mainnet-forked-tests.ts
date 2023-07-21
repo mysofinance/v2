@@ -1897,6 +1897,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       )
 
       const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+      // revert if index out of bounds
+      await expect(quoteHandler.getOnChainQuoteHistory(lenderVault.address, 5)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'InvalidArrayIndex'
+      )
       const onChainQuoteHistoryElem = await quoteHandler.getOnChainQuoteHistory(lenderVault.address, 0)
       expect(quoteHashAndValidUntilArr.length).to.equal(1)
       expect(quoteHashAndValidUntilArr[0].quoteHash).to.be.equal(onChainQuoteHistoryElem.quoteHash)

@@ -223,7 +223,11 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         uint256 idx
     ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo memory) {
-        return onChainQuoteHistory[lenderVault][idx];
+        if (idx < onChainQuoteHistory[lenderVault].length) {
+            return onChainQuoteHistory[lenderVault][idx];
+        } else {
+            revert Errors.InvalidArrayIndex();
+        }
     }
 
     function getFullOnChainQuoteHistory(
