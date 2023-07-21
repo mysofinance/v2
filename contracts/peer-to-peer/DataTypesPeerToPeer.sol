@@ -153,7 +153,7 @@ library DataTypesPeerToPeer {
         uint256 tokenAmount;
     }
 
-    struct QuoteHashAndValidDeadline {
+    struct OnChainQuoteInfo {
         // hash of on chain quote
         bytes32 quoteHash;
         // valid until timestamp

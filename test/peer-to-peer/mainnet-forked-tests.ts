@@ -879,7 +879,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(lenderVault.address)
+      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
 
       expect(quoteHashAndValidUntilArr.length).to.equal(2)
 
@@ -968,9 +968,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       expect(borrowQuoteAddedEvent).to.be.not.undefined
 
-      const quoteHashAndValidUntilArrAfterUpdate = await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(
-        lenderVault.address
-      )
+      const quoteHashAndValidUntilArrAfterUpdate = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
 
       expect(quoteHashAndValidUntilArrAfterUpdate.length).to.equal(3)
 
@@ -978,7 +976,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         .connect(lender)
         .updateOnChainQuote(lenderVault.address, quoteHashAndValidUntilArrAfterUpdate[2].quoteHash, onChainQuote)
 
-      expect(await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(lenderVault.address)).to.have.lengthOf(4)
+      expect(await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)).to.have.lengthOf(4)
 
       // borrower approves borrower gateway
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -1898,9 +1896,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const quoteHashAndValidUntilArr = await quoteHandler.getQuoteHashesAndValidUntilTimestampsPerVault(lenderVault.address)
-
+      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+      const onChainQuoteHistoryElem = await quoteHandler.getOnChainQuoteHistory(lenderVault.address, 0)
       expect(quoteHashAndValidUntilArr.length).to.equal(1)
+      expect(quoteHashAndValidUntilArr[0].quoteHash).to.be.equal(onChainQuoteHistoryElem.quoteHash)
+      expect(quoteHashAndValidUntilArr[0].validUntil).to.be.equal(onChainQuoteHistoryElem.validUntil)
 
       await expect(
         quoteHandler.connect(lender).deleteOnChainQuote(borrower.address, quoteHashAndValidUntilArr[0].quoteHash)
@@ -5175,7 +5175,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
+      const preTotalNumSigners = await lenderVault.numSigners()
       await lenderVault.connect(lender).addSigners([team.address])
+      const postTotalNumSigners = await lenderVault.numSigners()
+      expect(postTotalNumSigners.sub(preTotalNumSigners)).to.be.equal(1)
 
       // deploy chainlinkOracleContract
       const usdcEthChainlinkAddr = '0x986b5e1e1755e3c2440e960477f25201b0a8bbd4'

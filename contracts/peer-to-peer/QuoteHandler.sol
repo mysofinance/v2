@@ -19,8 +19,8 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool))
         public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
-    mapping(address => DataTypesPeerToPeer.QuoteHashAndValidDeadline[])
-        internal quoteHashesAndValidUntilTimestampsPerVault;
+    mapping(address => DataTypesPeerToPeer.OnChainQuoteInfo[])
+        internal onChainQuoteHistory;
 
     constructor(address _addressRegistry) {
         if (_addressRegistry == address(0)) {
@@ -43,10 +43,9 @@ contract QuoteHandler is IQuoteHandler {
         if (isOnChainQuoteFromVault[onChainQuoteHash]) {
             revert Errors.OnChainQuoteAlreadyAdded();
         }
-        // note: in case of a vault re-adding a prior invalidated quote, this does create duplicate entry in array
-        // but that should be very rare and not worth tracking index with extra storage variable
-        quoteHashesAndValidUntilTimestampsPerVault[lenderVault].push(
-            DataTypesPeerToPeer.QuoteHashAndValidDeadline({
+        // @dev: on-chain quote history is append only
+        onChainQuoteHistory[lenderVault].push(
+            DataTypesPeerToPeer.OnChainQuoteInfo({
                 quoteHash: onChainQuoteHash,
                 validUntil: onChainQuote.generalQuoteInfo.validUntil
             })
@@ -74,10 +73,9 @@ contract QuoteHandler is IQuoteHandler {
         if (!isOnChainQuoteFromVault[oldOnChainQuoteHash]) {
             revert Errors.UnknownOnChainQuote();
         }
-        // note: in case of a vault re-adding a prior invalidated quote, this does create duplicate entry in array
-        // but that should be very rare and not worth tracking index with extra storage variable
-        quoteHashesAndValidUntilTimestampsPerVault[lenderVault].push(
-            DataTypesPeerToPeer.QuoteHashAndValidDeadline({
+        // @dev: on-chain quote history is append only
+        onChainQuoteHistory[lenderVault].push(
+            DataTypesPeerToPeer.OnChainQuoteInfo({
                 quoteHash: newOnChainQuoteHash,
                 validUntil: newOnChainQuote.generalQuoteInfo.validUntil
             })
@@ -221,14 +219,23 @@ contract QuoteHandler is IQuoteHandler {
         );
     }
 
-    function getQuoteHashesAndValidUntilTimestampsPerVault(
+    function getOnChainQuoteHistory(
+        address lenderVault,
+        uint256 idx
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo memory) {
+        return onChainQuoteHistory[lenderVault][idx];
+    }
+
+    function getFullOnChainQuoteHistory(
         address lenderVault
-    )
-        external
-        view
-        returns (DataTypesPeerToPeer.QuoteHashAndValidDeadline[] memory)
-    {
-        return quoteHashesAndValidUntilTimestampsPerVault[lenderVault];
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo[] memory) {
+        return onChainQuoteHistory[lenderVault];
+    }
+
+    function getOnChainQuoteHistoryLength(
+        address lenderVault
+    ) external view returns (uint256) {
+        return onChainQuoteHistory[lenderVault].length;
     }
 
     /**

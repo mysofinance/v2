@@ -164,13 +164,13 @@ File                                                     |  % Stmts | % Branch |
   Helpers.sol                                            |      100 |       50 |      100 |      100 |                |
  contracts\interfaces\                                   |      100 |      100 |      100 |      100 |                |
   IMysoTokenManager.sol                                  |      100 |      100 |      100 |      100 |                |
- contracts\peer-to-peer\                                 |    99.72 |    94.74 |    98.72 |    98.75 |                |
+ contracts\peer-to-peer\                                 |    99.73 |    94.74 |    98.78 |    98.76 |                |
   AddressRegistry.sol                                    |      100 |    96.74 |      100 |    99.17 |            116 |
   BorrowerGateway.sol                                    |    98.57 |    90.91 |    90.91 |    96.97 |    241,317,358 |
   DataTypesPeerToPeer.sol                                |      100 |      100 |      100 |      100 |                |
   LenderVaultFactory.sol                                 |      100 |     87.5 |      100 |      100 |                |
   LenderVaultImpl.sol                                    |      100 |    92.86 |      100 |    98.88 |         63,206 |
-  QuoteHandler.sol                                       |      100 |    98.04 |      100 |    99.34 |            365 |
+  QuoteHandler.sol                                       |      100 |    98.04 |      100 |    99.35 |            412 |
  contracts\peer-to-peer\callbacks\                       |      100 |       75 |    88.89 |    96.88 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
   UniV3Looping.sol                                       |      100 |      100 |      100 |      100 |                |
@@ -245,6 +245,6 @@ File                                                     |  % Stmts | % Branch |
   IFundingPoolImpl.sol                                   |      100 |      100 |      100 |      100 |                |
   ILoanProposalImpl.sol                                  |      100 |      100 |      100 |      100 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    98.99 |    88.83 |    98.63 |     96.8 |                |
+All files                                                |    98.99 |    88.83 |    98.65 |    96.81 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```

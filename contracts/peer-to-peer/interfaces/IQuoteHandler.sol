@@ -165,14 +165,30 @@ interface IQuoteHandler {
     ) external view returns (bool);
 
     /**
-     * @notice function returns array of structs containing the on chain quote hash and validUntil timestamp
+     * @notice function returns element of on-chain history
      * @param lenderVault address of vault
-     * @return array of quote hash and validUntil data for every on chain quote in a vault
+     * @return element of on-chain quote history
      */
-    function getQuoteHashesAndValidUntilTimestampsPerVault(
+    function getOnChainQuoteHistory(
+        address lenderVault,
+        uint256 idx
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo memory);
+
+    /**
+     * @notice function returns array of structs containing the on-chain quote hash and validUntil timestamp
+     * @param lenderVault address of vault
+     * @return array of quote hash and validUntil data for on-chain quote history of a vault
+     */
+    function getFullOnChainQuoteHistory(
         address lenderVault
-    )
-        external
-        view
-        returns (DataTypesPeerToPeer.QuoteHashAndValidDeadline[] memory);
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo[] memory);
+
+    /**
+     * @notice function returns the number of on-chain quotes that were added or updated
+     * @param lenderVault address of vault
+     * @return number of on-chain quotes that were added or updated
+     */
+    function getOnChainQuoteHistoryLength(
+        address lenderVault
+    ) external view returns (uint256);
 }
