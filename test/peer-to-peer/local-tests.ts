@@ -172,7 +172,7 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, signer, borrower, team, circuitBreaker, whitelistAuthority, addr1, addr2, addr3] =
+    const [lender, signer, borrower, team, circuitBreaker, approvedQuoteHandler, whitelistAuthority, addr1, addr2, addr3] =
       await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
@@ -543,6 +543,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       signer2: sortedAddrs[1],
       signer3: sortedAddrs[2],
       circuitBreaker,
+      approvedQuoteHandler,
       usdc,
       weth,
       lenderVault,
@@ -1121,6 +1122,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrower,
         whitelistAuthority,
         circuitBreaker,
+        approvedQuoteHandler,
         usdc,
         weth,
         lenderVault,
@@ -1284,6 +1286,25 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault,
         'InvalidAddress'
       )
+
+      // only owner can set approved quote handler
+      await expect(lenderVault.connect(borrower).setApprovedQuoteHandler(lender.address)).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+
+      // should revert when trying to set invalid quote handler address (owner address)
+      await expect(lenderVault.connect(lender).setApprovedQuoteHandler(lender.address)).to.be.revertedWithCustomError(
+        lenderVault,
+        'InvalidAddress'
+      )
+
+      // set valid approved quote handler
+      await lenderVault.connect(lender).setApprovedQuoteHandler(approvedQuoteHandler.address)
+
+      // should revert if new handler same as old one
+      await expect(
+        lenderVault.connect(lender).setApprovedQuoteHandler(approvedQuoteHandler.address)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
 
       // set valid circuit breaker
       await lenderVault.connect(lender).setCircuitBreaker(circuitBreaker.address)
