@@ -5865,21 +5865,10 @@ describe('Peer-to-Peer: Local Tests', function () {
         .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
         .withArgs(lenderVault.address, testQuotePolicyManager.address)
 
-      // should revert since policy is set to not allow
-      await expect(
-        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
-
-      // set policy to allow
-      await testQuotePolicyManager.connect(team).updatePolicy(lenderVault.address, true)
-
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
       )
-
-      // set borrow policy to not allowed
-      await testQuotePolicyManager.connect(team).updatePolicy(lenderVault.address, false)
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -5897,7 +5886,6 @@ describe('Peer-to-Peer: Local Tests', function () {
         mysoTokenManagerData: ZERO_BYTES32
       }
 
-      // should revert since quote violates policy
       await expect(
         borrowerGateway
           .connect(borrower)

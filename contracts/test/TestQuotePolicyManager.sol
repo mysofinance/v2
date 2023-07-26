@@ -24,11 +24,4 @@ contract TestQuotePolicyManager is IQuotePolicyManager {
     ) external view returns (bool isValid) {
         isValid = allow[lenderVault];
     }
-
-    function checkNewOnChainQuote(
-        address lenderVault,
-        DataTypesPeerToPeer.OnChainQuote calldata
-    ) external view returns (bool isValid) {
-        isValid = allow[lenderVault];
-    }
 }

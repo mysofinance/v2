@@ -36,7 +36,7 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
         _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
-        if (!_isValidOnChainQuote(lenderVault, onChainQuote)) {
+        if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -62,7 +62,7 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external {
         _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
-        if (!_isValidOnChainQuote(lenderVault, newOnChainQuote)) {
+        if (!_isValidOnChainQuote(newOnChainQuote)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -379,16 +379,8 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function _isValidOnChainQuote(
-        address lenderVault,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) internal view returns (bool) {
-        if (
-            quotePolicyManagerForVault[lenderVault] != address(0) &&
-            !IQuotePolicyManager(quotePolicyManagerForVault[lenderVault])
-                .checkNewOnChainQuote(lenderVault, onChainQuote)
-        ) {
-            return false;
-        }
         if (
             onChainQuote.generalQuoteInfo.collToken ==
             onChainQuote.generalQuoteInfo.loanToken
