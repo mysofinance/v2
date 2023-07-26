@@ -132,11 +132,13 @@ interface IQuoteHandler {
     /**
      * @notice function to update the quote policy manager for a vault
      * @param lenderVault address for which quote policy manager is being updated
+     * @param newPolicyManagerAddress address of new quote policy manager
      * @param isRevoke true if policy manager is being revoked, else set to current whitelisted policy manager in registry
-     * @dev function can only be called by vault owner or approved quote handler
+     * @dev function can only be called by vault owner, not even quoteHandler can update policy manager
      */
     function updateQuotePolicyManagerForVault(
         address lenderVault,
+        address newPolicyManagerAddress,
         bool isRevoke
     ) external;
 
