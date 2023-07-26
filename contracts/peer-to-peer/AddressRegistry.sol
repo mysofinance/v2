@@ -27,6 +27,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     address public borrowerGateway;
     address public quoteHandler;
     address public mysoTokenManager;
+    address public quotePolicyManager;
     address public erc721Wrapper;
     address public erc20Wrapper;
     mapping(address => bool) public isRegisteredVault;
@@ -83,14 +84,16 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         (
             address _erc721Wrapper,
             address _erc20Wrapper,
-            address _mysoTokenManager
-        ) = (erc721Wrapper, erc20Wrapper, mysoTokenManager);
-        // note (1/2): ERC721WRAPPER, ERC20WRAPPER and MYSO_TOKEN_MANAGER state can only be "occupied" by
+            address _mysoTokenManager,
+            address _quotePolicyManager
+        ) = (erc721Wrapper, erc20Wrapper, mysoTokenManager, quotePolicyManager);
+        // note (1/2): ERC721WRAPPER, ERC20WRAPPER, MYSO_TOKEN_MANAGER, and QUOTE_POLICY_MANAGER state can only be "occupied" by
         // one addresses ("singleton state")
         if (
             state == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER ||
             state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER ||
-            state == DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
+            state == DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER ||
+            state == DataTypesPeerToPeer.WhitelistState.QUOTE_POLICY_MANAGER
         ) {
             if (addrsLen != 1) {
                 revert Errors.InvalidArrayLength();
@@ -103,7 +106,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
                 state,
                 _erc721Wrapper,
                 _erc20Wrapper,
-                _mysoTokenManager
+                _mysoTokenManager,
+                _quotePolicyManager
             );
             whitelistState[addrs[0]] = state;
         } else {
@@ -120,7 +124,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
                     addrs[i],
                     _erc721Wrapper,
                     _erc20Wrapper,
-                    _mysoTokenManager
+                    _mysoTokenManager,
+                    _quotePolicyManager
                 );
                 whitelistState[addrs[i]] = state;
                 unchecked {
@@ -406,7 +411,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         DataTypesPeerToPeer.WhitelistState state,
         address _erc721Wrapper,
         address _erc20Wrapper,
-        address _mysoTokenManager
+        address _mysoTokenManager,
+        address _quotePolicyManager
     ) internal {
         // check if address already has given state set or
         // other singleton addresses occupy target state
@@ -414,7 +420,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             whitelistState[newAddr] == state ||
             whitelistState[_erc721Wrapper] == state ||
             whitelistState[_erc20Wrapper] == state ||
-            whitelistState[_mysoTokenManager] == state
+            whitelistState[_mysoTokenManager] == state ||
+            whitelistState[_quotePolicyManager] == state
         ) {
             revert Errors.StateAlreadySet();
         }
@@ -423,14 +430,19 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             newAddr,
             _erc721Wrapper,
             _erc20Wrapper,
-            _mysoTokenManager
+            _mysoTokenManager,
+            _quotePolicyManager
         );
         if (state == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER) {
             erc721Wrapper = newAddr;
         } else if (state == DataTypesPeerToPeer.WhitelistState.ERC20WRAPPER) {
             erc20Wrapper = newAddr;
-        } else {
+        } else if (
+            state == DataTypesPeerToPeer.WhitelistState.MYSO_TOKEN_MANAGER
+        ) {
             mysoTokenManager = newAddr;
+        } else {
+            quotePolicyManager = newAddr;
         }
     }
 
@@ -438,7 +450,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
         address addr,
         address _erc721Wrapper,
         address _erc20Wrapper,
-        address _mysoTokenManager
+        address _mysoTokenManager,
+        address _quotePolicyManager
     ) internal {
         if (addr == _erc721Wrapper) {
             delete erc721Wrapper;
@@ -446,6 +459,8 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             delete erc20Wrapper;
         } else if (addr == _mysoTokenManager) {
             delete mysoTokenManager;
+        } else if (addr == _quotePolicyManager) {
+            delete quotePolicyManager;
         }
     }
 

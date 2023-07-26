@@ -42,6 +42,7 @@ contract LenderVaultImpl is
     address[] public signers;
     address public circuitBreaker;
     address public reverseCircuitBreaker;
+    address public approvedQuoteHandler;
     uint256 public minNumOfSigners;
     mapping(address => bool) public isSigner;
     bool public withdrawEntered;
@@ -364,6 +365,16 @@ contract LenderVaultImpl is
             newReverseCircuitBreaker,
             oldReverseCircuitBreaker
         );
+    }
+
+    function setApprovedQuoteHandler(address newQuoteHandler) external {
+        _checkOwner();
+        address oldQuoteHandler = approvedQuoteHandler;
+        if (newQuoteHandler == oldQuoteHandler || newQuoteHandler == owner()) {
+            revert Errors.InvalidAddress();
+        }
+        approvedQuoteHandler = newQuoteHandler;
+        emit ApprovedQuoteHandlerUpdated(newQuoteHandler, oldQuoteHandler);
     }
 
     function pauseQuotes() external {

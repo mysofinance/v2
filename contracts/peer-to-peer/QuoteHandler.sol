@@ -10,6 +10,7 @@ import {Helpers} from "../Helpers.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
+import {IQuotePolicyManager} from "./interfaces/IQuotePolicyManager.sol";
 
 contract QuoteHandler is IQuoteHandler {
     using ECDSA for bytes32;
@@ -19,6 +20,7 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool))
         public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
+    mapping(address => address) public quotePolicyManagerForVault;
     mapping(address => DataTypesPeerToPeer.OnChainQuoteInfo[])
         internal onChainQuoteHistory;
 
@@ -33,8 +35,8 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
-        if (!_isValidOnChainQuote(onChainQuote)) {
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
+        if (!_isValidOnChainQuote(lenderVault, onChainQuote)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -59,8 +61,8 @@ contract QuoteHandler is IQuoteHandler {
         bytes32 oldOnChainQuoteHash,
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external {
-        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
-        if (!_isValidOnChainQuote(newOnChainQuote)) {
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
+        if (!_isValidOnChainQuote(lenderVault, newOnChainQuote)) {
             revert Errors.InvalidQuote();
         }
         mapping(bytes32 => bool)
@@ -95,7 +97,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         bytes32 onChainQuoteHash
     ) external {
-        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         if (!isOnChainQuoteFromVault[onChainQuoteHash]) {
@@ -106,7 +108,7 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function incrementOffChainQuoteNonce(address lenderVault) external {
-        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
         uint256 newNonce = offChainQuoteNonce[lenderVault] + 1;
         offChainQuoteNonce[lenderVault] = newNonce;
         emit OffChainQuoteNonceIncremented(lenderVault, newNonce);
@@ -116,7 +118,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         bytes32 offChainQuoteHash
     ) external {
-        _checkIsRegisteredVaultAndSenderIsOwner(lenderVault);
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
         offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
         emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
     }
@@ -132,6 +134,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         _checkSenderAndQuoteInfo(
             borrower,
+            lenderVault,
             onChainQuote.generalQuoteInfo,
             onChainQuote.quoteTuples[quoteTupleIdx]
         );
@@ -163,6 +166,7 @@ contract QuoteHandler is IQuoteHandler {
     ) external {
         _checkSenderAndQuoteInfo(
             borrower,
+            lenderVault,
             offChainQuote.generalQuoteInfo,
             quoteTuple
         );
@@ -217,6 +221,20 @@ contract QuoteHandler is IQuoteHandler {
             toBeRegisteredLoanId,
             quoteTuple
         );
+    }
+
+    function updateQuotePolicyManagerForVault(
+        address lenderVault,
+        bool isRevoke
+    ) external {
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
+        if (isRevoke) {
+            delete quotePolicyManagerForVault[lenderVault];
+        } else {
+            quotePolicyManagerForVault[lenderVault] = IAddressRegistry(
+                addressRegistry
+            ).quotePolicyManager();
+        }
     }
 
     function getOnChainQuoteHistory(
@@ -294,11 +312,24 @@ contract QuoteHandler is IQuoteHandler {
 
     function _checkSenderAndQuoteInfo(
         address borrower,
+        address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal view {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
+        }
+        if (
+            quotePolicyManagerForVault[lenderVault] != address(0) &&
+            !IQuotePolicyManager(quotePolicyManagerForVault[lenderVault])
+                .checkPendingBorrowQuoteInfoAndTuple(
+                    borrower,
+                    lenderVault,
+                    generalQuoteInfo,
+                    quoteTuple
+                )
+        ) {
+            revert Errors.QuoteViolatesPolicy();
         }
         _checkWhitelist(
             generalQuoteInfo.collToken,
@@ -333,8 +364,16 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function _isValidOnChainQuote(
+        address lenderVault,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) internal view returns (bool) {
+        if (
+            quotePolicyManagerForVault[lenderVault] != address(0) &&
+            !IQuotePolicyManager(quotePolicyManagerForVault[lenderVault])
+                .checkNewOnChainQuote(lenderVault, onChainQuote)
+        ) {
+            return false;
+        }
         if (
             onChainQuote.generalQuoteInfo.collToken ==
             onChainQuote.generalQuoteInfo.loanToken
@@ -434,13 +473,16 @@ contract QuoteHandler is IQuoteHandler {
         }
     }
 
-    function _checkIsRegisteredVaultAndSenderIsOwner(
+    function _checkIsRegisteredVaultAndSenderIsApproved(
         address lenderVault
     ) internal view {
         if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
             revert Errors.UnregisteredVault();
         }
-        if (ILenderVaultImpl(lenderVault).owner() != msg.sender) {
+        if (
+            ILenderVaultImpl(lenderVault).owner() != msg.sender &&
+            ILenderVaultImpl(lenderVault).approvedQuoteHandler() != msg.sender
+        ) {
             revert Errors.InvalidSender();
         }
     }

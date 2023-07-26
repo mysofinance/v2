@@ -123,4 +123,5 @@ library Errors {
     error TokenNotOwnedByWrapper();
     error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
     error InvalidMintAmount();
+    error QuoteViolatesPolicy();
 }

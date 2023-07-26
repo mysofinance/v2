@@ -130,6 +130,17 @@ interface IQuoteHandler {
     ) external;
 
     /**
+     * @notice function to update the quote policy manager for a vault
+     * @param lenderVault address for which quote policy manager is being updated
+     * @param isRevoke true if policy manager is being revoked, else set to current whitelisted policy manager in registry
+     * @dev function can only be called by vault owner or approved quote handler
+     */
+    function updateQuotePolicyManagerForVault(
+        address lenderVault,
+        bool isRevoke
+    ) external;
+
+    /**
      * @notice function to return address of registry
      * @return registry address
      */
@@ -163,6 +174,17 @@ interface IQuoteHandler {
         address lenderVault,
         bytes32 hashToCheck
     ) external view returns (bool);
+
+    /**
+     * @notice function returns the address of the policy manager for a vault
+     * @param lenderVault address of vault
+     * @return address of quote policy manager for vault
+     * @dev if policy manager address changes in registry, this function will still return the old address
+     * unless and until the vault owner calls updateQuotePolicyManagerForVault
+     */
+    function quotePolicyManagerForVault(
+        address lenderVault
+    ) external view returns (address);
 
     /**
      * @notice function returns element of on-chain history
