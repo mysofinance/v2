@@ -241,6 +241,7 @@ contract QuoteHandler is IQuoteHandler {
             ) {
                 revert Errors.InvalidAddress();
             }
+            // note: this will overwrite any existing policy manager to a new valid quote policy manager
             quotePolicyManagerForVault[lenderVault] = newPolicyManagerAddress;
         }
         emit QuotePolicyManagerUpdated(
