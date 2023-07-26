@@ -86,7 +86,7 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
             address _erc20Wrapper,
             address _mysoTokenManager
         ) = (erc721Wrapper, erc20Wrapper, mysoTokenManager);
-        // note (1/2): ERC721WRAPPER, ERC20WRAPPER, and MYSO_TOKEN_MANAGER state can only be "occupied" by
+        // note (1/2): ERC721WRAPPER, ERC20WRAPPER and MYSO_TOKEN_MANAGER state can only be "occupied" by
         // one addresses ("singleton state")
         if (
             state == DataTypesPeerToPeer.WhitelistState.ERC721WRAPPER ||
