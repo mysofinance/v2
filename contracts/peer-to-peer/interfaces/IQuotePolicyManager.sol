@@ -9,7 +9,8 @@ interface IQuotePolicyManager {
         address borrower,
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
-        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
+        bool onChainQuote
     ) external view returns (bool isValid);
 
     function checkNewOnChainQuote(

@@ -136,7 +136,8 @@ contract QuoteHandler is IQuoteHandler {
             borrower,
             lenderVault,
             onChainQuote.generalQuoteInfo,
-            onChainQuote.quoteTuples[quoteTupleIdx]
+            onChainQuote.quoteTuples[quoteTupleIdx],
+            true
         );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
@@ -168,7 +169,8 @@ contract QuoteHandler is IQuoteHandler {
             borrower,
             lenderVault,
             offChainQuote.generalQuoteInfo,
-            quoteTuple
+            quoteTuple,
+            false
         );
         if (offChainQuote.nonce < offChainQuoteNonce[lenderVault]) {
             revert Errors.InvalidQuote();
@@ -314,7 +316,8 @@ contract QuoteHandler is IQuoteHandler {
         address borrower,
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
-        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
+        bool onChainQuote
     ) internal view {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
@@ -326,7 +329,8 @@ contract QuoteHandler is IQuoteHandler {
                     borrower,
                     lenderVault,
                     generalQuoteInfo,
-                    quoteTuple
+                    quoteTuple,
+                    onChainQuote
                 )
         ) {
             revert Errors.QuoteViolatesPolicy();
