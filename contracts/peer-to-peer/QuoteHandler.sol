@@ -243,6 +243,10 @@ contract QuoteHandler is IQuoteHandler {
             }
             quotePolicyManagerForVault[lenderVault] = newPolicyManagerAddress;
         }
+        emit QuotePolicyManagerUpdated(
+            lenderVault,
+            isRevoke ? address(0) : newPolicyManagerAddress
+        );
     }
 
     function getOnChainQuoteHistory(

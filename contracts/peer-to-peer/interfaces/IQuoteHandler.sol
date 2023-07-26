@@ -40,6 +40,10 @@ interface IQuoteHandler {
         uint256 indexed toBeRegisteredLoanId,
         DataTypesPeerToPeer.QuoteTuple quoteTuple
     );
+    event QuotePolicyManagerUpdated(
+        address indexed lenderVault,
+        address indexed newPolicyManagerAddress
+    );
 
     /**
      * @notice function adds on chain quote

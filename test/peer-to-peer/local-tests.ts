@@ -5775,4 +5775,63 @@ describe('Peer-to-Peer: Local Tests', function () {
       expect(vaultLockedWeth).to.be.lte(vaultBalWeth)
     })
   })
+
+  describe('Quote Policy Manager', function () {
+    it('Should handle checks on policy updates correctly', async function () {
+      const {
+        quoteHandler,
+        addressRegistry,
+        borrowerGateway,
+        lender,
+        approvedQuoteHandler,
+        borrower,
+        team,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
+
+      const TestQuotePolicyManager = await ethers.getContractFactory('TestQuotePolicyManager')
+      const testQuotePolicyManager = await TestQuotePolicyManager.connect(team).deploy()
+      await testQuotePolicyManager.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([testQuotePolicyManager.address], 10)
+
+      // should revert if unregistered vault
+      await expect(
+        quoteHandler.connect(team).updateQuotePolicyManagerForVault(borrower.address, testQuotePolicyManager.address, false)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+
+      // should revert if not vault owner
+      await expect(
+        quoteHandler
+          .connect(team)
+          .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
+
+      await expect(lenderVault.connect(lender).setApprovedQuoteHandler(approvedQuoteHandler.address))
+        .to.emit(lenderVault, 'ApprovedQuoteHandlerUpdated')
+        .withArgs(approvedQuoteHandler.address, ZERO_ADDRESS)
+
+      // should revert even if called by approved quote handler
+      await expect(
+        quoteHandler
+          .connect(approvedQuoteHandler)
+          .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
+
+      // should revert if not whitelisted quote policy manager
+      await expect(
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, quoteHandler.address, false)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidAddress')
+
+      await expect(
+        quoteHandler
+          .connect(lender)
+          .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
+      )
+        .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
+        .withArgs(lenderVault.address, testQuotePolicyManager.address)
+    })
+  })
 })
