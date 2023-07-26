@@ -5825,6 +5825,38 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, quoteHandler.address, false)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidAddress')
 
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender owner gives regular quote
+      const loanPerCollUnit = ONE_USDC.mul(1000)
+      let quoteTuples1 = [
+        {
+          loanPerCollUnitOrLtv: loanPerCollUnit,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(30)
+        }
+      ]
+      let onChainQuote1 = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: MAX_UINT256,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples1,
+        salt: ZERO_BYTES32
+      }
+
+      // set policy manager address
       await expect(
         quoteHandler
           .connect(lender)
@@ -5832,6 +5864,52 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
         .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
         .withArgs(lenderVault.address, testQuotePolicyManager.address)
+
+      // should revert since policy is set to not allow
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+      // set policy to allow
+      await testQuotePolicyManager.connect(team).updatePolicy(lenderVault.address, true)
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      // set borrow policy to not allowed
+      await testQuotePolicyManager.connect(team).updatePolicy(lenderVault.address, false)
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const collSendAmount1 = ONE_WETH
+      const quoteTupleIdx1 = 0
+      const borrowInstructions1 = {
+        collSendAmount: collSendAmount1,
+        expectedProtocolAndVaultTransferFee: 0,
+        expectedCompartmentTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+
+      // should revert since quote violates policy
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // set policy to allow
+      await testQuotePolicyManager.connect(team).updatePolicy(lenderVault.address, true)
+
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
     })
   })
 })
