@@ -42,7 +42,7 @@ contract LenderVaultImpl is
     address[] public signers;
     address public circuitBreaker;
     address public reverseCircuitBreaker;
-    address public approvedQuoteHandler;
+    address public delegateOnChainQuoting;
     uint256 public minNumOfSigners;
     mapping(address => bool) public isSigner;
     bool public withdrawEntered;
@@ -367,14 +367,22 @@ contract LenderVaultImpl is
         );
     }
 
-    function setApprovedQuoteHandler(address newQuoteHandler) external {
+    function setDelegateOnChainQuoting(
+        address newDelegateOnChainQuoting
+    ) external {
         _checkOwner();
-        address oldQuoteHandler = approvedQuoteHandler;
-        if (newQuoteHandler == oldQuoteHandler || newQuoteHandler == owner()) {
+        address oldDelegateOnChainQuoting = delegateOnChainQuoting;
+        if (
+            newDelegateOnChainQuoting == oldDelegateOnChainQuoting ||
+            newDelegateOnChainQuoting == owner()
+        ) {
             revert Errors.InvalidAddress();
         }
-        approvedQuoteHandler = newQuoteHandler;
-        emit ApprovedQuoteHandlerUpdated(newQuoteHandler, oldQuoteHandler);
+        delegateOnChainQuoting = newDelegateOnChainQuoting;
+        emit DelegateOnChainQuotingUpdated(
+            newDelegateOnChainQuoting,
+            oldDelegateOnChainQuoting
+        );
     }
 
     function pauseQuotes() external {

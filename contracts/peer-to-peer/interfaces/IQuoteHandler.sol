@@ -47,7 +47,7 @@ interface IQuoteHandler {
 
     /**
      * @notice function adds on chain quote
-     * @dev function can only be called by vault owner
+     * @dev function can only be called by vault owner or delegated on chain quoter
      * @param lenderVault address of the vault adding quote
      * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
@@ -58,7 +58,7 @@ interface IQuoteHandler {
 
     /**
      * @notice function updates on chain quote
-     * @dev function can only be called by vault owner
+     * @dev function can only be called by vault owner or delegated on chain quoter
      * @param lenderVault address of the vault updating quote
      * @param oldOnChainQuoteHash quote hash for the old onChain quote marked for deletion
      * @param newOnChainQuote data for the new onChain quote (See notes in DataTypesPeerToPeer.sol)
@@ -71,7 +71,7 @@ interface IQuoteHandler {
 
     /**
      * @notice function deletes on chain quote
-     * @dev function can only be called by vault owner
+     * @dev function can only be called by vault owner or delegated on chain quoter
      * @param lenderVault address of the vault deleting
      * @param onChainQuoteHash quote hash for the onChain quote marked for deletion
      */

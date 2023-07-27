@@ -108,7 +108,7 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function incrementOffChainQuoteNonce(address lenderVault) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, true);
         uint256 newNonce = offChainQuoteNonce[lenderVault] + 1;
         offChainQuoteNonce[lenderVault] = newNonce;
         emit OffChainQuoteNonceIncremented(lenderVault, newNonce);
@@ -118,7 +118,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         bytes32 offChainQuoteHash
     ) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, true);
         offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
         emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
     }
@@ -490,7 +490,7 @@ contract QuoteHandler is IQuoteHandler {
         if (
             ILenderVaultImpl(lenderVault).owner() != msg.sender &&
             (onlyOwner ||
-                ILenderVaultImpl(lenderVault).approvedQuoteHandler() !=
+                ILenderVaultImpl(lenderVault).delegateOnChainQuoting() !=
                 msg.sender)
         ) {
             revert Errors.InvalidSender();

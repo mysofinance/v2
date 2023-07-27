@@ -39,9 +39,9 @@ interface ILenderVaultImpl {
         address indexed oldReverseCircuitBreaker
     );
 
-    event ApprovedQuoteHandlerUpdated(
-        address indexed newQuoteHandler,
-        address indexed oldQuoteHandler
+    event DelegateOnChainQuotingUpdated(
+        address indexed newDelegateOnChainQuoting,
+        address indexed oldDelegateOnChainQuoting
     );
 
     /**
@@ -189,12 +189,11 @@ interface ILenderVaultImpl {
     function setReverseCircuitBreaker(address reverseCircuitBreaker) external;
 
     /**
-     * @notice function to set an quote handler
+     * @notice function to set a delegate for on chain quoting
      * @dev the quote handler (and vault owner) can add, delete and update on chain quotes
-     * as well as invalidate off chain quotes or increment the off chain quote nonce
-     * @param quoteHandler address of the quote handler
+     * @param delegateOnChainQuoting address of the delegate
      */
-    function setApprovedQuoteHandler(address quoteHandler) external;
+    function setDelegateOnChainQuoting(address delegateOnChainQuoting) external;
 
     /**
      * @notice function to pause all quotes from lendervault
@@ -275,10 +274,10 @@ interface ILenderVaultImpl {
     function reverseCircuitBreaker() external view returns (address);
 
     /**
-     * @notice function to return address of the approved quote handler
-     * @return approved quote handler address
+     * @notice function to return address of the delegate for on chain quoting
+     * @return approved delegate address
      */
-    function approvedQuoteHandler() external view returns (address);
+    function delegateOnChainQuoting() external view returns (address);
 
     /**
      * @notice function returns signer at given index

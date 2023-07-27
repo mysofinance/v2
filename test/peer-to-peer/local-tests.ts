@@ -172,7 +172,7 @@ describe('Peer-to-Peer: Local Tests', function () {
   })
 
   async function setupTest() {
-    const [lender, signer, borrower, team, circuitBreaker, approvedQuoteHandler, whitelistAuthority, addr1, addr2, addr3] =
+    const [lender, signer, borrower, team, circuitBreaker, delegateOnChainQuoting, whitelistAuthority, addr1, addr2, addr3] =
       await ethers.getSigners()
     /* ************************************ */
     /* DEPLOYMENT OF SYSTEM CONTRACTS START */
@@ -543,7 +543,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       signer2: sortedAddrs[1],
       signer3: sortedAddrs[2],
       circuitBreaker,
-      approvedQuoteHandler,
+      delegateOnChainQuoting,
       usdc,
       weth,
       lenderVault,
@@ -1122,7 +1122,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         borrower,
         whitelistAuthority,
         circuitBreaker,
-        approvedQuoteHandler,
+        delegateOnChainQuoting,
         usdc,
         weth,
         lenderVault,
@@ -1288,22 +1288,22 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
 
       // only owner can set approved quote handler
-      await expect(lenderVault.connect(borrower).setApprovedQuoteHandler(lender.address)).to.be.revertedWith(
+      await expect(lenderVault.connect(borrower).setDelegateOnChainQuoting(lender.address)).to.be.revertedWith(
         'Ownable: caller is not the owner'
       )
 
       // should revert when trying to set invalid quote handler address (owner address)
-      await expect(lenderVault.connect(lender).setApprovedQuoteHandler(lender.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).setDelegateOnChainQuoting(lender.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidAddress'
       )
 
       // set valid approved quote handler
-      await lenderVault.connect(lender).setApprovedQuoteHandler(approvedQuoteHandler.address)
+      await lenderVault.connect(lender).setDelegateOnChainQuoting(delegateOnChainQuoting.address)
 
       // should revert if new handler same as old one
       await expect(
-        lenderVault.connect(lender).setApprovedQuoteHandler(approvedQuoteHandler.address)
+        lenderVault.connect(lender).setDelegateOnChainQuoting(delegateOnChainQuoting.address)
       ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
 
       // set valid circuit breaker
@@ -5783,7 +5783,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         addressRegistry,
         borrowerGateway,
         lender,
-        approvedQuoteHandler,
+        delegateOnChainQuoting,
         borrower,
         team,
         usdc,
@@ -5809,14 +5809,14 @@ describe('Peer-to-Peer: Local Tests', function () {
           .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
-      await expect(lenderVault.connect(lender).setApprovedQuoteHandler(approvedQuoteHandler.address))
-        .to.emit(lenderVault, 'ApprovedQuoteHandlerUpdated')
-        .withArgs(approvedQuoteHandler.address, ZERO_ADDRESS)
+      await expect(lenderVault.connect(lender).setDelegateOnChainQuoting(delegateOnChainQuoting.address))
+        .to.emit(lenderVault, 'DelegateOnChainQuotingUpdated')
+        .withArgs(delegateOnChainQuoting.address, ZERO_ADDRESS)
 
       // should revert even if called by approved quote handler
       await expect(
         quoteHandler
-          .connect(approvedQuoteHandler)
+          .connect(delegateOnChainQuoting)
           .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
