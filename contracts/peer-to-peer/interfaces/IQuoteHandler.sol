@@ -44,6 +44,16 @@ interface IQuoteHandler {
         address indexed lenderVault,
         address indexed newPolicyManagerAddress
     );
+    event OnChainQuoteProposed(
+        address indexed lenderVault,
+        DataTypesPeerToPeer.OnChainQuote onChainQuote,
+        bytes32 indexed onChainQuoteHash,
+        address indexed proposer
+    );
+    event ProposedOnChainQuoteApproved(
+        address indexed lenderVault,
+        bytes32 indexed onChainQuoteHash
+    );
 
     /**
      * @notice function adds on chain quote
@@ -78,6 +88,28 @@ interface IQuoteHandler {
     function deleteOnChainQuote(
         address lenderVault,
         bytes32 onChainQuoteHash
+    ) external;
+
+    /**
+     * @notice function approves proposed on chain quote
+     * @dev function can only be called by vault owner or on chain quote delegate
+     * @param lenderVault address of the vault approving
+     * @param onChainQuoteHash quote hash for the onChain quote marked for approval
+     */
+    function approveProposedOnChainQuote(
+        address lenderVault,
+        bytes32 onChainQuoteHash
+    ) external;
+
+    /**
+     * @notice function proposes on chain quote for vault
+     * @dev function can be called by anyone
+     * @param lenderVault address of the vault adding quote
+     * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
+     */
+    function proposeOnChainQuoteForVault(
+        address lenderVault,
+        DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external;
 
     /**
@@ -175,6 +207,17 @@ interface IQuoteHandler {
      * @return true if hash belongs to a valid on-chain quote, else false
      */
     function isOnChainQuote(
+        address lenderVault,
+        bytes32 hashToCheck
+    ) external view returns (bool);
+
+    /**
+     * @notice function returns if hash is for an on chain quote that has been proposed
+     * @param lenderVault address of vault
+     * @param hashToCheck hash of the on chain quote
+     * @return true if hash belongs to a valid on-chain quote, else false
+     */
+    function isProposedOnChainQuote(
         address lenderVault,
         bytes32 hashToCheck
     ) external view returns (bool);
