@@ -1288,22 +1288,22 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
 
       // only owner can set approved quote handler
-      await expect(lenderVault.connect(borrower).setDelegateOnChainQuoting(lender.address)).to.be.revertedWith(
+      await expect(lenderVault.connect(borrower).setOnChainQuotingDelegate(lender.address)).to.be.revertedWith(
         'Ownable: caller is not the owner'
       )
 
       // should revert when trying to set invalid quote handler address (owner address)
-      await expect(lenderVault.connect(lender).setDelegateOnChainQuoting(lender.address)).to.be.revertedWithCustomError(
+      await expect(lenderVault.connect(lender).setOnChainQuotingDelegate(lender.address)).to.be.revertedWithCustomError(
         lenderVault,
         'InvalidAddress'
       )
 
       // set valid approved quote handler
-      await lenderVault.connect(lender).setDelegateOnChainQuoting(delegateOnChainQuoting.address)
+      await lenderVault.connect(lender).setOnChainQuotingDelegate(delegateOnChainQuoting.address)
 
       // should revert if new handler same as old one
       await expect(
-        lenderVault.connect(lender).setDelegateOnChainQuoting(delegateOnChainQuoting.address)
+        lenderVault.connect(lender).setOnChainQuotingDelegate(delegateOnChainQuoting.address)
       ).to.be.revertedWithCustomError(lenderVault, 'InvalidAddress')
 
       // set valid circuit breaker
@@ -5799,30 +5799,28 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // should revert if unregistered vault
       await expect(
-        quoteHandler.connect(team).updateQuotePolicyManagerForVault(borrower.address, testQuotePolicyManager.address, false)
+        quoteHandler.connect(team).updateQuotePolicyManagerForVault(borrower.address, testQuotePolicyManager.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
 
       // should revert if not vault owner
       await expect(
-        quoteHandler
-          .connect(team)
-          .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
+        quoteHandler.connect(team).updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
-      await expect(lenderVault.connect(lender).setDelegateOnChainQuoting(delegateOnChainQuoting.address))
-        .to.emit(lenderVault, 'DelegateOnChainQuotingUpdated')
+      await expect(lenderVault.connect(lender).setOnChainQuotingDelegate(delegateOnChainQuoting.address))
+        .to.emit(lenderVault, 'OnChainQuotingDelegateUpdated')
         .withArgs(delegateOnChainQuoting.address, ZERO_ADDRESS)
 
-      // should revert even if called by approved quote handler
+      // should revert even if called by approved on chain delegate
       await expect(
         quoteHandler
           .connect(delegateOnChainQuoting)
-          .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
+          .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       // should revert if not whitelisted quote policy manager
       await expect(
-        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, quoteHandler.address, false)
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, quoteHandler.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidAddress')
 
       // lenderVault owner deposits usdc
@@ -5858,12 +5856,15 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // set policy manager address
       await expect(
-        quoteHandler
-          .connect(lender)
-          .updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address, false)
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address)
       )
         .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
         .withArgs(lenderVault.address, testQuotePolicyManager.address)
+
+      // should revert if new address matches current policy manager
+      await expect(
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, testQuotePolicyManager.address)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidAddress')
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)).to.emit(
         quoteHandler,

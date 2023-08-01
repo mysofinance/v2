@@ -15,13 +15,13 @@ contract TestQuotePolicyManager is IQuotePolicyManager {
         allow[lenderVault] = _allow;
     }
 
-    function checkPendingBorrowQuoteInfoAndTuple(
+    function borrowViolatesPolicy(
         address,
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata,
         DataTypesPeerToPeer.QuoteTuple calldata,
         bool
-    ) external view returns (bool isValid) {
-        isValid = allow[lenderVault];
+    ) external view returns (bool _borrowViolatesPolicy) {
+        _borrowViolatesPolicy = !allow[lenderVault];
     }
 }

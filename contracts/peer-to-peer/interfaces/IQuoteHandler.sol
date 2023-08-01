@@ -47,7 +47,7 @@ interface IQuoteHandler {
 
     /**
      * @notice function adds on chain quote
-     * @dev function can only be called by vault owner or delegated on chain quoter
+     * @dev function can only be called by vault owner or on chain quote delegate
      * @param lenderVault address of the vault adding quote
      * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
@@ -58,7 +58,7 @@ interface IQuoteHandler {
 
     /**
      * @notice function updates on chain quote
-     * @dev function can only be called by vault owner or delegated on chain quoter
+     * @dev function can only be called by vault owner or on chain quote delegate
      * @param lenderVault address of the vault updating quote
      * @param oldOnChainQuoteHash quote hash for the old onChain quote marked for deletion
      * @param newOnChainQuote data for the new onChain quote (See notes in DataTypesPeerToPeer.sol)
@@ -71,7 +71,7 @@ interface IQuoteHandler {
 
     /**
      * @notice function deletes on chain quote
-     * @dev function can only be called by vault owner or delegated on chain quoter
+     * @dev function can only be called by vault owner or on chain quote delegate
      * @param lenderVault address of the vault deleting
      * @param onChainQuoteHash quote hash for the onChain quote marked for deletion
      */
@@ -137,13 +137,11 @@ interface IQuoteHandler {
      * @notice function to update the quote policy manager for a vault
      * @param lenderVault address for which quote policy manager is being updated
      * @param newPolicyManagerAddress address of new quote policy manager
-     * @param isRevoke true if policy manager is being revoked, else set to current whitelisted policy manager in registry
-     * @dev function can only be called by vault owner, not even quoteHandler can update policy manager
+     * @dev function can only be called by vault owner
      */
     function updateQuotePolicyManagerForVault(
         address lenderVault,
-        address newPolicyManagerAddress,
-        bool isRevoke
+        address newPolicyManagerAddress
     ) external;
 
     /**

@@ -227,27 +227,26 @@ contract QuoteHandler is IQuoteHandler {
 
     function updateQuotePolicyManagerForVault(
         address lenderVault,
-        address newPolicyManagerAddress,
-        bool isRevoke
+        address newPolicyManagerAddress
     ) external {
         _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, true);
-        if (isRevoke) {
+        if (newPolicyManagerAddress == address(0)) {
             delete quotePolicyManagerForVault[lenderVault];
         } else {
             if (
                 IAddressRegistry(addressRegistry).whitelistState(
                     newPolicyManagerAddress
-                ) != DataTypesPeerToPeer.WhitelistState.QUOTE_POLICY_MANAGER
+                ) !=
+                DataTypesPeerToPeer.WhitelistState.QUOTE_POLICY_MANAGER ||
+                newPolicyManagerAddress ==
+                quotePolicyManagerForVault[lenderVault]
             ) {
                 revert Errors.InvalidAddress();
             }
             // note: this will overwrite any existing policy manager to a new valid quote policy manager
             quotePolicyManagerForVault[lenderVault] = newPolicyManagerAddress;
         }
-        emit QuotePolicyManagerUpdated(
-            lenderVault,
-            isRevoke ? address(0) : newPolicyManagerAddress
-        );
+        emit QuotePolicyManagerUpdated(lenderVault, newPolicyManagerAddress);
     }
 
     function getOnChainQuoteHistory(
@@ -328,21 +327,21 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
-        bool onChainQuote
+        bool _isOnChainQuote
     ) internal view {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
         }
+        address quotePolicyManager = quotePolicyManagerForVault[lenderVault];
         if (
-            quotePolicyManagerForVault[lenderVault] != address(0) &&
-            !IQuotePolicyManager(quotePolicyManagerForVault[lenderVault])
-                .checkPendingBorrowQuoteInfoAndTuple(
-                    borrower,
-                    lenderVault,
-                    generalQuoteInfo,
-                    quoteTuple,
-                    onChainQuote
-                )
+            quotePolicyManager != address(0) &&
+            IQuotePolicyManager(quotePolicyManager).borrowViolatesPolicy(
+                borrower,
+                lenderVault,
+                generalQuoteInfo,
+                quoteTuple,
+                _isOnChainQuote
+            )
         ) {
             revert Errors.QuoteViolatesPolicy();
         }
@@ -490,7 +489,7 @@ contract QuoteHandler is IQuoteHandler {
         if (
             ILenderVaultImpl(lenderVault).owner() != msg.sender &&
             (onlyOwner ||
-                ILenderVaultImpl(lenderVault).delegateOnChainQuoting() !=
+                ILenderVaultImpl(lenderVault).onChainQuotingDelegate() !=
                 msg.sender)
         ) {
             revert Errors.InvalidSender();
