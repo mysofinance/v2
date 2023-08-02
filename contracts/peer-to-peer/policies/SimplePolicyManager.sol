@@ -31,10 +31,10 @@ contract SimplePolicyManager is IQuotePolicyManager {
         uint64 minFee;
         // global min apr
         uint80 minAPR;
-        // min allowable LTV or loan per collateral amount
-        uint128 minAllowableLTVorLoanPerColl;
-        // max allowbale LTV or loan per collateral amount
-        uint128 maxAllowableLTVorLoanPerColl;
+        // min allowable loan per collateral amount or LTV
+        uint128 minAllowableLoanPerCollUnitOrLtv;
+        // max allowbale loan per collateral amount or LTV
+        uint128 maxAllowableLoanPerCollUnitOrLtv;
     }
 
     mapping(address => DataTypesPeerToPeer.DefaultPolicyState)
@@ -52,7 +52,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
 
     error PolicyNotSet();
     error InvalidTenors();
-    error MinLTVGreaterThanMaxLTV();
+    error InvalidLoanPerCollOrLTV();
 
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
@@ -130,12 +130,8 @@ contract SimplePolicyManager is IQuotePolicyManager {
         DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState = defaultRulesWhenNoPolicySet[
                 lenderVault
             ];
+        // check three cases where violations could occur, else by default no violation
         if (
-            defaultPolicyState ==
-            DataTypesPeerToPeer.DefaultPolicyState.ALLOW_ALL
-        ) {
-            _borrowViolatesPolicy = false;
-        } else if (
             defaultPolicyState ==
             DataTypesPeerToPeer.DefaultPolicyState.DISALLOW_ALL
         ) {
@@ -186,9 +182,9 @@ contract SimplePolicyManager is IQuotePolicyManager {
             _borrowViolatesPolicy = true;
         } else if (
             quoteTuple.loanPerCollUnitOrLtv <
-            policy.minAllowableLTVorLoanPerColl ||
+            policy.minAllowableLoanPerCollUnitOrLtv ||
             quoteTuple.loanPerCollUnitOrLtv >
-            policy.maxAllowableLTVorLoanPerColl
+            policy.maxAllowableLoanPerCollUnitOrLtv
         ) {
             _borrowViolatesPolicy = true;
         } else if (
@@ -222,10 +218,10 @@ contract SimplePolicyManager is IQuotePolicyManager {
             revert InvalidTenors();
         }
         if (
-            policy.minAllowableLTVorLoanPerColl >
-            policy.maxAllowableLTVorLoanPerColl
+            policy.minAllowableLoanPerCollUnitOrLtv >
+            policy.minAllowableLoanPerCollUnitOrLtv
         ) {
-            revert MinLTVGreaterThanMaxLTV();
+            revert InvalidLoanPerCollOrLTV();
         }
     }
 }
