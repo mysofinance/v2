@@ -152,6 +152,8 @@ contract SimplePolicyManager is IQuotePolicyManager {
         }
     }
 
+    // note: off chain quotes are allowed to leave _minNumSignersForThisPolicy as 0
+    // since the quote handler will just always use the vault min num signers in that case
     function _checkPolicy(
         Policy memory policy,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
