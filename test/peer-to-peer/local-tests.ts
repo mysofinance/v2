@@ -3390,6 +3390,108 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler.connect(lender).deleteOnChainQuote(lenderVault.address, quoteHashAndValidUntilArr[0].quoteHash)
       ).to.emit(quoteHandler, 'OnChainQuoteDeleted')
     })
+
+    it('Should process proposed on-chain quote correctly', async function () {
+      const {
+        addressRegistry,
+        borrowerGateway,
+        quoteHandler,
+        lender,
+        borrower,
+        whitelistAuthority,
+        usdc,
+        weth,
+        lenderVault,
+        testnetTokenManager
+      } = await setupTest()
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lenderVault owner gives quote
+      const blocknum = await ethers.provider.getBlockNumber()
+      const timestamp = (await ethers.provider.getBlock(blocknum)).timestamp
+      let quoteTuples = [
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(10).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(90)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(1000),
+          interestRatePctInBase: BASE.mul(20).div(100),
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(180)
+        }
+      ]
+      let onChainQuote = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: ONE_USDC.mul(1000),
+          maxLoan: MAX_UINT256,
+          validUntil: timestamp + 60,
+          earliestRepayTenor: ONE_DAY,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: whitelistAuthority.address,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(
+        quoteHandler.connect(lender).proposeOnChainQuoteForVault(borrower.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
+
+      await expect(
+        quoteHandler
+          .connect(lender)
+          .proposeOnChainQuoteForVault(lenderVault.address, {
+            ...onChainQuote,
+            generalQuoteInfo: { ...onChainQuote.generalQuoteInfo, maxLoan: ethers.BigNumber.from(0) }
+          })
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
+
+      const proposedQuoteTransaction = await quoteHandler
+        .connect(borrower)
+        .proposeOnChainQuoteForVault(lenderVault.address, onChainQuote)
+
+      const proposedQuoteReceipt = await proposedQuoteTransaction.wait()
+
+      const proposeQuoteEvent = proposedQuoteReceipt.events?.find(x => {
+        return x.event === 'OnChainQuoteProposed'
+      })
+
+      const proposedOnChainQuoteHash = proposeQuoteEvent?.args?.onChainQuoteHash || ZERO_BYTES32
+
+      expect(await quoteHandler.isProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)).to.be.true
+
+      await expect(
+        quoteHandler.connect(borrower).approveProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
+
+      await expect(
+        quoteHandler.connect(lender).approveProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
+      ).to.emit(quoteHandler, 'ProposedOnChainQuoteApproved')
+
+      expect(await quoteHandler.isProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)).to.be.false
+
+      await expect(
+        quoteHandler.connect(lender).approveProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidProposedQuoteApproval')
+
+      await expect(
+        quoteHandler.connect(borrower).proposeOnChainQuoteForVault(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'RedundantOnChainQuoteProposed')
+
+      await expect(
+        quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
+      ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
+    })
   })
 
   describe('ERC721 Wrapper Testing', function () {

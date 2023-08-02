@@ -20,8 +20,9 @@ contract SimplePolicyManager is IQuotePolicyManager {
         // min signers for this policy if off chain quote
         // if 0, then quote handler will use vault min num signers
         // if > 0, then quote handler will use this value
-        // this is convenient for automated quotes or RFQs. e.g., lender only wants 1 key
-        // for quotes covered by policy, but vault requires more signers for pairs without policies
+        // this is convenient for automated quotes or RFQs or easy third party handling.
+        // e.g., lender only wants 1 key for quotes covered by policy,
+        // but vault requires more signers for pairs without policies.
         uint8 minNumSigners;
         // min allowable tenor
         uint40 minTenor;
@@ -48,6 +49,17 @@ contract SimplePolicyManager is IQuotePolicyManager {
         address indexed collToken,
         address indexed loanToken,
         Policy policy
+    );
+
+    event PolicyDeleted(
+        address indexed lenderVault,
+        address indexed collToken,
+        address indexed loanToken
+    );
+
+    event DefaultPolicySet(
+        address indexed lenderVault,
+        DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState
     );
 
     error PolicyNotSet();
@@ -77,6 +89,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
     ) external {
         _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
         delete policies[lenderVault][collToken][loanToken];
+        emit PolicyDeleted(lenderVault, collToken, loanToken);
     }
 
     function setDefaultPolicy(
@@ -85,6 +98,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
     ) external {
         _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
         defaultRulesWhenNoPolicySet[lenderVault] = defaultPolicyState;
+        emit DefaultPolicySet(lenderVault, defaultPolicyState);
     }
 
     function borrowViolatesPolicy(
