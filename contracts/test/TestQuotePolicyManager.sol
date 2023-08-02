@@ -21,7 +21,26 @@ contract TestQuotePolicyManager is IQuotePolicyManager {
         DataTypesPeerToPeer.GeneralQuoteInfo calldata,
         DataTypesPeerToPeer.QuoteTuple calldata,
         bool
-    ) external view returns (bool _borrowViolatesPolicy) {
+    )
+        external
+        view
+        returns (bool _borrowViolatesPolicy, uint256 _minSignersForThisPolicy)
+    {
         _borrowViolatesPolicy = !allow[lenderVault];
+        _minSignersForThisPolicy = 0;
+    }
+
+    function defaultRulesWhenNoPolicySet(
+        address
+    )
+        external
+        pure
+        returns (DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState)
+    {
+        defaultPolicyState = DataTypesPeerToPeer.DefaultPolicyState.ALLOW_ALL;
+    }
+
+    function addressRegistry() external pure returns (address) {
+        return address(0);
     }
 }

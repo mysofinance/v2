@@ -219,7 +219,8 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] calldata proof
     ) external {
-        _checkSenderAndQuoteInfo(
+        // this returns 0 if no policy manager or policy is set
+        uint256 policyMinNumSigners = _checkSenderAndQuoteInfo(
             borrower,
             lenderVault,
             offChainQuote.generalQuoteInfo,
@@ -244,6 +245,7 @@ contract QuoteHandler is IQuoteHandler {
             !_areValidSignatures(
                 lenderVault,
                 offChainQuoteHash,
+                policyMinNumSigners,
                 offChainQuote.compactSigs
             )
         ) {
@@ -332,12 +334,16 @@ contract QuoteHandler is IQuoteHandler {
     function _areValidSignatures(
         address lenderVault,
         bytes32 offChainQuoteHash,
+        uint256 policyMinNumSigners,
         bytes[] calldata compactSigs
     ) internal view returns (bool) {
         uint256 compactSigsLength = compactSigs.length;
-        if (
-            compactSigsLength < ILenderVaultImpl(lenderVault).minNumOfSigners()
-        ) {
+        // note: if policy min num signers returns 0, use the vault's min num signers
+        // this protects against case where for policy manager is set, but no policy is set for this pair
+        uint256 minNumSigners = policyMinNumSigners == 0
+            ? ILenderVaultImpl(lenderVault).minNumOfSigners()
+            : policyMinNumSigners;
+        if (compactSigsLength < minNumSigners) {
             return false;
         }
         bytes32 messageHash = ECDSA.toEthSignedMessageHash(offChainQuoteHash);
@@ -382,22 +388,25 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bool _isOnChainQuote
-    ) internal view {
+    ) internal view returns (uint256 policyMinNumSigners) {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
         }
         address quotePolicyManager = quotePolicyManagerForVault[lenderVault];
-        if (
-            quotePolicyManager != address(0) &&
-            IQuotePolicyManager(quotePolicyManager).borrowViolatesPolicy(
-                borrower,
-                lenderVault,
-                generalQuoteInfo,
-                quoteTuple,
-                _isOnChainQuote
-            )
-        ) {
-            revert Errors.QuoteViolatesPolicy();
+        if (quotePolicyManager != address(0)) {
+            bool _violatesPolicy;
+            (_violatesPolicy, policyMinNumSigners) = IQuotePolicyManager(
+                quotePolicyManager
+            ).borrowViolatesPolicy(
+                    borrower,
+                    lenderVault,
+                    generalQuoteInfo,
+                    quoteTuple,
+                    _isOnChainQuote
+                );
+            if (_violatesPolicy) {
+                revert Errors.QuoteViolatesPolicy();
+            }
         }
         _checkWhitelist(
             generalQuoteInfo.collToken,

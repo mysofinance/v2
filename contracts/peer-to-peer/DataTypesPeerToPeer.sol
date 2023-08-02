@@ -186,4 +186,24 @@ library DataTypesPeerToPeer {
         // can be used as quote policy manager contract
         QUOTE_POLICY_MANAGER
     }
+
+    enum DefaultPolicyState {
+        // if no explicit policy set, then default to ALLOW
+        ALLOW_ALL,
+        // allow only on chain quotes when no policy
+        ALLOW_ONLY_ON_CHAIN_QUOTES,
+        // allow only off chain quotes when no policy
+        ALLOW_ONLY_OFF_CHAIN_QUOTES,
+        // only allow quotes when explicit policy is set
+        DISALLOW_ALL
+    }
+
+    enum PolicyType {
+        // apply policy to both on chain and off chain quotes by default
+        ALL_QUOTES,
+        // apply policy only to on chain quotes
+        ONLY_ON_CHAIN_QUOTES,
+        // apply policy only to off chain quotes
+        ONLY_OFF_CHAIN_QUOTES
+    }
 }
