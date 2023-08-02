@@ -110,7 +110,10 @@ contract SimplePolicyManager is IQuotePolicyManager {
             ? _doesPolicyApplyToThisQuote(policy.policyType, isOnChainQuote)
             : false;
         if (!doesPolicyApplyToThisQuote) {
-            _borrowViolatesPolicy = _checkDefaultPolicy(isOnChainQuote);
+            _borrowViolatesPolicy = _checkDefaultPolicy(
+                lenderVault,
+                isOnChainQuote
+            );
         } else {
             _borrowViolatesPolicy = _checkPolicy(
                 policy,
@@ -121,10 +124,11 @@ contract SimplePolicyManager is IQuotePolicyManager {
     }
 
     function _checkDefaultPolicy(
+        address lenderVault,
         bool isOnChainQuote
     ) internal view returns (bool _borrowViolatesPolicy) {
         DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState = defaultRulesWhenNoPolicySet[
-                msg.sender
+                lenderVault
             ];
         if (
             defaultPolicyState ==
