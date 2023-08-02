@@ -186,6 +186,7 @@ contract QuoteHandler is IQuoteHandler {
         if (quoteTupleIdx >= onChainQuote.quoteTuples.length) {
             revert Errors.InvalidArrayIndex();
         }
+        // note: return value for minNumSigners not consumed for on-chain quotes
         _checkSenderAndQuoteInfo(
             borrower,
             lenderVault,

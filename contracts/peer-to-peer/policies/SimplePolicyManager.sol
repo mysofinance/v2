@@ -79,6 +79,14 @@ contract SimplePolicyManager is IQuotePolicyManager {
         delete policies[lenderVault][collToken][loanToken];
     }
 
+    function setDefaultPolicy(
+        address lenderVault,
+        DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState
+    ) external {
+        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
+        defaultRulesWhenNoPolicySet[lenderVault] = defaultPolicyState;
+    }
+
     function borrowViolatesPolicy(
         address,
         address lenderVault,

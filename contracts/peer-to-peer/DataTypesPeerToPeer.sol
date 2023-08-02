@@ -188,7 +188,7 @@ library DataTypesPeerToPeer {
     }
 
     enum DefaultPolicyState {
-        // if no explicit policy set, then default to ALLOW
+        // if no explicit policy set, then default to allow all quotes
         ALLOW_ALL,
         // allow only on chain quotes when no policy
         ALLOW_ONLY_ON_CHAIN_QUOTES,
