@@ -6021,9 +6021,13 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       await addressRegistry.connect(team).setWhitelistState([simplePolicyManager.address], 10)
 
+      const reth = '0xae78736Cd615f374D3085123A210448E74Fc6393'
+
+      await addressRegistry.connect(team).setWhitelistState([reth], 1)
+
       // set policy manager address
       await expect(
-        quoteHandler.connect(team).updateQuotePolicyManagerForVault(lenderVault.address, simplePolicyManager.address)
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, simplePolicyManager.address)
       )
         .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
         .withArgs(lenderVault.address, simplePolicyManager.address)
@@ -6070,7 +6074,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         policyType: 0,
         minNumSigners: 0,
         minTenor: ONE_DAY,
-        maxTenor: ONE_DAY.mul(30),
+        maxTenor: ONE_DAY.mul(25),
         minFee: 0,
         minAPR: 0,
         minAllowableLoanPerCollUnitOrLtv: BASE.div(10),
@@ -6087,7 +6091,16 @@ describe('Peer-to-Peer: Local Tests', function () {
         simplePolicyManager.connect(borrower).setPolicyForPair(lenderVault.address, weth.address, usdc.address, policy)
       ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidSender')
 
-      // should revert if sender is not whitelisted
+      // should revert if unregistered vault
+      await expect(simplePolicyManager.connect(team).setDefaultPolicy(borrower.address, 1)).to.be.revertedWithCustomError(
+        simplePolicyManager,
+        'UnregisteredVault'
+      )
+
+      // should revert if sender is not vault owner
+      await expect(
+        simplePolicyManager.connect(borrower).setDefaultPolicy(lenderVault.address, 1)
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidSender')
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -6105,18 +6118,75 @@ describe('Peer-to-Peer: Local Tests', function () {
         mysoTokenManagerData: ZERO_BYTES32
       }
 
+      /*** Test default policy ***/
+
+      // before default policy or policy is set this should go through as default policy is by default, allow all
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+
+      // set default policy to only allow off-chain quotes
+      await simplePolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 2)
+
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      // set policy to allow
-      await testQuotePolicyManager.connect(team).updatePolicy(lenderVault.address, true)
+      // set policy to allow no quotes without a policy
+      await simplePolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 3)
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // set policy to allow on chain quotes without a policy and borrow should go through again
+      await simplePolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 1)
 
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+
+      /*** Test specific policy ***/
+      const policy2 = {
+        isSet: true,
+        requiresOracle: false,
+        policyType: 0,
+        minNumSigners: 0,
+        minTenor: ONE_DAY,
+        maxTenor: ONE_DAY.mul(30),
+        minFee: 0,
+        minAPR: 0,
+        minAllowableLoanPerCollUnitOrLtv: BASE.div(10),
+        maxAllowableLoanPerCollUnitOrLtv: BASE.div(2)
+      }
+
+      // should default if not set
+      await expect(
+        simplePolicyManager
+          .connect(lender)
+          .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, isSet: false })
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'PolicyNotSet')
+
+      // should default if min tenor < max tenor
+      await expect(
+        simplePolicyManager
+          .connect(lender)
+          .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, maxTenor: ONE_DAY.div(2) })
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidTenors')
+
+      // should default if min ltv > max ltv
+      await expect(
+        simplePolicyManager
+          .connect(lender)
+          .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+            ...policy2,
+            maxAllowableLoanPerCollUnitOrLtv: BASE.div(100)
+          })
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidLoanPerCollOrLTV')
     })
   })
 })

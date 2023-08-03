@@ -233,7 +233,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
         }
         if (
             policy.minAllowableLoanPerCollUnitOrLtv >
-            policy.minAllowableLoanPerCollUnitOrLtv
+            policy.maxAllowableLoanPerCollUnitOrLtv
         ) {
             revert InvalidLoanPerCollOrLTV();
         }
