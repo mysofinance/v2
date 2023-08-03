@@ -6040,8 +6040,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       let quoteTuples1 = [
         {
           loanPerCollUnitOrLtv: loanPerCollUnit,
-          interestRatePctInBase: 0,
-          upfrontFeePctInBase: 0,
+          interestRatePctInBase: BASE.div(10),
+          upfrontFeePctInBase: BASE.div(10),
           tenor: ONE_DAY.mul(30)
         }
       ]
@@ -6156,8 +6156,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         requiresOracle: false,
         policyType: 0,
         minNumSigners: 0,
-        minTenor: ONE_DAY,
-        maxTenor: ONE_DAY.mul(30),
+        minTenor: ONE_DAY.mul(35),
+        maxTenor: ONE_DAY.mul(35),
         minFee: 0,
         minAPR: 0,
         minAllowableLoanPerCollUnitOrLtv: BASE.div(10),
@@ -6180,13 +6180,149 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // should default if min ltv > max ltv
       await expect(
+        simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+          ...policy2,
+          maxAllowableLoanPerCollUnitOrLtv: BASE.div(100)
+        })
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidLoanPerCollOrLTV')
+
+      // policy set correctly
+      await expect(
         simplePolicyManager
           .connect(lender)
-          .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
-            ...policy2,
-            maxAllowableLoanPerCollUnitOrLtv: BASE.div(100)
-          })
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidLoanPerCollOrLTV')
+          .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, requiresOracle: true })
+      ).to.emit(simplePolicyManager, 'PolicySet')
+
+      // borrow should fail without oracle address
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      await simplePolicyManager
+        .connect(lender)
+        .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, requiresOracle: false })
+
+      // borrow fail if tenor less than min tenor
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      await simplePolicyManager
+        .connect(lender)
+        .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+          ...policy2,
+          minTenor: ONE_DAY,
+          maxTenor: ONE_DAY.mul(25)
+        })
+
+      // borrow fail if tenor greater than max tenor
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      await simplePolicyManager
+        .connect(lender)
+        .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+          ...policy2,
+          minTenor: ONE_DAY,
+          maxTenor: ONE_DAY.mul(35),
+          minFee: BASE.div(5)
+        })
+
+      // borrow should fail if upfront fee is below min fee
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      await simplePolicyManager
+        .connect(lender)
+        .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+          ...policy2,
+          minTenor: ONE_DAY,
+          maxTenor: ONE_DAY.mul(35),
+          minAPR: BASE.div(5)
+        })
+
+      // borrow should fail if apr is below min apr
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      await simplePolicyManager
+        .connect(lender)
+        .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+          ...policy2,
+          minTenor: ONE_DAY,
+          maxTenor: ONE_DAY.mul(35),
+          minAllowableLoanPerCollUnitOrLtv: BASE.mul(4).div(5),
+          maxAllowableLoanPerCollUnitOrLtv: BASE.mul(9).div(10)
+        })
+
+      // borrow should fail if loan per coll unit is below min allowable loan per coll unit
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      await simplePolicyManager
+        .connect(lender)
+        .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+          ...policy2,
+          minTenor: ONE_DAY,
+          maxTenor: ONE_DAY.mul(35),
+          minAllowableLoanPerCollUnitOrLtv: ONE_USDC,
+          maxAllowableLoanPerCollUnitOrLtv: ONE_USDC.mul(800)
+        })
+
+      // borrow should fail if loan per coll unit is above max allowable loan per coll unit
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      await simplePolicyManager
+        .connect(lender)
+        .setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+          ...policy2,
+          minTenor: ONE_DAY,
+          maxTenor: ONE_DAY.mul(35),
+          minAllowableLoanPerCollUnitOrLtv: ONE_USDC,
+          maxAllowableLoanPerCollUnitOrLtv: ONE_USDC.mul(1000)
+        })
+
+      // borrow should go through as all conditions are met
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+
+      const currPolicyPreDelete = await simplePolicyManager.policies(lenderVault.address, weth.address, usdc.address)
+      expect(currPolicyPreDelete.isSet).to.be.true
+
+      await expect(
+        simplePolicyManager.connect(lender).deletePolicyForPair(borrower.address, weth.address, usdc.address)
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'UnregisteredVault')
+
+      await expect(
+        simplePolicyManager.connect(team).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidSender')
+
+      await simplePolicyManager.connect(lender).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
+
+      const currPolicyPostDelete = await simplePolicyManager.policies(lenderVault.address, weth.address, usdc.address)
+
+      expect(currPolicyPostDelete.isSet).to.be.false
     })
   })
 })

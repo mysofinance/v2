@@ -41,7 +41,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
     mapping(address => DataTypesPeerToPeer.DefaultPolicyState)
         public defaultRulesWhenNoPolicySet;
     mapping(address => mapping(address => mapping(address => Policy)))
-        internal policies;
+        public policies;
     address public immutable addressRegistry;
 
     event PolicySet(
