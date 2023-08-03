@@ -3448,12 +3448,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
 
       await expect(
-        quoteHandler
-          .connect(lender)
-          .proposeOnChainQuoteForVault(lenderVault.address, {
-            ...onChainQuote,
-            generalQuoteInfo: { ...onChainQuote.generalQuoteInfo, maxLoan: ethers.BigNumber.from(0) }
-          })
+        quoteHandler.connect(lender).proposeOnChainQuoteForVault(lenderVault.address, {
+          ...onChainQuote,
+          generalQuoteInfo: { ...onChainQuote.generalQuoteInfo, maxLoan: ethers.BigNumber.from(0) }
+        })
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
       const proposedQuoteTransaction = await quoteHandler
@@ -5972,6 +5970,124 @@ describe('Peer-to-Peer: Local Tests', function () {
         quoteHandler,
         'OnChainQuoteAdded'
       )
+
+      // borrower approves gateway and executes quote
+      await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
+
+      const collSendAmount1 = ONE_WETH
+      const quoteTupleIdx1 = 0
+      const borrowInstructions1 = {
+        collSendAmount: collSendAmount1,
+        expectedProtocolAndVaultTransferFee: 0,
+        expectedCompartmentTransferFee: 0,
+        deadline: MAX_UINT256,
+        minLoanAmount: 0,
+        callbackAddr: ZERO_ADDRESS,
+        callbackData: ZERO_BYTES32,
+        mysoTokenManagerData: ZERO_BYTES32
+      }
+
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // set policy to allow
+      await testQuotePolicyManager.connect(team).updatePolicy(lenderVault.address, true)
+
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+    })
+
+    it('Should handle simple policy implementation', async function () {
+      const {
+        quoteHandler,
+        addressRegistry,
+        borrowerGateway,
+        lender,
+        delegateOnChainQuoting,
+        borrower,
+        team,
+        usdc,
+        weth,
+        lenderVault
+      } = await setupTest()
+
+      const SimplePolicyManager = await ethers.getContractFactory('SimplePolicyManager')
+      const simplePolicyManager = await SimplePolicyManager.connect(team).deploy(addressRegistry.address)
+      await simplePolicyManager.deployed()
+
+      await addressRegistry.connect(team).setWhitelistState([simplePolicyManager.address], 10)
+
+      // set policy manager address
+      await expect(
+        quoteHandler.connect(team).updateQuotePolicyManagerForVault(lenderVault.address, simplePolicyManager.address)
+      )
+        .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
+        .withArgs(lenderVault.address, simplePolicyManager.address)
+
+      // lenderVault owner deposits usdc
+      await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
+
+      // lender owner gives regular quote
+      const loanPerCollUnit = ONE_USDC.mul(1000)
+      let quoteTuples1 = [
+        {
+          loanPerCollUnitOrLtv: loanPerCollUnit,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: 0,
+          tenor: ONE_DAY.mul(30)
+        }
+      ]
+      let onChainQuote1 = {
+        generalQuoteInfo: {
+          collToken: weth.address,
+          loanToken: usdc.address,
+          oracleAddr: ZERO_ADDRESS,
+          minLoan: 1,
+          maxLoan: MAX_UINT256,
+          validUntil: MAX_UINT256,
+          earliestRepayTenor: 0,
+          borrowerCompartmentImplementation: ZERO_ADDRESS,
+          isSingleUse: false,
+          whitelistAddr: ZERO_ADDRESS,
+          isWhitelistAddrSingleBorrower: false
+        },
+        quoteTuples: quoteTuples1,
+        salt: ZERO_BYTES32
+      }
+
+      await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)).to.emit(
+        quoteHandler,
+        'OnChainQuoteAdded'
+      )
+
+      const policy = {
+        isSet: true,
+        requiresOracle: false,
+        policyType: 0,
+        minNumSigners: 0,
+        minTenor: ONE_DAY,
+        maxTenor: ONE_DAY.mul(30),
+        minFee: 0,
+        minAPR: 0,
+        minAllowableLoanPerCollUnitOrLtv: BASE.div(10),
+        maxAllowableLoanPerCollUnitOrLtv: BASE.div(2)
+      }
+
+      // should revert if unregistered vault
+      await expect(
+        simplePolicyManager.connect(team).setPolicyForPair(borrower.address, weth.address, usdc.address, policy)
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'UnregisteredVault')
+
+      // should revert if sender is not vault owner
+      await expect(
+        simplePolicyManager.connect(borrower).setPolicyForPair(lenderVault.address, weth.address, usdc.address, policy)
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidSender')
+
+      // should revert if sender is not whitelisted
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)

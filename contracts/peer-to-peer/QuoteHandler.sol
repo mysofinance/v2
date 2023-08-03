@@ -36,7 +36,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
+        _checkIsVaultAndSenderIsApproved(lenderVault, false);
         if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
@@ -62,7 +62,7 @@ contract QuoteHandler is IQuoteHandler {
         bytes32 oldOnChainQuoteHash,
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
+        _checkIsVaultAndSenderIsApproved(lenderVault, false);
         if (!_isValidOnChainQuote(newOnChainQuote)) {
             revert Errors.InvalidQuote();
         }
@@ -98,7 +98,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         bytes32 onChainQuoteHash
     ) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
+        _checkIsVaultAndSenderIsApproved(lenderVault, false);
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         if (!isOnChainQuoteFromVault[onChainQuoteHash]) {
@@ -112,7 +112,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         bytes32 onChainQuoteHash
     ) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, false);
+        _checkIsVaultAndSenderIsApproved(lenderVault, false);
         mapping(bytes32 => bool)
             storage isOnChainProposedForVault = isProposedOnChainQuote[
                 lenderVault
@@ -162,7 +162,7 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function incrementOffChainQuoteNonce(address lenderVault) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, true);
+        _checkIsVaultAndSenderIsApproved(lenderVault, true);
         uint256 newNonce = offChainQuoteNonce[lenderVault] + 1;
         offChainQuoteNonce[lenderVault] = newNonce;
         emit OffChainQuoteNonceIncremented(lenderVault, newNonce);
@@ -172,7 +172,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         bytes32 offChainQuoteHash
     ) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, true);
+        _checkIsVaultAndSenderIsApproved(lenderVault, true);
         offChainQuoteIsInvalidated[lenderVault][offChainQuoteHash] = true;
         emit OffChainQuoteInvalidated(lenderVault, offChainQuoteHash);
     }
@@ -286,7 +286,7 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         address newPolicyManagerAddress
     ) external {
-        _checkIsRegisteredVaultAndSenderIsApproved(lenderVault, true);
+        _checkIsVaultAndSenderIsApproved(lenderVault, true);
         if (newPolicyManagerAddress == address(0)) {
             delete quotePolicyManagerForVault[lenderVault];
         } else {
@@ -543,7 +543,7 @@ contract QuoteHandler is IQuoteHandler {
         }
     }
 
-    function _checkIsRegisteredVaultAndSenderIsApproved(
+    function _checkIsVaultAndSenderIsApproved(
         address lenderVault,
         bool onlyOwner
     ) internal view {
