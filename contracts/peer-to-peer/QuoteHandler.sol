@@ -20,7 +20,7 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool))
         public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
-    mapping(address => mapping(bytes32 => bool)) public isProposedOnChainQuote;
+    mapping(bytes32 => bool) public isProposedOnChainQuote;
     mapping(address => address) public quotePolicyManagerForVault;
     mapping(address => DataTypesPeerToPeer.OnChainQuoteInfo[])
         internal onChainQuoteHistory;
@@ -114,51 +114,29 @@ contract QuoteHandler is IQuoteHandler {
     ) external {
         _checkIsVaultAndSenderIsApproved(lenderVault, false);
         mapping(bytes32 => bool)
-            storage isOnChainProposedForVault = isProposedOnChainQuote[
-                lenderVault
-            ];
-        mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         if (
-            !isOnChainProposedForVault[onChainQuoteHash] ||
+            !isProposedOnChainQuote[onChainQuoteHash] ||
             isOnChainQuoteFromVault[onChainQuoteHash]
         ) {
             revert Errors.InvalidProposedQuoteApproval();
         }
-        delete isOnChainProposedForVault[onChainQuoteHash];
         isOnChainQuoteFromVault[onChainQuoteHash] = true;
         emit ProposedOnChainQuoteApproved(lenderVault, onChainQuoteHash);
     }
 
-    function proposeOnChainQuoteForVault(
-        address lenderVault,
+    function proposeOnChainQuote(
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
-        // caller can be any address, so only check vault is registered
-        if (!IAddressRegistry(addressRegistry).isRegisteredVault(lenderVault)) {
-            revert Errors.UnregisteredVault();
-        }
         if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
-        mapping(bytes32 => bool)
-            storage isOnChainProposedForVault = isProposedOnChainQuote[
-                lenderVault
-            ];
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
-        if (
-            isOnChainQuote[lenderVault][onChainQuoteHash] ||
-            isOnChainProposedForVault[onChainQuoteHash]
-        ) {
+        if (isProposedOnChainQuote[onChainQuoteHash]) {
             revert Errors.RedundantOnChainQuoteProposed();
         }
-        isOnChainProposedForVault[onChainQuoteHash] = true;
-        emit OnChainQuoteProposed(
-            lenderVault,
-            onChainQuote,
-            onChainQuoteHash,
-            msg.sender
-        );
+        isProposedOnChainQuote[onChainQuoteHash] = true;
+        emit OnChainQuoteProposed(onChainQuote, onChainQuoteHash, msg.sender);
     }
 
     function incrementOffChainQuoteNonce(address lenderVault) external {

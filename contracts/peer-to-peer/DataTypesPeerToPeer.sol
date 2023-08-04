@@ -160,6 +160,34 @@ library DataTypesPeerToPeer {
         uint256 validUntil;
     }
 
+    struct SimplePolicy {
+        // check if policy is set
+        bool isSet;
+        // requires oracle
+        bool requiresOracle;
+        // is policy for all quotes, on chain quotes only, or off chain quotes only
+        DataTypesPeerToPeer.PolicyType policyType;
+        // min signers for this policy if off chain quote
+        // if 0, then quote handler will use vault min num signers
+        // if > 0, then quote handler will use this value
+        // this is convenient for automated quotes or RFQs or easy third party handling.
+        // e.g., lender only wants 1 key for quotes covered by policy,
+        // but vault requires more signers for pairs without policies.
+        uint8 minNumSigners;
+        // min allowable tenor
+        uint40 minTenor;
+        // max allowable tenor
+        uint40 maxTenor;
+        // global min fee
+        uint64 minFee;
+        // global min apr
+        uint80 minAPR;
+        // min allowable loan per collateral amount or LTV
+        uint128 minAllowableLoanPerCollUnitOrLtv;
+        // max allowbale loan per collateral amount or LTV
+        uint128 maxAllowableLoanPerCollUnitOrLtv;
+    }
+
     enum WhitelistState {
         // not whitelisted
         NOT_WHITELISTED,

@@ -5,6 +5,40 @@ pragma solidity 0.8.19;
 import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface IQuotePolicyManager {
+    event PolicyDeleted(
+        address indexed lenderVault,
+        address indexed collToken,
+        address indexed loanToken
+    );
+
+    event DefaultPolicySet(
+        address indexed lenderVault,
+        DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState
+    );
+
+    /**
+     * @notice deletes the policy for a pair of tokens
+     * @param lenderVault Address of the lender vault
+     * @param collToken Address of the collateral token
+     * @param loanToken Address of the loan token
+     */
+    function deletePolicyForPair(
+        address lenderVault,
+        address collToken,
+        address loanToken
+    ) external;
+
+    /**
+     * @notice sets the default policy for a vault
+     * this state will control access whenever a policy is not set for a pair of tokens
+     * @param lenderVault Address of the lender vault
+     * @param defaultPolicyState Default policy state to be set
+     */
+    function setDefaultPolicy(
+        address lenderVault,
+        DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState
+    ) external;
+
     /**
      * @notice Checks if a borrow violates the policy set by the lender
      * this function should always return 0 for _minSignersForThisPolicy if the policy is not set

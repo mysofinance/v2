@@ -8,63 +8,17 @@ import {Errors} from "../../Errors.sol";
 import {IAddressRegistry} from "../interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "../interfaces/ILenderVaultImpl.sol";
 import {IQuotePolicyManager} from "../interfaces/IQuotePolicyManager.sol";
+import {ISimpleQuotePolicyManager} from "./interfaces/ISimpleQuotePolicyManager.sol";
 
-contract SimplePolicyManager is IQuotePolicyManager {
-    struct Policy {
-        // check if policy is set
-        bool isSet;
-        // requires oracle
-        bool requiresOracle;
-        // is policy for all quotes, on chain quotes only, or off chain quotes only
-        DataTypesPeerToPeer.PolicyType policyType;
-        // min signers for this policy if off chain quote
-        // if 0, then quote handler will use vault min num signers
-        // if > 0, then quote handler will use this value
-        // this is convenient for automated quotes or RFQs or easy third party handling.
-        // e.g., lender only wants 1 key for quotes covered by policy,
-        // but vault requires more signers for pairs without policies.
-        uint8 minNumSigners;
-        // min allowable tenor
-        uint40 minTenor;
-        // max allowable tenor
-        uint40 maxTenor;
-        // global min fee
-        uint64 minFee;
-        // global min apr
-        uint80 minAPR;
-        // min allowable loan per collateral amount or LTV
-        uint128 minAllowableLoanPerCollUnitOrLtv;
-        // max allowbale loan per collateral amount or LTV
-        uint128 maxAllowableLoanPerCollUnitOrLtv;
-    }
-
+contract SimpleQuotePolicyManager is
+    IQuotePolicyManager,
+    ISimpleQuotePolicyManager
+{
     mapping(address => DataTypesPeerToPeer.DefaultPolicyState)
         public defaultRulesWhenNoPolicySet;
-    mapping(address => mapping(address => mapping(address => Policy)))
+    mapping(address => mapping(address => mapping(address => DataTypesPeerToPeer.SimplePolicy)))
         public policies;
     address public immutable addressRegistry;
-
-    event PolicySet(
-        address indexed lenderVault,
-        address indexed collToken,
-        address indexed loanToken,
-        Policy policy
-    );
-
-    event PolicyDeleted(
-        address indexed lenderVault,
-        address indexed collToken,
-        address indexed loanToken
-    );
-
-    event DefaultPolicySet(
-        address indexed lenderVault,
-        DataTypesPeerToPeer.DefaultPolicyState defaultPolicyState
-    );
-
-    error PolicyNotSet();
-    error InvalidTenors();
-    error InvalidLoanPerCollOrLTV();
 
     constructor(address _addressRegistry) {
         addressRegistry = _addressRegistry;
@@ -74,7 +28,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
         address lenderVault,
         address collToken,
         address loanToken,
-        Policy calldata policy
+        DataTypesPeerToPeer.SimplePolicy calldata policy
     ) external {
         _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
         _isValidPolicy(policy);
@@ -88,7 +42,14 @@ contract SimplePolicyManager is IQuotePolicyManager {
         address loanToken
     ) external {
         _checkIsRegisteredVaultAndSenderIsApproved(lenderVault);
-        delete policies[lenderVault][collToken][loanToken];
+        mapping(address => DataTypesPeerToPeer.SimplePolicy)
+            storage policiesForVaultAndCollToken = policies[lenderVault][
+                collToken
+            ];
+        if (!policiesForVaultAndCollToken[loanToken].isSet) {
+            revert Errors.PolicyNotSet();
+        }
+        delete policiesForVaultAndCollToken[loanToken];
         emit PolicyDeleted(lenderVault, collToken, loanToken);
     }
 
@@ -112,7 +73,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
         view
         returns (bool _borrowViolatesPolicy, uint256 _minSignersForThisPolicy)
     {
-        Policy memory policy = policies[lenderVault][
+        DataTypesPeerToPeer.SimplePolicy memory policy = policies[lenderVault][
             generalQuoteInfo.collToken
         ][generalQuoteInfo.loanToken];
         // this will only affect off chain quotes once returned to the quote handler
@@ -181,7 +142,7 @@ contract SimplePolicyManager is IQuotePolicyManager {
     // note: off chain quotes are allowed to leave _minNumSignersForThisPolicy as 0
     // since the quote handler will just always use the vault min num signers in that case
     function _checkPolicy(
-        Policy memory policy,
+        DataTypesPeerToPeer.SimplePolicy memory policy,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
     ) internal pure returns (bool _borrowViolatesPolicy) {
@@ -224,18 +185,20 @@ contract SimplePolicyManager is IQuotePolicyManager {
                 !isOnChainQuote);
     }
 
-    function _isValidPolicy(Policy calldata policy) internal pure {
+    function _isValidPolicy(
+        DataTypesPeerToPeer.SimplePolicy calldata policy
+    ) internal pure {
         if (!policy.isSet) {
-            revert PolicyNotSet();
+            revert Errors.PolicyNotSet();
         }
         if (policy.minTenor > policy.maxTenor) {
-            revert InvalidTenors();
+            revert Errors.InvalidTenors();
         }
         if (
             policy.minAllowableLoanPerCollUnitOrLtv >
             policy.maxAllowableLoanPerCollUnitOrLtv
         ) {
-            revert InvalidLoanPerCollOrLTV();
+            revert Errors.InvalidLoanPerCollOrLTV();
         }
     }
 }

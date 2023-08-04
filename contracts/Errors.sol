@@ -126,4 +126,7 @@ library Errors {
     error QuoteViolatesPolicy();
     error RedundantOnChainQuoteProposed();
     error InvalidProposedQuoteApproval();
+    error PolicyNotSet();
+    error InvalidTenors();
+    error InvalidLoanPerCollOrLTV();
 }

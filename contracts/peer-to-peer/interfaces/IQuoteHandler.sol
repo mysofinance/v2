@@ -45,7 +45,6 @@ interface IQuoteHandler {
         address indexed newPolicyManagerAddress
     );
     event OnChainQuoteProposed(
-        address indexed lenderVault,
         DataTypesPeerToPeer.OnChainQuote onChainQuote,
         bytes32 indexed onChainQuoteHash,
         address indexed proposer
@@ -102,13 +101,11 @@ interface IQuoteHandler {
     ) external;
 
     /**
-     * @notice function proposes on chain quote for vault
-     * @dev function can be called by anyone
-     * @param lenderVault address of the vault adding quote
+     * @notice function proposes on chain quote
+     * @dev function can be called by anyone and used by any vault
      * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
-    function proposeOnChainQuoteForVault(
-        address lenderVault,
+    function proposeOnChainQuote(
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external;
 
@@ -213,12 +210,10 @@ interface IQuoteHandler {
 
     /**
      * @notice function returns if hash is for an on chain quote that has been proposed
-     * @param lenderVault address of vault
      * @param hashToCheck hash of the on chain quote
      * @return true if hash belongs to a valid on-chain quote, else false
      */
     function isProposedOnChainQuote(
-        address lenderVault,
         bytes32 hashToCheck
     ) external view returns (bool);
 
