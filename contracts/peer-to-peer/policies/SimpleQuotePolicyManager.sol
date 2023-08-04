@@ -2,8 +2,10 @@
 
 pragma solidity 0.8.19;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
+import {Constants} from "../../Constants.sol";
 import {Errors} from "../../Errors.sol";
 import {IAddressRegistry} from "../interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "../interfaces/ILenderVaultImpl.sol";
@@ -151,6 +153,7 @@ contract SimpleQuotePolicyManager is
         ) {
             _borrowViolatesPolicy = true;
         } else if (
+            quoteTuple.tenor == 0 ||
             quoteTuple.tenor < policy.minTenor ||
             quoteTuple.tenor > policy.maxTenor
         ) {
@@ -163,7 +166,13 @@ contract SimpleQuotePolicyManager is
         ) {
             _borrowViolatesPolicy = true;
         } else if (
-            SafeCast.toUint256(quoteTuple.interestRatePctInBase) < policy.minAPR
+            quoteTuple.interestRatePctInBase < 0 ||
+            Math.mulDiv(
+                SafeCast.toUint256(quoteTuple.interestRatePctInBase),
+                Constants.YEAR_IN_SECONDS,
+                quoteTuple.tenor
+            ) <
+            policy.minAPR
         ) {
             _borrowViolatesPolicy = true;
         } else if (quoteTuple.upfrontFeePctInBase < policy.minFee) {
