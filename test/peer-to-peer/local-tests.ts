@@ -6119,7 +6119,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           ...policy2,
           maxAllowableLoanPerCollUnitOrLtv: BASE.div(100)
         })
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidLoanPerCollOrLTV')
+      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidLoanPerCollOrLtv')
 
       // policy set correctly
       await expect(

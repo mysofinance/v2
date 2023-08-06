@@ -128,5 +128,5 @@ library Errors {
     error PolicyAlreadySet();
     error NoPolicyToDelete();
     error InvalidTenors();
-    error InvalidLoanPerCollOrLTV();
+    error InvalidLoanPerCollOrLtv();
 }

@@ -51,7 +51,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             revert Errors.InvalidTenors();
         }
         if (minLoanPerCollUnitOrLtv > maxLoanPerCollUnitOrLtv) {
-            revert Errors.InvalidLoanPerCollOrLTV();
+            revert Errors.InvalidLoanPerCollOrLtv();
         }
         isPairAllowed[lenderVault][collToken][loanToken] = true;
         quotingPolicies[lenderVault][collToken][loanToken] = policyData;
