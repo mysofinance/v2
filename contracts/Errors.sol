@@ -124,6 +124,7 @@ library Errors {
     error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
     error InvalidMintAmount();
     error QuoteViolatesPolicy();
+    error AlreadyPublished();
     error PolicyAlreadySet();
     error NoPolicyToDelete();
     error InvalidTenors();

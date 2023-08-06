@@ -133,7 +133,7 @@ contract QuoteHandler is IQuoteHandler {
         }
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
         if (isPublishedOnChainQuote[onChainQuoteHash]) {
-            revert Errors.InvalidQuote();
+            revert Errors.AlreadyPublished();
         }
         isPublishedOnChainQuote[onChainQuoteHash] = true;
         emit OnChainQuotePublished(onChainQuote, onChainQuoteHash, msg.sender);
