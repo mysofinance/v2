@@ -160,30 +160,6 @@ library DataTypesPeerToPeer {
         uint256 validUntil;
     }
 
-    struct QuotingPolicy {
-        // requires oracle
-        bool requiresOracle;
-        // min signers for this policy if off chain quote
-        // if 0, then quote handler will use vault min num signers
-        // if > 0, then quote handler will use this value
-        // this is convenient for automated quotes or RFQs or easy third party handling.
-        // e.g., lender only wants 1 key for quotes covered by policy,
-        // but vault requires more signers for pairs without policies.
-        uint8 minNumSigners;
-        // min allowable tenor
-        uint40 minTenor;
-        // max allowable tenor
-        uint40 maxTenor;
-        // global min fee
-        uint64 minFee;
-        // global min apr
-        uint80 minAPR;
-        // min allowable loan per collateral amount or LTV
-        uint128 minAllowableLoanPerCollUnitOrLtv;
-        // max allowbale loan per collateral amount or LTV
-        uint128 maxAllowableLoanPerCollUnitOrLtv;
-    }
-
     enum WhitelistState {
         // not whitelisted
         NOT_WHITELISTED,
@@ -209,25 +185,5 @@ library DataTypesPeerToPeer {
         MYSO_TOKEN_MANAGER,
         // can be used as quote policy manager contract
         QUOTE_POLICY_MANAGER
-    }
-
-    enum DefaultPolicyState {
-        // if no explicit policy set, then default to allow all quotes
-        ALLOW_ALL,
-        // allow only on chain quotes when no policy
-        ALLOW_ONLY_ON_CHAIN_QUOTES,
-        // allow only off chain quotes when no policy
-        ALLOW_ONLY_OFF_CHAIN_QUOTES,
-        // only allow quotes when explicit policy is set
-        DISALLOW_ALL
-    }
-
-    enum PolicyType {
-        // apply policy to both on chain and off chain quotes by default
-        ALL_QUOTES,
-        // apply policy only to on chain quotes
-        ONLY_ON_CHAIN_QUOTES,
-        // apply policy only to off chain quotes
-        ONLY_OFF_CHAIN_QUOTES
     }
 }
