@@ -169,8 +169,7 @@ contract QuoteHandler is IQuoteHandler {
             borrower,
             lenderVault,
             onChainQuote.generalQuoteInfo,
-            onChainQuote.quoteTuples[quoteTupleIdx],
-            true
+            onChainQuote.quoteTuples[quoteTupleIdx]
         );
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
@@ -198,13 +197,11 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] calldata proof
     ) external {
-        // this returns 0 if no policy manager or policy is set
-        uint256 policyMinNumSigners = _checkSenderAndQuoteInfo(
+        _checkSenderAndQuoteInfo(
             borrower,
             lenderVault,
             offChainQuote.generalQuoteInfo,
-            quoteTuple,
-            false
+            quoteTuple
         );
         if (offChainQuote.nonce < offChainQuoteNonce[lenderVault]) {
             revert Errors.InvalidQuote();
@@ -224,7 +221,6 @@ contract QuoteHandler is IQuoteHandler {
             !_areValidSignatures(
                 lenderVault,
                 offChainQuoteHash,
-                policyMinNumSigners,
                 offChainQuote.compactSigs
             )
         ) {
@@ -313,16 +309,12 @@ contract QuoteHandler is IQuoteHandler {
     function _areValidSignatures(
         address lenderVault,
         bytes32 offChainQuoteHash,
-        uint256 policyMinNumSigners,
         bytes[] calldata compactSigs
     ) internal view returns (bool) {
         uint256 compactSigsLength = compactSigs.length;
-        // note: if policy min num signers returns 0, use the vault's min num signers
-        // this protects against case where for policy manager is set, but no policy is set for this pair
-        uint256 minNumSigners = policyMinNumSigners == 0
-            ? ILenderVaultImpl(lenderVault).minNumOfSigners()
-            : policyMinNumSigners;
-        if (compactSigsLength < minNumSigners) {
+        if (
+            compactSigsLength < ILenderVaultImpl(lenderVault).minNumOfSigners()
+        ) {
             return false;
         }
         bytes32 messageHash = ECDSA.toEthSignedMessageHash(offChainQuoteHash);
@@ -365,25 +357,20 @@ contract QuoteHandler is IQuoteHandler {
         address borrower,
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
-        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
-        bool _isOnChainQuote
-    ) internal view returns (uint256 policyMinNumSigners) {
+        DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
+    ) internal view {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
         }
         address quotePolicyManager = quotePolicyManagerForVault[lenderVault];
         if (quotePolicyManager != address(0)) {
-            bool _violatesPolicy;
-            (_violatesPolicy, policyMinNumSigners) = IQuotePolicyManager(
-                quotePolicyManager
-            ).borrowViolatesPolicy(
-                    borrower,
-                    lenderVault,
-                    generalQuoteInfo,
-                    quoteTuple,
-                    _isOnChainQuote
-                );
-            if (_violatesPolicy) {
+            bool isAllowed = IQuotePolicyManager(quotePolicyManager).isAllowed(
+                borrower,
+                lenderVault,
+                generalQuoteInfo,
+                quoteTuple
+            );
+            if (!isAllowed) {
                 revert Errors.QuoteViolatesPolicy();
             }
         }

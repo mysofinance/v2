@@ -160,13 +160,9 @@ library DataTypesPeerToPeer {
         uint256 validUntil;
     }
 
-    struct SimplePolicy {
-        // check if policy is set
-        bool isSet;
+    struct QuotingPolicy {
         // requires oracle
         bool requiresOracle;
-        // is policy for all quotes, on chain quotes only, or off chain quotes only
-        DataTypesPeerToPeer.PolicyType policyType;
         // min signers for this policy if off chain quote
         // if 0, then quote handler will use vault min num signers
         // if > 0, then quote handler will use this value
