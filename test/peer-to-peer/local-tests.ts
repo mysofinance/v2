@@ -3433,39 +3433,39 @@ describe('Peer-to-Peer: Local Tests', function () {
       }
 
       await expect(
-        quoteHandler.connect(lender).proposeOnChainQuote({
+        quoteHandler.connect(lender).broadcastOnChainQuote({
           ...onChainQuote,
           generalQuoteInfo: { ...onChainQuote.generalQuoteInfo, maxLoan: ethers.BigNumber.from(0) }
         })
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
-      const proposedQuoteTransaction = await quoteHandler.connect(borrower).proposeOnChainQuote(onChainQuote)
+      const proposedQuoteTransaction = await quoteHandler.connect(borrower).broadcastOnChainQuote(onChainQuote)
 
       const proposedQuoteReceipt = await proposedQuoteTransaction.wait()
 
       const proposeQuoteEvent = proposedQuoteReceipt.events?.find(x => {
-        return x.event === 'OnChainQuoteProposed'
+        return x.event === 'OnChainQuotePublished'
       })
 
       const proposedOnChainQuoteHash = proposeQuoteEvent?.args?.onChainQuoteHash || ZERO_BYTES32
 
-      expect(await quoteHandler.isProposedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
+      expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
 
       await expect(
-        quoteHandler.connect(borrower).approveProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
+        quoteHandler.connect(borrower).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await expect(
-        quoteHandler.connect(lender).approveProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
-      ).to.emit(quoteHandler, 'ProposedOnChainQuoteApproved')
+        quoteHandler.connect(lender).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
+      ).to.emit(quoteHandler, 'OnChainQuoteCopied')
 
-      expect(await quoteHandler.isProposedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
+      expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
 
       await expect(
-        quoteHandler.connect(lender).approveProposedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
+        quoteHandler.connect(lender).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidProposedQuoteApproval')
 
-      await expect(quoteHandler.connect(borrower).proposeOnChainQuote(onChainQuote)).to.be.revertedWithCustomError(
+      await expect(quoteHandler.connect(borrower).broadcastOnChainQuote(onChainQuote)).to.be.revertedWithCustomError(
         quoteHandler,
         'RedundantOnChainQuoteProposed'
       )

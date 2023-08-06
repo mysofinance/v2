@@ -20,7 +20,7 @@ contract QuoteHandler is IQuoteHandler {
     mapping(address => mapping(bytes32 => bool))
         public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
-    mapping(bytes32 => bool) public isProposedOnChainQuote;
+    mapping(bytes32 => bool) public isPublishedOnChainQuote;
     mapping(address => address) public quotePolicyManagerForVault;
     mapping(address => DataTypesPeerToPeer.OnChainQuoteInfo[])
         internal onChainQuoteHistory;
@@ -108,7 +108,7 @@ contract QuoteHandler is IQuoteHandler {
         emit OnChainQuoteDeleted(lenderVault, onChainQuoteHash);
     }
 
-    function approveProposedOnChainQuote(
+    function copyPublishedOnChainQuote(
         address lenderVault,
         bytes32 onChainQuoteHash
     ) external {
@@ -116,27 +116,27 @@ contract QuoteHandler is IQuoteHandler {
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
         if (
-            !isProposedOnChainQuote[onChainQuoteHash] ||
+            !isPublishedOnChainQuote[onChainQuoteHash] ||
             isOnChainQuoteFromVault[onChainQuoteHash]
         ) {
-            revert Errors.InvalidProposedQuoteApproval();
+            revert Errors.InvalidQuote();
         }
         isOnChainQuoteFromVault[onChainQuoteHash] = true;
-        emit ProposedOnChainQuoteApproved(lenderVault, onChainQuoteHash);
+        emit OnChainQuoteCopied(lenderVault, onChainQuoteHash);
     }
 
-    function proposeOnChainQuote(
+    function publishOnChainQuote(
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external {
         if (!_isValidOnChainQuote(onChainQuote)) {
             revert Errors.InvalidQuote();
         }
         bytes32 onChainQuoteHash = _hashOnChainQuote(onChainQuote);
-        if (isProposedOnChainQuote[onChainQuoteHash]) {
-            revert Errors.RedundantOnChainQuoteProposed();
+        if (isPublishedOnChainQuote[onChainQuoteHash]) {
+            revert Errors.InvalidQuote();
         }
-        isProposedOnChainQuote[onChainQuoteHash] = true;
-        emit OnChainQuoteProposed(onChainQuote, onChainQuoteHash, msg.sender);
+        isPublishedOnChainQuote[onChainQuoteHash] = true;
+        emit OnChainQuotePublished(onChainQuote, onChainQuoteHash, msg.sender);
     }
 
     function incrementOffChainQuoteNonce(address lenderVault) external {
@@ -164,7 +164,6 @@ contract QuoteHandler is IQuoteHandler {
         if (quoteTupleIdx >= onChainQuote.quoteTuples.length) {
             revert Errors.InvalidArrayIndex();
         }
-        // note: return value for minNumSigners not consumed for on-chain quotes
         _checkSenderAndQuoteInfo(
             borrower,
             lenderVault,

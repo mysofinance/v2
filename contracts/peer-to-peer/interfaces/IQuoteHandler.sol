@@ -44,12 +44,12 @@ interface IQuoteHandler {
         address indexed lenderVault,
         address indexed newPolicyManagerAddress
     );
-    event OnChainQuoteProposed(
+    event OnChainQuotePublished(
         DataTypesPeerToPeer.OnChainQuote onChainQuote,
         bytes32 indexed onChainQuoteHash,
         address indexed proposer
     );
-    event ProposedOnChainQuoteApproved(
+    event OnChainQuoteCopied(
         address indexed lenderVault,
         bytes32 indexed onChainQuoteHash
     );
@@ -90,22 +90,22 @@ interface IQuoteHandler {
     ) external;
 
     /**
-     * @notice function approves proposed on chain quote
+     * @notice function to copy a published on chain quote
      * @dev function can only be called by vault owner or on chain quote delegate
      * @param lenderVault address of the vault approving
-     * @param onChainQuoteHash quote hash for the onChain quote marked for approval
+     * @param onChainQuoteHash quote hash of a published onChain quote
      */
-    function approveProposedOnChainQuote(
+    function copyPublishedOnChainQuote(
         address lenderVault,
         bytes32 onChainQuoteHash
     ) external;
 
     /**
-     * @notice function proposes on chain quote
+     * @notice function to publish an on chain quote
      * @dev function can be called by anyone and used by any vault
      * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
-    function proposeOnChainQuote(
+    function publishOnChainQuote(
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external;
 
@@ -209,11 +209,11 @@ interface IQuoteHandler {
     ) external view returns (bool);
 
     /**
-     * @notice function returns if hash is for an on chain quote that has been proposed
+     * @notice function returns if hash belongs to a published on chain quote
      * @param hashToCheck hash of the on chain quote
-     * @return true if hash belongs to a valid on-chain quote, else false
+     * @return true if hash belongs to a published on-chain quote, else false
      */
-    function isProposedOnChainQuote(
+    function isPublishedOnChainQuote(
         bytes32 hashToCheck
     ) external view returns (bool);
 
