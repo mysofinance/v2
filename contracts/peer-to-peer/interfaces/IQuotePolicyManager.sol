@@ -5,42 +5,36 @@ pragma solidity 0.8.19;
 import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 
 interface IQuotePolicyManager {
-    event PolicySet(
+    event PairPolicySet(
         address indexed lenderVault,
         address indexed collToken,
         address indexed loanToken,
-        bytes policyData
+        bytes singlePolicyData
     );
-    event PolicyDeleted(
-        address indexed lenderVault,
-        address indexed collToken,
-        address indexed loanToken
-    );
+    event GlobalPolicySet(address indexed lenderVault, bytes globalPolicyData);
+
+    /**
+     * @notice sets the policy for a pair of tokens
+     * @param lenderVault Address of the lender vault
+     * @param globalPolicyData Policy data to be set
+     */
+    function setGlobalPolicy(
+        address lenderVault,
+        bytes calldata globalPolicyData
+    ) external;
 
     /**
      * @notice sets the policy for a pair of tokens
      * @param lenderVault Address of the lender vault
      * @param collToken Address of the collateral token
      * @param loanToken Address of the loan token
-     * @param policyData Policy data to be set
+     * @param pairPolicyData Policy data to be set
      */
-    function setAllowedPairAndPolicy(
+    function setPairPolicy(
         address lenderVault,
         address collToken,
         address loanToken,
-        bytes calldata policyData
-    ) external;
-
-    /**
-     * @notice deletes the policy for a pair of tokens
-     * @param lenderVault Address of the lender vault
-     * @param collToken Address of the collateral token
-     * @param loanToken Address of the loan token
-     */
-    function deleteAllowedPairAndPolicy(
-        address lenderVault,
-        address collToken,
-        address loanToken
+        bytes calldata pairPolicyData
     ) external;
 
     /**
@@ -50,13 +44,14 @@ interface IQuotePolicyManager {
      * @param generalQuoteInfo General quote info (see DataTypesPeerToPeer.sol)
      * @param quoteTuple Quote tuple (see DataTypesPeerToPeer.sol)
      * @return _isAllowed Flag to indicate if the borrow is allowed
+     * @return minNumOfSignersOverwrite Overwrite of minimum number of signers (if zero ignored in quote handler)
      */
     function isAllowed(
         address borrower,
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
-    ) external view returns (bool _isAllowed);
+    ) external view returns (bool _isAllowed, uint256 minNumOfSignersOverwrite);
 
     /**
      * @notice Gets the address registry

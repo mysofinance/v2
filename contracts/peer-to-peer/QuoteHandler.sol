@@ -164,6 +164,7 @@ contract QuoteHandler is IQuoteHandler {
         if (quoteTupleIdx >= onChainQuote.quoteTuples.length) {
             revert Errors.InvalidArrayIndex();
         }
+        // @dev: ignore returned minNumOfSignersOverwrite for on-chain quotes
         _checkSenderAndQuoteInfo(
             borrower,
             lenderVault,
@@ -196,7 +197,7 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] calldata proof
     ) external {
-        _checkSenderAndQuoteInfo(
+        uint256 minNumOfSignersOverwrite = _checkSenderAndQuoteInfo(
             borrower,
             lenderVault,
             offChainQuote.generalQuoteInfo,
@@ -220,6 +221,7 @@ contract QuoteHandler is IQuoteHandler {
             !_areValidSignatures(
                 lenderVault,
                 offChainQuoteHash,
+                minNumOfSignersOverwrite,
                 offChainQuote.compactSigs
             )
         ) {
@@ -308,12 +310,14 @@ contract QuoteHandler is IQuoteHandler {
     function _areValidSignatures(
         address lenderVault,
         bytes32 offChainQuoteHash,
+        uint256 minNumOfSignersOverwrite,
         bytes[] calldata compactSigs
     ) internal view returns (bool) {
         uint256 compactSigsLength = compactSigs.length;
-        if (
-            compactSigsLength < ILenderVaultImpl(lenderVault).minNumOfSigners()
-        ) {
+        uint256 minNumOfSigners = minNumOfSignersOverwrite == 0
+            ? ILenderVaultImpl(lenderVault).minNumOfSigners()
+            : minNumOfSignersOverwrite;
+        if (compactSigsLength < minNumOfSigners) {
             return false;
         }
         bytes32 messageHash = ECDSA.toEthSignedMessageHash(offChainQuoteHash);
@@ -357,18 +361,16 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple
-    ) internal view {
+    ) internal view returns (uint256 minNumOfSignersOverwrite) {
         if (msg.sender != IAddressRegistry(addressRegistry).borrowerGateway()) {
             revert Errors.InvalidSender();
         }
         address quotePolicyManager = quotePolicyManagerForVault[lenderVault];
         if (quotePolicyManager != address(0)) {
-            bool isAllowed = IQuotePolicyManager(quotePolicyManager).isAllowed(
-                borrower,
-                lenderVault,
-                generalQuoteInfo,
-                quoteTuple
-            );
+            bool isAllowed;
+            (isAllowed, minNumOfSignersOverwrite) = IQuotePolicyManager(
+                quotePolicyManager
+            ).isAllowed(borrower, lenderVault, generalQuoteInfo, quoteTuple);
             if (!isAllowed) {
                 revert Errors.QuoteViolatesPolicy();
             }
@@ -403,6 +405,7 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             revert Errors.InvalidBorrower();
         }
+        return minNumOfSignersOverwrite;
     }
 
     function _isValidOnChainQuote(
