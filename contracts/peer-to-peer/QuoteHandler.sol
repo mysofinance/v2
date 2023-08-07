@@ -165,7 +165,7 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.InvalidArrayIndex();
         }
         // @dev: ignore returned minNumOfSignersOverwrite for on-chain quotes
-        _checkSenderAndQuoteInfo(
+        _checkSenderAndPolicyAndQuoteInfo(
             borrower,
             lenderVault,
             onChainQuote.generalQuoteInfo,
@@ -197,7 +197,7 @@ contract QuoteHandler is IQuoteHandler {
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bytes32[] calldata proof
     ) external {
-        uint256 minNumOfSignersOverwrite = _checkSenderAndQuoteInfo(
+        uint256 minNumOfSignersOverwrite = _checkSenderAndPolicyAndQuoteInfo(
             borrower,
             lenderVault,
             offChainQuote.generalQuoteInfo,
@@ -356,7 +356,7 @@ contract QuoteHandler is IQuoteHandler {
         );
     }
 
-    function _checkSenderAndQuoteInfo(
+    function _checkSenderAndPolicyAndQuoteInfo(
         address borrower,
         address lenderVault,
         DataTypesPeerToPeer.GeneralQuoteInfo calldata generalQuoteInfo,
