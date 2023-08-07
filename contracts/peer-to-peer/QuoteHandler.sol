@@ -314,6 +314,7 @@ contract QuoteHandler is IQuoteHandler {
         bytes[] calldata compactSigs
     ) internal view returns (bool) {
         uint256 compactSigsLength = compactSigs.length;
+        // @dev: if defined in policy, allow overwriting of min number of signers (except zero)
         uint256 minNumOfSigners = minNumOfSignersOverwrite == 0
             ? ILenderVaultImpl(lenderVault).minNumOfSigners()
             : minNumOfSignersOverwrite;

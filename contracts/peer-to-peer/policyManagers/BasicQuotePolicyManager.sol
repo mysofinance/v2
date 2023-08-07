@@ -96,18 +96,18 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             generalQuoteInfo.collToken
         ][generalQuoteInfo.loanToken];
         if (!globalPolicy.allowAllPairs && !hasSinglePolicy) {
-            return (false, minNumOfSignersOverwrite);
+            return (false, 0);
         }
 
         // @dev: single quoting policy takes precedence over global quoting policy
-        bool noOracle = generalQuoteInfo.oracleAddr == address(0);
+        bool hasOracle = generalQuoteInfo.oracleAddr != address(0);
         if (hasSinglePolicy) {
             DataTypesBasicPolicies.SinglePolicy
                 memory singlePolicy = singleQuotingPolicies[lenderVault][
                     generalQuoteInfo.collToken
                 ][generalQuoteInfo.loanToken];
-            if (singlePolicy.requiresOracle && noOracle) {
-                return (false, minNumOfSignersOverwrite);
+            if (singlePolicy.requiresOracle && !hasOracle) {
+                return (false, 0);
             }
             return (
                 _isQuoteTupleInBounds(
@@ -118,13 +118,14 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 singlePolicy.minNumOfSignersOverwrite
             );
         } else {
+            // @dev: check against global minLoanPerCollUnitOrLtv only if pair has oracle
             return (
                 _isQuoteTupleInBounds(
                     globalPolicy.quoteBounds,
                     quoteTuple,
-                    noOracle
+                    hasOracle
                 ),
-                minNumOfSignersOverwrite
+                0
             );
         }
     }
