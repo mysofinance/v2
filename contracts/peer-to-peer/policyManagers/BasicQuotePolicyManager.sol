@@ -238,12 +238,14 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             return false;
         }
 
-        int256 apr = (quoteTuple.interestRatePctInBase *
-            SafeCast.toInt256(Constants.YEAR_IN_SECONDS)) /
-            SafeCast.toInt256(quoteTuple.tenor);
-        // @dev: disallow negative apr and where earliest repay is zero
-        if ((apr < 0 && earliestRepayTenor == 0) || apr < quoteBounds.minApr) {
-            return false;
+        // @dev: if earliest repay is zero no need to check apr
+        if (earliestRepayTenor > 0) {
+            int256 apr = (quoteTuple.interestRatePctInBase *
+                SafeCast.toInt256(Constants.YEAR_IN_SECONDS)) /
+                SafeCast.toInt256(quoteTuple.tenor);
+            if (apr < quoteBounds.minApr) {
+                return false;
+            }
         }
 
         if (quoteTuple.upfrontFeePctInBase < quoteBounds.minFee) {
