@@ -5865,20 +5865,20 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { quoteHandler, addressRegistry, lender, delegateOnChainQuoting, borrower, team, usdc, weth, lenderVault } =
         await setupTest()
 
-      const SimpleQuotePolicyManager = await ethers.getContractFactory('SimpleQuotePolicyManager')
-      const simpleQuotePolicyManager = await SimpleQuotePolicyManager.connect(team).deploy(addressRegistry.address)
-      await simpleQuotePolicyManager.deployed()
+      const BasicQuotePolicyManager = await ethers.getContractFactory('BasicQuotePolicyManager')
+      const basicQuotePolicyManager = await BasicQuotePolicyManager.connect(team).deploy(addressRegistry.address)
+      await basicQuotePolicyManager.deployed()
 
-      await addressRegistry.connect(team).setWhitelistState([simpleQuotePolicyManager.address], 10)
+      await addressRegistry.connect(team).setWhitelistState([basicQuotePolicyManager.address], 10)
 
       // should revert if unregistered vault
       await expect(
-        quoteHandler.connect(team).updateQuotePolicyManagerForVault(borrower.address, simpleQuotePolicyManager.address)
+        quoteHandler.connect(team).updateQuotePolicyManagerForVault(borrower.address, basicQuotePolicyManager.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'UnregisteredVault')
 
       // should revert if not vault owner
       await expect(
-        quoteHandler.connect(team).updateQuotePolicyManagerForVault(lenderVault.address, simpleQuotePolicyManager.address)
+        quoteHandler.connect(team).updateQuotePolicyManagerForVault(lenderVault.address, basicQuotePolicyManager.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       await expect(lenderVault.connect(lender).setOnChainQuotingDelegate(delegateOnChainQuoting.address))
@@ -5889,7 +5889,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         quoteHandler
           .connect(delegateOnChainQuoting)
-          .updateQuotePolicyManagerForVault(lenderVault.address, simpleQuotePolicyManager.address)
+          .updateQuotePolicyManagerForVault(lenderVault.address, basicQuotePolicyManager.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidSender')
 
       // should revert if not whitelisted quote policy manager
@@ -5930,14 +5930,14 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // set policy manager address
       await expect(
-        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, simpleQuotePolicyManager.address)
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, basicQuotePolicyManager.address)
       )
         .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
-        .withArgs(lenderVault.address, simpleQuotePolicyManager.address)
+        .withArgs(lenderVault.address, basicQuotePolicyManager.address)
 
       // should revert if new address matches current policy manager
       await expect(
-        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, simpleQuotePolicyManager.address)
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, basicQuotePolicyManager.address)
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidAddress')
 
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote1)).to.emit(
@@ -5950,11 +5950,11 @@ describe('Peer-to-Peer: Local Tests', function () {
       const { quoteHandler, addressRegistry, borrowerGateway, lender, borrower, team, usdc, weth, lenderVault } =
         await setupTest()
 
-      const SimplePolicyManager = await ethers.getContractFactory('SimpleQuotePolicyManager')
-      const simplePolicyManager = await SimplePolicyManager.connect(team).deploy(addressRegistry.address)
-      await simplePolicyManager.deployed()
+      const BasicPolicyManager = await ethers.getContractFactory('BasicQuotePolicyManager')
+      const basicPolicyManager = await BasicPolicyManager.connect(team).deploy(addressRegistry.address)
+      await basicPolicyManager.deployed()
 
-      await addressRegistry.connect(team).setWhitelistState([simplePolicyManager.address], 10)
+      await addressRegistry.connect(team).setWhitelistState([basicPolicyManager.address], 10)
 
       const reth = '0xae78736Cd615f374D3085123A210448E74Fc6393'
 
@@ -5962,10 +5962,10 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // set policy manager address
       await expect(
-        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, simplePolicyManager.address)
+        quoteHandler.connect(lender).updateQuotePolicyManagerForVault(lenderVault.address, basicPolicyManager.address)
       )
         .to.emit(quoteHandler, 'QuotePolicyManagerUpdated')
-        .withArgs(lenderVault.address, simplePolicyManager.address)
+        .withArgs(lenderVault.address, basicPolicyManager.address)
 
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
@@ -6018,24 +6018,24 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // should revert if unregistered vault
       await expect(
-        simplePolicyManager.connect(team).setPolicyForPair(borrower.address, weth.address, usdc.address, policy)
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'UnregisteredVault')
+        basicPolicyManager.connect(team).setPolicyForPair(borrower.address, weth.address, usdc.address, policy)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'UnregisteredVault')
 
       // should revert if sender is not vault owner
       await expect(
-        simplePolicyManager.connect(borrower).setPolicyForPair(lenderVault.address, weth.address, usdc.address, policy)
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidSender')
+        basicPolicyManager.connect(borrower).setPolicyForPair(lenderVault.address, weth.address, usdc.address, policy)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
 
       // should revert if unregistered vault
-      await expect(simplePolicyManager.connect(team).setDefaultPolicy(borrower.address, 1)).to.be.revertedWithCustomError(
-        simplePolicyManager,
+      await expect(basicPolicyManager.connect(team).setDefaultPolicy(borrower.address, 1)).to.be.revertedWithCustomError(
+        basicPolicyManager,
         'UnregisteredVault'
       )
 
       // should revert if sender is not vault owner
       await expect(
-        simplePolicyManager.connect(borrower).setDefaultPolicy(lenderVault.address, 1)
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidSender')
+        basicPolicyManager.connect(borrower).setDefaultPolicy(lenderVault.address, 1)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
 
       // borrower approves gateway and executes quote
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
@@ -6061,7 +6061,7 @@ describe('Peer-to-Peer: Local Tests', function () {
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
 
       // set default policy to only allow off-chain quotes
-      await simplePolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 2)
+      await basicPolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 2)
 
       await expect(
         borrowerGateway
@@ -6070,7 +6070,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
       // set policy to allow no quotes without a policy
-      await simplePolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 3)
+      await basicPolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 3)
 
       await expect(
         borrowerGateway
@@ -6079,7 +6079,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
       // set policy to allow on chain quotes without a policy and borrow should go through again
-      await simplePolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 1)
+      await basicPolicyManager.connect(lender).setDefaultPolicy(lenderVault.address, 1)
 
       await borrowerGateway
         .connect(borrower)
@@ -6101,32 +6101,32 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       // should default if not set
       await expect(
-        simplePolicyManager
+        basicPolicyManager
           .connect(lender)
           .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, isSet: false })
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'PolicyNotSet')
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'PolicyNotSet')
 
       // should default if min tenor < max tenor
       await expect(
-        simplePolicyManager
+        basicPolicyManager
           .connect(lender)
           .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, maxTenor: ONE_DAY.div(2) })
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidTenors')
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidTenors')
 
       // should default if min ltv > max ltv
       await expect(
-        simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+        basicPolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
           ...policy2,
           maxAllowableLoanPerCollUnitOrLtv: BASE.div(100)
         })
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidLoanPerCollOrLtv')
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollOrLtv')
 
       // policy set correctly
       await expect(
-        simplePolicyManager
+        basicPolicyManager
           .connect(lender)
           .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, requiresOracle: true })
-      ).to.emit(simplePolicyManager, 'PolicySet')
+      ).to.emit(basicPolicyManager, 'PolicySet')
 
       // borrow should fail without oracle address
       await expect(
@@ -6135,7 +6135,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await simplePolicyManager
+      await basicPolicyManager
         .connect(lender)
         .setPolicyForPair(lenderVault.address, weth.address, usdc.address, { ...policy2, requiresOracle: false })
 
@@ -6146,7 +6146,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+      await basicPolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
         ...policy2,
         minTenor: ONE_DAY,
         maxTenor: ONE_DAY.mul(25)
@@ -6159,7 +6159,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+      await basicPolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
         ...policy2,
         minTenor: ONE_DAY,
         maxTenor: ONE_DAY.mul(35),
@@ -6173,7 +6173,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+      await basicPolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
         ...policy2,
         minTenor: ONE_DAY,
         maxTenor: ONE_DAY.mul(35),
@@ -6187,7 +6187,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+      await basicPolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
         ...policy2,
         minTenor: ONE_DAY,
         maxTenor: ONE_DAY.mul(35),
@@ -6202,7 +6202,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+      await basicPolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
         ...policy2,
         minTenor: ONE_DAY,
         maxTenor: ONE_DAY.mul(35),
@@ -6217,7 +6217,7 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await simplePolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
+      await basicPolicyManager.connect(lender).setPolicyForPair(lenderVault.address, weth.address, usdc.address, {
         ...policy2,
         minTenor: ONE_DAY,
         maxTenor: ONE_DAY.mul(35),
@@ -6230,26 +6230,26 @@ describe('Peer-to-Peer: Local Tests', function () {
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
 
-      const currPolicyPreDelete = await simplePolicyManager.policies(lenderVault.address, weth.address, usdc.address)
+      const currPolicyPreDelete = await basicPolicyManager.policies(lenderVault.address, weth.address, usdc.address)
       expect(currPolicyPreDelete.isSet).to.be.true
 
       await expect(
-        simplePolicyManager.connect(lender).deletePolicyForPair(borrower.address, weth.address, usdc.address)
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'UnregisteredVault')
+        basicPolicyManager.connect(lender).deletePolicyForPair(borrower.address, weth.address, usdc.address)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'UnregisteredVault')
 
       await expect(
-        simplePolicyManager.connect(team).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'InvalidSender')
+        basicPolicyManager.connect(team).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
 
-      await simplePolicyManager.connect(lender).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
+      await basicPolicyManager.connect(lender).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
 
-      const currPolicyPostDelete = await simplePolicyManager.policies(lenderVault.address, weth.address, usdc.address)
+      const currPolicyPostDelete = await basicPolicyManager.policies(lenderVault.address, weth.address, usdc.address)
 
       expect(currPolicyPostDelete.isSet).to.be.false
 
       await expect(
-        simplePolicyManager.connect(lender).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
-      ).to.be.revertedWithCustomError(simplePolicyManager, 'PolicyNotSet')
+        basicPolicyManager.connect(lender).deletePolicyForPair(lenderVault.address, weth.address, usdc.address)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'PolicyNotSet')
     })
   })
 })
