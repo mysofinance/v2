@@ -24,7 +24,9 @@ import {
   getExactLpTokenPriceInEth,
   getFairReservesPriceAndEthValue,
   getDeltaBNComparison,
-  setupBorrowerWhitelist
+  setupBorrowerWhitelist,
+  encodeGlobalPolicy,
+  encodePairPolicy
 } from './helpers/misc'
 
 // test config constants & vars
@@ -5332,14 +5334,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       let allowAllPairs = false
       let globalRequiresOracle = false
-      let globalPolicyData = ethers.utils.defaultAbiCoder.encode(
-        [
-          'bool allowAllPairs',
-          'bool requiresOracle',
-          'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
-        ],
-        [allowAllPairs, globalRequiresOracle, globalQuoteBounds]
-      )
+      let globalPolicyData = encodeGlobalPolicy(allowAllPairs, globalRequiresOracle, globalQuoteBounds)
 
       // check revert when trying to delete global policy although not yet set
       await expect(
@@ -5397,6 +5392,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
           interestRatePctInBase: BASE.mul(22).div(100),
           upfrontFeePctInBase: BASE.mul(22).div(100),
           tenor: ONE_DAY.mul(11)
+        },
+        {
+          loanPerCollUnitOrLtv: BASE,
+          interestRatePctInBase: 0,
+          upfrontFeePctInBase: BASE,
+          tenor: 0
         }
       ]
       const { offChainQuote, quoteTuplesTree } = await generateOffChainQuote({
@@ -5440,14 +5441,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
 
       // update global policy to allow all pairs
       allowAllPairs = true
-      globalPolicyData = ethers.utils.defaultAbiCoder.encode(
-        [
-          'bool allowAllPairs',
-          'bool requiresOracle',
-          'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
-        ],
-        [allowAllPairs, globalRequiresOracle, globalQuoteBounds]
-      )
+      globalPolicyData = encodeGlobalPolicy(allowAllPairs, globalRequiresOracle, globalQuoteBounds)
       await basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, globalPolicyData)
 
       // check revert if borrow violates policy (here because min signer threshold is breached)
@@ -5534,14 +5528,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       }
       const pairRequiresOracle = true
       const pairMinNumOfSignersOverwrite = 1
-      const pairPolicyData = ethers.utils.defaultAbiCoder.encode(
-        [
-          'bool requiresOracle',
-          'uint8 minNumOfSignersOverwrite',
-          'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
-        ],
-        [pairRequiresOracle, pairMinNumOfSignersOverwrite, pairQuoteBounds]
-      )
+      let pairPolicyData = encodePairPolicy(pairRequiresOracle, pairMinNumOfSignersOverwrite, pairQuoteBounds)
 
       // check revert when trying to delete pair policy although not yet set
       await expect(
@@ -5563,6 +5550,7 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await basicQuotePolicyManager
         .connect(lender)
         .setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
+
       const actPairPolicyData = await basicQuotePolicyManager.pairQuotingPolicy(
         lenderVault.address,
         weth.address,
@@ -5577,6 +5565,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(actPairPolicyData.quoteBounds.minEarliestRepayTenor).to.be.equal(pairQuoteBounds.minEarliestRepayTenor)
       expect(actPairPolicyData.quoteBounds.minLoanPerCollUnitOrLtv).to.be.equal(pairQuoteBounds.minLoanPerCollUnitOrLtv)
       expect(actPairPolicyData.quoteBounds.maxLoanPerCollUnitOrLtv).to.be.equal(pairQuoteBounds.maxLoanPerCollUnitOrLtv)
+
+      // check revert when trying to set same policy again
+      await expect(
+        basicQuotePolicyManager
+          .connect(lender)
+          .setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
+      ).to.be.revertedWithCustomError(basicQuotePolicyManager, 'PolicyAlreadySet')
 
       // check revert if borrow violates policy (here because LTV too high)
       quoteTupleIdx = 0
@@ -5632,11 +5627,57 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         .connect(borrower)
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
 
-      // delete policies
+      // delete global policy
       await basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, '0x')
       expect(await basicQuotePolicyManager.hasGlobalQuotingPolicy(lenderVault.address)).to.be.false
+
+      // check borrow should still go through
+      quoteTupleIdx = 5
+      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+
+      // swap should initially revert
+      quoteTupleIdx = 6
+      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // update pair policy
+      pairQuoteBounds.minTenor = ethers.BigNumber.from(0)
+      pairQuoteBounds.maxLoanPerCollUnitOrLtv = BASE
+      pairPolicyData = encodePairPolicy(pairRequiresOracle, pairMinNumOfSignersOverwrite, pairQuoteBounds)
+      await basicQuotePolicyManager
+        .connect(lender)
+        .setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
+
+      // swap should now go through
+      quoteTupleIdx = 6
+      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      await borrowerGateway
+        .connect(borrower)
+        .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+
+      // delete pair policy
       await basicQuotePolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, '0x')
       expect(await basicQuotePolicyManager.hasPairQuotingPolicy(lenderVault.address, weth.address, usdc.address)).to.be.false
+
+      // check borrow shouldn't go through anymore
+      quoteTupleIdx = 5
+      selectedQuoteTuple = quoteTuples[quoteTupleIdx]
+      proof = quoteTuplesTree.getProof(quoteTupleIdx)
+      await expect(
+        borrowerGateway
+          .connect(borrower)
+          .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
     })
 
     it('Should process off-chain quote with too high ltv or negative rate correctly', async function () {
