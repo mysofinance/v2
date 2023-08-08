@@ -182,6 +182,8 @@ library DataTypesPeerToPeer {
         // can be used as ERC20 wrapper contract
         ERC20WRAPPER,
         // can be used as MYSO token manager contract
-        MYSO_TOKEN_MANAGER
+        MYSO_TOKEN_MANAGER,
+        // can be used as quote policy manager contract
+        QUOTE_POLICY_MANAGER
     }
 }

@@ -42,6 +42,7 @@ contract LenderVaultImpl is
     address[] public signers;
     address public circuitBreaker;
     address public reverseCircuitBreaker;
+    address public onChainQuotingDelegate;
     uint256 public minNumOfSigners;
     mapping(address => bool) public isSigner;
     bool public withdrawEntered;
@@ -363,6 +364,25 @@ contract LenderVaultImpl is
         emit ReverseCircuitBreakerUpdated(
             newReverseCircuitBreaker,
             oldReverseCircuitBreaker
+        );
+    }
+
+    function setOnChainQuotingDelegate(
+        address newOnChainQuotingDelegate
+    ) external {
+        _checkOwner();
+        address oldOnChainQuotingDelegate = onChainQuotingDelegate;
+        // delegate is allowed to be a signer, unlike owner, circuit breaker or reverse circuit breaker
+        if (
+            newOnChainQuotingDelegate == oldOnChainQuotingDelegate ||
+            newOnChainQuotingDelegate == owner()
+        ) {
+            revert Errors.InvalidAddress();
+        }
+        onChainQuotingDelegate = newOnChainQuotingDelegate;
+        emit OnChainQuotingDelegateUpdated(
+            newOnChainQuotingDelegate,
+            oldOnChainQuotingDelegate
         );
     }
 
