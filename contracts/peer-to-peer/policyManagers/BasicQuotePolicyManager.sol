@@ -157,6 +157,9 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 singlePolicy.minNumOfSignersOverwrite
             );
         } else {
+            if (globalPolicy.requiresOracle && !hasOracle) {
+                return (false, 0);
+            }
             // @dev: check against global min/max loanPerCollUnitOrLtv only if pair has oracle
             return (
                 _isAllowedWithBounds(
