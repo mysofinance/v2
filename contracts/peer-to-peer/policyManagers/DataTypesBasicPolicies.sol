@@ -10,7 +10,7 @@ library DataTypesBasicPolicies {
         // Allowed minimum fee for the quote (in BASE)
         uint80 minFee;
         // Allowed minimum APR for the quote (in BASE)
-        uint80 minAPR;
+        int80 minApr;
         // Allowed minimum loan per collateral unit or LTV for the quote
         uint128 minLoanPerCollUnitOrLtv;
         // Allowed maximum loan per collateral unit or LTV for the quote

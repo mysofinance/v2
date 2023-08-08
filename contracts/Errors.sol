@@ -129,4 +129,5 @@ library Errors {
     error NoPolicyToDelete();
     error InvalidTenors();
     error InvalidLoanPerCollOrLtv();
+    error InvalidMinApr();
 }

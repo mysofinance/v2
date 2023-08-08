@@ -151,6 +151,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 _isAllowedWithBounds(
                     singlePolicy.quoteBounds,
                     quoteTuple,
+                    generalQuoteInfo.earliestRepayTenor,
                     true
                 ),
                 singlePolicy.minNumOfSignersOverwrite
@@ -161,6 +162,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 _isAllowedWithBounds(
                     globalPolicy.quoteBounds,
                     quoteTuple,
+                    generalQuoteInfo.earliestRepayTenor,
                     hasOracle
                 ),
                 0
@@ -185,7 +187,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             quoteBounds1.minTenor == quoteBounds2.minTenor &&
             quoteBounds1.maxTenor == quoteBounds2.maxTenor &&
             quoteBounds1.minFee == quoteBounds2.minFee &&
-            quoteBounds1.minAPR == quoteBounds2.minAPR &&
+            quoteBounds1.minApr == quoteBounds2.minApr &&
             quoteBounds1.minLoanPerCollUnitOrLtv ==
             quoteBounds2.minLoanPerCollUnitOrLtv &&
             quoteBounds1.maxLoanPerCollUnitOrLtv ==
@@ -198,11 +200,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
     function _checkNewQuoteBounds(
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds
     ) internal pure {
-        if (
-            quoteBounds.minTenor <
-            Constants.MIN_TIME_BETWEEN_EARLIEST_REPAY_AND_EXPIRY ||
-            quoteBounds.minTenor > quoteBounds.maxTenor
-        ) {
+        // @dev: allow minTenor == 0 to enable swaps
+        if (quoteBounds.minTenor > quoteBounds.maxTenor) {
             revert Errors.InvalidTenors();
         }
         if (
@@ -211,11 +210,15 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         ) {
             revert Errors.InvalidLoanPerCollOrLtv();
         }
+        if (quoteBounds.minApr + int(Constants.BASE) <= 0) {
+            revert Errors.InvalidMinApr();
+        }
     }
 
     function _isAllowedWithBounds(
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
+        uint256 earliestRepayTenor,
         bool checkLoanPerCollUnitOrLtv
     ) internal pure returns (bool) {
         if (
@@ -235,15 +238,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             return false;
         }
 
-        if (
-            quoteTuple.interestRatePctInBase < 0 ||
-            Math.mulDiv(
-                SafeCast.toUint256(quoteTuple.interestRatePctInBase),
-                Constants.YEAR_IN_SECONDS,
-                quoteTuple.tenor
-            ) <
-            quoteBounds.minAPR
-        ) {
+        int256 apr = (quoteTuple.interestRatePctInBase *
+            SafeCast.toInt256(Constants.YEAR_IN_SECONDS)) /
+            SafeCast.toInt256(quoteTuple.tenor);
+        // @dev: disallow negative apr and where earliest repay is zero
+        if ((apr < 0 && earliestRepayTenor == 0) || apr < quoteBounds.minApr) {
             return false;
         }
 
