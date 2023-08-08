@@ -4,13 +4,15 @@ pragma solidity 0.8.19;
 library DataTypesBasicPolicies {
     struct QuoteBounds {
         // Allowed minimum tenor for the quote (in seconds)
-        uint40 minTenor;
+        uint32 minTenor;
         // Allowed maximum tenor for the quote (in seconds)
-        uint40 maxTenor;
+        uint32 maxTenor;
         // Allowed minimum fee for the quote (in BASE)
         uint80 minFee;
         // Allowed minimum APR for the quote (in BASE)
         int80 minApr;
+        // Allowed minimum earliest repay tenor
+        uint32 minEarliestRepayTenor;
         // Allowed minimum loan per collateral unit or LTV for the quote
         uint128 minLoanPerCollUnitOrLtv;
         // Allowed maximum loan per collateral unit or LTV for the quote

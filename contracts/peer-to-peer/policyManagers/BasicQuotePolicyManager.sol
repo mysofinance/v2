@@ -246,8 +246,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             if (apr < quoteBounds.minApr) {
                 return false;
             }
-            // @dev: disallow if negative apr and earliest repay is zero
-            if (apr < 0 && earliestRepayTenor == 0) {
+            // @dev: disallow if negative apr and earliest repay is below bound
+            if (
+                apr < 0 &&
+                earliestRepayTenor < quoteBounds.minEarliestRepayTenor
+            ) {
                 return false;
             }
         }
