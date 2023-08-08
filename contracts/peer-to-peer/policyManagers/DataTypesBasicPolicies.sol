@@ -23,6 +23,8 @@ library DataTypesBasicPolicies {
         // Flag indicating if all pairs are allowed (=true) or
         // only pairs with explicitly defined pair policy (=false), default case
         bool allowAllPairs;
+        //Flag indicating if an oracle is required for the pair
+        bool requiresOracle;
         // Applicable global bounds
         QuoteBounds quoteBounds;
     }
