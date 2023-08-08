@@ -43,6 +43,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 memory currGlobalPolicy = _globalQuotingPolicies[lenderVault];
             if (
                 globalPolicy.allowAllPairs == currGlobalPolicy.allowAllPairs &&
+                globalPolicy.requiresOracle ==
+                currGlobalPolicy.requiresOracle &&
                 _equalQuoteBounds(
                     globalPolicy.quoteBounds,
                     currGlobalPolicy.quoteBounds
