@@ -59,6 +59,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             if (!hasGlobalQuotingPolicy[lenderVault]) {
                 revert Errors.NoPolicyToDelete();
             }
+            delete hasGlobalQuotingPolicy[lenderVault];
             delete globalQuotingPolicies[lenderVault];
         }
         emit GlobalPolicySet(lenderVault, globalPolicyData);
