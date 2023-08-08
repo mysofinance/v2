@@ -5341,6 +5341,11 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         [allowAllPairs, globalRequiresOracle, globalQuoteBounds]
       )
 
+      // check revert when trying to delete global policy although not yet set
+      await expect(
+        basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, '0x')
+      ).to.be.revertedWithCustomError(basicQuotePolicyManager, 'NoPolicyToDelete')
+
       // set global policy
       await basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, globalPolicyData)
       expect(await basicQuotePolicyManager.hasGlobalQuotingPolicy(lenderVault.address)).to.be.true
@@ -5538,6 +5543,22 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         [pairRequiresOracle, pairMinNumOfSignersOverwrite, pairQuoteBounds]
       )
 
+      // check revert when trying to delete pair policy although not yet set
+      await expect(
+        basicQuotePolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, '0x')
+      ).to.be.revertedWithCustomError(basicQuotePolicyManager, 'NoPolicyToDelete')
+
+      // check revert for pair policy with either token being zero address
+      await expect(
+        basicQuotePolicyManager.connect(lender).setPairPolicy(lenderVault.address, ZERO_ADDR, usdc.address, pairPolicyData)
+      ).to.be.revertedWithCustomError(basicQuotePolicyManager, 'InvalidAddress')
+      await expect(
+        basicQuotePolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, ZERO_ADDR, pairPolicyData)
+      ).to.be.revertedWithCustomError(basicQuotePolicyManager, 'InvalidAddress')
+      await expect(
+        basicQuotePolicyManager.connect(lender).setPairPolicy(lenderVault.address, ZERO_ADDR, ZERO_ADDR, pairPolicyData)
+      ).to.be.revertedWithCustomError(basicQuotePolicyManager, 'InvalidAddress')
+
       // set pair policy
       await basicQuotePolicyManager
         .connect(lender)
@@ -5610,6 +5631,12 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       await borrowerGateway
         .connect(borrower)
         .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
+
+      // delete policies
+      await basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, '0x')
+      expect(await basicQuotePolicyManager.hasGlobalQuotingPolicy(lenderVault.address)).to.be.false
+      await basicQuotePolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, '0x')
+      expect(await basicQuotePolicyManager.hasPairQuotingPolicy(lenderVault.address, weth.address, usdc.address)).to.be.false
     })
 
     it('Should process off-chain quote with too high ltv or negative rate correctly', async function () {
