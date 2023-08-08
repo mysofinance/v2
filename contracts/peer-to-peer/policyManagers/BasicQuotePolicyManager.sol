@@ -130,47 +130,49 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
     {
         DataTypesBasicPolicies.GlobalPolicy
             memory globalPolicy = _globalQuotingPolicies[lenderVault];
-        bool hasSinglePolicy = _hasPairQuotingPolicy[lenderVault][
+        bool hasPairPolicy = _hasPairQuotingPolicy[lenderVault][
             generalQuoteInfo.collToken
         ][generalQuoteInfo.loanToken];
-        if (!globalPolicy.allowAllPairs && !hasSinglePolicy) {
+        if (!globalPolicy.allowAllPairs && !hasPairPolicy) {
             return (false, 0);
         }
 
         // @dev: pair policy (if defined) takes precedence over global policy
         bool hasOracle = generalQuoteInfo.oracleAddr != address(0);
-        if (hasSinglePolicy) {
+        bool requiresOracle;
+        DataTypesBasicPolicies.QuoteBounds memory quoteBounds;
+        bool checkLoanPerCollUnitOrLtv;
+        if (hasPairPolicy) {
             DataTypesBasicPolicies.PairPolicy
                 memory singlePolicy = _pairQuotingPolicies[lenderVault][
                     generalQuoteInfo.collToken
                 ][generalQuoteInfo.loanToken];
-            if (singlePolicy.requiresOracle && !hasOracle) {
-                return (false, 0);
-            }
-            return (
-                _isAllowedWithBounds(
-                    singlePolicy.quoteBounds,
-                    quoteTuple,
-                    generalQuoteInfo.earliestRepayTenor,
-                    true
-                ),
-                singlePolicy.minNumOfSignersOverwrite
-            );
+            requiresOracle = singlePolicy.requiresOracle;
+            quoteBounds = singlePolicy.quoteBounds;
+            // @dev: in case of pair policy always check against min/max loanPerCollUnitOrLtv
+            checkLoanPerCollUnitOrLtv = true;
+            minNumOfSignersOverwrite = singlePolicy.minNumOfSignersOverwrite;
         } else {
-            if (globalPolicy.requiresOracle && !hasOracle) {
-                return (false, 0);
-            }
-            // @dev: check against global min/max loanPerCollUnitOrLtv only if pair has oracle
-            return (
-                _isAllowedWithBounds(
-                    globalPolicy.quoteBounds,
-                    quoteTuple,
-                    generalQuoteInfo.earliestRepayTenor,
-                    hasOracle
-                ),
-                0
-            );
+            requiresOracle = globalPolicy.requiresOracle;
+            quoteBounds = globalPolicy.quoteBounds;
+            // @dev: in case of global policy, only check against global min/max loanPerCollUnitOrLtv if
+            // pair has oracle
+            checkLoanPerCollUnitOrLtv = hasOracle;
         }
+
+        if (requiresOracle && !hasOracle) {
+            return (false, 0);
+        }
+
+        return (
+            _isAllowedWithBounds(
+                quoteBounds,
+                quoteTuple,
+                generalQuoteInfo.earliestRepayTenor,
+                checkLoanPerCollUnitOrLtv
+            ),
+            minNumOfSignersOverwrite
+        );
     }
 
     function globalQuotingPolicy(
