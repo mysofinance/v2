@@ -238,12 +238,16 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             return false;
         }
 
-        // @dev: if earliest repay is zero no need to check apr
-        if (earliestRepayTenor > 0) {
+        // @dev: if tenor is zero tx is swap and no need to check apr
+        if (quoteTuple.tenor > 0) {
             int256 apr = (quoteTuple.interestRatePctInBase *
                 SafeCast.toInt256(Constants.YEAR_IN_SECONDS)) /
                 SafeCast.toInt256(quoteTuple.tenor);
             if (apr < quoteBounds.minApr) {
+                return false;
+            }
+            // @dev: disallow if negative apr and earliest repay is zero
+            if (apr < 0 && earliestRepayTenor == 0) {
                 return false;
             }
         }
