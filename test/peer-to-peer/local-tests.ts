@@ -6,7 +6,6 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { payloadScheme } from './helpers/abi'
 import { setupBorrowerWhitelist, getSlot, findBalanceSlot } from './helpers/misc'
 import { HARDHAT_CHAIN_ID_AND_FORKING_CONFIG } from '../../hardhat.config'
-import { erc20 } from '../../typechain-types/@openzeppelin/contracts/token'
 
 // test config vars
 let snapshotId: String // use snapshot id to reset state before each test
@@ -3433,13 +3432,13 @@ describe('Peer-to-Peer: Local Tests', function () {
       }
 
       await expect(
-        quoteHandler.connect(lender).broadcastOnChainQuote({
+        quoteHandler.connect(lender).publishOnChainQuote({
           ...onChainQuote,
           generalQuoteInfo: { ...onChainQuote.generalQuoteInfo, maxLoan: ethers.BigNumber.from(0) }
         })
       ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
-      const proposedQuoteTransaction = await quoteHandler.connect(borrower).broadcastOnChainQuote(onChainQuote)
+      const proposedQuoteTransaction = await quoteHandler.connect(borrower).publishOnChainQuote(onChainQuote)
 
       const proposedQuoteReceipt = await proposedQuoteTransaction.wait()
 
@@ -3463,11 +3462,11 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       await expect(
         quoteHandler.connect(lender).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
-      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidProposedQuoteApproval')
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
 
-      await expect(quoteHandler.connect(borrower).broadcastOnChainQuote(onChainQuote)).to.be.revertedWithCustomError(
+      await expect(quoteHandler.connect(borrower).publishOnChainQuote(onChainQuote)).to.be.revertedWithCustomError(
         quoteHandler,
-        'RedundantOnChainQuoteProposed'
+        'AlreadyPublished'
       )
 
       await expect(

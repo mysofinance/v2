@@ -277,7 +277,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             return false;
         }
 
-        // @dev: if tenor is zero tx is swap and no need to check apr
+        // @dev: if tenor is zero then tx is swap and no need to check apr
         if (quoteTuple.tenor > 0) {
             int256 apr = (quoteTuple.interestRatePctInBase *
                 SafeCast.toInt256(Constants.YEAR_IN_SECONDS)) /
