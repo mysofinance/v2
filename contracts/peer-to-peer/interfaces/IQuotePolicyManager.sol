@@ -14,9 +14,9 @@ interface IQuotePolicyManager {
     event GlobalPolicySet(address indexed lenderVault, bytes globalPolicyData);
 
     /**
-     * @notice sets the policy for a pair of tokens
+     * @notice sets the global policy
      * @param lenderVault Address of the lender vault
-     * @param globalPolicyData Policy data to be set
+     * @param globalPolicyData Global policy data to be set
      */
     function setGlobalPolicy(
         address lenderVault,
@@ -28,7 +28,7 @@ interface IQuotePolicyManager {
      * @param lenderVault Address of the lender vault
      * @param collToken Address of the collateral token
      * @param loanToken Address of the loan token
-     * @param pairPolicyData Policy data to be set
+     * @param pairPolicyData Pair policy data to be set
      */
     function setPairPolicy(
         address lenderVault,

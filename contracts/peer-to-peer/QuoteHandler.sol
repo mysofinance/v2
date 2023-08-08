@@ -406,7 +406,6 @@ contract QuoteHandler is IQuoteHandler {
         ) {
             revert Errors.InvalidBorrower();
         }
-        return minNumOfSignersOverwrite;
     }
 
     function _isValidOnChainQuote(

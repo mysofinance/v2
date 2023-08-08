@@ -13,12 +13,13 @@ import {ILenderVaultImpl} from "../interfaces/ILenderVaultImpl.sol";
 import {IQuotePolicyManager} from "../interfaces/IQuotePolicyManager.sol";
 
 contract BasicQuotePolicyManager is IQuotePolicyManager {
-    mapping(address => mapping(address => mapping(address => DataTypesBasicPolicies.SinglePolicy)))
-        public singleQuotingPolicies;
     mapping(address => DataTypesBasicPolicies.GlobalPolicy)
         public globalQuotingPolicies;
+    mapping(address => mapping(address => mapping(address => DataTypesBasicPolicies.PairPolicy)))
+        public pairQuotingPolicies;
+    mapping(address => bool) public hasGlobalQuotingPolicy;
     mapping(address => mapping(address => mapping(address => bool)))
-        public hasSingleQuotingPolicy;
+        public hasPairQuotingPolicy;
     address public immutable addressRegistry;
 
     constructor(address _addressRegistry) {
@@ -29,7 +30,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         address lenderVault,
         bytes calldata globalPolicyData
     ) external {
-        // @dev: global policy applies across all pairs
+        // @dev: global policy applies across all pairs;
+        // note: pair policies (if defined) take precedence over global policy
         _checkIsVaultAndSenderIsOwner(lenderVault);
         if (globalPolicyData.length > 0) {
             DataTypesBasicPolicies.GlobalPolicy memory globalPolicy = abi
@@ -37,9 +39,26 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                     globalPolicyData,
                     (DataTypesBasicPolicies.GlobalPolicy)
                 );
-            _checkQuoteBounds(globalPolicy.quoteBounds);
+            DataTypesBasicPolicies.GlobalPolicy
+                memory currGlobalPolicy = globalQuotingPolicies[lenderVault];
+            if (
+                globalPolicy.allowAllPairs == currGlobalPolicy.allowAllPairs &&
+                _equalQuoteBounds(
+                    globalPolicy.quoteBounds,
+                    currGlobalPolicy.quoteBounds
+                )
+            ) {
+                revert Errors.PolicyAlreadySet();
+            }
+            _checkNewQuoteBounds(globalPolicy.quoteBounds);
+            if (!hasGlobalQuotingPolicy[lenderVault]) {
+                hasGlobalQuotingPolicy[lenderVault] = true;
+            }
             globalQuotingPolicies[lenderVault] = globalPolicy;
         } else {
+            if (!hasGlobalQuotingPolicy[lenderVault]) {
+                revert Errors.NoPolicyToDelete();
+            }
             delete globalQuotingPolicies[lenderVault];
         }
         emit GlobalPolicySet(lenderVault, globalPolicyData);
@@ -51,23 +70,41 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         address loanToken,
         bytes calldata pairPolicyData
     ) external {
+        // @dev: pair policies (if defined) take precedence over global policy
         _checkIsVaultAndSenderIsOwner(lenderVault);
         if (collToken == address(0) || loanToken == address(0)) {
             revert Errors.InvalidAddress();
         }
         mapping(address => bool)
-            storage _hasSingleQuotingPolicy = hasSingleQuotingPolicy[
-                lenderVault
-            ][collToken];
+            storage _hasSingleQuotingPolicy = hasPairQuotingPolicy[lenderVault][
+                collToken
+            ];
         if (pairPolicyData.length > 0) {
-            if (_hasSingleQuotingPolicy[loanToken]) {
+            DataTypesBasicPolicies.PairPolicy memory singlePolicy = abi.decode(
+                pairPolicyData,
+                (DataTypesBasicPolicies.PairPolicy)
+            );
+            DataTypesBasicPolicies.PairPolicy
+                memory currSinglePolicy = pairQuotingPolicies[lenderVault][
+                    collToken
+                ][loanToken];
+            if (
+                singlePolicy.requiresOracle ==
+                currSinglePolicy.requiresOracle &&
+                singlePolicy.minNumOfSignersOverwrite ==
+                currSinglePolicy.minNumOfSignersOverwrite &&
+                _equalQuoteBounds(
+                    singlePolicy.quoteBounds,
+                    currSinglePolicy.quoteBounds
+                )
+            ) {
                 revert Errors.PolicyAlreadySet();
             }
-            DataTypesBasicPolicies.SinglePolicy memory singlePolicy = abi
-                .decode(pairPolicyData, (DataTypesBasicPolicies.SinglePolicy));
-            _checkQuoteBounds(singlePolicy.quoteBounds);
-            _hasSingleQuotingPolicy[loanToken] = true;
-            singleQuotingPolicies[lenderVault][collToken][
+            _checkNewQuoteBounds(singlePolicy.quoteBounds);
+            if (!_hasSingleQuotingPolicy[loanToken]) {
+                _hasSingleQuotingPolicy[loanToken] = true;
+            }
+            pairQuotingPolicies[lenderVault][collToken][
                 loanToken
             ] = singlePolicy;
         } else {
@@ -75,7 +112,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 revert Errors.NoPolicyToDelete();
             }
             delete _hasSingleQuotingPolicy[loanToken];
-            delete singleQuotingPolicies[lenderVault][collToken][loanToken];
+            delete pairQuotingPolicies[lenderVault][collToken][loanToken];
         }
         emit PairPolicySet(lenderVault, collToken, loanToken, pairPolicyData);
     }
@@ -92,25 +129,25 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
     {
         DataTypesBasicPolicies.GlobalPolicy
             memory globalPolicy = globalQuotingPolicies[lenderVault];
-        bool hasSinglePolicy = hasSingleQuotingPolicy[lenderVault][
+        bool hasSinglePolicy = hasPairQuotingPolicy[lenderVault][
             generalQuoteInfo.collToken
         ][generalQuoteInfo.loanToken];
         if (!globalPolicy.allowAllPairs && !hasSinglePolicy) {
             return (false, 0);
         }
 
-        // @dev: single quoting policy takes precedence over global quoting policy
+        // @dev: pair policy (if defined) takes precedence over global policy
         bool hasOracle = generalQuoteInfo.oracleAddr != address(0);
         if (hasSinglePolicy) {
-            DataTypesBasicPolicies.SinglePolicy
-                memory singlePolicy = singleQuotingPolicies[lenderVault][
+            DataTypesBasicPolicies.PairPolicy
+                memory singlePolicy = pairQuotingPolicies[lenderVault][
                     generalQuoteInfo.collToken
                 ][generalQuoteInfo.loanToken];
             if (singlePolicy.requiresOracle && !hasOracle) {
                 return (false, 0);
             }
             return (
-                _isQuoteTupleInBounds(
+                _isAllowedWithBounds(
                     singlePolicy.quoteBounds,
                     quoteTuple,
                     true
@@ -118,9 +155,9 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 singlePolicy.minNumOfSignersOverwrite
             );
         } else {
-            // @dev: check against global minLoanPerCollUnitOrLtv only if pair has oracle
+            // @dev: check against global min/max loanPerCollUnitOrLtv only if pair has oracle
             return (
-                _isQuoteTupleInBounds(
+                _isAllowedWithBounds(
                     globalPolicy.quoteBounds,
                     quoteTuple,
                     hasOracle
@@ -139,7 +176,25 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         }
     }
 
-    function _checkQuoteBounds(
+    function _equalQuoteBounds(
+        DataTypesBasicPolicies.QuoteBounds memory quoteBounds1,
+        DataTypesBasicPolicies.QuoteBounds memory quoteBounds2
+    ) internal pure returns (bool isEqual) {
+        if (
+            quoteBounds1.minTenor == quoteBounds2.minTenor &&
+            quoteBounds1.maxTenor == quoteBounds2.maxTenor &&
+            quoteBounds1.minFee == quoteBounds2.minFee &&
+            quoteBounds1.minAPR == quoteBounds2.minAPR &&
+            quoteBounds1.minLoanPerCollUnitOrLtv ==
+            quoteBounds2.minLoanPerCollUnitOrLtv &&
+            quoteBounds1.maxLoanPerCollUnitOrLtv ==
+            quoteBounds2.maxLoanPerCollUnitOrLtv
+        ) {
+            isEqual = true;
+        }
+    }
+
+    function _checkNewQuoteBounds(
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds
     ) internal pure {
         if (
@@ -157,13 +212,12 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         }
     }
 
-    function _isQuoteTupleInBounds(
+    function _isAllowedWithBounds(
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         bool checkLoanPerCollUnitOrLtv
     ) internal pure returns (bool) {
         if (
-            quoteTuple.tenor == 0 ||
             quoteTuple.tenor < quoteBounds.minTenor ||
             quoteTuple.tenor > quoteBounds.maxTenor
         ) {
