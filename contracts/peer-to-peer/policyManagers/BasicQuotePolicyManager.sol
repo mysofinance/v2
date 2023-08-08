@@ -10,16 +10,16 @@ import {Constants} from "../../Constants.sol";
 import {Errors} from "../../Errors.sol";
 import {IAddressRegistry} from "../interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "../interfaces/ILenderVaultImpl.sol";
-import {IQuotePolicyManager} from "../interfaces/IQuotePolicyManager.sol";
+import {IQuotePolicyManager} from "../interfaces/policyManagers/IQuotePolicyManager.sol";
 
 contract BasicQuotePolicyManager is IQuotePolicyManager {
     mapping(address => DataTypesBasicPolicies.GlobalPolicy)
-        public globalQuotingPolicies;
+        internal _globalQuotingPolicies;
     mapping(address => mapping(address => mapping(address => DataTypesBasicPolicies.PairPolicy)))
-        public pairQuotingPolicies;
-    mapping(address => bool) public hasGlobalQuotingPolicy;
+        internal _pairQuotingPolicies;
+    mapping(address => bool) internal _hasGlobalQuotingPolicy;
     mapping(address => mapping(address => mapping(address => bool)))
-        public hasPairQuotingPolicy;
+        internal _hasPairQuotingPolicy;
     address public immutable addressRegistry;
 
     constructor(address _addressRegistry) {
@@ -40,7 +40,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                     (DataTypesBasicPolicies.GlobalPolicy)
                 );
             DataTypesBasicPolicies.GlobalPolicy
-                memory currGlobalPolicy = globalQuotingPolicies[lenderVault];
+                memory currGlobalPolicy = _globalQuotingPolicies[lenderVault];
             if (
                 globalPolicy.allowAllPairs == currGlobalPolicy.allowAllPairs &&
                 _equalQuoteBounds(
@@ -51,16 +51,16 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 revert Errors.PolicyAlreadySet();
             }
             _checkNewQuoteBounds(globalPolicy.quoteBounds);
-            if (!hasGlobalQuotingPolicy[lenderVault]) {
-                hasGlobalQuotingPolicy[lenderVault] = true;
+            if (!_hasGlobalQuotingPolicy[lenderVault]) {
+                _hasGlobalQuotingPolicy[lenderVault] = true;
             }
-            globalQuotingPolicies[lenderVault] = globalPolicy;
+            _globalQuotingPolicies[lenderVault] = globalPolicy;
         } else {
-            if (!hasGlobalQuotingPolicy[lenderVault]) {
+            if (!_hasGlobalQuotingPolicy[lenderVault]) {
                 revert Errors.NoPolicyToDelete();
             }
-            delete hasGlobalQuotingPolicy[lenderVault];
-            delete globalQuotingPolicies[lenderVault];
+            delete _hasGlobalQuotingPolicy[lenderVault];
+            delete _globalQuotingPolicies[lenderVault];
         }
         emit GlobalPolicySet(lenderVault, globalPolicyData);
     }
@@ -77,16 +77,16 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             revert Errors.InvalidAddress();
         }
         mapping(address => bool)
-            storage _hasSingleQuotingPolicy = hasPairQuotingPolicy[lenderVault][
-                collToken
-            ];
+            storage _hasSingleQuotingPolicy = _hasPairQuotingPolicy[
+                lenderVault
+            ][collToken];
         if (pairPolicyData.length > 0) {
             DataTypesBasicPolicies.PairPolicy memory singlePolicy = abi.decode(
                 pairPolicyData,
                 (DataTypesBasicPolicies.PairPolicy)
             );
             DataTypesBasicPolicies.PairPolicy
-                memory currSinglePolicy = pairQuotingPolicies[lenderVault][
+                memory currSinglePolicy = _pairQuotingPolicies[lenderVault][
                     collToken
                 ][loanToken];
             if (
@@ -105,7 +105,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             if (!_hasSingleQuotingPolicy[loanToken]) {
                 _hasSingleQuotingPolicy[loanToken] = true;
             }
-            pairQuotingPolicies[lenderVault][collToken][
+            _pairQuotingPolicies[lenderVault][collToken][
                 loanToken
             ] = singlePolicy;
         } else {
@@ -113,7 +113,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 revert Errors.NoPolicyToDelete();
             }
             delete _hasSingleQuotingPolicy[loanToken];
-            delete pairQuotingPolicies[lenderVault][collToken][loanToken];
+            delete _pairQuotingPolicies[lenderVault][collToken][loanToken];
         }
         emit PairPolicySet(lenderVault, collToken, loanToken, pairPolicyData);
     }
@@ -129,8 +129,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         returns (bool _isAllowed, uint256 minNumOfSignersOverwrite)
     {
         DataTypesBasicPolicies.GlobalPolicy
-            memory globalPolicy = globalQuotingPolicies[lenderVault];
-        bool hasSinglePolicy = hasPairQuotingPolicy[lenderVault][
+            memory globalPolicy = _globalQuotingPolicies[lenderVault];
+        bool hasSinglePolicy = _hasPairQuotingPolicy[lenderVault][
             generalQuoteInfo.collToken
         ][generalQuoteInfo.loanToken];
         if (!globalPolicy.allowAllPairs && !hasSinglePolicy) {
@@ -141,7 +141,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         bool hasOracle = generalQuoteInfo.oracleAddr != address(0);
         if (hasSinglePolicy) {
             DataTypesBasicPolicies.PairPolicy
-                memory singlePolicy = pairQuotingPolicies[lenderVault][
+                memory singlePolicy = _pairQuotingPolicies[lenderVault][
                     generalQuoteInfo.collToken
                 ][generalQuoteInfo.loanToken];
             if (singlePolicy.requiresOracle && !hasOracle) {
@@ -168,6 +168,40 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 0
             );
         }
+    }
+
+    function globalQuotingPolicy(
+        address lenderVault
+    ) external view returns (DataTypesBasicPolicies.GlobalPolicy memory) {
+        if (!_hasGlobalQuotingPolicy[lenderVault]) {
+            revert Errors.NoPolicy();
+        }
+        return _globalQuotingPolicies[lenderVault];
+    }
+
+    function pairQuotingPolicy(
+        address lenderVault,
+        address collToken,
+        address loanToken
+    ) external view returns (DataTypesBasicPolicies.PairPolicy memory) {
+        if (!_hasPairQuotingPolicy[lenderVault][collToken][loanToken]) {
+            revert Errors.NoPolicy();
+        }
+        return _pairQuotingPolicies[lenderVault][collToken][loanToken];
+    }
+
+    function hasGlobalQuotingPolicy(
+        address lenderVault
+    ) external view returns (bool) {
+        return _hasGlobalQuotingPolicy[lenderVault];
+    }
+
+    function hasPairQuotingPolicy(
+        address lenderVault,
+        address collToken,
+        address loanToken
+    ) external view returns (bool) {
+        return _hasPairQuotingPolicy[lenderVault][collToken][loanToken];
     }
 
     function _checkIsVaultAndSenderIsOwner(address lenderVault) internal view {

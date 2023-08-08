@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.19;
 
-import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
+import {DataTypesPeerToPeer} from "../../DataTypesPeerToPeer.sol";
 
 interface IQuotePolicyManager {
     event PairPolicySet(

@@ -10,7 +10,7 @@ import {Helpers} from "../Helpers.sol";
 import {IAddressRegistry} from "./interfaces/IAddressRegistry.sol";
 import {ILenderVaultImpl} from "./interfaces/ILenderVaultImpl.sol";
 import {IQuoteHandler} from "./interfaces/IQuoteHandler.sol";
-import {IQuotePolicyManager} from "./interfaces/IQuotePolicyManager.sol";
+import {IQuotePolicyManager} from "./interfaces/policyManagers/IQuotePolicyManager.sol";
 
 contract QuoteHandler is IQuoteHandler {
     using ECDSA for bytes32;

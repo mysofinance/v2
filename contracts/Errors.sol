@@ -130,4 +130,5 @@ library Errors {
     error InvalidTenors();
     error InvalidLoanPerCollOrLtv();
     error InvalidMinApr();
+    error NoPolicy();
 }
