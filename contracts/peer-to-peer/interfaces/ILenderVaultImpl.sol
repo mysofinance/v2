@@ -33,9 +33,15 @@ interface ILenderVaultImpl {
         address indexed newCircuitBreaker,
         address indexed oldCircuitBreaker
     );
+
     event ReverseCircuitBreakerUpdated(
         address indexed newReverseCircuitBreaker,
         address indexed oldReverseCircuitBreaker
+    );
+
+    event OnChainQuotingDelegateUpdated(
+        address indexed newOnChainQuotingDelegate,
+        address indexed oldOnChainQuotingDelegate
     );
 
     /**
@@ -183,6 +189,13 @@ interface ILenderVaultImpl {
     function setReverseCircuitBreaker(address reverseCircuitBreaker) external;
 
     /**
+     * @notice function to set a delegate for on chain quoting
+     * @dev the quote handler (and vault owner) can add, delete and update on chain quotes
+     * @param onChainQuotingDelegate address of the delegate
+     */
+    function setOnChainQuotingDelegate(address onChainQuotingDelegate) external;
+
+    /**
      * @notice function to pause all quotes from lendervault
      * @dev only vault owner and circuit breaker can pause quotes
      */
@@ -261,6 +274,12 @@ interface ILenderVaultImpl {
     function reverseCircuitBreaker() external view returns (address);
 
     /**
+     * @notice function to return address of the delegate for on chain quoting
+     * @return approved delegate address
+     */
+    function onChainQuotingDelegate() external view returns (address);
+
+    /**
      * @notice function returns signer at given index
      * @param index of the signers array
      * @return signer address
@@ -297,4 +316,10 @@ interface ILenderVaultImpl {
      * @return total number of loans
      */
     function totalNumLoans() external view returns (uint256);
+
+    /**
+     * @notice function returns total number of signers
+     * @return total number of signers
+     */
+    function totalNumSigners() external view returns (uint256);
 }

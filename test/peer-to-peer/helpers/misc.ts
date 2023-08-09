@@ -324,3 +324,39 @@ export const findBalanceSlot = async (erc20: any) => {
     await ethers.provider.send('evm_revert', [snapshot])
   }
 }
+
+export type QuoteBounds = {
+  minTenor: BigNumber
+  maxTenor: BigNumber
+  minFee: BigNumber
+  minApr: BigNumber
+  minEarliestRepayTenor: BigNumber
+  minLoanPerCollUnitOrLtv: BigNumber
+  maxLoanPerCollUnitOrLtv: BigNumber
+}
+
+export const encodeGlobalPolicy = (allowAllPairs: boolean, requiresOracle: boolean, quoteBounds: QuoteBounds): string => {
+  return ethers.utils.defaultAbiCoder.encode(
+    [
+      'bool allowAllPairs',
+      'bool requiresOracle',
+      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
+    ],
+    [allowAllPairs, requiresOracle, quoteBounds]
+  )
+}
+
+export const encodePairPolicy = (
+  requiresOracle: boolean,
+  minNumOfSignersOverwrite: number,
+  quoteBounds: QuoteBounds
+): string => {
+  return ethers.utils.defaultAbiCoder.encode(
+    [
+      'bool requiresOracle',
+      'uint8 minNumOfSignersOverwrite',
+      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
+    ],
+    [requiresOracle, minNumOfSignersOverwrite, quoteBounds]
+  )
+}

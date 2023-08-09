@@ -52,6 +52,9 @@ contracts/
 ┃ ┃ ┃ ┣ IDSETH.sol
 ┃ ┃ ┃ ┣ IOlympus.sol
 ┃ ┃ ┃ ┗ IUniV2.sol
+┃ ┃ ┣ policyManagers/
+┃ ┃ ┃ ┣ IBasicQuotePolicyManager.sol
+┃ ┃ ┃ ┗ IQuotePolicyManager.sol
 ┃ ┃ ┣ wrappers/
 ┃ ┃ ┃ ┣ ERC20/
 ┃ ┃ ┃ ┃ ┣ IERC20Wrapper.sol
@@ -81,6 +84,9 @@ contracts/
 ┃ ┃   ┣ OracleLibrary.sol
 ┃ ┃   ┣ TickMath.sol
 ┃ ┃   ┗ TwapGetter.sol
+┃ ┣ policyManagers/
+┃ ┃ ┣ BasicQuotePolicyManager.sol
+┃ ┃ ┗ DataTypesBasicPolicies.sol
 ┃ ┣ wrappers/
 ┃ ┃ ┣ ERC20/
 ┃ ┃ ┃ ┣ ERC20Wrapper.sol
@@ -164,13 +170,13 @@ File                                                     |  % Stmts | % Branch |
   Helpers.sol                                            |      100 |       50 |      100 |      100 |                |
  contracts\interfaces\                                   |      100 |      100 |      100 |      100 |                |
   IMysoTokenManager.sol                                  |      100 |      100 |      100 |      100 |                |
- contracts\peer-to-peer\                                 |    99.72 |    94.74 |    98.72 |    98.75 |                |
-  AddressRegistry.sol                                    |      100 |    96.74 |      100 |    99.17 |            116 |
+ contracts\peer-to-peer\                                 |    99.74 |    94.61 |    98.84 |    98.66 |                |
+  AddressRegistry.sol                                    |      100 |    96.74 |      100 |    99.17 |            117 |
   BorrowerGateway.sol                                    |    98.57 |    90.91 |    90.91 |    96.97 |    241,317,358 |
   DataTypesPeerToPeer.sol                                |      100 |      100 |      100 |      100 |                |
   LenderVaultFactory.sol                                 |      100 |     87.5 |      100 |      100 |                |
-  LenderVaultImpl.sol                                    |      100 |    92.86 |      100 |    98.88 |         63,206 |
-  QuoteHandler.sol                                       |      100 |    98.04 |      100 |    99.34 |            365 |
+  LenderVaultImpl.sol                                    |      100 |     93.1 |      100 |    98.92 |         64,207 |
+  QuoteHandler.sol                                       |      100 |    96.83 |      100 |    98.91 |        266,478 |
  contracts\peer-to-peer\callbacks\                       |      100 |       75 |    88.89 |    96.88 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
   UniV3Looping.sol                                       |      100 |      100 |      100 |      100 |                |
@@ -209,6 +215,9 @@ File                                                     |  % Stmts | % Branch |
   AggregatorV3Interface.sol                              |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\interfaces\oracles\uniswap\      |      100 |      100 |      100 |      100 |                |
   ITwapGetter.sol                                        |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\interfaces\policyManagers\       |      100 |      100 |      100 |      100 |                |
+  IBasicQuotePolicyManager.sol                           |      100 |      100 |      100 |      100 |                |
+  IQuotePolicyManager.sol                                |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\interfaces\wrappers\ERC20\       |      100 |      100 |      100 |      100 |                |
   IERC20Wrapper.sol                                      |      100 |      100 |      100 |      100 |                |
   IWrappedERC20Impl.sol                                  |      100 |      100 |      100 |      100 |                |
@@ -229,6 +238,9 @@ File                                                     |  % Stmts | % Branch |
   OracleLibrary.sol                                      |      100 |    66.67 |      100 |      100 |                |
   TickMath.sol                                           |      100 |    80.43 |      100 |    84.09 |... 63,65,67,73 |
   TwapGetter.sol                                         |      100 |     62.5 |      100 |    93.33 |             57 |
+ contracts\peer-to-peer\policyManagers\                  |      100 |      100 |      100 |      100 |                |
+  BasicQuotePolicyManager.sol                            |      100 |      100 |      100 |      100 |                |
+  DataTypesBasicPolicies.sol                             |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\wrappers\ERC20\                  |      100 |    83.33 |      100 |    98.88 |                |
   ERC20Wrapper.sol                                       |      100 |       75 |      100 |    96.88 |             45 |
   WrappedERC20Impl.sol                                   |      100 |    89.29 |      100 |      100 |                |
@@ -245,6 +257,6 @@ File                                                     |  % Stmts | % Branch |
   IFundingPoolImpl.sol                                   |      100 |      100 |      100 |      100 |                |
   ILoanProposalImpl.sol                                  |      100 |      100 |      100 |      100 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    98.99 |    88.83 |    98.63 |     96.8 |                |
+All files                                                |    99.07 |    89.56 |    98.74 |    96.97 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```

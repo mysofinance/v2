@@ -40,10 +40,23 @@ interface IQuoteHandler {
         uint256 indexed toBeRegisteredLoanId,
         DataTypesPeerToPeer.QuoteTuple quoteTuple
     );
+    event QuotePolicyManagerUpdated(
+        address indexed lenderVault,
+        address indexed newPolicyManagerAddress
+    );
+    event OnChainQuotePublished(
+        DataTypesPeerToPeer.OnChainQuote onChainQuote,
+        bytes32 indexed onChainQuoteHash,
+        address indexed proposer
+    );
+    event OnChainQuoteCopied(
+        address indexed lenderVault,
+        bytes32 indexed onChainQuoteHash
+    );
 
     /**
      * @notice function adds on chain quote
-     * @dev function can only be called by vault owner
+     * @dev function can only be called by vault owner or on chain quote delegate
      * @param lenderVault address of the vault adding quote
      * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
@@ -54,25 +67,45 @@ interface IQuoteHandler {
 
     /**
      * @notice function updates on chain quote
-     * @dev function can only be called by vault owner
+     * @dev function can only be called by vault owner or on chain quote delegate
      * @param lenderVault address of the vault updating quote
-     * @param oldOnChainQuote data for the old onChain quote (See notes in DataTypesPeerToPeer.sol)
+     * @param oldOnChainQuoteHash quote hash for the old onChain quote marked for deletion
      * @param newOnChainQuote data for the new onChain quote (See notes in DataTypesPeerToPeer.sol)
      */
     function updateOnChainQuote(
         address lenderVault,
-        DataTypesPeerToPeer.OnChainQuote calldata oldOnChainQuote,
+        bytes32 oldOnChainQuoteHash,
         DataTypesPeerToPeer.OnChainQuote calldata newOnChainQuote
     ) external;
 
     /**
      * @notice function deletes on chain quote
-     * @dev function can only be called by vault owner
+     * @dev function can only be called by vault owner or on chain quote delegate
      * @param lenderVault address of the vault deleting
-     * @param onChainQuote data for the onChain quote marked for deletion (See notes in DataTypesPeerToPeer.sol)
+     * @param onChainQuoteHash quote hash for the onChain quote marked for deletion
      */
     function deleteOnChainQuote(
         address lenderVault,
+        bytes32 onChainQuoteHash
+    ) external;
+
+    /**
+     * @notice function to copy a published on chain quote
+     * @dev function can only be called by vault owner or on chain quote delegate
+     * @param lenderVault address of the vault approving
+     * @param onChainQuoteHash quote hash of a published onChain quote
+     */
+    function copyPublishedOnChainQuote(
+        address lenderVault,
+        bytes32 onChainQuoteHash
+    ) external;
+
+    /**
+     * @notice function to publish an on chain quote
+     * @dev function can be called by anyone and used by any vault
+     * @param onChainQuote data for the onChain quote (See notes in DataTypesPeerToPeer.sol)
+     */
+    function publishOnChainQuote(
         DataTypesPeerToPeer.OnChainQuote calldata onChainQuote
     ) external;
 
@@ -130,6 +163,17 @@ interface IQuoteHandler {
     ) external;
 
     /**
+     * @notice function to update the quote policy manager for a vault
+     * @param lenderVault address for which quote policy manager is being updated
+     * @param newPolicyManagerAddress address of new quote policy manager
+     * @dev function can only be called by vault owner
+     */
+    function updateQuotePolicyManagerForVault(
+        address lenderVault,
+        address newPolicyManagerAddress
+    ) external;
+
+    /**
      * @notice function to return address of registry
      * @return registry address
      */
@@ -163,4 +207,52 @@ interface IQuoteHandler {
         address lenderVault,
         bytes32 hashToCheck
     ) external view returns (bool);
+
+    /**
+     * @notice function returns if hash belongs to a published on chain quote
+     * @param hashToCheck hash of the on chain quote
+     * @return true if hash belongs to a published on-chain quote, else false
+     */
+    function isPublishedOnChainQuote(
+        bytes32 hashToCheck
+    ) external view returns (bool);
+
+    /**
+     * @notice function returns the address of the policy manager for a vault
+     * @param lenderVault address of vault
+     * @return address of quote policy manager for vault
+     * @dev if policy manager address changes in registry, this function will still return the old address
+     * unless and until the vault owner calls updateQuotePolicyManagerForVault
+     */
+    function quotePolicyManagerForVault(
+        address lenderVault
+    ) external view returns (address);
+
+    /**
+     * @notice function returns element of on-chain history
+     * @param lenderVault address of vault
+     * @return element of on-chain quote history
+     */
+    function getOnChainQuoteHistory(
+        address lenderVault,
+        uint256 idx
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo memory);
+
+    /**
+     * @notice function returns array of structs containing the on-chain quote hash and validUntil timestamp
+     * @param lenderVault address of vault
+     * @return array of quote hash and validUntil data for on-chain quote history of a vault
+     */
+    function getFullOnChainQuoteHistory(
+        address lenderVault
+    ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo[] memory);
+
+    /**
+     * @notice function returns the number of on-chain quotes that were added or updated
+     * @param lenderVault address of vault
+     * @return number of on-chain quotes that were added or updated
+     */
+    function getOnChainQuoteHistoryLength(
+        address lenderVault
+    ) external view returns (uint256);
 }

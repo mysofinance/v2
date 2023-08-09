@@ -123,4 +123,12 @@ library Errors {
     error TokenNotOwnedByWrapper();
     error TokenDoesNotBelongInWrapper(address tokenAddr, uint256 tokenId);
     error InvalidMintAmount();
+    error QuoteViolatesPolicy();
+    error AlreadyPublished();
+    error PolicyAlreadySet();
+    error NoPolicyToDelete();
+    error InvalidTenors();
+    error InvalidLoanPerCollOrLtv();
+    error InvalidMinApr();
+    error NoPolicy();
 }
