@@ -5332,28 +5332,13 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         minLoanPerCollUnitOrLtv: BASE.mul(11).div(100),
         maxLoanPerCollUnitOrLtv: BASE.mul(11).div(100)
       }
-      let allowAllPairs = false
       let globalRequiresOracle = false
-      let globalPolicyData = encodeGlobalPolicy(allowAllPairs, globalRequiresOracle, globalQuoteBounds)
+      let globalPolicyData = encodeGlobalPolicy(globalRequiresOracle, globalQuoteBounds)
 
       // check revert when trying to delete global policy although not yet set
       await expect(
         basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, '0x')
       ).to.be.revertedWithCustomError(basicQuotePolicyManager, 'NoPolicyToDelete')
-
-      // set global policy
-      await basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, globalPolicyData)
-      expect(await basicQuotePolicyManager.hasGlobalQuotingPolicy(lenderVault.address)).to.be.true
-      const actGlobalPolicyData = await basicQuotePolicyManager.globalQuotingPolicy(lenderVault.address)
-      expect(actGlobalPolicyData.allowAllPairs).to.be.equal(allowAllPairs)
-      expect(actGlobalPolicyData.requiresOracle).to.be.equal(globalRequiresOracle)
-      expect(actGlobalPolicyData.quoteBounds.minTenor).to.be.equal(globalQuoteBounds.minTenor)
-      expect(actGlobalPolicyData.quoteBounds.maxTenor).to.be.equal(globalQuoteBounds.maxTenor)
-      expect(actGlobalPolicyData.quoteBounds.minFee).to.be.equal(globalQuoteBounds.minFee)
-      expect(actGlobalPolicyData.quoteBounds.minApr).to.be.equal(globalQuoteBounds.minApr)
-      expect(actGlobalPolicyData.quoteBounds.minEarliestRepayTenor).to.be.equal(globalQuoteBounds.minEarliestRepayTenor)
-      expect(actGlobalPolicyData.quoteBounds.minLoanPerCollUnitOrLtv).to.be.equal(globalQuoteBounds.minLoanPerCollUnitOrLtv)
-      expect(actGlobalPolicyData.quoteBounds.maxLoanPerCollUnitOrLtv).to.be.equal(globalQuoteBounds.maxLoanPerCollUnitOrLtv)
 
       // lender produces off-chain quote
       let quoteTuples = [
@@ -5432,17 +5417,29 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // borrower approves gateway
       await weth.connect(borrower).approve(borrowerGateway.address, MAX_UINT256)
 
-      // check revert if borrow violates policy (here because allow all pairs is false and no explicit pair policy set)
+      // check revert if borrow violates policy (here because no global policy is set in which case
+      // per default all pairs are blocked)
       await expect(
         borrowerGateway
           .connect(borrower)
           .borrowWithOffChainQuote(lenderVault.address, borrowInstructions, offChainQuote, selectedQuoteTuple, proof)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      // update global policy to allow all pairs
-      allowAllPairs = true
-      globalPolicyData = encodeGlobalPolicy(allowAllPairs, globalRequiresOracle, globalQuoteBounds)
+      // add global policy to allow all pairs
+      globalPolicyData = encodeGlobalPolicy(globalRequiresOracle, globalQuoteBounds)
       await basicQuotePolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, globalPolicyData)
+
+      // check global policy is set correctly
+      expect(await basicQuotePolicyManager.hasGlobalQuotingPolicy(lenderVault.address)).to.be.true
+      const actGlobalPolicyData = await basicQuotePolicyManager.globalQuotingPolicy(lenderVault.address)
+      expect(actGlobalPolicyData.requiresOracle).to.be.equal(globalRequiresOracle)
+      expect(actGlobalPolicyData.quoteBounds.minTenor).to.be.equal(globalQuoteBounds.minTenor)
+      expect(actGlobalPolicyData.quoteBounds.maxTenor).to.be.equal(globalQuoteBounds.maxTenor)
+      expect(actGlobalPolicyData.quoteBounds.minFee).to.be.equal(globalQuoteBounds.minFee)
+      expect(actGlobalPolicyData.quoteBounds.minApr).to.be.equal(globalQuoteBounds.minApr)
+      expect(actGlobalPolicyData.quoteBounds.minEarliestRepayTenor).to.be.equal(globalQuoteBounds.minEarliestRepayTenor)
+      expect(actGlobalPolicyData.quoteBounds.minLoanPerCollUnitOrLtv).to.be.equal(globalQuoteBounds.minLoanPerCollUnitOrLtv)
+      expect(actGlobalPolicyData.quoteBounds.maxLoanPerCollUnitOrLtv).to.be.equal(globalQuoteBounds.maxLoanPerCollUnitOrLtv)
 
       // check revert if borrow violates policy (here because min signer threshold is breached)
       await expect(
@@ -5686,9 +5683,9 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       // lenderVault owner deposits usdc
       await usdc.connect(lender).transfer(lenderVault.address, ONE_USDC.mul(100000))
 
-      const preTotalNumSigners = await lenderVault.numSigners()
+      const preTotalNumSigners = await lenderVault.totalNumSigners()
       await lenderVault.connect(lender).addSigners([team.address])
-      const postTotalNumSigners = await lenderVault.numSigners()
+      const postTotalNumSigners = await lenderVault.totalNumSigners()
       expect(postTotalNumSigners.sub(preTotalNumSigners)).to.be.equal(1)
 
       // deploy chainlinkOracleContract

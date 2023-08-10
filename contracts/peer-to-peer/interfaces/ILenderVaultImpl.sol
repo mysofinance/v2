@@ -7,7 +7,7 @@ import {DataTypesPeerToPeer} from "../DataTypesPeerToPeer.sol";
 interface ILenderVaultImpl {
     event AddedSigners(address[] _signers);
 
-    event MinNumberOfSignersSet(uint256 numSigners);
+    event MinNumberOfSignersSet(uint256 minNumSigners);
 
     event RemovedSigner(
         address signerRemoved,
@@ -237,10 +237,10 @@ interface ILenderVaultImpl {
     function pendingOwner() external view returns (address);
 
     /**
-     * @notice function to return number of signers
+     * @notice function to return the total number of signers
      * @return number of signers
      */
-    function numSigners() external view returns (uint256);
+    function totalNumSigners() external view returns (uint256);
 
     /**
      * @notice function to return unlocked token balances
@@ -316,10 +316,4 @@ interface ILenderVaultImpl {
      * @return total number of loans
      */
     function totalNumLoans() external view returns (uint256);
-
-    /**
-     * @notice function returns total number of signers
-     * @return total number of signers
-     */
-    function totalNumSigners() external view returns (uint256);
 }

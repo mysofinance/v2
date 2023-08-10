@@ -20,9 +20,6 @@ library DataTypesBasicPolicies {
     }
 
     struct GlobalPolicy {
-        // Flag indicating if all pairs are allowed (=true) or
-        // per default only pairs with explicitly defined pair policy (=false)
-        bool allowAllPairs;
         // Flag indicating if an oracle is required for the pair
         bool requiresOracle;
         // Applicable global bounds

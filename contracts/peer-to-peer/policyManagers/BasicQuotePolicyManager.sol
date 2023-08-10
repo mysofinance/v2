@@ -26,6 +26,9 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         addressRegistry = _addressRegistry;
     }
 
+    // @dev: When no global policy is set (default case), all pairs are automatically blocked except
+    // for those where a pair policy is explicitly set. In the case where a global policy is set,
+    // all pairs are assumed to be allowed (no blocking).
     function setGlobalPolicy(
         address lenderVault,
         bytes calldata globalPolicyData
@@ -42,7 +45,6 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             DataTypesBasicPolicies.GlobalPolicy
                 memory currGlobalPolicy = _globalQuotingPolicies[lenderVault];
             if (
-                globalPolicy.allowAllPairs == currGlobalPolicy.allowAllPairs &&
                 globalPolicy.requiresOracle ==
                 currGlobalPolicy.requiresOracle &&
                 _equalQuoteBounds(
@@ -67,6 +69,9 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         emit GlobalPolicySet(lenderVault, globalPolicyData);
     }
 
+    // @dev: If no global policy is set, then setting a pair policy allows one to explicitly unblock a specific pair;
+    // in the other case where a global policy is set, setting a pair policy allows overwriting global policy
+    // parameters as well as overwriting minimum signer threshold requirements.
     function setPairPolicy(
         address lenderVault,
         address collToken,
@@ -135,7 +140,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         bool hasPairPolicy = _hasPairQuotingPolicy[lenderVault][
             generalQuoteInfo.collToken
         ][generalQuoteInfo.loanToken];
-        if (!globalPolicy.allowAllPairs && !hasPairPolicy) {
+        if (!_hasGlobalQuotingPolicy[lenderVault] && !hasPairPolicy) {
             return (false, 0);
         }
 
@@ -294,10 +299,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             ) {
                 return false;
             }
-        }
 
-        if (quoteTuple.upfrontFeePctInBase < quoteBounds.minFee) {
-            return false;
+            // @dev: only check upfront fee for loans (can skip for swaps where tenor=0)
+            if (quoteTuple.upfrontFeePctInBase < quoteBounds.minFee) {
+                return false;
+            }
         }
 
         return true;
