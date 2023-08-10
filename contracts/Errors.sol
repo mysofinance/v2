@@ -131,4 +131,5 @@ library Errors {
     error InvalidLoanPerCollOrLtv();
     error InvalidMinApr();
     error NoPolicy();
+    error InvalidMinFee();
 }

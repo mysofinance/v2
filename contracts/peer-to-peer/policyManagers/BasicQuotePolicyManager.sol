@@ -247,6 +247,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             revert Errors.InvalidTenors();
         }
         if (
+            quoteBounds.minLtv == 0 ||
+            quoteBounds.minLoanPerCollUnit == 0 ||
             quoteBounds.minLtv > quoteBounds.maxLtv ||
             quoteBounds.minLoanPerCollUnit > quoteBounds.maxLoanPerCollUnit
         ) {
@@ -254,6 +256,10 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         }
         if (quoteBounds.minApr + int(Constants.BASE) <= 0) {
             revert Errors.InvalidMinApr();
+        }
+        // @dev: if minFee = BASE, then only swaps will be allowed
+        if (quoteBounds.minFee > Constants.BASE) {
+            revert Errors.InvalidMinFee();
         }
     }
 

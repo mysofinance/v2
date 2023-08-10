@@ -6145,8 +6145,32 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         basicPolicyManager
           .connect(lender)
+          .setGlobalPolicy(
+            lenderVault.address,
+            encodeGlobalPolicy(false, { ...quoteBounds, minLtv: ethers.BigNumber.from(0) })
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollOrLtv')
+
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setGlobalPolicy(
+            lenderVault.address,
+            encodeGlobalPolicy(false, { ...quoteBounds, minLoanPerCollUnit: ethers.BigNumber.from(0) })
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollOrLtv')
+
+      await expect(
+        basicPolicyManager
+          .connect(lender)
           .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(false, { ...quoteBounds, minApr: BASE.mul(-2) }))
       ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidMinApr')
+
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(false, { ...quoteBounds, minFee: BASE.add(1) }))
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidMinFee')
 
       await basicPolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(true, quoteBounds))
 

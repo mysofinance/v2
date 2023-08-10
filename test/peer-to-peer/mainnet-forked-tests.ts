@@ -5526,8 +5526,8 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         minEarliestRepayTenor: ethers.BigNumber.from(0),
         minLtv: BASE.mul(1).div(100),
         maxLtv: BASE.sub(1),
-        minLoanPerCollUnit: ethers.BigNumber.from(0),
-        maxLoanPerCollUnit: ethers.BigNumber.from(0)
+        minLoanPerCollUnit: ethers.BigNumber.from(1),
+        maxLoanPerCollUnit: ethers.BigNumber.from(1)
       }
       const pairRequiresOracle = true
       const pairMinNumOfSignersOverwrite = 1
