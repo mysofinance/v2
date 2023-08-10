@@ -333,8 +333,8 @@ export type QuoteBounds = {
   minEarliestRepayTenor: BigNumber
   minLtv: BigNumber
   maxLtv: BigNumber
-  minLoanPerCollUnitOrLtv: BigNumber
-  maxLoanPerCollUnitOrLtv: BigNumber
+  minLoanPerCollUnit: BigNumber
+  maxLoanPerCollUnit: BigNumber
 }
 
 export const encodeGlobalPolicy = (requiresOracle: boolean, quoteBounds: QuoteBounds): string => {

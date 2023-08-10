@@ -16,6 +16,7 @@ const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
+const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
@@ -3378,7 +3379,19 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+      // start idx >= end idx should revert
+      await expect(quoteHandler.getFullOnChainQuoteHistory(lenderVault.address, 0, 0)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'InvalidArrayIndex'
+      )
+
+      // end idx > history length should revert
+      await expect(quoteHandler.getFullOnChainQuoteHistory(lenderVault.address, 0, 3)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'InvalidArrayIndex'
+      )
+
+      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address, 0, 2)
       const historyLen = await quoteHandler.getOnChainQuoteHistoryLength(lenderVault.address)
 
       expect(quoteHashAndValidUntilArr.length).to.equal(2)
@@ -3430,6 +3443,15 @@ describe('Peer-to-Peer: Local Tests', function () {
         salt: ZERO_BYTES32
       }
 
+      // new quote to with same valid until
+      let onChainQuote2 = {
+        ...onChainQuote,
+        generalQuoteInfo: {
+          ...onChainQuote.generalQuoteInfo,
+          earliestRepayTenor: ONE_DAY.mul(2)
+        }
+      }
+
       await expect(
         quoteHandler.connect(lender).publishOnChainQuote({
           ...onChainQuote,
@@ -3445,9 +3467,25 @@ describe('Peer-to-Peer: Local Tests', function () {
         return x.event === 'OnChainQuotePublished'
       })
 
+      const proposedQuoteTransaction2 = await quoteHandler.connect(borrower).publishOnChainQuote(onChainQuote2)
+
+      const proposedQuoteReceipt2 = await proposedQuoteTransaction2.wait()
+
+      const proposeQuoteEvent2 = proposedQuoteReceipt2.events?.find(x => {
+        return x.event === 'OnChainQuotePublished'
+      })
+
       const proposedOnChainQuoteHash = proposeQuoteEvent?.args?.onChainQuoteHash || ZERO_BYTES32
 
+      const proposedOnChainQuoteHash2 = proposeQuoteEvent2?.args?.onChainQuoteHash || ZERO_BYTES32
+
       expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
+
+      expect(await quoteHandler.publishedOnChainQuoteValidUntil(proposedOnChainQuoteHash)).to.equal(timestamp + 60)
+
+      expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash2)).to.be.true
+
+      expect(await quoteHandler.publishedOnChainQuoteValidUntil(proposedOnChainQuoteHash2)).to.equal(timestamp + 60)
 
       await expect(
         quoteHandler.connect(borrower).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
@@ -3458,6 +3496,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.emit(quoteHandler, 'OnChainQuoteCopied')
 
       expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
+
+      expect(await quoteHandler.publishedOnChainQuoteValidUntil(proposedOnChainQuoteHash)).to.equal(timestamp + 60)
 
       await expect(
         quoteHandler.connect(lender).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
@@ -3471,6 +3511,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
+
+      // move forward in time to make quote invalid
+      await ethers.provider.send('evm_increaseTime', [61])
+
+      // second proposed quote copy should revert since valid until has passed
+      await expect(
+        quoteHandler.connect(lender).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash2)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
   })
 
@@ -6009,8 +6057,8 @@ describe('Peer-to-Peer: Local Tests', function () {
         minEarliestRepayTenor: ethers.BigNumber.from(0),
         minLtv: BASE.div(10),
         maxLtv: BASE.div(2),
-        minLoanPerCollUnit: 0,
-        maxLoanPerCollUnit: 0
+        minLoanPerCollUnit: ONE_USDC.mul(500),
+        maxLoanPerCollUnit: ONE_USDC.mul(2000)
       }
 
       const globalPolicyData = encodeGlobalPolicy(false, quoteBounds)
@@ -6171,10 +6219,10 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault.address,
         encodeGlobalPolicy(false, {
           ...quoteBounds,
-          minLtv: ethers.BigNumber.from(0),
-          maxLtv: ethers.BigNumber.from(0),
-          minLoanPerCollUnitOrLtv: 0,
-          maxLoanPerCollUnitOrLtv: MAX_UINT256
+          minLtv: ethers.BigNumber.from(1),
+          maxLtv: ethers.BigNumber.from(1),
+          minLoanPerCollUnit: ethers.BigNumber.from(1),
+          maxLoanPerCollUnit: MAX_UINT128
         })
       )
 

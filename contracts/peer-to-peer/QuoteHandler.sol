@@ -21,6 +21,7 @@ contract QuoteHandler is IQuoteHandler {
         public offChainQuoteIsInvalidated;
     mapping(address => mapping(bytes32 => bool)) public isOnChainQuote;
     mapping(bytes32 => bool) public isPublishedOnChainQuote;
+    mapping(bytes32 => uint256) public publishedOnChainQuoteValidUntil;
     mapping(address => address) public quotePolicyManagerForVault;
     mapping(address => DataTypesPeerToPeer.OnChainQuoteInfo[])
         internal onChainQuoteHistory;
@@ -115,12 +116,21 @@ contract QuoteHandler is IQuoteHandler {
         _checkIsVaultAndSenderIsApproved(lenderVault, false);
         mapping(bytes32 => bool)
             storage isOnChainQuoteFromVault = isOnChainQuote[lenderVault];
+        uint256 validUntil = publishedOnChainQuoteValidUntil[onChainQuoteHash];
         if (
             !isPublishedOnChainQuote[onChainQuoteHash] ||
-            isOnChainQuoteFromVault[onChainQuoteHash]
+            isOnChainQuoteFromVault[onChainQuoteHash] ||
+            validUntil < block.timestamp
         ) {
             revert Errors.InvalidQuote();
         }
+        // @dev: on-chain quote history is append only
+        onChainQuoteHistory[lenderVault].push(
+            DataTypesPeerToPeer.OnChainQuoteInfo({
+                quoteHash: onChainQuoteHash,
+                validUntil: validUntil
+            })
+        );
         isOnChainQuoteFromVault[onChainQuoteHash] = true;
         emit OnChainQuoteCopied(lenderVault, onChainQuoteHash);
     }
@@ -136,6 +146,9 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.AlreadyPublished();
         }
         isPublishedOnChainQuote[onChainQuoteHash] = true;
+        publishedOnChainQuoteValidUntil[onChainQuoteHash] = onChainQuote
+            .generalQuoteInfo
+            .validUntil;
         emit OnChainQuotePublished(onChainQuote, onChainQuoteHash, msg.sender);
     }
 
@@ -293,9 +306,29 @@ contract QuoteHandler is IQuoteHandler {
     }
 
     function getFullOnChainQuoteHistory(
-        address lenderVault
+        address lenderVault,
+        uint256 startIdx,
+        uint256 endIdx
     ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo[] memory) {
-        return onChainQuoteHistory[lenderVault];
+        if (
+            startIdx >= endIdx ||
+            endIdx > onChainQuoteHistory[lenderVault].length
+        ) {
+            revert Errors.InvalidArrayIndex();
+        }
+        DataTypesPeerToPeer.OnChainQuoteInfo[]
+            memory onChainQuoteHistoryRequested = new DataTypesPeerToPeer.OnChainQuoteInfo[](
+                endIdx - startIdx
+            );
+        for (uint256 i = startIdx; i < endIdx; ) {
+            onChainQuoteHistoryRequested[i - startIdx] = onChainQuoteHistory[
+                lenderVault
+            ][i];
+            unchecked {
+                ++i;
+            }
+        }
+        return onChainQuoteHistoryRequested;
     }
 
     function getOnChainQuoteHistoryLength(

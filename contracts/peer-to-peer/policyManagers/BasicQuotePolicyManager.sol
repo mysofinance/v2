@@ -170,7 +170,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 quoteBounds,
                 quoteTuple,
                 generalQuoteInfo.earliestRepayTenor,
-                requiresOracle
+                hasOracle,
+                !hasOracle && !hasPairPolicy
             ),
             minNumOfSignersOverwrite
         );
@@ -260,7 +261,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         uint256 earliestRepayTenor,
-        bool checkLtv
+        bool checkLtv,
+        bool skipLoanPerCollCheck
     ) internal pure returns (bool) {
         if (
             quoteTuple.tenor < quoteBounds.minTenor ||
@@ -274,8 +276,9 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             ? (quoteBounds.minLtv, quoteBounds.maxLtv)
             : (quoteBounds.minLoanPerCollUnit, quoteBounds.maxLoanPerCollUnit);
         if (
-            quoteTuple.loanPerCollUnitOrLtv < lowerBnd ||
-            quoteTuple.loanPerCollUnitOrLtv > upperBnd
+            !skipLoanPerCollCheck &&
+            (quoteTuple.loanPerCollUnitOrLtv < lowerBnd ||
+                quoteTuple.loanPerCollUnitOrLtv > upperBnd)
         ) {
             return false;
         }
