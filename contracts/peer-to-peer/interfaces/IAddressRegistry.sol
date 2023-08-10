@@ -187,12 +187,6 @@ interface IAddressRegistry {
     function mysoTokenManager() external view returns (address);
 
     /**
-     * @notice Returns the address of the quote policy manager
-     * @return Address of the quote policy manager contract
-     */
-    function quotePolicyManager() external view returns (address);
-
-    /**
      * @notice Returns boolean flag indicating whether given address is a registered vault
      * @param addr Address to check if it is a registered vault
      * @return Boolean flag indicating whether given address is a registered vault

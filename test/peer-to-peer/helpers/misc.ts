@@ -335,14 +335,13 @@ export type QuoteBounds = {
   maxLoanPerCollUnitOrLtv: BigNumber
 }
 
-export const encodeGlobalPolicy = (allowAllPairs: boolean, requiresOracle: boolean, quoteBounds: QuoteBounds): string => {
+export const encodeGlobalPolicy = (requiresOracle: boolean, quoteBounds: QuoteBounds): string => {
   return ethers.utils.defaultAbiCoder.encode(
     [
-      'bool allowAllPairs',
       'bool requiresOracle',
       'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
     ],
-    [allowAllPairs, requiresOracle, quoteBounds]
+    [requiresOracle, quoteBounds]
   )
 }
 

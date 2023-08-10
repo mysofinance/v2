@@ -414,10 +414,6 @@ contract LenderVaultImpl is
         return _loans.length;
     }
 
-    function totalNumSigners() external view returns (uint256) {
-        return signers.length;
-    }
-
     function getTokenBalancesAndLockedAmounts(
         address[] calldata tokens
     )
@@ -443,7 +439,7 @@ contract LenderVaultImpl is
         }
     }
 
-    function numSigners() external view returns (uint256) {
+    function totalNumSigners() external view returns (uint256) {
         return signers.length;
     }
 
