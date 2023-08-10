@@ -6007,8 +6007,10 @@ describe('Peer-to-Peer: Local Tests', function () {
         minFee: ethers.BigNumber.from(0),
         minApr: ethers.BigNumber.from(0),
         minEarliestRepayTenor: ethers.BigNumber.from(0),
-        minLoanPerCollUnitOrLtv: BASE.div(10),
-        maxLoanPerCollUnitOrLtv: BASE.div(2)
+        minLtv: BASE.div(10),
+        maxLtv: BASE.div(2),
+        minLoanPerCollUnit: 0,
+        maxLoanPerCollUnit: 0
       }
 
       const globalPolicyData = encodeGlobalPolicy(false, quoteBounds)
@@ -6089,7 +6091,7 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         basicPolicyManager
           .connect(lender)
-          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(false, { ...quoteBounds, minLoanPerCollUnitOrLtv: BASE }))
+          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(false, { ...quoteBounds, minLtv: BASE }))
       ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollOrLtv')
 
       await expect(
@@ -6155,12 +6157,12 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault.address,
         encodeGlobalPolicy(false, {
           ...quoteBounds,
-          minLoanPerCollUnitOrLtv: BASE.mul(4).div(5),
-          maxLoanPerCollUnitOrLtv: BASE.mul(9).div(10)
+          minLtv: BASE.mul(4).div(5),
+          maxLtv: BASE.mul(9).div(10)
         })
       )
 
-      // borrow should go through even if loanPerCollUnitOrLtv is below minLoanPerCollUnitOrLtv if no oracle required
+      // borrow should go through even if loanPerCollUnitOrLtv is below min LTV if no oracle required
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
@@ -6169,12 +6171,14 @@ describe('Peer-to-Peer: Local Tests', function () {
         lenderVault.address,
         encodeGlobalPolicy(false, {
           ...quoteBounds,
-          minLoanPerCollUnitOrLtv: ethers.BigNumber.from(0),
-          maxLoanPerCollUnitOrLtv: ethers.BigNumber.from(0)
+          minLtv: ethers.BigNumber.from(0),
+          maxLtv: ethers.BigNumber.from(0),
+          minLoanPerCollUnitOrLtv: 0,
+          maxLoanPerCollUnitOrLtv: MAX_UINT256
         })
       )
 
-      // borrow should go through even if loanPerCollUnitOrLtv is above maxLoanPerCollUnitOrLtv if no oracle required
+      // borrow should go through even if loanPerCollUnitOrLtv is above maxLtv if no oracle required
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)

@@ -5329,8 +5329,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         minFee: BASE.mul(11).div(100),
         minApr: BASE.mul(11).div(100),
         minEarliestRepayTenor: 0,
-        minLoanPerCollUnitOrLtv: BASE.mul(11).div(100),
-        maxLoanPerCollUnitOrLtv: BASE.mul(11).div(100)
+        minLtv: BASE.mul(11).div(100),
+        maxLtv: BASE.mul(11).div(100),
+        minLoanPerCollUnit: 0,
+        maxLoanPerCollUnit: 0
       }
       let globalRequiresOracle = false
       let globalPolicyData = encodeGlobalPolicy(globalRequiresOracle, globalQuoteBounds)
@@ -5438,8 +5440,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(actGlobalPolicyData.quoteBounds.minFee).to.be.equal(globalQuoteBounds.minFee)
       expect(actGlobalPolicyData.quoteBounds.minApr).to.be.equal(globalQuoteBounds.minApr)
       expect(actGlobalPolicyData.quoteBounds.minEarliestRepayTenor).to.be.equal(globalQuoteBounds.minEarliestRepayTenor)
-      expect(actGlobalPolicyData.quoteBounds.minLoanPerCollUnitOrLtv).to.be.equal(globalQuoteBounds.minLoanPerCollUnitOrLtv)
-      expect(actGlobalPolicyData.quoteBounds.maxLoanPerCollUnitOrLtv).to.be.equal(globalQuoteBounds.maxLoanPerCollUnitOrLtv)
+      expect(actGlobalPolicyData.quoteBounds.minLoanPerCollUnitOrLtv).to.be.equal(globalQuoteBounds.minLoanPerCollUnit)
+      expect(actGlobalPolicyData.quoteBounds.maxLoanPerCollUnit).to.be.equal(globalQuoteBounds.maxLoanPerCollUnit)
+      expect(actGlobalPolicyData.quoteBounds.minLtv).to.be.equal(globalQuoteBounds.minLtv)
+      expect(actGlobalPolicyData.quoteBounds.maxLtv).to.be.equal(globalQuoteBounds.maxLtv)
 
       // check revert if borrow violates policy (here because min signer threshold is breached)
       await expect(
@@ -5520,8 +5524,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
         minFee: 0,
         minApr: 0,
         minEarliestRepayTenor: 0,
-        minLoanPerCollUnitOrLtv: BASE.mul(1).div(100),
-        maxLoanPerCollUnitOrLtv: BASE.sub(1)
+        minLtv: BASE.mul(1).div(100),
+        maxLtv: BASE.sub(1),
+        minLoanPerCollUnit: 0,
+        maxLoanPerCollUnit: 0
       }
       const pairRequiresOracle = true
       const pairMinNumOfSignersOverwrite = 1
@@ -5560,8 +5566,10 @@ describe('Peer-to-Peer: Forked Mainnet Tests', function () {
       expect(actPairPolicyData.quoteBounds.minFee).to.be.equal(pairQuoteBounds.minFee)
       expect(actPairPolicyData.quoteBounds.minApr).to.be.equal(pairQuoteBounds.minApr)
       expect(actPairPolicyData.quoteBounds.minEarliestRepayTenor).to.be.equal(pairQuoteBounds.minEarliestRepayTenor)
-      expect(actPairPolicyData.quoteBounds.minLoanPerCollUnitOrLtv).to.be.equal(pairQuoteBounds.minLoanPerCollUnitOrLtv)
-      expect(actPairPolicyData.quoteBounds.maxLoanPerCollUnitOrLtv).to.be.equal(pairQuoteBounds.maxLoanPerCollUnitOrLtv)
+      expect(actPairPolicyData.quoteBounds.minLoanPerCollUnit).to.be.equal(pairQuoteBounds.minLoanPerCollUnit)
+      expect(actPairPolicyData.quoteBounds.maxLoanPerCollUnit).to.be.equal(pairQuoteBounds.maxLoanPerCollUnit)
+      expect(actPairPolicyData.quoteBounds.minLtv).to.be.equal(pairQuoteBounds.minLtv)
+      expect(actPairPolicyData.quoteBounds.maxLtv).to.be.equal(pairQuoteBounds.maxLtv)
 
       // check revert when trying to set same policy again
       await expect(
