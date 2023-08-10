@@ -13,10 +13,14 @@ library DataTypesBasicPolicies {
         int80 minApr;
         // Allowed minimum earliest repay tenor
         uint32 minEarliestRepayTenor;
+        // Allowed minimum LTV for the quote
+        uint128 minLtv;
+        // Allowed maximum LTV for the quote
+        uint128 maxLtv;
         // Allowed minimum loan per collateral unit or LTV for the quote
-        uint128 minLoanPerCollUnitOrLtv;
+        uint128 minLoanPerCollUnit;
         // Allowed maximum loan per collateral unit or LTV for the quote
-        uint128 maxLoanPerCollUnitOrLtv;
+        uint128 maxLoanPerCollUnit;
     }
 
     struct GlobalPolicy {

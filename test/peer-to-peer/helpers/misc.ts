@@ -331,6 +331,8 @@ export type QuoteBounds = {
   minFee: BigNumber
   minApr: BigNumber
   minEarliestRepayTenor: BigNumber
+  minLtv: BigNumber
+  maxLtv: BigNumber
   minLoanPerCollUnitOrLtv: BigNumber
   maxLoanPerCollUnitOrLtv: BigNumber
 }
@@ -339,7 +341,7 @@ export const encodeGlobalPolicy = (requiresOracle: boolean, quoteBounds: QuoteBo
   return ethers.utils.defaultAbiCoder.encode(
     [
       'bool requiresOracle',
-      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
+      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLtv, uint128 maxLtv, uint128 minLoanPerCollUnit, uint128 maxLoanPerCollUnit) quoteBounds'
     ],
     [requiresOracle, quoteBounds]
   )
@@ -354,7 +356,7 @@ export const encodePairPolicy = (
     [
       'bool requiresOracle',
       'uint8 minNumOfSignersOverwrite',
-      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
+      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLtv, uint128 maxLtv, uint128 minLoanPerCollUnit, uint128 maxLoanPerCollUnit) quoteBounds'
     ],
     [requiresOracle, minNumOfSignersOverwrite, quoteBounds]
   )

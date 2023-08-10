@@ -148,7 +148,6 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         bool hasOracle = generalQuoteInfo.oracleAddr != address(0);
         bool requiresOracle;
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds;
-        bool checkLoanPerCollUnitOrLtv;
         if (hasPairPolicy) {
             DataTypesBasicPolicies.PairPolicy
                 memory singlePolicy = _pairQuotingPolicies[lenderVault][
@@ -156,15 +155,10 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 ][generalQuoteInfo.loanToken];
             requiresOracle = singlePolicy.requiresOracle;
             quoteBounds = singlePolicy.quoteBounds;
-            // @dev: in case of pair policy always check against min/max loanPerCollUnitOrLtv
-            checkLoanPerCollUnitOrLtv = true;
             minNumOfSignersOverwrite = singlePolicy.minNumOfSignersOverwrite;
         } else {
             requiresOracle = globalPolicy.requiresOracle;
             quoteBounds = globalPolicy.quoteBounds;
-            // @dev: in case of global policy, only check against global min/max loanPerCollUnitOrLtv if
-            // pair has oracle
-            checkLoanPerCollUnitOrLtv = hasOracle;
         }
 
         if (requiresOracle && !hasOracle) {
@@ -176,7 +170,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 quoteBounds,
                 quoteTuple,
                 generalQuoteInfo.earliestRepayTenor,
-                checkLoanPerCollUnitOrLtv
+                requiresOracle
             ),
             minNumOfSignersOverwrite
         );
@@ -234,10 +228,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             quoteBounds1.maxTenor == quoteBounds2.maxTenor &&
             quoteBounds1.minFee == quoteBounds2.minFee &&
             quoteBounds1.minApr == quoteBounds2.minApr &&
-            quoteBounds1.minLoanPerCollUnitOrLtv ==
-            quoteBounds2.minLoanPerCollUnitOrLtv &&
-            quoteBounds1.maxLoanPerCollUnitOrLtv ==
-            quoteBounds2.maxLoanPerCollUnitOrLtv
+            quoteBounds1.minLtv == quoteBounds2.minLtv &&
+            quoteBounds1.maxLtv == quoteBounds2.maxLtv &&
+            quoteBounds1.minLoanPerCollUnit ==
+            quoteBounds2.minLoanPerCollUnit &&
+            quoteBounds1.maxLoanPerCollUnit == quoteBounds2.maxLoanPerCollUnit
         ) {
             isEqual = true;
         }
@@ -251,8 +246,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             revert Errors.InvalidTenors();
         }
         if (
-            quoteBounds.minLoanPerCollUnitOrLtv >
-            quoteBounds.maxLoanPerCollUnitOrLtv
+            quoteBounds.minLtv > quoteBounds.maxLtv ||
+            quoteBounds.minLoanPerCollUnit > quoteBounds.maxLoanPerCollUnit
         ) {
             revert Errors.InvalidLoanPerCollOrLtv();
         }
@@ -265,7 +260,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         uint256 earliestRepayTenor,
-        bool checkLoanPerCollUnitOrLtv
+        bool checkLtv
     ) internal pure returns (bool) {
         if (
             quoteTuple.tenor < quoteBounds.minTenor ||
@@ -274,12 +269,13 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             return false;
         }
 
+        // @dev: if requires oracle check against LTV bounds, else against loan-per-coll bounds
+        (uint256 lowerBnd, uint256 upperBnd) = checkLtv
+            ? (quoteBounds.minLtv, quoteBounds.maxLtv)
+            : (quoteBounds.minLoanPerCollUnit, quoteBounds.maxLoanPerCollUnit);
         if (
-            checkLoanPerCollUnitOrLtv &&
-            (quoteTuple.loanPerCollUnitOrLtv <
-                quoteBounds.minLoanPerCollUnitOrLtv ||
-                quoteTuple.loanPerCollUnitOrLtv >
-                quoteBounds.maxLoanPerCollUnitOrLtv)
+            quoteTuple.loanPerCollUnitOrLtv < lowerBnd ||
+            quoteTuple.loanPerCollUnitOrLtv > upperBnd
         ) {
             return false;
         }
