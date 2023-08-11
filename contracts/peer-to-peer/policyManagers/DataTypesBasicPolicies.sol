@@ -13,29 +13,30 @@ library DataTypesBasicPolicies {
         int80 minApr;
         // Allowed minimum earliest repay tenor
         uint32 minEarliestRepayTenor;
-        // Allowed minimum loan per collateral unit or LTV for the quote
-        uint128 minLoanPerCollUnitOrLtv;
-        // Allowed maximum loan per collateral unit or LTV for the quote
-        uint128 maxLoanPerCollUnitOrLtv;
+        // Allowed minimum LTV for the quote
+        uint128 minLtv;
+        // Allowed maximum LTV for the quote
+        uint128 maxLtv;
     }
 
     struct GlobalPolicy {
-        // Flag indicating if all pairs are allowed (=true) or
-        // per default only pairs with explicitly defined pair policy (=false)
-        bool allowAllPairs;
+        // Applicable general bounds
+        QuoteBounds quoteBounds;
         // Flag indicating if an oracle is required for the pair
         bool requiresOracle;
-        // Applicable global bounds
-        QuoteBounds quoteBounds;
     }
 
     struct PairPolicy {
+        // Applicable general bounds
+        QuoteBounds quoteBounds;
+        // Allowed minimum loan per collateral unit or LTV for the quote
+        uint128 minLoanPerCollUnit;
+        // Allowed maximum loan per collateral unit or LTV for the quote
+        uint128 maxLoanPerCollUnit;
         // Flag indicating if an oracle is required for the pair
         bool requiresOracle;
         // Minimum number of signers required for the pair (if zero ignored, otherwise overwrites vault min signers)
         // @dev: can overwrite signer threshold to be lower or higher than vault min signers
         uint8 minNumOfSignersOverwrite;
-        // Applicable global bounds
-        QuoteBounds quoteBounds;
     }
 }

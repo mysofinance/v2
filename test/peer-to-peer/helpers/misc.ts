@@ -331,32 +331,35 @@ export type QuoteBounds = {
   minFee: BigNumber
   minApr: BigNumber
   minEarliestRepayTenor: BigNumber
-  minLoanPerCollUnitOrLtv: BigNumber
-  maxLoanPerCollUnitOrLtv: BigNumber
+  minLtv: BigNumber
+  maxLtv: BigNumber
 }
 
-export const encodeGlobalPolicy = (allowAllPairs: boolean, requiresOracle: boolean, quoteBounds: QuoteBounds): string => {
+export const encodeGlobalPolicy = (quoteBounds: QuoteBounds, requiresOracle: boolean): string => {
   return ethers.utils.defaultAbiCoder.encode(
     [
-      'bool allowAllPairs',
-      'bool requiresOracle',
-      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
+      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLtv, uint128 maxLtv) quoteBounds',
+      'bool requiresOracle'
     ],
-    [allowAllPairs, requiresOracle, quoteBounds]
+    [quoteBounds, requiresOracle]
   )
 }
 
 export const encodePairPolicy = (
+  quoteBounds: QuoteBounds,
+  minLoanPerCollUnit: BigNumber,
+  maxLoanPerCollUnit: BigNumber,
   requiresOracle: boolean,
-  minNumOfSignersOverwrite: number,
-  quoteBounds: QuoteBounds
+  minNumOfSignersOverwrite: number
 ): string => {
   return ethers.utils.defaultAbiCoder.encode(
     [
+      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLtv, uint128 maxLtv) quoteBounds',
+      'uint128 minLoanPerCollUnit',
+      'uint128 maxLoanPerCollUnit',
       'bool requiresOracle',
-      'uint8 minNumOfSignersOverwrite',
-      'tuple(uint32 minTenor, uint32 maxTenor, uint80 minFee, int80 minApr, uint32 minEarliestRepayTenor, uint128 minLoanPerCollUnitOrLtv, uint128 maxLoanPerCollUnitOrLtv) quoteBounds'
+      'uint8 minNumOfSignersOverwrite'
     ],
-    [requiresOracle, minNumOfSignersOverwrite, quoteBounds]
+    [quoteBounds, minLoanPerCollUnit, maxLoanPerCollUnit, requiresOracle, minNumOfSignersOverwrite]
   )
 }

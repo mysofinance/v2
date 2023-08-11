@@ -26,6 +26,9 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         addressRegistry = _addressRegistry;
     }
 
+    // @dev: When no global policy is set (default case), all pairs are automatically blocked except
+    // for those where a pair policy is explicitly set. In the case where a global policy is set,
+    // all pairs are assumed to be allowed (no blocking).
     function setGlobalPolicy(
         address lenderVault,
         bytes calldata globalPolicyData
@@ -42,7 +45,6 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             DataTypesBasicPolicies.GlobalPolicy
                 memory currGlobalPolicy = _globalQuotingPolicies[lenderVault];
             if (
-                globalPolicy.allowAllPairs == currGlobalPolicy.allowAllPairs &&
                 globalPolicy.requiresOracle ==
                 currGlobalPolicy.requiresOracle &&
                 _equalQuoteBounds(
@@ -67,6 +69,9 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         emit GlobalPolicySet(lenderVault, globalPolicyData);
     }
 
+    // @dev: If no global policy is set, then setting a pair policy allows one to explicitly unblock a specific pair;
+    // in the other case where a global policy is set, setting a pair policy allows overwriting global policy
+    // parameters as well as overwriting minimum signer threshold requirements.
     function setPairPolicy(
         address lenderVault,
         address collToken,
@@ -96,6 +101,10 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 currSinglePolicy.requiresOracle &&
                 singlePolicy.minNumOfSignersOverwrite ==
                 currSinglePolicy.minNumOfSignersOverwrite &&
+                singlePolicy.minLoanPerCollUnit ==
+                currSinglePolicy.minLoanPerCollUnit &&
+                singlePolicy.maxLoanPerCollUnit ==
+                currSinglePolicy.maxLoanPerCollUnit &&
                 _equalQuoteBounds(
                     singlePolicy.quoteBounds,
                     currSinglePolicy.quoteBounds
@@ -104,6 +113,13 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 revert Errors.PolicyAlreadySet();
             }
             _checkNewQuoteBounds(singlePolicy.quoteBounds);
+            if (
+                singlePolicy.minLoanPerCollUnit == 0 ||
+                singlePolicy.minLoanPerCollUnit >
+                singlePolicy.maxLoanPerCollUnit
+            ) {
+                revert Errors.InvalidLoanPerCollBounds();
+            }
             if (!_hasSingleQuotingPolicy[loanToken]) {
                 _hasSingleQuotingPolicy[loanToken] = true;
             }
@@ -135,31 +151,30 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         bool hasPairPolicy = _hasPairQuotingPolicy[lenderVault][
             generalQuoteInfo.collToken
         ][generalQuoteInfo.loanToken];
-        if (!globalPolicy.allowAllPairs && !hasPairPolicy) {
+        if (!_hasGlobalQuotingPolicy[lenderVault] && !hasPairPolicy) {
             return (false, 0);
         }
 
         // @dev: pair policy (if defined) takes precedence over global policy
         bool hasOracle = generalQuoteInfo.oracleAddr != address(0);
+        bool checkLoanPerColl;
         bool requiresOracle;
+        uint256[2] memory minMaxLoanPerCollUnit;
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds;
-        bool checkLoanPerCollUnitOrLtv;
         if (hasPairPolicy) {
             DataTypesBasicPolicies.PairPolicy
                 memory singlePolicy = _pairQuotingPolicies[lenderVault][
                     generalQuoteInfo.collToken
                 ][generalQuoteInfo.loanToken];
-            requiresOracle = singlePolicy.requiresOracle;
             quoteBounds = singlePolicy.quoteBounds;
-            // @dev: in case of pair policy always check against min/max loanPerCollUnitOrLtv
-            checkLoanPerCollUnitOrLtv = true;
+            minMaxLoanPerCollUnit[0] = singlePolicy.minLoanPerCollUnit;
+            minMaxLoanPerCollUnit[1] = singlePolicy.maxLoanPerCollUnit;
+            requiresOracle = singlePolicy.requiresOracle;
             minNumOfSignersOverwrite = singlePolicy.minNumOfSignersOverwrite;
+            checkLoanPerColl = !hasOracle;
         } else {
-            requiresOracle = globalPolicy.requiresOracle;
             quoteBounds = globalPolicy.quoteBounds;
-            // @dev: in case of global policy, only check against global min/max loanPerCollUnitOrLtv if
-            // pair has oracle
-            checkLoanPerCollUnitOrLtv = hasOracle;
+            requiresOracle = globalPolicy.requiresOracle;
         }
 
         if (requiresOracle && !hasOracle) {
@@ -169,9 +184,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         return (
             _isAllowedWithBounds(
                 quoteBounds,
+                minMaxLoanPerCollUnit,
                 quoteTuple,
                 generalQuoteInfo.earliestRepayTenor,
-                checkLoanPerCollUnitOrLtv
+                hasOracle,
+                checkLoanPerColl
             ),
             minNumOfSignersOverwrite
         );
@@ -229,10 +246,8 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             quoteBounds1.maxTenor == quoteBounds2.maxTenor &&
             quoteBounds1.minFee == quoteBounds2.minFee &&
             quoteBounds1.minApr == quoteBounds2.minApr &&
-            quoteBounds1.minLoanPerCollUnitOrLtv ==
-            quoteBounds2.minLoanPerCollUnitOrLtv &&
-            quoteBounds1.maxLoanPerCollUnitOrLtv ==
-            quoteBounds2.maxLoanPerCollUnitOrLtv
+            quoteBounds1.minLtv == quoteBounds2.minLtv &&
+            quoteBounds1.maxLtv == quoteBounds2.maxLtv
         ) {
             isEqual = true;
         }
@@ -243,24 +258,29 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
     ) internal pure {
         // @dev: allow minTenor == 0 to enable swaps
         if (quoteBounds.minTenor > quoteBounds.maxTenor) {
-            revert Errors.InvalidTenors();
+            revert Errors.InvalidTenorBounds();
         }
         if (
-            quoteBounds.minLoanPerCollUnitOrLtv >
-            quoteBounds.maxLoanPerCollUnitOrLtv
+            quoteBounds.minLtv == 0 || quoteBounds.minLtv > quoteBounds.maxLtv
         ) {
-            revert Errors.InvalidLoanPerCollOrLtv();
+            revert Errors.InvalidLtvBounds();
         }
         if (quoteBounds.minApr + int(Constants.BASE) <= 0) {
             revert Errors.InvalidMinApr();
+        }
+        // @dev: if minFee = BASE, then only swaps will be allowed
+        if (quoteBounds.minFee > Constants.BASE) {
+            revert Errors.InvalidMinFee();
         }
     }
 
     function _isAllowedWithBounds(
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds,
+        uint256[2] memory minMaxLoanPerCollUnit,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         uint256 earliestRepayTenor,
-        bool checkLoanPerCollUnitOrLtv
+        bool checkLtv,
+        bool checkLoanPerColl
     ) internal pure returns (bool) {
         if (
             quoteTuple.tenor < quoteBounds.minTenor ||
@@ -269,12 +289,19 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             return false;
         }
 
-        if (
-            checkLoanPerCollUnitOrLtv &&
-            (quoteTuple.loanPerCollUnitOrLtv <
-                quoteBounds.minLoanPerCollUnitOrLtv ||
-                quoteTuple.loanPerCollUnitOrLtv >
-                quoteBounds.maxLoanPerCollUnitOrLtv)
+        if (checkLtv) {
+            // @dev: check either against LTV bounds
+            if (
+                quoteTuple.loanPerCollUnitOrLtv < quoteBounds.minLtv ||
+                quoteTuple.loanPerCollUnitOrLtv > quoteBounds.maxLtv
+            ) {
+                return false;
+            }
+        } else if (
+            // @dev: only check against absolute loan-per-coll bounds on pair policy and if no oracle
+            checkLoanPerColl &&
+            (quoteTuple.loanPerCollUnitOrLtv < minMaxLoanPerCollUnit[0] ||
+                quoteTuple.loanPerCollUnitOrLtv > minMaxLoanPerCollUnit[1])
         ) {
             return false;
         }
@@ -294,10 +321,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             ) {
                 return false;
             }
-        }
 
-        if (quoteTuple.upfrontFeePctInBase < quoteBounds.minFee) {
-            return false;
+            // @dev: only check upfront fee for loans (can skip for swaps where tenor=0)
+            if (quoteTuple.upfrontFeePctInBase < quoteBounds.minFee) {
+                return false;
+            }
         }
 
         return true;

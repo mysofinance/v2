@@ -27,7 +27,6 @@ contract AddressRegistry is Initializable, Ownable2Step, IAddressRegistry {
     address public borrowerGateway;
     address public quoteHandler;
     address public mysoTokenManager;
-    address public quotePolicyManager;
     address public erc721Wrapper;
     address public erc20Wrapper;
     mapping(address => bool) public isRegisteredVault;

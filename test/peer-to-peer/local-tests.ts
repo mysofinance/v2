@@ -16,6 +16,7 @@ const BASE = ethers.BigNumber.from(10).pow(18)
 const ONE_USDC = ethers.BigNumber.from(10).pow(6)
 const ONE_WETH = ethers.BigNumber.from(10).pow(18)
 const MAX_UINT256 = ethers.BigNumber.from(2).pow(256).sub(1)
+const MAX_UINT128 = ethers.BigNumber.from(2).pow(128).sub(1)
 const ONE_DAY = ethers.BigNumber.from(60 * 60 * 24)
 const ZERO_BYTES32 = ethers.utils.formatBytes32String('')
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
@@ -1807,11 +1808,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       )
 
       // reverts when trying to remove with signer idx that is out-of-bounds
-      let numSigners = Number((await lenderVault.numSigners()).toString())
-      await expect(lenderVault.connect(lender).removeSigner(borrower.address, numSigners)).to.be.revertedWithCustomError(
-        lenderVault,
-        'InvalidArrayIndex'
-      )
+      let totalNumSigners = Number((await lenderVault.totalNumSigners()).toString())
+      await expect(
+        lenderVault.connect(lender).removeSigner(borrower.address, totalNumSigners)
+      ).to.be.revertedWithCustomError(lenderVault, 'InvalidArrayIndex')
 
       // reverts when trying to remove unknown signer address
       await expect(lenderVault.connect(lender).removeSigner(weth.address, 0)).to.be.revertedWithCustomError(
@@ -1830,10 +1830,10 @@ describe('Peer-to-Peer: Local Tests', function () {
       await lenderVault.connect(lender).removeSigner(signerAddr, 0)
 
       // remove all signers (always remove last one to test edge case handling)
-      numSigners = Number((await lenderVault.numSigners()).toString())
-      for (let i = 0; i < numSigners; i++) {
-        const lastSignerAddr = await lenderVault.signers(numSigners - i - 1)
-        await lenderVault.connect(lender).removeSigner(lastSignerAddr, numSigners - i - 1)
+      totalNumSigners = Number((await lenderVault.totalNumSigners()).toString())
+      for (let i = 0; i < totalNumSigners; i++) {
+        const lastSignerAddr = await lenderVault.signers(totalNumSigners - i - 1)
+        await lenderVault.connect(lender).removeSigner(lastSignerAddr, totalNumSigners - i - 1)
       }
 
       // set borrower whitelist
@@ -3368,6 +3368,12 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       expect(await quoteHandler.getOnChainQuoteHistoryLength(lenderVault.address)).to.equal(0)
 
+      // check revert on empty history
+      await expect(quoteHandler.getOnChainQuoteHistorySlice(lenderVault.address, 0, 0)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'InvalidArrayIndex'
+      )
+
       await expect(quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)).to.emit(
         quoteHandler,
         'OnChainQuoteAdded'
@@ -3379,7 +3385,19 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      const quoteHashAndValidUntilArr = await quoteHandler.getFullOnChainQuoteHistory(lenderVault.address)
+      const emptyHistory1 = await quoteHandler.getOnChainQuoteHistorySlice(lenderVault.address, 0, 0)
+      expect(emptyHistory1.length).to.be.equal(0)
+
+      const emptyHistory2 = await quoteHandler.getOnChainQuoteHistorySlice(lenderVault.address, 1, 1)
+      expect(emptyHistory2.length).to.be.equal(0)
+
+      // start idx > history length should revert
+      await expect(quoteHandler.getOnChainQuoteHistorySlice(lenderVault.address, 2, 3)).to.be.revertedWithCustomError(
+        quoteHandler,
+        'InvalidArrayIndex'
+      )
+
+      const quoteHashAndValidUntilArr = await quoteHandler.getOnChainQuoteHistorySlice(lenderVault.address, 0, 2)
       const historyLen = await quoteHandler.getOnChainQuoteHistoryLength(lenderVault.address)
 
       expect(quoteHashAndValidUntilArr.length).to.equal(2)
@@ -3431,6 +3449,15 @@ describe('Peer-to-Peer: Local Tests', function () {
         salt: ZERO_BYTES32
       }
 
+      // new quote to with same valid until
+      let onChainQuote2 = {
+        ...onChainQuote,
+        generalQuoteInfo: {
+          ...onChainQuote.generalQuoteInfo,
+          earliestRepayTenor: ONE_DAY.mul(2)
+        }
+      }
+
       await expect(
         quoteHandler.connect(lender).publishOnChainQuote({
           ...onChainQuote,
@@ -3446,9 +3473,25 @@ describe('Peer-to-Peer: Local Tests', function () {
         return x.event === 'OnChainQuotePublished'
       })
 
+      const proposedQuoteTransaction2 = await quoteHandler.connect(borrower).publishOnChainQuote(onChainQuote2)
+
+      const proposedQuoteReceipt2 = await proposedQuoteTransaction2.wait()
+
+      const proposeQuoteEvent2 = proposedQuoteReceipt2.events?.find(x => {
+        return x.event === 'OnChainQuotePublished'
+      })
+
       const proposedOnChainQuoteHash = proposeQuoteEvent?.args?.onChainQuoteHash || ZERO_BYTES32
 
+      const proposedOnChainQuoteHash2 = proposeQuoteEvent2?.args?.onChainQuoteHash || ZERO_BYTES32
+
       expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
+
+      expect(await quoteHandler.publishedOnChainQuoteValidUntil(proposedOnChainQuoteHash)).to.equal(timestamp + 60)
+
+      expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash2)).to.be.true
+
+      expect(await quoteHandler.publishedOnChainQuoteValidUntil(proposedOnChainQuoteHash2)).to.equal(timestamp + 60)
 
       await expect(
         quoteHandler.connect(borrower).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
@@ -3459,6 +3502,8 @@ describe('Peer-to-Peer: Local Tests', function () {
       ).to.emit(quoteHandler, 'OnChainQuoteCopied')
 
       expect(await quoteHandler.isPublishedOnChainQuote(proposedOnChainQuoteHash)).to.be.true
+
+      expect(await quoteHandler.publishedOnChainQuoteValidUntil(proposedOnChainQuoteHash)).to.equal(timestamp + 60)
 
       await expect(
         quoteHandler.connect(lender).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash)
@@ -3472,6 +3517,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         quoteHandler.connect(lender).addOnChainQuote(lenderVault.address, onChainQuote)
       ).to.be.revertedWithCustomError(quoteHandler, 'OnChainQuoteAlreadyAdded')
+
+      // move forward in time to make quote invalid
+      await ethers.provider.send('evm_increaseTime', [61])
+
+      // second proposed quote copy should revert since valid until has passed
+      await expect(
+        quoteHandler.connect(lender).copyPublishedOnChainQuote(lenderVault.address, proposedOnChainQuoteHash2)
+      ).to.be.revertedWithCustomError(quoteHandler, 'InvalidQuote')
     })
   })
 
@@ -5977,6 +6030,18 @@ describe('Peer-to-Peer: Local Tests', function () {
           interestRatePctInBase: BASE.div(10),
           upfrontFeePctInBase: BASE.div(10),
           tenor: ONE_DAY.mul(30)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(400),
+          interestRatePctInBase: BASE.div(10),
+          upfrontFeePctInBase: BASE.div(10),
+          tenor: ONE_DAY.mul(30)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(2001),
+          interestRatePctInBase: BASE.div(10),
+          upfrontFeePctInBase: BASE.div(10),
+          tenor: ONE_DAY.mul(30)
         }
       ]
       let onChainQuote1 = {
@@ -6008,15 +6073,16 @@ describe('Peer-to-Peer: Local Tests', function () {
         minFee: ethers.BigNumber.from(0),
         minApr: ethers.BigNumber.from(0),
         minEarliestRepayTenor: ethers.BigNumber.from(0),
-        minLoanPerCollUnitOrLtv: BASE.div(10),
-        maxLoanPerCollUnitOrLtv: BASE.div(2)
+        minLtv: BASE.div(10),
+        maxLtv: BASE.div(2)
       }
 
-      const globalPolicyData = encodeGlobalPolicy(true, false, quoteBounds)
+      const globalPolicyData = encodeGlobalPolicy(quoteBounds, false)
 
-      const pairPolicyData = encodePairPolicy(true, 1, quoteBounds)
+      const minLoanPerColl = quoteTuples1[1].loanPerCollUnitOrLtv.add(1)
+      const pairPolicyData = encodePairPolicy(quoteBounds, minLoanPerColl, ONE_USDC.mul(2000), false, 1)
 
-      //should revert if unregistered vault
+      // should revert if unregistered vault
       await expect(
         basicPolicyManager.connect(team).setPairPolicy(borrower.address, weth.address, usdc.address, pairPolicyData)
       ).to.be.revertedWithCustomError(basicPolicyManager, 'UnregisteredVault')
@@ -6024,6 +6090,50 @@ describe('Peer-to-Peer: Local Tests', function () {
       // should revert if sender is not vault owner
       await expect(
         basicPolicyManager.connect(borrower).setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
+
+      // should revert with invalid loan-per-coll bounds
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ethers.BigNumber.from(0), ethers.BigNumber.from(1), false, 1)
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollBounds')
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ethers.BigNumber.from(1), ethers.BigNumber.from(0), false, 1)
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollBounds')
+
+      // should revert with invalid min/max loan per coll
+      await expect(
+        basicPolicyManager
+          .connect(borrower)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ONE_USDC.mul(0), ONE_USDC.mul(2000), false, 1)
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
+      await expect(
+        basicPolicyManager
+          .connect(borrower)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ONE_USDC.mul(2100), ONE_USDC.mul(2000), false, 1)
+          )
       ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
 
       // should revert if unregistered vault
@@ -6081,33 +6191,62 @@ describe('Peer-to-Peer: Local Tests', function () {
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
 
+      // set pair policy with loan-per-coll unit bounds
+      await basicPolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
+
+      // should revert with 2nd quote tuple where loan-per-coll unit is below bound
+      await expect(
+        borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, 1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // should revert with 3rd quote tuple where loan-per-coll unit is above bound
+      await expect(
+        borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, 2)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // delete pair policy again
+      await basicPolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, '0x')
+
       await expect(
         basicPolicyManager
           .connect(lender)
-          .setGlobalPolicy(
-            lenderVault.address,
-            encodeGlobalPolicy(true, false, { ...quoteBounds, minTenor: ONE_DAY.mul(40) })
-          )
-      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidTenors')
+          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, minTenor: ONE_DAY.mul(40) }, false))
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidTenorBounds')
+
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, minLtv: BASE }, false))
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLtvBounds')
 
       await expect(
         basicPolicyManager
           .connect(lender)
           .setGlobalPolicy(
             lenderVault.address,
-            encodeGlobalPolicy(true, false, { ...quoteBounds, minLoanPerCollUnitOrLtv: BASE })
+            encodeGlobalPolicy({ ...quoteBounds, minLtv: ethers.BigNumber.from(0) }, false)
           )
-      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollOrLtv')
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLtvBounds')
 
       await expect(
         basicPolicyManager
           .connect(lender)
-          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(true, false, { ...quoteBounds, minApr: BASE.mul(-2) }))
+          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds }, false))
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'PolicyAlreadySet')
+
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, minApr: BASE.mul(-2) }, false))
       ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidMinApr')
 
-      await basicPolicyManager
-        .connect(lender)
-        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(true, true, quoteBounds))
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, minFee: BASE.add(1) }, false))
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidMinFee')
+
+      await basicPolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(quoteBounds, true))
 
       // borrow should fail without oracle address
       await expect(
@@ -6118,7 +6257,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       await basicPolicyManager
         .connect(lender)
-        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(true, false, { ...quoteBounds, minTenor: ONE_DAY.mul(35) }))
+        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, minTenor: ONE_DAY.mul(35) }, false))
 
       // borrow fail if tenor less than min tenor
       await expect(
@@ -6129,7 +6268,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       await basicPolicyManager
         .connect(lender)
-        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(true, false, { ...quoteBounds, maxTenor: ONE_DAY.mul(25) }))
+        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, maxTenor: ONE_DAY.mul(25) }, false))
 
       // borrow fail if tenor greater than max tenor
       await expect(
@@ -6140,10 +6279,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       await basicPolicyManager
         .connect(lender)
-        .setGlobalPolicy(
-          lenderVault.address,
-          encodeGlobalPolicy(true, false, { ...quoteBounds, minFee: BASE.mul(9).div(10) })
-        )
+        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, minFee: BASE.mul(9).div(10) }, false))
 
       // borrow should fail if upfront fee is below min fee
       await expect(
@@ -6154,7 +6290,7 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       await basicPolicyManager
         .connect(lender)
-        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy(true, false, { ...quoteBounds, minApr: BASE.mul(10) }))
+        .setGlobalPolicy(lenderVault.address, encodeGlobalPolicy({ ...quoteBounds, minApr: BASE.mul(10) }, false))
 
       // borrow should fail if apr is below min apr
       await expect(
@@ -6163,34 +6299,36 @@ describe('Peer-to-Peer: Local Tests', function () {
           .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
-      await basicPolicyManager
-        .connect(lender)
-        .setGlobalPolicy(
-          lenderVault.address,
-          encodeGlobalPolicy(true, false, {
+      await basicPolicyManager.connect(lender).setGlobalPolicy(
+        lenderVault.address,
+        encodeGlobalPolicy(
+          {
             ...quoteBounds,
-            minLoanPerCollUnitOrLtv: BASE.mul(4).div(5),
-            maxLoanPerCollUnitOrLtv: BASE.mul(9).div(10)
-          })
+            minLtv: BASE.mul(4).div(5),
+            maxLtv: BASE.mul(9).div(10)
+          },
+          false
         )
+      )
 
-      // borrow should go through even if loanPerCollUnitOrLtv is below minLoanPerCollUnitOrLtv if no oracle required
+      // borrow should go through even if loanPerCollUnitOrLtv is below min LTV if no oracle required
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
 
-      await basicPolicyManager
-        .connect(lender)
-        .setGlobalPolicy(
-          lenderVault.address,
-          encodeGlobalPolicy(true, false, {
+      await basicPolicyManager.connect(lender).setGlobalPolicy(
+        lenderVault.address,
+        encodeGlobalPolicy(
+          {
             ...quoteBounds,
-            minLoanPerCollUnitOrLtv: ethers.BigNumber.from(0),
-            maxLoanPerCollUnitOrLtv: ethers.BigNumber.from(0)
-          })
+            minLtv: ethers.BigNumber.from(1),
+            maxLtv: ethers.BigNumber.from(1)
+          },
+          false
         )
+      )
 
-      // borrow should go through even if loanPerCollUnitOrLtv is above maxLoanPerCollUnitOrLtv if no oracle required
+      // borrow should go through even if loanPerCollUnitOrLtv is above maxLtv if no oracle required
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
@@ -6227,16 +6365,17 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      await basicPolicyManager
-        .connect(lender)
-        .setGlobalPolicy(
-          lenderVault.address,
-          encodeGlobalPolicy(true, false, {
+      await basicPolicyManager.connect(lender).setGlobalPolicy(
+        lenderVault.address,
+        encodeGlobalPolicy(
+          {
             ...quoteBounds,
             minApr: BASE.mul(-99).div(100),
             minEarliestRepayTenor: ONE_DAY.mul(20)
-          })
+          },
+          false
         )
+      )
 
       // borrow with negative interest rate should fail if earliest min repay is too short
       await expect(
