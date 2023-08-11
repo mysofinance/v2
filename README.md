@@ -238,8 +238,8 @@ File                                                     |  % Stmts | % Branch |
   OracleLibrary.sol                                      |      100 |    66.67 |      100 |      100 |                |
   TickMath.sol                                           |      100 |    80.43 |      100 |    84.09 |... 63,65,67,73 |
   TwapGetter.sol                                         |      100 |     62.5 |      100 |    93.33 |             57 |
- contracts\peer-to-peer\policyManagers\                  |      100 |    94.44 |      100 |    98.95 |                |
-  BasicQuotePolicyManager.sol                            |      100 |    94.44 |      100 |    98.95 |            121 |
+ contracts\peer-to-peer\policyManagers\                  |      100 |      100 |      100 |      100 |                |
+  BasicQuotePolicyManager.sol                            |      100 |      100 |      100 |      100 |                |
   DataTypesBasicPolicies.sol                             |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\wrappers\ERC20\                  |      100 |    83.33 |      100 |    98.88 |                |
   ERC20Wrapper.sol                                       |      100 |       75 |      100 |    96.88 |             45 |
@@ -257,6 +257,6 @@ File                                                     |  % Stmts | % Branch |
   IFundingPoolImpl.sol                                   |      100 |      100 |      100 |      100 |                |
   ILoanProposalImpl.sol                                  |      100 |      100 |      100 |      100 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    99.08 |    89.33 |    98.74 |    96.78 |                |
+All files                                                |    99.08 |     89.7 |    98.74 |    96.84 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```

@@ -6036,6 +6036,12 @@ describe('Peer-to-Peer: Local Tests', function () {
           interestRatePctInBase: BASE.div(10),
           upfrontFeePctInBase: BASE.div(10),
           tenor: ONE_DAY.mul(30)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(2001),
+          interestRatePctInBase: BASE.div(10),
+          upfrontFeePctInBase: BASE.div(10),
+          tenor: ONE_DAY.mul(30)
         }
       ]
       let onChainQuote1 = {
@@ -6085,6 +6091,28 @@ describe('Peer-to-Peer: Local Tests', function () {
       await expect(
         basicPolicyManager.connect(borrower).setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
       ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
+
+      // should revert with invalid loan-per-coll bounds
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ethers.BigNumber.from(0), ethers.BigNumber.from(1), false, 1)
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollBounds')
+      await expect(
+        basicPolicyManager
+          .connect(lender)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ethers.BigNumber.from(1), ethers.BigNumber.from(0), false, 1)
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidLoanPerCollBounds')
 
       // should revert with invalid min/max loan per coll
       await expect(
@@ -6166,9 +6194,14 @@ describe('Peer-to-Peer: Local Tests', function () {
       // set pair policy with loan-per-coll unit bounds
       await basicPolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
 
-      // should revert with 2nd quote tuple where loan-per-coll unit is out of bounds
+      // should revert with 2nd quote tuple where loan-per-coll unit is below bound
       await expect(
         borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, 1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // should revert with 3rd quote tuple where loan-per-coll unit is above bound
+      await expect(
+        borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, 2)
       ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
 
       // delete pair policy again
