@@ -254,7 +254,7 @@ interface IQuoteHandler {
      * @param endIdx ending index of on chain quote history array (non-inclusive)
      * @return array of quote hash and validUntil data for on-chain quote history of a vault
      */
-    function getFullOnChainQuoteHistory(
+    function getOnChainQuoteHistorySlice(
         address lenderVault,
         uint256 startIdx,
         uint256 endIdx

@@ -24,7 +24,7 @@ contract QuoteHandler is IQuoteHandler {
     mapping(bytes32 => uint256) public publishedOnChainQuoteValidUntil;
     mapping(address => address) public quotePolicyManagerForVault;
     mapping(address => DataTypesPeerToPeer.OnChainQuoteInfo[])
-        internal onChainQuoteHistory;
+        internal _onChainQuoteHistory;
 
     constructor(address _addressRegistry) {
         if (_addressRegistry == address(0)) {
@@ -48,7 +48,7 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.OnChainQuoteAlreadyAdded();
         }
         // @dev: on-chain quote history is append only
-        onChainQuoteHistory[lenderVault].push(
+        _onChainQuoteHistory[lenderVault].push(
             DataTypesPeerToPeer.OnChainQuoteInfo({
                 quoteHash: onChainQuoteHash,
                 validUntil: onChainQuote.generalQuoteInfo.validUntil
@@ -78,7 +78,7 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.UnknownOnChainQuote();
         }
         // @dev: on-chain quote history is append only
-        onChainQuoteHistory[lenderVault].push(
+        _onChainQuoteHistory[lenderVault].push(
             DataTypesPeerToPeer.OnChainQuoteInfo({
                 quoteHash: newOnChainQuoteHash,
                 validUntil: newOnChainQuote.generalQuoteInfo.validUntil
@@ -125,7 +125,7 @@ contract QuoteHandler is IQuoteHandler {
             revert Errors.InvalidQuote();
         }
         // @dev: on-chain quote history is append only
-        onChainQuoteHistory[lenderVault].push(
+        _onChainQuoteHistory[lenderVault].push(
             DataTypesPeerToPeer.OnChainQuoteInfo({
                 quoteHash: onChainQuoteHash,
                 validUntil: validUntil
@@ -298,30 +298,35 @@ contract QuoteHandler is IQuoteHandler {
         address lenderVault,
         uint256 idx
     ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo memory) {
-        if (idx < onChainQuoteHistory[lenderVault].length) {
-            return onChainQuoteHistory[lenderVault][idx];
+        if (idx < _onChainQuoteHistory[lenderVault].length) {
+            return _onChainQuoteHistory[lenderVault][idx];
         } else {
             revert Errors.InvalidArrayIndex();
         }
     }
 
-    function getFullOnChainQuoteHistory(
+    function getOnChainQuoteHistorySlice(
         address lenderVault,
         uint256 startIdx,
         uint256 endIdx
     ) external view returns (DataTypesPeerToPeer.OnChainQuoteInfo[] memory) {
-        if (
-            startIdx >= endIdx ||
-            endIdx > onChainQuoteHistory[lenderVault].length
-        ) {
+        uint256 onChainQuoteHistoryLen = _onChainQuoteHistory[lenderVault]
+            .length;
+        if (startIdx > endIdx || startIdx >= onChainQuoteHistoryLen) {
             revert Errors.InvalidArrayIndex();
+        }
+        endIdx = endIdx < onChainQuoteHistoryLen
+            ? endIdx
+            : onChainQuoteHistoryLen;
+        if (startIdx == 0 && endIdx == onChainQuoteHistoryLen) {
+            return _onChainQuoteHistory[lenderVault];
         }
         DataTypesPeerToPeer.OnChainQuoteInfo[]
             memory onChainQuoteHistoryRequested = new DataTypesPeerToPeer.OnChainQuoteInfo[](
                 endIdx - startIdx
             );
         for (uint256 i = startIdx; i < endIdx; ) {
-            onChainQuoteHistoryRequested[i - startIdx] = onChainQuoteHistory[
+            onChainQuoteHistoryRequested[i - startIdx] = _onChainQuoteHistory[
                 lenderVault
             ][i];
             unchecked {
@@ -334,7 +339,7 @@ contract QuoteHandler is IQuoteHandler {
     function getOnChainQuoteHistoryLength(
         address lenderVault
     ) external view returns (uint256) {
-        return onChainQuoteHistory[lenderVault].length;
+        return _onChainQuoteHistory[lenderVault].length;
     }
 
     /**

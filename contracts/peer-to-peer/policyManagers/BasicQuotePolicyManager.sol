@@ -101,6 +101,10 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 currSinglePolicy.requiresOracle &&
                 singlePolicy.minNumOfSignersOverwrite ==
                 currSinglePolicy.minNumOfSignersOverwrite &&
+                singlePolicy.minLoanPerCollUnit ==
+                currSinglePolicy.minLoanPerCollUnit &&
+                singlePolicy.maxLoanPerCollUnit ==
+                currSinglePolicy.maxLoanPerCollUnit &&
                 _equalQuoteBounds(
                     singlePolicy.quoteBounds,
                     currSinglePolicy.quoteBounds
@@ -109,6 +113,13 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
                 revert Errors.PolicyAlreadySet();
             }
             _checkNewQuoteBounds(singlePolicy.quoteBounds);
+            if (
+                singlePolicy.minLoanPerCollUnit == 0 ||
+                singlePolicy.minLoanPerCollUnit >
+                singlePolicy.maxLoanPerCollUnit
+            ) {
+                revert Errors.InvalidLoanPerCollBounds();
+            }
             if (!_hasSingleQuotingPolicy[loanToken]) {
                 _hasSingleQuotingPolicy[loanToken] = true;
             }
@@ -146,19 +157,24 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
 
         // @dev: pair policy (if defined) takes precedence over global policy
         bool hasOracle = generalQuoteInfo.oracleAddr != address(0);
+        bool checkLoanPerColl;
         bool requiresOracle;
+        uint256[2] memory minMaxLoanPerCollUnit;
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds;
         if (hasPairPolicy) {
             DataTypesBasicPolicies.PairPolicy
                 memory singlePolicy = _pairQuotingPolicies[lenderVault][
                     generalQuoteInfo.collToken
                 ][generalQuoteInfo.loanToken];
-            requiresOracle = singlePolicy.requiresOracle;
             quoteBounds = singlePolicy.quoteBounds;
+            minMaxLoanPerCollUnit[0] = singlePolicy.minLoanPerCollUnit;
+            minMaxLoanPerCollUnit[1] = singlePolicy.maxLoanPerCollUnit;
+            requiresOracle = singlePolicy.requiresOracle;
             minNumOfSignersOverwrite = singlePolicy.minNumOfSignersOverwrite;
+            checkLoanPerColl = !hasOracle;
         } else {
-            requiresOracle = globalPolicy.requiresOracle;
             quoteBounds = globalPolicy.quoteBounds;
+            requiresOracle = globalPolicy.requiresOracle;
         }
 
         if (requiresOracle && !hasOracle) {
@@ -168,10 +184,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
         return (
             _isAllowedWithBounds(
                 quoteBounds,
+                minMaxLoanPerCollUnit,
                 quoteTuple,
                 generalQuoteInfo.earliestRepayTenor,
                 hasOracle,
-                !hasOracle && !hasPairPolicy
+                checkLoanPerColl
             ),
             minNumOfSignersOverwrite
         );
@@ -230,10 +247,7 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             quoteBounds1.minFee == quoteBounds2.minFee &&
             quoteBounds1.minApr == quoteBounds2.minApr &&
             quoteBounds1.minLtv == quoteBounds2.minLtv &&
-            quoteBounds1.maxLtv == quoteBounds2.maxLtv &&
-            quoteBounds1.minLoanPerCollUnit ==
-            quoteBounds2.minLoanPerCollUnit &&
-            quoteBounds1.maxLoanPerCollUnit == quoteBounds2.maxLoanPerCollUnit
+            quoteBounds1.maxLtv == quoteBounds2.maxLtv
         ) {
             isEqual = true;
         }
@@ -244,15 +258,12 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
     ) internal pure {
         // @dev: allow minTenor == 0 to enable swaps
         if (quoteBounds.minTenor > quoteBounds.maxTenor) {
-            revert Errors.InvalidTenors();
+            revert Errors.InvalidTenorBounds();
         }
         if (
-            quoteBounds.minLtv == 0 ||
-            quoteBounds.minLoanPerCollUnit == 0 ||
-            quoteBounds.minLtv > quoteBounds.maxLtv ||
-            quoteBounds.minLoanPerCollUnit > quoteBounds.maxLoanPerCollUnit
+            quoteBounds.minLtv == 0 || quoteBounds.minLtv > quoteBounds.maxLtv
         ) {
-            revert Errors.InvalidLoanPerCollOrLtv();
+            revert Errors.InvalidLtvBounds();
         }
         if (quoteBounds.minApr + int(Constants.BASE) <= 0) {
             revert Errors.InvalidMinApr();
@@ -265,10 +276,11 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
 
     function _isAllowedWithBounds(
         DataTypesBasicPolicies.QuoteBounds memory quoteBounds,
+        uint256[2] memory minMaxLoanPerCollUnit,
         DataTypesPeerToPeer.QuoteTuple calldata quoteTuple,
         uint256 earliestRepayTenor,
         bool checkLtv,
-        bool skipLoanPerCollCheck
+        bool checkLoanPerColl
     ) internal pure returns (bool) {
         if (
             quoteTuple.tenor < quoteBounds.minTenor ||
@@ -277,14 +289,19 @@ contract BasicQuotePolicyManager is IQuotePolicyManager {
             return false;
         }
 
-        // @dev: if requires oracle check against LTV bounds, else against loan-per-coll bounds
-        (uint256 lowerBnd, uint256 upperBnd) = checkLtv
-            ? (quoteBounds.minLtv, quoteBounds.maxLtv)
-            : (quoteBounds.minLoanPerCollUnit, quoteBounds.maxLoanPerCollUnit);
-        if (
-            !skipLoanPerCollCheck &&
-            (quoteTuple.loanPerCollUnitOrLtv < lowerBnd ||
-                quoteTuple.loanPerCollUnitOrLtv > upperBnd)
+        if (checkLtv) {
+            // @dev: check either against LTV bounds
+            if (
+                quoteTuple.loanPerCollUnitOrLtv < quoteBounds.minLtv ||
+                quoteTuple.loanPerCollUnitOrLtv > quoteBounds.maxLtv
+            ) {
+                return false;
+            }
+        } else if (
+            // @dev: only check against absolute loan-per-coll bounds on pair policy and if no oracle
+            checkLoanPerColl &&
+            (quoteTuple.loanPerCollUnitOrLtv < minMaxLoanPerCollUnit[0] ||
+                quoteTuple.loanPerCollUnitOrLtv > minMaxLoanPerCollUnit[1])
         ) {
             return false;
         }
