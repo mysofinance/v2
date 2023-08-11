@@ -127,8 +127,10 @@ library Errors {
     error AlreadyPublished();
     error PolicyAlreadySet();
     error NoPolicyToDelete();
-    error InvalidTenors();
-    error InvalidLoanPerCollOrLtv();
+    error InvalidTenorBounds();
+    error InvalidLtvBounds();
+    error InvalidLoanPerCollBounds();
     error InvalidMinApr();
     error NoPolicy();
+    error InvalidMinFee();
 }
