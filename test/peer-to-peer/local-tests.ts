@@ -6030,6 +6030,12 @@ describe('Peer-to-Peer: Local Tests', function () {
           interestRatePctInBase: BASE.div(10),
           upfrontFeePctInBase: BASE.div(10),
           tenor: ONE_DAY.mul(30)
+        },
+        {
+          loanPerCollUnitOrLtv: ONE_USDC.mul(400),
+          interestRatePctInBase: BASE.div(10),
+          upfrontFeePctInBase: BASE.div(10),
+          tenor: ONE_DAY.mul(30)
         }
       ]
       let onChainQuote1 = {
@@ -6067,7 +6073,8 @@ describe('Peer-to-Peer: Local Tests', function () {
 
       const globalPolicyData = encodeGlobalPolicy(quoteBounds, false)
 
-      const pairPolicyData = encodePairPolicy(quoteBounds, ONE_USDC.mul(500), ONE_USDC.mul(2000), false, 1)
+      const minLoanPerColl = quoteTuples1[1].loanPerCollUnitOrLtv.add(1)
+      const pairPolicyData = encodePairPolicy(quoteBounds, minLoanPerColl, ONE_USDC.mul(2000), false, 1)
 
       // should revert if unregistered vault
       await expect(
@@ -6077,6 +6084,28 @@ describe('Peer-to-Peer: Local Tests', function () {
       // should revert if sender is not vault owner
       await expect(
         basicPolicyManager.connect(borrower).setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
+
+      // should revert with invalid min/max loan per coll
+      await expect(
+        basicPolicyManager
+          .connect(borrower)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ONE_USDC.mul(0), ONE_USDC.mul(2000), false, 1)
+          )
+      ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
+      await expect(
+        basicPolicyManager
+          .connect(borrower)
+          .setPairPolicy(
+            lenderVault.address,
+            weth.address,
+            usdc.address,
+            encodePairPolicy(quoteBounds, ONE_USDC.mul(2100), ONE_USDC.mul(2000), false, 1)
+          )
       ).to.be.revertedWithCustomError(basicPolicyManager, 'InvalidSender')
 
       // should revert if unregistered vault
@@ -6130,10 +6159,20 @@ describe('Peer-to-Peer: Local Tests', function () {
         basicPolicyManager.connect(lender).setGlobalPolicy(lenderVault.address, globalPolicyData)
       ).to.be.revertedWithCustomError(basicPolicyManager, 'PolicyAlreadySet')
 
-      console.log('ok0')
       await borrowerGateway
         .connect(borrower)
         .borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, quoteTupleIdx1)
+
+      // set pair policy with loan-per-coll unit bounds
+      await basicPolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, pairPolicyData)
+
+      // should revert with 2nd quote tuple where loan-per-coll unit is out of bounds
+      await expect(
+        borrowerGateway.connect(borrower).borrowWithOnChainQuote(lenderVault.address, borrowInstructions1, onChainQuote1, 1)
+      ).to.be.revertedWithCustomError(quoteHandler, 'QuoteViolatesPolicy')
+
+      // delete pair policy again
+      await basicPolicyManager.connect(lender).setPairPolicy(lenderVault.address, weth.address, usdc.address, '0x')
 
       await expect(
         basicPolicyManager
@@ -6239,7 +6278,6 @@ describe('Peer-to-Peer: Local Tests', function () {
         )
       )
 
-      console.log('ok1')
       // borrow should go through even if loanPerCollUnitOrLtv is below min LTV if no oracle required
       await borrowerGateway
         .connect(borrower)
@@ -6257,7 +6295,6 @@ describe('Peer-to-Peer: Local Tests', function () {
         )
       )
 
-      console.log('ok2')
       // borrow should go through even if loanPerCollUnitOrLtv is above maxLtv if no oracle required
       await borrowerGateway
         .connect(borrower)
@@ -6327,7 +6364,6 @@ describe('Peer-to-Peer: Local Tests', function () {
         'OnChainQuoteAdded'
       )
 
-      console.log('ok3')
       // borrow with negative interest rate should go through if earliest min repay is long enough
       await borrowerGateway
         .connect(borrower)

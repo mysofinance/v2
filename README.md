@@ -170,13 +170,13 @@ File                                                     |  % Stmts | % Branch |
   Helpers.sol                                            |      100 |       50 |      100 |      100 |                |
  contracts\interfaces\                                   |      100 |      100 |      100 |      100 |                |
   IMysoTokenManager.sol                                  |      100 |      100 |      100 |      100 |                |
- contracts\peer-to-peer\                                 |    99.74 |    94.61 |    98.84 |    98.66 |                |
-  AddressRegistry.sol                                    |      100 |    96.74 |      100 |    99.17 |            117 |
+ contracts\peer-to-peer\                                 |    99.75 |     94.5 |    98.82 |     98.2 |                |
+  AddressRegistry.sol                                    |      100 |    96.74 |      100 |    99.17 |            116 |
   BorrowerGateway.sol                                    |    98.57 |    90.91 |    90.91 |    96.97 |    241,317,358 |
   DataTypesPeerToPeer.sol                                |      100 |      100 |      100 |      100 |                |
   LenderVaultFactory.sol                                 |      100 |     87.5 |      100 |      100 |                |
-  LenderVaultImpl.sol                                    |      100 |     93.1 |      100 |    98.92 |         64,207 |
-  QuoteHandler.sol                                       |      100 |    96.83 |      100 |    98.91 |        266,478 |
+  LenderVaultImpl.sol                                    |      100 |     93.1 |      100 |    98.91 |         64,207 |
+  QuoteHandler.sol                                       |      100 |    96.32 |      100 |    97.46 |... 332,333,516 |
  contracts\peer-to-peer\callbacks\                       |      100 |       75 |    88.89 |    96.88 |                |
   BalancerV2Looping.sol                                  |      100 |      100 |      100 |      100 |                |
   UniV3Looping.sol                                       |      100 |      100 |      100 |      100 |                |
@@ -238,8 +238,8 @@ File                                                     |  % Stmts | % Branch |
   OracleLibrary.sol                                      |      100 |    66.67 |      100 |      100 |                |
   TickMath.sol                                           |      100 |    80.43 |      100 |    84.09 |... 63,65,67,73 |
   TwapGetter.sol                                         |      100 |     62.5 |      100 |    93.33 |             57 |
- contracts\peer-to-peer\policyManagers\                  |      100 |      100 |      100 |      100 |                |
-  BasicQuotePolicyManager.sol                            |      100 |      100 |      100 |      100 |                |
+ contracts\peer-to-peer\policyManagers\                  |      100 |    94.44 |      100 |    98.95 |                |
+  BasicQuotePolicyManager.sol                            |      100 |    94.44 |      100 |    98.95 |            121 |
   DataTypesBasicPolicies.sol                             |      100 |      100 |      100 |      100 |                |
  contracts\peer-to-peer\wrappers\ERC20\                  |      100 |    83.33 |      100 |    98.88 |                |
   ERC20Wrapper.sol                                       |      100 |       75 |      100 |    96.88 |             45 |
@@ -257,6 +257,6 @@ File                                                     |  % Stmts | % Branch |
   IFundingPoolImpl.sol                                   |      100 |      100 |      100 |      100 |                |
   ILoanProposalImpl.sol                                  |      100 |      100 |      100 |      100 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
-All files                                                |    99.07 |    89.56 |    98.74 |    96.97 |                |
+All files                                                |    99.08 |    89.33 |    98.74 |    96.78 |                |
 ---------------------------------------------------------|----------|----------|----------|----------|----------------|
 ```
