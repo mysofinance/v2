@@ -19,3 +19,6 @@ jobs:
         env:
           ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
           INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
+          LOCAL_HOST_DEPLOYER_KEY: ${{ secrets.LOCAL_HOST_DEPLOYER_KEY }}
+          SEPOLIA_DEPLOYER_KEY: ${{ secrets.SEPOLIA_DEPLOYER_KEY }}
+          MANTLE_TESTNET_DEPLOYER_KEY: ${{ secrets.MANTLE_TESTNET_DEPLOYER_KEY }}
