@@ -9,7 +9,7 @@ import {VaultCallback} from "../peer-to-peer/callbacks/VaultCallback.sol";
 import {ISwapRouter} from "../peer-to-peer/interfaces/callbacks/ISwapRouter.sol";
 import {IVaultCallback} from "../peer-to-peer/interfaces/IVaultCallback.sol";
 
-contract UniV3Looping is VaultCallback {
+contract TestnetUniV3Looping is VaultCallback {
     using SafeERC20 for IERC20Metadata;
 
     address private constant UNI_V3_SWAP_ROUTER =

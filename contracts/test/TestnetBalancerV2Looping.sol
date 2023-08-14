@@ -11,7 +11,7 @@ import {IBalancerAsset} from "../peer-to-peer/interfaces/callbacks/IBalancerAsse
 import {IBalancerVault} from "../peer-to-peer/interfaces/callbacks/IBalancerVault.sol";
 import {IVaultCallback} from "../peer-to-peer/interfaces/IVaultCallback.sol";
 
-contract BalancerV2Looping is VaultCallback {
+contract TestnetBalancerV2Looping is VaultCallback {
     using SafeERC20 for IERC20Metadata;
 
     address private constant BALANCER_V2_VAULT =
