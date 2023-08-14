@@ -15,7 +15,7 @@ contract BalancerV2Looping is VaultCallback {
     using SafeERC20 for IERC20Metadata;
 
     address private constant BALANCER_V2_VAULT =
-        0x5758059F5b5f636D4E68dD729b43729B4cF34870;
+        0xBA12222222228d8Ba445958a75a0704d566BF2C8;
 
     constructor(address _borrowerGateway) VaultCallback(_borrowerGateway) {} // solhint-disable no-empty-blocks
 

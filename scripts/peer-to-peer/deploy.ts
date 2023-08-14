@@ -155,10 +155,20 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonConfig: any
   } else {
     logger.log('Skipping testnet oracles.')
   }
+
+  logger.log('Checking whether to deploy testnet balancer callback...')
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployTestnetBalancerCallback']) {
+    deployedContracts['deployedTestnetBalancerCallback'] = await deployTestnetBalancerCallback(
+      deployer,
+      borrowerGateway,
+      addressRegistry
+    )
+  } else {
+    logger.log('Skipping callbacks.')
+  }
+
   logger.log('Checking whether to deploy callbacks...')
   if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployCallbacks']) {
-    //const borrowerGateway = await ethers.getContractAt('BorrowerGateway', "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512")
-    //const addressRegistry = await ethers.getContractAt('AddressRegistry', "0x5FbDB2315678afecb367f032d93F642f64180aa3")
     deployedContracts['deployedCallbacks'] = await deployCallbacks(deployer, borrowerGateway, addressRegistry)
   } else {
     logger.log('Skipping callbacks.')
@@ -241,6 +251,26 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonConf
     logger.log('Tokens whitelisted.')
   }
   return { testnetTokenData, tokenNamesToAddrs }
+}
+
+async function deployTestnetBalancerCallback(deployer: any, borrowerGateway: any, addressRegistry: any) {
+  let res = []
+
+  logger.log('Deploying Testnet Balancer v2 callback...')
+  const TestnetBalancerV2Looping = await ethers.getContractFactory('TestnetBalancerV2Looping')
+  await TestnetBalancerV2Looping.connect(deployer)
+  const testnetBalancerV2Looping = await TestnetBalancerV2Looping.deploy(borrowerGateway.address)
+  await testnetBalancerV2Looping.deployed()
+  res.push({ name: 'testnetBalancerV2Looping', address: testnetBalancerV2Looping.address })
+  logger.log('Testnet Balancer v2 callback deployed at:', testnetBalancerV2Looping.address)
+
+  logger.log('Setting whitelist state...')
+  await addressRegistry.connect(deployer).setWhitelistState([testnetBalancerV2Looping.address], 4)
+  logger.log('Whitelist state set.')
+
+  logger.log('Testnet Balancer v2 callback contract deployment completed.')
+
+  return res
 }
 
 async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegistry: any) {
