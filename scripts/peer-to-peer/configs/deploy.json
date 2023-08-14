@@ -18,7 +18,7 @@
             {"name": "PAXG", "symbol": "PAXG", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1941000000", "hasTransferFee": true}
         ],
         "deployTestnetOracle": true,
-        "deployTestnetBalancerCallback": true,
+        "deployTestnetCallbacks": true,
         "deployCallbacks": true,
         "deployCompartments": true
     },
@@ -38,6 +38,7 @@
         "deployTestnetOracle": false,
         "deployTestnetBalancerCallback": false,
         "deployCallbacks": false,
+        "deployTestnetCallbacks": false,
         "deployCompartments": false,
         "deployTestnetTokenManager": true
     },
@@ -52,7 +53,7 @@
             {"name": "NEXO", "symbol": "NEXO", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1941000000", "hasTransferFee": false}
         ],
         "deployTestnetOracle": false,
-        "deployTestnetBalancerCallback": false,
+        "deployTestnetCallbacks": false,
         "deployCallbacks": false,
         "deployCompartments": false,
         "deployTestnetTokenManager": false

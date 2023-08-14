@@ -156,15 +156,11 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonConfig: any
     logger.log('Skipping testnet oracles.')
   }
 
-  logger.log('Checking whether to deploy testnet balancer callback...')
-  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployTestnetBalancerCallback']) {
-    deployedContracts['deployedTestnetBalancerCallback'] = await deployTestnetBalancerCallback(
-      deployer,
-      borrowerGateway,
-      addressRegistry
-    )
+  logger.log('Checking whether to deploy testnet callbacks...')
+  if (hardhatNetworkName in jsonConfig && jsonConfig[hardhatNetworkName]['deployTestnetCallbacks']) {
+    deployedContracts['deployedTestnetCallbacks'] = await deployTestnetCallbacks(deployer, borrowerGateway, addressRegistry)
   } else {
-    logger.log('Skipping callbacks.')
+    logger.log('Skipping testnet callbacks.')
   }
 
   logger.log('Checking whether to deploy callbacks...')
@@ -253,8 +249,10 @@ async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonConf
   return { testnetTokenData, tokenNamesToAddrs }
 }
 
-async function deployTestnetBalancerCallback(deployer: any, borrowerGateway: any, addressRegistry: any) {
+async function deployTestnetCallbacks(deployer: any, borrowerGateway: any, addressRegistry: any) {
   let res = []
+
+  logger.log('Deploying testnet callback contracts...')
 
   logger.log('Deploying Testnet Balancer v2 callback...')
   const TestnetBalancerV2Looping = await ethers.getContractFactory('TestnetBalancerV2Looping')
@@ -264,11 +262,21 @@ async function deployTestnetBalancerCallback(deployer: any, borrowerGateway: any
   res.push({ name: 'testnetBalancerV2Looping', address: testnetBalancerV2Looping.address })
   logger.log('Testnet Balancer v2 callback deployed at:', testnetBalancerV2Looping.address)
 
+  logger.log('Deploying Testnet Uni v3 callback...')
+  const TestnetUniV3Looping = await ethers.getContractFactory('TestnetUniV3Looping')
+  await TestnetUniV3Looping.connect(deployer)
+  const testnetUniV3Looping = await TestnetUniV3Looping.deploy(borrowerGateway.address)
+  await testnetUniV3Looping.deployed()
+  res.push({ name: 'testnetUniV3Looping', address: testnetUniV3Looping.address })
+  logger.log('Testnet Uni v3 callback deployed at:', testnetUniV3Looping.address)
+
   logger.log('Setting whitelist state...')
-  await addressRegistry.connect(deployer).setWhitelistState([testnetBalancerV2Looping.address], 4)
+  await addressRegistry
+    .connect(deployer)
+    .setWhitelistState([testnetBalancerV2Looping.address, testnetUniV3Looping.address], 4)
   logger.log('Whitelist state set.')
 
-  logger.log('Testnet Balancer v2 callback contract deployment completed.')
+  logger.log('Testnet callback contracts deployment completed.')
 
   return res
 }
@@ -297,7 +305,7 @@ async function deployCallbacks(deployer: any, borrowerGateway: any, addressRegis
   await addressRegistry.connect(deployer).setWhitelistState([balancerV2Looping.address, uniV3Looping.address], 4)
   logger.log('Whitelist state set.')
 
-  logger.log('Callback contract deployment completed.')
+  logger.log('Callback contracts deployment completed.')
 
   return res
 }
