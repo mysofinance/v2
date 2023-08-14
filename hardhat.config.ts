@@ -106,17 +106,17 @@ const config: HardhatUserConfig = {
     hardhat: HARDHAT_CHAIN_ID_AND_FORKING_CONFIG,
     localhost: {
       chainId: 31337,
-      accounts: [`0x${process.env.LOCAL_HOST_DEPLOYER_KEY}`]
+      accounts: [`${process.env.LOCAL_HOST_DEPLOYER_KEY}`]
     },
     sepolia: {
       chainId: 11155111,
       url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_SEPOLIA_API_KEY}`,
-      accounts: [`0x${process.env.SEPOLIA_DEPLOYER_KEY}`]
+      accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`]
     },
     mantleTestnet: {
       chainId: 5001,
       url: `https://rpc.ankr.com/mantle_testnet/${process.env.ANKR_API_KEY}`, //`https://rpc.testnet.mantle.xyz/`,
-      accounts: [`0x${process.env.MANTLE_TESTNET_DEPLOYER_KEY}`]
+      accounts: [`${process.env.MANTLE_TESTNET_DEPLOYER_KEY}`]
     }
   },
   mocha: {
