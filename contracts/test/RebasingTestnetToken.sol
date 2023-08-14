@@ -24,7 +24,7 @@ contract RebasingTestnetToken is TestnetToken {
             _mintCoolDownPeriod,
             _mintAmountPerCoolDownPeriod
         )
-    {}
+    {} // solhint-disable no-empty-blocks
 
     function rebase(
         int256 rebaseInBASE,
