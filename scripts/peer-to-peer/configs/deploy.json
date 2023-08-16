@@ -2,6 +2,7 @@
     "hardhat":
     {        
         "deployCore": true,
+        "transferOwnershipInstructions": {},
         "preExistingCore": {},
         "deployTestnetTokens": true,
         "testnetTokenConfig": [
@@ -23,12 +24,13 @@
         "deployCompartments": true
     },
     "mantleTestnet": {
-        "deployCore": false,
+        "deployCore": true,
+        "transferOwnershipInstructions": {"addressRegistry": "0x6e0e55fbE93C16fAf9d3C064dAaA4c6654680ae0"},
         "preExistingCore": {
             "addressRegistry": "0xd589bA4478a47844D5FaeAC292F8daEa6b2A5887",
             "borrowerGateway": "0x4cc29943399A61AA8B2A53eb4b7BBc4b7365d1Db"
         },
-        "deployTestnetTokens": false,
+        "deployTestnetTokens": true,
         "testnetTokenConfig": [
             {"name": "wETH", "symbol": "wETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000"},
             {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000"},
@@ -44,6 +46,7 @@
     },
     "sepolia": {
         "deployCore": false,
+        "transferOwnershipInstructions": {},
         "deployTestnetTokens": true,
         "preExistingCore": {
             "addressRegistry": "0x8154a288c6a9fbB49bC686897F01913451f1d991",
