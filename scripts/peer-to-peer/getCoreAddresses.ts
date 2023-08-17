@@ -32,9 +32,13 @@ async function getCoreAddresses(hardhatNetworkName: string, jsonConfig: any) {
   const quoteHandler = await addressRegistry.quoteHandler()
   const borrowerGateWayAddr = await addressRegistry.borrowerGateway()
   const lenderVaultFactory = await addressRegistry.lenderVaultFactory()
+  const currOwner = await addressRegistry.owner()
+  const pendingOwner = await addressRegistry.pendingOwner()
   logger.log(`Quote handler address is ${quoteHandler}`)
   logger.log(`Borrower gateway address is ${borrowerGateWayAddr}`)
   logger.log(`Lender vault factory address is ${lenderVaultFactory}`)
+  logger.log(`Address registry owner is ${currOwner}`)
+  logger.log(`Address registry pending owner is ${pendingOwner}`)
 
   const BorrowerGateway = await ethers.getContractFactory('BorrowerGateway')
   const borrowerGateway = await BorrowerGateway.attach(borrowerGateWayAddr)

@@ -187,8 +187,6 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonConfig: any
       addressRegistry,
       tokensThatRequireCompartment
     )
-    //const addressRegistry = await ethers.getContractAt('AddressRegistry', "0x5FbDB2315678afecb367f032d93F642f64180aa3")
-    //deployedContracts['deployedCompartments'] = await deployCompartments(deployer, addressRegistry, ["0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0"])
   } else {
     logger.log('Skipping compartment.')
   }
@@ -203,6 +201,24 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonConfig: any
   logger.log('Saving contracts to json...')
   saveDeployedContracts(deployedContracts, path.join(__dirname, 'output/'), scriptName)
   logger.log('Saving completed.')
+
+  // transfer ownership instructions
+  if (
+    hardhatNetworkName in jsonConfig &&
+    Object.keys(jsonConfig[hardhatNetworkName]['transferOwnershipInstructions']).length !== 0
+  ) {
+    const transferOwnershipInstructions = jsonConfig[hardhatNetworkName]['transferOwnershipInstructions']
+    // check if address registry ownership transferral shall be done
+    if (
+      'newAddressRegistryOwner' in transferOwnershipInstructions &&
+      transferOwnershipInstructions['newAddressRegistryOwner'] !== ''
+    ) {
+      const newOwnerProposal = ethers.utils.getAddress(transferOwnershipInstructions['newAddressRegistryOwner'])
+      logger.log(`Transferring address registry ownership to '${newOwnerProposal}'...`)
+      await addressRegistry.connect(deployer).transferOwnership(newOwnerProposal)
+      logger.log(`Done. Note new owner needs to call acceptOwnership() method!`)
+    }
+  }
 }
 
 async function deployTestnetTokens(deployer: any, addressRegistry: any, jsonConfig: any, hardhatNetworkName: string) {
