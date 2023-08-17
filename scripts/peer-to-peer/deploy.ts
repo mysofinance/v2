@@ -209,10 +209,13 @@ async function deploy(deployer: any, hardhatNetworkName: string, jsonConfig: any
   ) {
     const transferOwnershipInstructions = jsonConfig[hardhatNetworkName]['transferOwnershipInstructions']
     // check if address registry ownership transferral shall be done
-    if ('addressRegistry' in transferOwnershipInstructions && transferOwnershipInstructions['addressRegistry'] != '') {
-      const newOnwerPrposal = transferOwnershipInstructions['addressRegistry']
-      logger.log(`Transferring address registry ownership to '${newOnwerPrposal}'...`)
-      await addressRegistry.connect(deployer).transferOwnership(newOnwerPrposal)
+    if (
+      'newAddressRegistryOwner' in transferOwnershipInstructions &&
+      transferOwnershipInstructions['newAddressRegistryOwner'] !== ''
+    ) {
+      const newOwnerProposal = ethers.utils.getAddress(transferOwnershipInstructions['newAddressRegistryOwner'])
+      logger.log(`Transferring address registry ownership to '${newOwnerProposal}'...`)
+      await addressRegistry.connect(deployer).transferOwnership(newOwnerProposal)
       logger.log(`Done. Note new owner needs to call acceptOwnership() method!`)
     }
   }

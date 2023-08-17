@@ -24,13 +24,13 @@
         "deployCompartments": true
     },
     "mantleTestnet": {
-        "deployCore": true,
-        "transferOwnershipInstructions": {"addressRegistry": "0x6e0e55fbE93C16fAf9d3C064dAaA4c6654680ae0"},
+        "deployCore": false,
+        "transferOwnershipInstructions": {"newAddressRegistryOwner": "0x343e244189AE8fE182F55F05EbFB4B594303bE05"},
         "preExistingCore": {
-            "addressRegistry": "0xd589bA4478a47844D5FaeAC292F8daEa6b2A5887",
-            "borrowerGateway": "0x4cc29943399A61AA8B2A53eb4b7BBc4b7365d1Db"
+            "addressRegistry": "0x0ABEC34f87537CCD706EC5B359817058a480EadF",
+            "borrowerGateway": "0xEf91f90e7DA023423748c05dAcF8f9665E5D2Fe9"
         },
-        "deployTestnetTokens": true,
+        "deployTestnetTokens": false,
         "testnetTokenConfig": [
             {"name": "wETH", "symbol": "wETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3000000000"},
             {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "3100000000"},
@@ -42,7 +42,7 @@
         "deployCallbacks": false,
         "deployTestnetCallbacks": false,
         "deployCompartments": false,
-        "deployTestnetTokenManager": true
+        "deployTestnetTokenManager": false
     },
     "sepolia": {
         "deployCore": false,
