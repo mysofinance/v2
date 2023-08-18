@@ -45,20 +45,31 @@
         "deployTestnetTokenManager": false
     },
     "sepolia": {
-        "deployCore": false,
+        "deployCore": true,
         "transferOwnershipInstructions": {},
         "deployTestnetTokens": true,
         "preExistingCore": {
-            "addressRegistry": "0x8154a288c6a9fbB49bC686897F01913451f1d991",
-            "borrowerGateway": "0x15f60eB1d7D79adCBfb35F85BBC8e378f2f28695"
+            "addressRegistry": "",
+            "borrowerGateway": ""
         },
         "testnetTokenConfig": [
+            {"name": "WETH", "symbol": "WETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1777000000", "isRebasing": false},
+            {"name": "rETH", "symbol": "rETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1930000000", "isRebasing": false},
+            {"name": "RPL", "symbol": "RPL", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "27000000", "isRebasing": false},
+            {"name": "USDC", "symbol": "USDC", "decimals": "6", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000", "initialOracleUsdcPrice": "1000000", "isRebasing": false},
+            {"name": "DAI", "symbol": "DAI", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000", "initialOracleUsdcPrice": "1000000", "isRebasing": false},
+            {"name": "USDT", "symbol": "USDT", "decimals": "6", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000", "initialOracleUsdcPrice": "1000000", "isRebasing": false},
+            {"name": "aUSDT", "symbol": "aUSDT", "decimals": "6", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000", "initialOracleUsdcPrice": "1000000", "isRebasing": true},
+            {"name": "wBTC", "symbol": "WBTC", "decimals": "8", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000", "initialOracleUsdcPrice": "28300000000", "isRebasing": false},
+            {"name": "HT", "symbol": "HT", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "100000000000000000000000", "initialOracleUsdcPrice": "2710000", "isRebasing": false},
+            {"name": "dsETH", "symbol": "dsETH", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1932100000", "isRebasing": false},
+            {"name": "PAXG", "symbol": "PAXG", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1941000000", "hasTransferFee": true},
             {"name": "NEXO", "symbol": "NEXO", "decimals": "18", "initialMint": "10000000000000000000000000", "mintCoolDownPeriod": "86400", "mintAmountPerCoolDownPeriod": "10000000000000000000", "initialOracleUsdcPrice": "1941000000", "hasTransferFee": false}
         ],
-        "deployTestnetOracle": false,
-        "deployTestnetCallbacks": false,
-        "deployCallbacks": false,
-        "deployCompartments": false,
+        "deployTestnetOracle": true,
+        "deployTestnetCallbacks": true,
+        "deployCallbacks": true,
+        "deployCompartments": true,
         "deployTestnetTokenManager": false
     }
 }
