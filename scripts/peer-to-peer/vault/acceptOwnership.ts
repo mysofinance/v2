@@ -39,7 +39,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await proposeNewOwner(signer, hardhatNetworkName, jsonConfig)
+          await acceptOwnership(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -57,31 +57,22 @@ async function main() {
   }
 }
 
-async function proposeNewOwner(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+async function acceptOwnership(signer: any, hardhatNetworkName: string, jsonConfig: any) {
   logger.log(`Running script on lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
 
   logger.log('Retrieving current vault owner from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
   const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVault'])
 
-  const owner = await lenderVault.owner()
-  logger.log(`Current vault owner is ${owner}.`)
+  const currPendingOwner = await lenderVault.pendingOwner()
+  logger.log(`Currently pending vault owner is ${currPendingOwner}.`)
 
-  if (signer.address == owner) {
-    const currPendingOwner = await lenderVault.pendingOwner()
-    logger.log(`Currently pending vault owner is ${currPendingOwner}.`)
-    const newVaultOwnerProposal = jsonConfig[hardhatNetworkName]['newOwnerProposal']
-    logger.log(`New vault owner proposal is ${newVaultOwnerProposal}`)
-
-    if (currPendingOwner == newVaultOwnerProposal) {
-      logger.log(`No update needed, exiting sript.`)
-    } else {
-      logger.log(`Proposing new owner...`)
-      await lenderVault.transferOwnership(newVaultOwnerProposal)
-      logger.log(`Done.`)
-    }
+  if (signer.address == currPendingOwner) {
+    logger.log(`Accepting vault ownership...`)
+    await lenderVault.acceptOwnership()
+    logger.log(`Done.`)
   } else {
-    logger.log(`Invalid signer ${signer.address}, doesn't match current vault owner.`)
+    logger.log(`Invalid signer ${signer.address}, doesn't match pending vault owner.`)
   }
 }
 

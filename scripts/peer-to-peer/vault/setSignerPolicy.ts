@@ -1,6 +1,6 @@
 import { ethers } from 'hardhat'
 import * as readline from 'readline/promises'
-import { Logger, loadConfig } from '../helpers/misc'
+import { Logger, loadConfig } from '../../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
@@ -21,7 +21,7 @@ async function main() {
   logger.log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
   logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  const expectedConfigFile = `/configs/${scriptName}.json`
+  const expectedConfigFile = `/${scriptName}.json`
   logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
   const jsonConfig = loadConfig(__dirname, expectedConfigFile)
   logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
@@ -73,7 +73,7 @@ async function setSigningPolicy(signer: any, hardhatNetworkName: string, jsonCon
       const signersToBeRemoved = jsonConfig[hardhatNetworkName]['signersToBeRemoved']
       logger.log(`Starting to remove signers: ${signersToBeRemoved}`)
 
-      const numSigners = await lenderVault.numSigners()
+      const numSigners = await lenderVault.totalNumSigners()
       const currSigners: any = {}
       for (let i = 0; i < Number(numSigners.toString()); ++i) {
         const signer = await lenderVault.signers(i)

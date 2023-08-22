@@ -1,2 +1,2 @@
-{"mantleTestnet": {"lenderVault": "0x17C878d7B1712E33b9F5C9C8650404bd05c7C9a8", "newOwnerProposal": "0x343e244189AE8fE182F55F05EbFB4B594303bE05"},
+{"mantleTestnet": {"lenderVault": "0x7654C9B35f17c5A1EE19Bf143Fa03524e809A3E0", "newOwnerProposal": "0x7D21B0f200C9Bf1152D9f384b28db5b02216Eb63"},
 "sepolia": {"lenderVaultFactory": "", "newOwnerProposal": ""}}

@@ -39,7 +39,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await proposeNewOwner(signer, hardhatNetworkName, jsonConfig)
+          await setCircuitBreakers(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -57,10 +57,10 @@ async function main() {
   }
 }
 
-async function proposeNewOwner(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+async function setCircuitBreakers(signer: any, hardhatNetworkName: string, jsonConfig: any) {
   logger.log(`Running script on lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
 
-  logger.log('Retrieving current vault owner from lender vault...')
+  logger.log('Retrieving current circuit breaker from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
   const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVault'])
 
@@ -68,16 +68,35 @@ async function proposeNewOwner(signer: any, hardhatNetworkName: string, jsonConf
   logger.log(`Current vault owner is ${owner}.`)
 
   if (signer.address == owner) {
-    const currPendingOwner = await lenderVault.pendingOwner()
-    logger.log(`Currently pending vault owner is ${currPendingOwner}.`)
-    const newVaultOwnerProposal = jsonConfig[hardhatNetworkName]['newOwnerProposal']
-    logger.log(`New vault owner proposal is ${newVaultOwnerProposal}`)
+    const currCircuitBreaker = await lenderVault.circuitBreaker()
+    logger.log(`Current circuit breaker is ${currCircuitBreaker}.`)
 
-    if (currPendingOwner == newVaultOwnerProposal) {
-      logger.log(`No update needed, exiting sript.`)
+    const currReverseCircuitBreaker = await lenderVault.reverseCircuitBreaker()
+    logger.log(`Current reverse circuit breaker is ${currReverseCircuitBreaker}.`)
+
+    const newCircuitBreaker = jsonConfig[hardhatNetworkName]['circuitBreaker']
+    logger.log(`New circuit breaker proposal is '${newCircuitBreaker}'`)
+
+    if (typeof newCircuitBreaker === 'undefined' || newCircuitBreaker === '') {
+      logger.log(`Skipping circuit breaker...`)
+    } else if (currCircuitBreaker == newCircuitBreaker) {
+      logger.log(`No update needed.`)
     } else {
-      logger.log(`Proposing new owner...`)
-      await lenderVault.transferOwnership(newVaultOwnerProposal)
+      logger.log(`Setting new circuit breaker...`)
+      await lenderVault.setCircuitBreaker(newCircuitBreaker)
+      logger.log(`Done.`)
+    }
+
+    const newReverseCircuitBreaker = jsonConfig[hardhatNetworkName]['reverseCircuitBreaker']
+    logger.log(`New reverse circuit breaker proposal is '${newReverseCircuitBreaker}'`)
+
+    if (typeof newReverseCircuitBreaker === 'undefined' || newReverseCircuitBreaker === '') {
+      logger.log(`Skipping circuit breaker...`)
+    } else if (currReverseCircuitBreaker == newReverseCircuitBreaker) {
+      logger.log(`No update needed.`)
+    } else {
+      logger.log(`Setting new reverse circuit breaker...`)
+      await lenderVault.setReverseCircuitBreaker(newReverseCircuitBreaker)
       logger.log(`Done.`)
     }
   } else {
