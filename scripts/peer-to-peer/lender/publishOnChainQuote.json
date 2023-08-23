@@ -1,0 +1,19 @@
+{"mantleTestnet": {"quoteHandler": "0x720ff6d4DC8dAA96ff0DB415b89941B85FA97C14", "addressRegistry": "0x0ABEC34f87537CCD706EC5B359817058a480EadF", "onChainQuotes": [
+   {"generalQuoteInfo": {
+    "collToken": "0xfea51414195Daec4a394973545C6dAe980EaDb0d",
+    "loanToken": "0x5CeF45FC7D7Cd196c71C875Ff3537003a30d0321",
+    "oracleAddr": "0x0000000000000000000000000000000000000000",
+    "minLoan": "1000000",
+    "maxLoan": "1000000000000",
+    "validUntil": "1704018884",
+    "earliestRepayTenor": 0,
+    "borrowerCompartmentImplementation": "0x0000000000000000000000000000000000000000",
+    "isSingleUse": false,
+    "whitelistAddr": "0x0000000000000000000000000000000000000000",
+    "isWhitelistAddrSingleBorrower": false
+}, "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+"quoteTuples": [{"loanPerCollUnitOrLtv": "1100000000", "interestRatePctInBase": "0", "upfrontFeePctInBase": "833479840122844", "tenor": "86400"}]}
+]}}
+
+
+

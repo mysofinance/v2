@@ -58,7 +58,7 @@ async function main() {
 }
 
 async function setSigningPolicy(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  logger.log(`Adding signers to lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
+  logger.log(`Setting signer policy for lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
 
   logger.log('Retrieving vault owner from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')

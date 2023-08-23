@@ -1,9 +1,9 @@
 {"mantleTestnet": {
-    "lenderVault": "0x39231Bd4cF021D6f9Fa5640a875083CD79976728",
+    "lenderVault": "0x7654C9B35f17c5A1EE19Bf143Fa03524e809A3E0",
     "removeSigners": false,
     "signersToBeRemoved": [],
     "updateMinNumOfSigners": true,
-    "newMinNumOfSigners": 2,
+    "newMinNumOfSigners": 3,
     "addSigners": true,
     "signersToBeAdded": ["0xc8CC6A25A67410e1AC63B6118aEB466Eac89254C"]
     }   
