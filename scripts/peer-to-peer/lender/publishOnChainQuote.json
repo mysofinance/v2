@@ -1,35 +1,188 @@
-{"mantleTestnet": {"quoteHandler": "0xCF7c16D099583aA75e2cdD937116F1b6E1F241fa", "addressRegistry": "0xE31bA1bD07792ad7C382F1293e55E14798476F3C", "onChainQuotes": [
-   {"generalQuoteInfo": {
-    "collToken": "0xfea51414195daec4a394973545c6dae980eadb0d",
-    "loanToken": "0x5CeF45FC7D7Cd196c71C875Ff3537003a30d0321",
-    "oracleAddr": "0x0000000000000000000000000000000000000000",
-    "minLoan": "1000000",
-    "maxLoan": "1000000000000",
-    "validUntil": "1704018884",
-    "earliestRepayTenor": 0,
-    "borrowerCompartmentImplementation": "0x0000000000000000000000000000000000000000",
-    "isSingleUse": false,
-    "whitelistAddr": "0x0000000000000000000000000000000000000000",
-    "isWhitelistAddrSingleBorrower": false
-}, "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
-"quoteTuples": [{"loanPerCollUnitOrLtv": "1000000000", "interestRatePctInBase": "5000000000000000", "upfrontFeePctInBase": "0", "tenor": "2592000"}, {"loanPerCollUnitOrLtv": "1000000000", "interestRatePctInBase": "0", "upfrontFeePctInBase": "5000000000000000", "tenor": "2592000"}]}
-]},
-"sepolia": {"quoteHandler": "0x82d3577F888bAAd102D93BAD6DD90e53636505cF", "addressRegistry": "0x5EdDDFCAB93b4637b3365E4BB8c69aa1806AE46f", "onChainQuotes": [
-    {"generalQuoteInfo": {
-     "collToken": "0x3564c06EfEe0FeB0af5EF59dc5440bC45A265dA5",
-     "loanToken": "0x2296282e2e2a4158140E3b4B99855ADa4a06a4B8",
-     "oracleAddr": "0x0000000000000000000000000000000000000000",
-     "minLoan": "1000000",
-     "maxLoan": "1000000000000",
-     "validUntil": "1704018884",
-     "earliestRepayTenor": 0,
-     "borrowerCompartmentImplementation": "0x0000000000000000000000000000000000000000",
-     "isSingleUse": false,
-     "whitelistAddr": "0x0000000000000000000000000000000000000000",
-     "isWhitelistAddrSingleBorrower": false
- }, "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
- "quoteTuples": [{"loanPerCollUnitOrLtv": "1000000000", "interestRatePctInBase": "5000000000000000", "upfrontFeePctInBase": "0", "tenor": "2592000"}, {"loanPerCollUnitOrLtv": "1000000000", "interestRatePctInBase": "0", "upfrontFeePctInBase": "5000000000000000", "tenor": "2592000"}]}
- ]}}
-
-
-
+{
+    "mantleMainnet": {
+        "quoteHandler": "0x3EAf1BA2C14B2d353fd63c3881bbcc7583E665f9",
+        "addressRegistry": "0x196A6649e2A7eb225Ee53BA507552cCc8BcdB07a",
+        "onChainQuotes": [
+            {
+                "generalQuoteInfo": {
+                    "collToken": "0x201EBa5CC46D216Ce6DC03F6a759e8E766e956aE",
+                    "loanToken": "0x09Bc4E0D864854c6aFB6eB9A9cdF58aC190D0dF9",
+                    "oracleAddr": "0x0000000000000000000000000000000000000000",
+                    "minLoan": "500000000",
+                    "maxLoan": "1000000000000",
+                    "validUntil": "1704018884",
+                    "earliestRepayTenor": 0,
+                    "borrowerCompartmentImplementation": "0x0000000000000000000000000000000000000000",
+                    "isSingleUse": false,
+                    "whitelistAddr": "0x0000000000000000000000000000000000000000",
+                    "isWhitelistAddrSingleBorrower": false
+                },
+                "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "quoteTuples": [
+                  {
+                    "loanPerCollUnitOrLtv": "500000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "2050573132428291",
+                    "tenor": "2592000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "500000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "4092741494560420",
+                    "tenor": "5184000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "500000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "6126534661403318",
+                    "tenor": "7775999"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "600000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "2460688757491650",
+                    "tenor": "2592000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "600000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "4911290857953662",
+                    "tenor": "5184000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "600000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "7351842543580668",
+                    "tenor": "7775999"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "700000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "2870804442247435",
+                    "tenor": "2592000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "700000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "5729840165283295",
+                    "tenor": "5184000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "700000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "8577150573734505",
+                    "tenor": "7775999"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "900000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "3694121661603609",
+                    "tenor": "2592000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "900000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "7488858401562225",
+                    "tenor": "5184000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "900000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "11534471265395404",
+                    "tenor": "7775999"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "950000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "4589153313496427",
+                    "tenor": "2592000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "950000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "10781163161745592",
+                    "tenor": "5184000"
+                  },
+                  {
+                    "loanPerCollUnitOrLtv": "950000",
+                    "interestRatePctInBase": "0",
+                    "upfrontFeePctInBase": "17493674098417786",
+                    "tenor": "7775999"
+                  }
+                ]
+            }
+        ]
+    },
+    "mantleTestnet": {
+        "quoteHandler": "0xCF7c16D099583aA75e2cdD937116F1b6E1F241fa",
+        "addressRegistry": "0xE31bA1bD07792ad7C382F1293e55E14798476F3C",
+        "onChainQuotes": [
+            {
+                "generalQuoteInfo": {
+                    "collToken": "0xfea51414195daec4a394973545c6dae980eadb0d",
+                    "loanToken": "0x5CeF45FC7D7Cd196c71C875Ff3537003a30d0321",
+                    "oracleAddr": "0x0000000000000000000000000000000000000000",
+                    "minLoan": "1000000",
+                    "maxLoan": "1000000000000",
+                    "validUntil": "1704018884",
+                    "earliestRepayTenor": 0,
+                    "borrowerCompartmentImplementation": "0x0000000000000000000000000000000000000000",
+                    "isSingleUse": false,
+                    "whitelistAddr": "0x0000000000000000000000000000000000000000",
+                    "isWhitelistAddrSingleBorrower": false
+                },
+                "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "quoteTuples": [
+                    {
+                        "loanPerCollUnitOrLtv": "1000000000",
+                        "interestRatePctInBase": "5000000000000000",
+                        "upfrontFeePctInBase": "0",
+                        "tenor": "2592000"
+                    },
+                    {
+                        "loanPerCollUnitOrLtv": "1000000000",
+                        "interestRatePctInBase": "0",
+                        "upfrontFeePctInBase": "5000000000000000",
+                        "tenor": "2592000"
+                    }
+                ]
+            }
+        ]
+    },
+    "sepolia": {
+        "quoteHandler": "0x82d3577F888bAAd102D93BAD6DD90e53636505cF",
+        "addressRegistry": "0x5EdDDFCAB93b4637b3365E4BB8c69aa1806AE46f",
+        "onChainQuotes": [
+            {
+                "generalQuoteInfo": {
+                    "collToken": "0x3564c06EfEe0FeB0af5EF59dc5440bC45A265dA5",
+                    "loanToken": "0x2296282e2e2a4158140E3b4B99855ADa4a06a4B8",
+                    "oracleAddr": "0x0000000000000000000000000000000000000000",
+                    "minLoan": "1000000",
+                    "maxLoan": "1000000000000",
+                    "validUntil": "1704018884",
+                    "earliestRepayTenor": 0,
+                    "borrowerCompartmentImplementation": "0x0000000000000000000000000000000000000000",
+                    "isSingleUse": false,
+                    "whitelistAddr": "0x0000000000000000000000000000000000000000",
+                    "isWhitelistAddrSingleBorrower": false
+                },
+                "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "quoteTuples": [
+                    {
+                        "loanPerCollUnitOrLtv": "1000000000",
+                        "interestRatePctInBase": "5000000000000000",
+                        "upfrontFeePctInBase": "0",
+                        "tenor": "2592000"
+                    },
+                    {
+                        "loanPerCollUnitOrLtv": "1000000000",
+                        "interestRatePctInBase": "0",
+                        "upfrontFeePctInBase": "5000000000000000",
+                        "tenor": "2592000"
+                    }
+                ]
+            }
+        ]
+    }
+}
