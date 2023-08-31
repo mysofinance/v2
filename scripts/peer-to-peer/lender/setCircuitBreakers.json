@@ -1,1 +1,11 @@
-{"mantleTestnet": {"lenderVault": "0x7654C9B35f17c5A1EE19Bf143Fa03524e809A3E0", "circuitBreaker": "0xc8CC6A25A67410e1AC63B6118aEB466Eac89254C", "reverseCircuitBreaker": "0xc8CC6A25A67410e1AC63B6118aEB466Eac89254C"}}
+{
+    "exampleNetwork": {
+        "lenderVault": "<0x address>",
+        "circuitBreaker": "<0x address>",
+        "reverseCircuitBreaker": "<0x address>"
+    },
+    "mantleTestnet": {
+        "lenderVault": "0xc9818E4403F6bCd8b12e54Dd604dEb6174Eded50",
+        "circuitBreaker": "0x7D21B0f200C9Bf1152D9f384b28db5b02216Eb63"
+    }
+}
