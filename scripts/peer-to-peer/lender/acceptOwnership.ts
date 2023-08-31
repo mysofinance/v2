@@ -1,6 +1,6 @@
 import { ethers } from 'hardhat'
 import * as readline from 'readline/promises'
-import { Logger, loadConfig } from '../helpers/misc'
+import { Logger, loadConfig } from '../../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
@@ -21,7 +21,7 @@ async function main() {
   logger.log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
   logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  const expectedConfigFile = `/configs/${scriptName}.json`
+  const expectedConfigFile = `${scriptName}.json`
   logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
   const jsonConfig = loadConfig(__dirname, expectedConfigFile)
   logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
@@ -39,7 +39,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await withdraw(signer, hardhatNetworkName, jsonConfig)
+          await acceptOwnership(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -57,36 +57,22 @@ async function main() {
   }
 }
 
-async function withdraw(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  logger.log(`Unlocking tokens on lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
+async function acceptOwnership(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+  logger.log(`Running script on lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
 
-  logger.log('Retrieving vault owner from lender vault...')
+  logger.log('Retrieving current vault owner from lender vault...')
   const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
   const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVault'])
-  const vaultOwner = await lenderVault.owner()
 
-  if (signer.address == vaultOwner) {
-    logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
+  const currPendingOwner = await lenderVault.pendingOwner()
+  logger.log(`Currently pending vault owner is ${currPendingOwner}.`)
 
-    for (let unlockInstructions of jsonConfig[hardhatNetworkName]['unlockInstructions']) {
-      const unlockToken = await ethers.getContractAt('IERC20Metadata', unlockInstructions['token'])
-      const symbol = await unlockToken.symbol()
-      const decimals = await unlockToken.decimals()
-      const balance = await unlockToken.balanceOf(jsonConfig[hardhatNetworkName]['lenderVault'])
-      logger.log(`Initiating unlock for token ${symbol} and for loan ids: ${unlockInstructions['loanIds']}`)
-      logger.log(`Note: Vault's relevant token balance is: ${ethers.utils.formatUnits(balance, decimals)} ${symbol}...`)
-      const tx = await lenderVault
-        .connect(signer)
-        .unlockCollateral(unlockInstructions['token'], unlockInstructions['loanIds'])
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(x => {
-        return x.event === 'CollateralUnlocked'
-      })
-      const amountUnlocked = event?.args?.['amountUnlocked']
-      logger.log(`Unlocked '${ethers.utils.formatUnits(amountUnlocked, decimals)}' ${symbol}.`)
-    }
+  if (signer.address == currPendingOwner) {
+    logger.log(`Accepting vault ownership...`)
+    await lenderVault.acceptOwnership()
+    logger.log(`Done.`)
   } else {
-    logger.log(`Vault owner is ${vaultOwner} and doesn't match signer.`)
+    logger.log(`Invalid signer ${signer.address}, doesn't match pending vault owner.`)
   }
 }
 

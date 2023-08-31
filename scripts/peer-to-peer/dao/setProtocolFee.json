@@ -1,0 +1,26 @@
+{
+    "sepolia": {
+        "addressRegistry": "0x5EdDDFCAB93b4637b3365E4BB8c69aa1806AE46f",
+        "borrowerGateway": "0xCc3b01aE6501EAeB52AB282251cd474854a748EC",
+        "protocolFeeParams": [
+            "10000000000000000",
+            "2000000000000000"
+        ]
+    },
+    "mantleTestnet": {
+        "addressRegistry": "0xE31bA1bD07792ad7C382F1293e55E14798476F3C",
+        "borrowerGateway": "0xb7724633daD157CD609a3b061534892B33532069",
+        "protocolFeeParams": [
+            "10000000000000000",
+            "2000000000000000"
+        ]
+    },
+    "mantleMainnet": {
+        "addressRegistry": "0x196A6649e2A7eb225Ee53BA507552cCc8BcdB07a",
+        "borrowerGateway": "0xd8b132A0abA610D0AaA18716A2b26e14141f112C",
+        "protocolFeeParams": [
+            "2000000000000000",
+            "10000000000000000"
+        ]
+    }
+}

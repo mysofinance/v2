@@ -1,5 +1,5 @@
 import { ethers } from 'hardhat'
-import { Logger, loadConfig } from '../helpers/misc'
+import { Logger, loadConfig } from '../../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
@@ -16,7 +16,7 @@ async function main() {
 
   logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
   logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  const expectedConfigFile = `/configs/${scriptName}.json`
+  const expectedConfigFile = `${scriptName}.json`
   logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
   const jsonConfig = loadConfig(__dirname, expectedConfigFile)
   logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))

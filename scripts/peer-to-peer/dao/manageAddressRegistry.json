@@ -1,0 +1,41 @@
+{
+    "<NETWORK_NAME>": {
+        "addressRegistry": "<0xAddressRegistryAddr>",
+        "actions": [
+            {
+                "type": "setWhitelistState",
+                "addresses": ["<0xAddress1>", "<0xAddress2>"],
+                "state": 1
+            },
+            {
+                "type": "setAllowedTokensForCompartment",
+                "compartmentImpl": "<0xSomeCompartmentImpl>",
+                "tokens": ["<0xToken1>", "<0xToken2>"],
+                "allow": true
+            },
+            {
+                "type": "transferOwnership",
+                "newOwnerProposal": "<0xAddress1>"
+            }
+        ]
+    },
+    "sepolia": {
+        "addressRegistry": "0x5EdDDFCAB93b4637b3365E4BB8c69aa1806AE46f",
+        "actions": [
+            {
+                "type": "setWhitelistState",
+                "addresses": ["0x45b5B91b2f507F881aD42cCb8446bE88BaAfcDAE"],
+                "state": 1
+            }
+        ]
+    },
+    "mantleMainnet": {
+        "addressRegistry": "0x196A6649e2A7eb225Ee53BA507552cCc8BcdB07a",
+        "actions": [
+            {
+                "type": "transferOwnership",
+                "newOwnerProposal": "0x8E2Dd4d57dF7E3480ABFe0eACa1c0Ccd41F1E18E"
+            }
+        ]
+    }
+}

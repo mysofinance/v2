@@ -1,6 +1,6 @@
 import { ethers } from 'hardhat'
 import * as readline from 'readline/promises'
-import { Logger, loadConfig } from '../helpers/misc'
+import { Logger, loadConfig } from '../../helpers/misc'
 
 const hre = require('hardhat')
 const path = require('path')
@@ -15,15 +15,13 @@ async function main() {
   const signerBal = await ethers.provider.getBalance(signer.address)
   const network = await ethers.getDefaultProvider().getNetwork()
   const hardhatNetworkName = hre.network.name
-  const hardhatChainId = hre.network.config.chainId
 
   logger.log('Running script with the following signer:', signer.address)
   logger.log('Signer ETH balance:', ethers.utils.formatEther(signerBal.toString()))
   logger.log(`Interacting with network '${hardhatNetworkName}' (default provider network name '${network.name}')`)
-  logger.log(`Configured chain id '${hardhatChainId}' (default provider config chain id '${network.chainId}')`)
-  const expectedConfigFile = `/configs/${scriptName}.json`
-  logger.log(`Loading config '${expectedConfigFile}' with the following data:`)
-  const jsonConfig = loadConfig(__dirname, expectedConfigFile)
+
+  logger.log(`Loading '${scriptName}.json' with the following config data:`)
+  const jsonConfig = loadConfig(__dirname, `${scriptName}.json`)
   logger.log(JSON.stringify(jsonConfig[hardhatNetworkName]))
 
   if (hardhatNetworkName in jsonConfig) {
@@ -39,7 +37,7 @@ async function main() {
 
       switch (answer.toLowerCase()) {
         case 'y':
-          await withdraw(signer, hardhatNetworkName, jsonConfig)
+          await performActions(signer, hardhatNetworkName, jsonConfig)
           logger.log('Script completed.')
           break
         case 'n':
@@ -57,31 +55,39 @@ async function main() {
   }
 }
 
-async function withdraw(signer: any, hardhatNetworkName: string, jsonConfig: any) {
-  logger.log(`Withdrawing from lender vault '${jsonConfig[hardhatNetworkName]['lenderVault']}'.`)
+async function performActions(signer: any, hardhatNetworkName: string, jsonConfig: any) {
+  const AddressRegistry = await ethers.getContractFactory('AddressRegistry')
+  const addressRegistry = await AddressRegistry.attach(jsonConfig[hardhatNetworkName]['addressRegistry'])
 
-  logger.log('Retrieving vault owner from lender vault...')
-  const LenderVaultImpl = await ethers.getContractFactory('LenderVaultImpl')
-  const lenderVault = await LenderVaultImpl.attach(jsonConfig[hardhatNetworkName]['lenderVault'])
-  const vaultOwner = await lenderVault.owner()
+  logger.log('Retrieving address registry owner...')
+  const owner = await addressRegistry.owner()
 
-  if (signer.address == vaultOwner) {
-    logger.log(`Vault owner is ${vaultOwner} and matches signer.`)
+  if (signer.address === owner) {
+    logger.log(`Registry owner is ${owner} and matches signer.`)
+    const actions = jsonConfig[hardhatNetworkName]['actions']
+    for (const action of actions) {
+      switch (action.type) {
+        case 'setWhitelistState':
+          await addressRegistry.setWhitelistState(action.addresses, action.state)
+          logger.log(`Whitelist state for addresses ${action.addresses} set to ${action.state}.`)
+          break
 
-    for (let withdrawalInstruction of jsonConfig[hardhatNetworkName]['withdrawalInstructions']) {
-      logger.log(`Initiating withdrawal...`)
-      const tx = await lenderVault.connect(signer).withdraw(withdrawalInstruction['token'], withdrawalInstruction['amount'])
-      const receipt = await tx.wait()
-      const event = receipt.events?.find(x => {
-        return x.event === 'Withdrew'
-      })
-      const tokenAddr = event?.args?.['tokenAddr']
-      const withdrawAmount = event?.args?.['withdrawAmount']
+        case 'setAllowedTokensForCompartment':
+          await addressRegistry.setAllowedTokensForCompartment(action.compartmentImpl, action.tokens, action.allow)
+          logger.log(`Allowed tokens for compartment ${action.compartmentImpl} updated.`)
+          break
 
-      logger.log(`Withdrew '${withdrawAmount}' of token '${tokenAddr}'.`)
+        case 'transferOwnership':
+          await addressRegistry.transferOwnership(action.newOwnerProposal)
+          logger.log(`New owner ${action.newOwnerProposal} proposed.`)
+          break
+
+        default:
+          logger.log(`Unknown action type: ${action.type}`)
+      }
     }
   } else {
-    logger.log(`Vault owner is ${vaultOwner} and doesn't match signer.`)
+    logger.log(`Registry owner is ${owner} and doesn't match signer.`)
   }
 }
 
