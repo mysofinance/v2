@@ -55,6 +55,7 @@ async function getVaultReport(hardhatNetworkName: string, jsonConfig: any) {
   logger.log('tokenAddr;name;symbol;balance')
   let tokenLookups: any = {}
   for (let tokenAddr of jsonConfig[hardhatNetworkName]['tokenAddrsToCheck']) {
+    tokenAddr = ethers.utils.getAddress(tokenAddr)
     const token = await ethers.getContractAt('IERC20Metadata', tokenAddr)
     const name = await token.name()
     const symbol = await token.symbol()
@@ -128,18 +129,29 @@ async function getVaultReport(hardhatNetworkName: string, jsonConfig: any) {
 }
 
 function logLoan(loanId: number, status: string, loan: any, tokenLookups: any) {
-  const collTokenSymbol = tokenLookups[loan.collToken]['symbol']
-  const loanTokenSymbol = tokenLookups[loan.loanToken]['symbol']
-  const initCollAmount = ethers.utils.formatUnits(loan.initCollAmount.toString(), tokenLookups[loan.collToken]['decimals'])
-  const initLoanAmount = ethers.utils.formatUnits(loan.initLoanAmount.toString(), tokenLookups[loan.loanToken]['decimals'])
-  const initRepayAmount = ethers.utils.formatUnits(loan.initRepayAmount.toString(), tokenLookups[loan.loanToken]['decimals'])
+  const collTokenAddrChecksummed = ethers.utils.getAddress(loan.collToken)
+  const loanTokenAddrChecksummed = ethers.utils.getAddress(loan.loanToken)
+  const collTokenSymbol = tokenLookups[collTokenAddrChecksummed]['symbol']
+  const loanTokenSymbol = tokenLookups[loanTokenAddrChecksummed]['symbol']
+  const initCollAmount = ethers.utils.formatUnits(
+    loan.initCollAmount.toString(),
+    tokenLookups[collTokenAddrChecksummed]['decimals']
+  )
+  const initLoanAmount = ethers.utils.formatUnits(
+    loan.initLoanAmount.toString(),
+    tokenLookups[loanTokenAddrChecksummed]['decimals']
+  )
+  const initRepayAmount = ethers.utils.formatUnits(
+    loan.initRepayAmount.toString(),
+    tokenLookups[loanTokenAddrChecksummed]['decimals']
+  )
   const amountRepaidSoFar = ethers.utils.formatUnits(
     loan.amountRepaidSoFar.toString(),
-    tokenLookups[loan.loanToken]['decimals']
+    tokenLookups[loanTokenAddrChecksummed]['decimals']
   )
   const amountReclaimedSoFar = ethers.utils.formatUnits(
     loan.amountReclaimedSoFar.toString(),
-    tokenLookups[loan.collToken]['decimals']
+    tokenLookups[collTokenAddrChecksummed]['decimals']
   )
   logger.log(
     `${loanId};${status};${

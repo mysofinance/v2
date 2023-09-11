@@ -120,7 +120,7 @@ const config: HardhatUserConfig = {
     },
     mantleMainnet: {
       chainId: 5000,
-      url: `https://rpc.ankr.com/mantle/${process.env.ANKR_API_KEY}`, //`https://rpc.mantle.xyz/`,
+      url: `https://rpc.mantle.xyz/`, //`https://rpc.ankr.com/mantle/${process.env.ANKR_API_KEY}`,
       accounts: [`0x${process.env.MANTLE_MAINNET_DEPLOYER_KEY}`]
     }
   },
