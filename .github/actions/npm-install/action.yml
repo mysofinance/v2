@@ -5,7 +5,7 @@ runs:
   using: composite
   steps:
     - name: Setup | cache for node modules
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       id: cache
       with:
         path: '**/node_modules'
@@ -14,9 +14,9 @@ runs:
           ${{ runner.os }}-node-
 
     - name: Setup | install node
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v4
       with:
-        node-version: '16'
+        node-version: '18'
 
     - name: Setup | install node modules
       if: steps.cache.outputs.cache-hit != 'true'
