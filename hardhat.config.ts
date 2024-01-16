@@ -122,8 +122,12 @@ const config: HardhatUserConfig = {
       chainId: 5000,
       url: `https://rpc.mantle.xyz/`, //`https://rpc.ankr.com/mantle/${process.env.ANKR_API_KEY}`,
       accounts: [`0x${process.env.MANTLE_MAINNET_DEPLOYER_KEY}`]
-    }
-  },
+    },
+    mainnet: {
+      chainId: 1,
+      url: `https://rpc.ankr.com/eth/`,
+      accounts: [`0x${process.env.MAINNET_DEPLOYER_KEY}`]
+    },
   mocha: {
     timeout: 100000000
   },
