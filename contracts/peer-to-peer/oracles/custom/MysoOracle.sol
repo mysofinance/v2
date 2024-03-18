@@ -14,9 +14,9 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  */
 contract MysoOracle is ChainlinkBase, Ownable2Step {
     struct MysoPrice {
-        uint112 priceUntilTimestampPassed;
-        uint112 priceOnceTimestampPassed;
-        uint32 timestampLatestProposedPriceBecomesValid;
+        uint112 prePrice;
+        uint112 postPrice;
+        uint32 switchTime;
     }
 
     // solhint-disable var-name-mixedcase
@@ -30,9 +30,15 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
     address internal constant ETH_USD_CHAINLINK =
         0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419; //eth usd chainlink
 
-    uint256 internal constant MYSO_PRICE_TIME_LOCK = 1 days;
+    uint256 internal constant MYSO_PRICE_TIME_LOCK = 1 hours;
 
     MysoPrice public mysoPrice;
+
+    event MysoPriceUpdated(
+        uint112 prePrice,
+        uint112 postPrice,
+        uint32 switchTime
+    );
 
     /**
      * @dev constructor for MysoOracle
@@ -50,32 +56,43 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
             _mysoUsdPrice,
             uint32(block.timestamp)
         );
+        _transferOwnership(msg.sender);
     }
 
     /**
-     * @dev updates timestampLatestProposedPriceBecomesValid and priceOnceTimestampPassed
-     * only updates priceUntilTimestampPassed if the prior time lock had passed
+     * @dev updates postPrice and switchTime
+     * only updates prePrice if the switchTime has passed
      * @param _newMysoUsdPrice initial price of myso in usd (use 8 decimals like chainlink) (eg. 0.50 USD = 0.5 * 1e8)
      */
 
     function setMysoPrice(uint112 _newMysoUsdPrice) external onlyOwner {
-        if (
-            block.timestamp < mysoPrice.timestampLatestProposedPriceBecomesValid
-        ) {
-            // if the priceOnceTimestampPassed is not yet active, update that price,
-            // leave priceUntilTimestampPassed the same but reset the time lock
+        MysoPrice memory currMysoPrice = mysoPrice;
+        uint32 newTimeStamp = uint32(block.timestamp + MYSO_PRICE_TIME_LOCK);
+        if (block.timestamp < currMysoPrice.switchTime) {
+            // if the switchTime has not yet passed, update only postPrice with new price,
+            // leave prePrice the same and update switchTime
             mysoPrice = MysoPrice(
-                mysoPrice.priceUntilTimestampPassed,
+                currMysoPrice.prePrice,
+                _newMysoUsdPrice,
+                newTimeStamp
+            );
+            emit MysoPriceUpdated(
+                currMysoPrice.prePrice,
+                _newMysoUsdPrice,
+                newTimeStamp
+            );
+        } else {
+            // if the switchTime has passed (or exactly equal), update the prePrice with postPrice,
+            // update the postPrice with new price, and update switchTime
+            mysoPrice = MysoPrice(
+                mysoPrice.postPrice,
                 _newMysoUsdPrice,
                 uint32(block.timestamp + MYSO_PRICE_TIME_LOCK)
             );
-        } else {
-            // if the priceOnceTimestampPassed is not yet active, update the priceUntilTimestampPassed with old priceOnceTimestampPassed,
-            // update the priceOnceTimestampPassed with new price, and reset the time lock
-            mysoPrice = MysoPrice(
-                mysoPrice.priceOnceTimestampPassed,
+            emit MysoPriceUpdated(
+                currMysoPrice.postPrice,
                 _newMysoUsdPrice,
-                uint32(block.timestamp + MYSO_PRICE_TIME_LOCK)
+                newTimeStamp
             );
         }
     }
@@ -109,10 +126,9 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
         view
         returns (uint256 mysoPriceInEth)
     {
-        uint256 mysoPriceInUsd = block.timestamp <
-            mysoPrice.timestampLatestProposedPriceBecomesValid
-            ? mysoPrice.priceUntilTimestampPassed
-            : mysoPrice.priceOnceTimestampPassed;
+        uint256 mysoPriceInUsd = block.timestamp < mysoPrice.switchTime
+            ? mysoPrice.prePrice
+            : mysoPrice.postPrice;
         uint256 ethPriceInUsd = _checkAndReturnLatestRoundData(
             ETH_USD_CHAINLINK
         );
