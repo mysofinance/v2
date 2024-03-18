@@ -12,7 +12,7 @@ The protocol supports two different models, each targeted at different use cases
 ## Quick Start
 ```
 npm i
-npx hardhat test
+npx hardhat test --grep "IOO price correctly"
 ```
 
 ## Contract Files

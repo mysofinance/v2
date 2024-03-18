@@ -3,11 +3,11 @@
 pragma solidity 0.8.19;
 
 import {ChainlinkBase} from "../chainlink/ChainlinkBase.sol";
-import {Errors} from "../../../Errors.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IWSTETH} from "../../interfaces/oracles/IWSTETH.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
@@ -24,11 +24,11 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // weth
     address internal constant WSTETH =
         0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0; //wsteth
-    address internal constant STETH =
-        0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84; //steth
     uint256 internal constant MYSO_IOO_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
     address internal constant ETH_USD_CHAINLINK =
         0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419; //eth usd chainlink
+    address internal constant STETH_ETH_CHAINLINK =
+        0x86392dC19c0b719886221c78AB11eb8Cf5c52812; //steth eth chainlink
 
     uint256 internal constant MYSO_PRICE_TIME_LOCK = 1 hours;
 
@@ -39,6 +39,8 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
         uint112 postPrice,
         uint32 switchTime
     );
+
+    error NoMyso();
 
     /**
      * @dev constructor for MysoOracle
@@ -97,6 +99,41 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
         }
     }
 
+    function getPrice(
+        address collToken,
+        address loanToken
+    ) external view override returns (uint256 collTokenPriceInLoanToken) {
+        (uint256 priceOfCollToken, uint256 priceOfLoanToken) = getRawPrices(
+            collToken,
+            loanToken
+        );
+        uint256 loanTokenDecimals = (loanToken == MYSO)
+            ? 18
+            : IERC20Metadata(loanToken).decimals();
+        collTokenPriceInLoanToken =
+            (priceOfCollToken * 10 ** loanTokenDecimals) /
+            priceOfLoanToken;
+    }
+
+    function getRawPrices(
+        address collToken,
+        address loanToken
+    )
+        public
+        view
+        override
+        returns (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw)
+    {
+        // must have at least one token is MYSO to use this oracle
+        if (collToken != MYSO && loanToken != MYSO) {
+            revert NoMyso();
+        }
+        (collTokenPriceRaw, loanTokenPriceRaw) = (
+            _getPriceOfToken(collToken),
+            _getPriceOfToken(loanToken)
+        );
+    }
+
     function _getPriceOfToken(
         address token
     ) internal view virtual override returns (uint256 tokenPriceRaw) {
@@ -113,7 +150,9 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
 
     function _getWstEthPrice() internal view returns (uint256 wstEthPriceRaw) {
         uint256 stEthAmountPerWstEth = IWSTETH(WSTETH).getStETHByWstETH(1e18);
-        uint256 stEthPriceInEth = _getPriceOfToken(STETH);
+        uint256 stEthPriceInEth = _checkAndReturnLatestRoundData(
+            (STETH_ETH_CHAINLINK)
+        );
         wstEthPriceRaw = Math.mulDiv(
             stEthPriceInEth,
             stEthAmountPerWstEth,

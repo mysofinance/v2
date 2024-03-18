@@ -28,6 +28,17 @@ export const getRecentMainnetForkingConfig = () => {
   return { chainId: chainId, url: url, blockNumber: blockNumber }
 }
 
+export const getMysoOracleMainnetForkingConfig = () => {
+  const INFURA_API_KEY = process.env.INFURA_API_KEY
+  if (INFURA_API_KEY === undefined) {
+    throw new Error('Invalid hardhat.config.ts! Need to set `INFURA_API_KEY`!')
+  }
+  const chainId = 1
+  const url = `https://mainnet.infura.io/v3/${INFURA_API_KEY}`
+  const blockNumber = 19300000 // 2024-02-24 (9PM UTC)
+  return { chainId: chainId, url: url, blockNumber: blockNumber }
+}
+
 export const getArbitrumForkingConfig = () => {
   const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY
   if (ALCHEMY_API_KEY === undefined) {
