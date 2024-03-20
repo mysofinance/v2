@@ -170,13 +170,17 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       } = await setupTest()
 
       const myso = '0x00000000000000000000000000000000DeaDBeef'
+      const meth = '0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa'
+      const rpl = '0xD33526068D116cE69F19A9ee46F0bd304F21A51f'
+      const usdc = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+      const usdcToEthChainlinkAddr = '0x986b5E1e1755e3C2440e960477f25201B0a8bbD4'
 
       // deploy myso oracle
       const MysoOracle = await ethers.getContractFactory('MysoOracle')
 
       const mysoOracle = await MysoOracle.connect(team).deploy(
-        [reth, cbeth],
-        [rethToEthChainlinkAddr, cbethToEthChainlinkAddr],
+        [reth, cbeth, usdc],
+        [rethToEthChainlinkAddr, cbethToEthChainlinkAddr, usdcToEthChainlinkAddr],
         50000000
       )
       await mysoOracle.deployed()
@@ -195,6 +199,9 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       const wstEthCollMysoLoanPrice = await mysoOracle.getPrice(wsteth.address, myso)
       const rethCollMysoLoanPrice = await mysoOracle.getPrice(reth, myso)
       const cbethCollMysoLoanPrice = await mysoOracle.getPrice(cbeth, myso)
+      const usdcCollMysoLoanPrice = await mysoOracle.getPrice(usdc, myso)
+      const rplCollMysoLoanPrice = await mysoOracle.getPrice(rpl, myso)
+      const methCollMysoLoanPrice = await mysoOracle.getPrice(meth, myso)
 
       //toggle to show logs
       const showLogs = true
@@ -215,6 +222,25 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
           'cbEthCollMysoLoanPrice',
           Math.round(1000000 * Number(ethers.utils.formatUnits(cbethCollMysoLoanPrice, 18).slice(0, 8))) / 1000000
         )
+        console.log(
+          'rplCollMysoLoanPrice',
+          Math.round(1000000 * Number(ethers.utils.formatUnits(rplCollMysoLoanPrice, 18).slice(0, 8))) / 1000000
+        )
+        console.log(
+          'methCollMysoLoanPrice',
+          Math.round(1000000 * Number(ethers.utils.formatUnits(methCollMysoLoanPrice, 18).slice(0, 8))) / 1000000
+        )
+        console.log(
+          'usdcCollMysoLoanPrice',
+          Math.round(1000000 * Number(ethers.utils.formatUnits(usdcCollMysoLoanPrice, 18).slice(0, 8))) / 1000000
+        )
+        console.log(ethers.utils.formatUnits(wethCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(wstEthCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(rethCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(cbethCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(rplCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(methCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(usdcCollMysoLoanPrice, 18))
       }
 
       await mysoOracle.connect(team).setMysoPrice(100000000)
@@ -237,6 +263,9 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       const wstEthCollMysoLoanPostPrice = await mysoOracle.getPrice(wsteth.address, myso)
       const rethCollMysoLoanPostPrice = await mysoOracle.getPrice(reth, myso)
       const cbethCollMysoLoanPostPrice = await mysoOracle.getPrice(cbeth, myso)
+      const rplCollMysoLoanPostPrice = await mysoOracle.getPrice(rpl, myso)
+      const methCollMysoLoanPostPrice = await mysoOracle.getPrice(meth, myso)
+      const usdcCollMysoLoanPostPrice = await mysoOracle.getPrice(usdc, myso)
 
       if (showLogs) {
         console.log(
@@ -255,6 +284,25 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
           'cbEthCollMysoLoanPostPrice',
           Math.round(1000000 * Number(ethers.utils.formatUnits(cbethCollMysoLoanPostPrice, 18).slice(0, 8))) / 1000000
         )
+        console.log(
+          'rplCollMysoLoanPostPrice',
+          Math.round(1000000 * Number(ethers.utils.formatUnits(rplCollMysoLoanPostPrice, 18).slice(0, 8))) / 1000000
+        )
+        console.log(
+          'methCollMysoLoanPostPrice',
+          Math.round(1000000 * Number(ethers.utils.formatUnits(methCollMysoLoanPostPrice, 18).slice(0, 8))) / 1000000
+        )
+        console.log(
+          'usdcCollMysoLoanPostPrice',
+          Math.round(1000000 * Number(ethers.utils.formatUnits(usdcCollMysoLoanPostPrice, 18).slice(0, 8))) / 1000000
+        )
+        console.log(ethers.utils.formatUnits(wethCollMysoLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(wstEthCollMysoLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(rethCollMysoLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(cbethCollMysoLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(rplCollMysoLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(methCollMysoLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(usdcCollMysoLoanPostPrice, 18))
       }
     })
   })

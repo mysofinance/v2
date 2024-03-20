@@ -6,6 +6,7 @@ import {ChainlinkBase} from "../chainlink/ChainlinkBase.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IWSTETH} from "../../interfaces/oracles/IWSTETH.sol";
+import {IMETH} from "../../interfaces/oracles/IMETH.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -24,11 +25,17 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
     address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // weth
     address internal constant WSTETH =
         0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0; //wsteth
+    address internal constant METH = 0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa; //meth
+    address internal constant RPL = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f; //rpl
+    address internal constant METH_STAKING_CONTRACT =
+        0xe3cBd06D7dadB3F4e6557bAb7EdD924CD1489E8f; //meth staking contract
     uint256 internal constant MYSO_IOO_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
     address internal constant ETH_USD_CHAINLINK =
         0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419; //eth usd chainlink
     address internal constant STETH_ETH_CHAINLINK =
         0x86392dC19c0b719886221c78AB11eb8Cf5c52812; //steth eth chainlink
+    address internal constant RPL_USD_CHAINLINK =
+        0x4E155eD98aFE9034b7A5962f6C84c86d869daA9d; //rpl usd chainlink
 
     uint256 internal constant MYSO_PRICE_TIME_LOCK = 1 hours;
 
@@ -143,6 +150,10 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
             tokenPriceRaw = 1e18;
         } else if (token == WSTETH) {
             tokenPriceRaw = _getWstEthPrice();
+        } else if (token == METH) {
+            tokenPriceRaw = IMETH(METH_STAKING_CONTRACT).mETHToETH(1e18);
+        } else if (token == RPL) {
+            tokenPriceRaw = _getRPLPriceInEth();
         } else {
             tokenPriceRaw = super._getPriceOfToken(token);
         }
@@ -172,5 +183,15 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
             ETH_USD_CHAINLINK
         );
         mysoPriceInEth = Math.mulDiv(mysoPriceInUsd, 1e18, ethPriceInUsd);
+    }
+
+    function _getRPLPriceInEth() internal view returns (uint256 rplPriceRaw) {
+        uint256 rplPriceInUSD = _checkAndReturnLatestRoundData(
+            (RPL_USD_CHAINLINK)
+        );
+        uint256 ethPriceInUsd = _checkAndReturnLatestRoundData(
+            ETH_USD_CHAINLINK
+        );
+        rplPriceRaw = Math.mulDiv(rplPriceInUSD, 1e18, ethPriceInUsd);
     }
 }
