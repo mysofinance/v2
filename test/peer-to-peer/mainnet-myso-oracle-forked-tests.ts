@@ -173,14 +173,24 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       const meth = '0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa'
       const rpl = '0xD33526068D116cE69F19A9ee46F0bd304F21A51f'
       const usdc = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+      const dai = '0x6B175474E89094C44Da98b954EedeAC495271d0F'
+      const usdt = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
       const usdcToEthChainlinkAddr = '0x986b5E1e1755e3C2440e960477f25201B0a8bbD4'
+      const daiToEthChainlinkAddr = '0x773616E4d11A78F511299002da57A0a94577F1f4'
+      const usdtToEthChainlinkAddr = '0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46'
 
       // deploy myso oracle
       const MysoOracle = await ethers.getContractFactory('MysoOracle')
 
       const mysoOracle = await MysoOracle.connect(team).deploy(
-        [reth, cbeth, usdc],
-        [rethToEthChainlinkAddr, cbethToEthChainlinkAddr, usdcToEthChainlinkAddr],
+        [reth, cbeth, usdc, dai, usdt],
+        [
+          rethToEthChainlinkAddr,
+          cbethToEthChainlinkAddr,
+          usdcToEthChainlinkAddr,
+          daiToEthChainlinkAddr,
+          usdtToEthChainlinkAddr
+        ],
         50000000
       )
       await mysoOracle.deployed()
@@ -200,8 +210,16 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       const rethCollMysoLoanPrice = await mysoOracle.getPrice(reth, myso)
       const cbethCollMysoLoanPrice = await mysoOracle.getPrice(cbeth, myso)
       const usdcCollMysoLoanPrice = await mysoOracle.getPrice(usdc, myso)
+      const usdtCollMysoLoanPrice = await mysoOracle.getPrice(usdt, myso)
+      const daiCollMysoLoanPrice = await mysoOracle.getPrice(dai, myso)
       const rplCollMysoLoanPrice = await mysoOracle.getPrice(rpl, myso)
       const methCollMysoLoanPrice = await mysoOracle.getPrice(meth, myso)
+
+      const mysoCollWethLoanPrice = await mysoOracle.getPrice(myso, weth.address)
+      const mysoCollWstEthLoanPrice = await mysoOracle.getPrice(myso, wsteth.address)
+      const mysoCollUsdcLoanPrice = await mysoOracle.getPrice(myso, usdc)
+      const mysoCollUsdtLoanPrice = await mysoOracle.getPrice(myso, usdt)
+      const mysoCollDaiLoanPrice = await mysoOracle.getPrice(myso, dai)
 
       //toggle to show logs
       const showLogs = true
@@ -241,6 +259,13 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
         console.log(ethers.utils.formatUnits(rplCollMysoLoanPrice, 18))
         console.log(ethers.utils.formatUnits(methCollMysoLoanPrice, 18))
         console.log(ethers.utils.formatUnits(usdcCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(usdtCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(daiCollMysoLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(mysoCollWethLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(mysoCollWstEthLoanPrice, 18))
+        console.log(ethers.utils.formatUnits(mysoCollUsdcLoanPrice, 6))
+        console.log(ethers.utils.formatUnits(mysoCollUsdtLoanPrice, 6))
+        console.log(ethers.utils.formatUnits(mysoCollDaiLoanPrice, 18))
       }
 
       await mysoOracle.connect(team).setMysoPrice(100000000)
@@ -266,6 +291,11 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       const rplCollMysoLoanPostPrice = await mysoOracle.getPrice(rpl, myso)
       const methCollMysoLoanPostPrice = await mysoOracle.getPrice(meth, myso)
       const usdcCollMysoLoanPostPrice = await mysoOracle.getPrice(usdc, myso)
+      const mysoCollWethLoanPostPrice = await mysoOracle.getPrice(myso, weth.address)
+      const mysoCollWstEthLoanPostPrice = await mysoOracle.getPrice(myso, wsteth.address)
+      const mysoCollUsdcLoanPostPrice = await mysoOracle.getPrice(myso, usdc)
+      const mysoCollUsdtLoanPostPrice = await mysoOracle.getPrice(myso, usdt)
+      const mysoCollDaiLoanPostPrice = await mysoOracle.getPrice(myso, dai)
 
       if (showLogs) {
         console.log(
@@ -303,6 +333,11 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
         console.log(ethers.utils.formatUnits(rplCollMysoLoanPostPrice, 18))
         console.log(ethers.utils.formatUnits(methCollMysoLoanPostPrice, 18))
         console.log(ethers.utils.formatUnits(usdcCollMysoLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(mysoCollWethLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(mysoCollWstEthLoanPostPrice, 18))
+        console.log(ethers.utils.formatUnits(mysoCollUsdcLoanPostPrice, 6))
+        console.log(ethers.utils.formatUnits(mysoCollUsdtLoanPostPrice, 6))
+        console.log(ethers.utils.formatUnits(mysoCollDaiLoanPostPrice, 18))
       }
     })
   })
