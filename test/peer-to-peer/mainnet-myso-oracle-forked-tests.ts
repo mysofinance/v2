@@ -182,7 +182,7 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       // deploy myso oracle
       const MysoOracle = await ethers.getContractFactory('MysoOracle')
 
-      const mysoOracle = await MysoOracle.connect(team).deploy(
+      const mysoOracle = await MysoOracle.connect(lender).deploy(
         [reth, cbeth, usdc, dai, usdt],
         [
           rethToEthChainlinkAddr,
@@ -191,7 +191,8 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
           daiToEthChainlinkAddr,
           usdtToEthChainlinkAddr
         ],
-        50000000
+        50000000,
+        team.address
       )
       await mysoOracle.deployed()
 
@@ -200,6 +201,10 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       expect(mysoPriceData.prePrice).to.equal(50000000)
       expect(mysoPriceData.postPrice).to.equal(50000000)
       const timestampAtDeployment = mysoPriceData.switchTime
+
+      const mysoOracleOwner = await mysoOracle.owner()
+
+      expect(mysoOracleOwner).to.equal(team.address)
 
       await expect(mysoOracle.connect(lender).setMysoPrice(80000000)).to.be.revertedWith('Ownable: caller is not the owner')
 
@@ -272,7 +277,7 @@ describe('Peer-to-Peer: Myso Recent Forked Mainnet Tests', function () {
       const newMysoPriceData = await mysoOracle.mysoPrice()
       expect(newMysoPriceData.prePrice).to.equal(50000000)
       expect(newMysoPriceData.postPrice).to.equal(100000000)
-      expect(newMysoPriceData.switchTime).to.be.gte(ethers.BigNumber.from(timestampAtDeployment).add(ONE_HOUR))
+      expect(newMysoPriceData.switchTime).to.be.gte(ethers.BigNumber.from(timestampAtDeployment).add(ONE_HOUR.div(12)))
       const newWethCollMysoLoanPrice = await mysoOracle.getPrice(weth.address, myso)
       expect(newWethCollMysoLoanPrice).to.equal(wethCollMysoLoanPrice)
       await ethers.provider.send('evm_mine', [ethers.BigNumber.from(newMysoPriceData.switchTime).add(10).toNumber()])

@@ -4,7 +4,6 @@ pragma solidity 0.8.19;
 
 import {ChainlinkBase} from "../chainlink/ChainlinkBase.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IWSTETH} from "../../interfaces/oracles/IWSTETH.sol";
 import {IMETH} from "../../interfaces/oracles/IMETH.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -13,7 +12,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 /**
  * @dev supports oracles which are compatible with v2v3 or v3 interfaces
  */
-contract MysoOracle is ChainlinkBase, Ownable2Step {
+contract MysoOracle is ChainlinkBase, Ownable {
     struct MysoPrice {
         uint112 prePrice;
         uint112 postPrice;
@@ -22,24 +21,25 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
 
     // solhint-disable var-name-mixedcase
     address internal constant MYSO = 0x00000000000000000000000000000000DeaDBeef; // TODO: put in real myso address
-    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // weth
+    address internal constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address internal constant WSTETH =
-        0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0; //wsteth
-    address internal constant METH = 0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa; //meth
-    address internal constant RPL = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f; //rpl
+        0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+    address internal constant METH = 0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa;
+    address internal constant RPL = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f;
     address internal constant METH_STAKING_CONTRACT =
-        0xe3cBd06D7dadB3F4e6557bAb7EdD924CD1489E8f; //meth staking contract
+        0xe3cBd06D7dadB3F4e6557bAb7EdD924CD1489E8f;
     uint256 internal constant MYSO_IOO_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
     address internal constant ETH_USD_CHAINLINK =
-        0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419; //eth usd chainlink
+        0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     address internal constant STETH_ETH_CHAINLINK =
-        0x86392dC19c0b719886221c78AB11eb8Cf5c52812; //steth eth chainlink
+        0x86392dC19c0b719886221c78AB11eb8Cf5c52812;
     address internal constant RPL_USD_CHAINLINK =
-        0x4E155eD98aFE9034b7A5962f6C84c86d869daA9d; //rpl usd chainlink
+        0x4E155eD98aFE9034b7A5962f6C84c86d869daA9d;
 
-    uint256 internal constant MYSO_PRICE_TIME_LOCK = 1 hours;
+    uint256 internal constant MYSO_PRICE_TIME_LOCK = 5 minutes;
 
     MysoPrice public mysoPrice;
+    //address public owner;
 
     event MysoPriceUpdated(
         uint112 prePrice,
@@ -58,14 +58,18 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
-        uint112 _mysoUsdPrice
-    ) ChainlinkBase(_tokenAddrs, _oracleAddrs, MYSO_IOO_BASE_CURRENCY_UNIT) {
+        uint112 _mysoUsdPrice,
+        address _owner
+    )
+        ChainlinkBase(_tokenAddrs, _oracleAddrs, MYSO_IOO_BASE_CURRENCY_UNIT)
+        Ownable()
+    {
         mysoPrice = MysoPrice(
             _mysoUsdPrice,
             _mysoUsdPrice,
             uint32(block.timestamp)
         );
-        _transferOwnership(msg.sender);
+        _transferOwnership(_owner);
     }
 
     /**
@@ -77,33 +81,15 @@ contract MysoOracle is ChainlinkBase, Ownable2Step {
     function setMysoPrice(uint112 _newMysoUsdPrice) external onlyOwner {
         MysoPrice memory currMysoPrice = mysoPrice;
         uint32 newTimeStamp = uint32(block.timestamp + MYSO_PRICE_TIME_LOCK);
-        if (block.timestamp < currMysoPrice.switchTime) {
-            // if the switchTime has not yet passed, update only postPrice with new price,
-            // leave prePrice the same and update switchTime
-            mysoPrice = MysoPrice(
-                currMysoPrice.prePrice,
-                _newMysoUsdPrice,
-                newTimeStamp
-            );
-            emit MysoPriceUpdated(
-                currMysoPrice.prePrice,
-                _newMysoUsdPrice,
-                newTimeStamp
-            );
-        } else {
-            // if the switchTime has passed (or exactly equal), update the prePrice with postPrice,
-            // update the postPrice with new price, and update switchTime
-            mysoPrice = MysoPrice(
-                mysoPrice.postPrice,
-                _newMysoUsdPrice,
-                uint32(block.timestamp + MYSO_PRICE_TIME_LOCK)
-            );
-            emit MysoPriceUpdated(
-                currMysoPrice.postPrice,
-                _newMysoUsdPrice,
-                newTimeStamp
-            );
-        }
+        // if the switchTime has not yet passed, update only postPrice with new price,
+        // leave prePrice the same and update switchTime
+        // else if the switchTime has passed (or exactly equal), update the prePrice with postPrice,
+        // update the postPrice with new price, and update switchTime
+        uint112 prePrice = block.timestamp < currMysoPrice.switchTime
+            ? currMysoPrice.prePrice
+            : mysoPrice.postPrice;
+        mysoPrice = MysoPrice(prePrice, _newMysoUsdPrice, newTimeStamp);
+        emit MysoPriceUpdated(prePrice, _newMysoUsdPrice, newTimeStamp);
     }
 
     function getPrice(
