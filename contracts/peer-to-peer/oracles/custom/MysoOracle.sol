@@ -39,7 +39,6 @@ contract MysoOracle is ChainlinkBase, Ownable {
     uint256 internal constant MYSO_PRICE_TIME_LOCK = 5 minutes;
 
     MysoPrice public mysoPrice;
-    //address public owner;
 
     event MysoPriceUpdated(
         uint112 prePrice,
