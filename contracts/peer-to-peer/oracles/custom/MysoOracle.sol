@@ -5,6 +5,7 @@ pragma solidity 0.8.19;
 import {ChainlinkBase} from "../chainlink/ChainlinkBase.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IWSTETH} from "../../interfaces/oracles/IWSTETH.sol";
+import {IANKRETH} from "../../interfaces/oracles/IANKRETH.sol";
 import {IMETH} from "../../interfaces/oracles/IMETH.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -26,6 +27,8 @@ contract MysoOracle is ChainlinkBase, Ownable {
         0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
     address internal constant METH = 0xd5F7838F5C461fefF7FE49ea5ebaF7728bB0ADfa;
     address internal constant RPL = 0xD33526068D116cE69F19A9ee46F0bd304F21A51f;
+    address internal constant ANKRETH =
+        0xE95A203B1a91a908F9B9CE46459d101078c2c3cb;
     address internal constant METH_STAKING_CONTRACT =
         0xe3cBd06D7dadB3F4e6557bAb7EdD924CD1489E8f;
     uint256 internal constant MYSO_IOO_BASE_CURRENCY_UNIT = 1e18; // 18 decimals for ETH based oracles
@@ -139,6 +142,8 @@ contract MysoOracle is ChainlinkBase, Ownable {
             tokenPriceRaw = IMETH(METH_STAKING_CONTRACT).mETHToETH(1e18);
         } else if (token == RPL) {
             tokenPriceRaw = _getRPLPriceInEth();
+        } else if (token == ANKRETH) {
+            tokenPriceRaw = IANKRETH(ANKRETH).sharesToBonds(1e18);
         } else {
             tokenPriceRaw = super._getPriceOfToken(token);
         }
